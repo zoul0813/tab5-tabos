@@ -150,6 +150,8 @@ TabOS API
 
 Programs should not require the complete TabOS firmware to be rebuilt and reflashed.
 
+Current first-stage implementation provides format-neutral `tabos_app_descriptor_t`, fixed built-in registry, and cooperative single-foreground lifecycle. Lifecycle manager grants console capability, invokes entry/update/cleanup callbacks, records exit status, and returns to idle runtime. This validates application/kernel ownership boundaries for statically linked host and Tab5 applications without settling ELF layout, task mapping, syscall ABI, isolation, or executable memory placement.
+
 The exact mapping between a TabOS process and FreeRTOS tasks remains an implementation detail.
 
 Possible models include:

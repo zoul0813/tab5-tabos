@@ -8,6 +8,7 @@ This directory contains user and contributor documentation for TabOS.
 - [Display System](display.md): logical framebuffer contract, host presentation, and Tab5 display behavior.
 - [Keyboard Input](input.md): public events, SDL3 translation, and Tab5 Keyboard protocol.
 - [Console Service](console.md): foreground ownership, terminal controls, input, and diagnostic app.
+- [Application Lifecycle](applications.md): descriptors, built-in registry, foreground execution, and current limits.
 - [Time and Timers](time.md): monotonic clock and reusable polling timers.
 
 ## Documentation Policy

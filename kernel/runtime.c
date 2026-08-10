@@ -1,6 +1,8 @@
 #include <tabos/internal/runtime.h>
 
+#include <tabos/internal/application.h>
 #include <tabos/internal/boot_report.h>
+#include <tabos/internal/builtin_apps.h>
 #include <tabos/internal/console.h>
 #include <tabos/internal/display.h>
 #include <tabos/internal/input.h>
@@ -13,10 +15,6 @@
 #include <tabos/config/identity.h>
 #include <tabos/config/display.h>
 #include <tabos/config/console.h>
-
-#if TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP
-#include <tabos/internal/console_diagnostic.h>
-#endif
 
 #include <inttypes.h>
 #include <stdio.h>
@@ -168,16 +166,24 @@ bool tabos_runtime_start(void)
     }
 
     tab_console_init(&terminal);
+    tab_app_system_init();
+    if (!tab_builtin_apps_register()) {
+        tab_app_system_shutdown();
+        tab_console_shutdown();
+        tab_terminal_shutdown(&terminal);
+        tab_display_shutdown();
+        return false;
+    }
     runtime_started = true;
-#if TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP
-    if (!tab_console_diagnostic_start()) {
+    const char *startup_app = tab_builtin_startup_app();
+    if (startup_app != NULL && tabos_app_launch(startup_app) != TABOS_APP_RESULT_OK) {
+        tab_app_system_shutdown();
         tab_console_shutdown();
         tab_terminal_shutdown(&terminal);
         runtime_started = false;
         tab_display_shutdown();
         return false;
     }
-#endif
     return true;
 }
 
@@ -187,17 +193,13 @@ void tabos_runtime_update(void)
         return;
     }
     tab_console_update();
-#if TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP
-    tab_console_diagnostic_update();
-#endif
+    tab_app_system_update();
 }
 
 void tabos_runtime_shutdown(void)
 {
     if (runtime_started) {
-#if TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP
-        tab_console_diagnostic_stop();
-#endif
+        tab_app_system_shutdown();
         tab_console_shutdown();
         tab_terminal_shutdown(&terminal);
         tab_display_shutdown();

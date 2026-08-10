@@ -8,7 +8,7 @@ This document describes the current TabOS repository layout. It is authoritative
 tabos/
 ├── .github/workflows/   GitHub Actions builds, tests, and artifacts
 ├── agents/              Context and implementation guidance for coding agents
-├── apps/                Bundled TabOS applications, including the future shell
+├── apps/                Built-in registry and bundled applications, including future shell
 ├── audio/               Portable audio subsystem
 ├── cmake/               Shared host-build CMake modules
 ├── config/              Common identity, display, input, and console build settings
@@ -17,7 +17,7 @@ tabos/
 ├── fs/                  Portable filesystem subsystem
 ├── graphics/            Portable framebuffer and graphics subsystem
 ├── input/               Portable input-event subsystem
-├── kernel/              Portable runtime and system-service core
+├── kernel/              Portable runtime, application lifecycle, registry, and service core
 ├── loader/              Future application loader
 ├── net/                 Portable networking subsystem
 ├── platform/            Environment-specific service implementations

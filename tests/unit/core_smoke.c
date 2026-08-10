@@ -1,5 +1,10 @@
 #include <tabos/internal/runtime.h>
+#include <tabos/internal/input.h>
+
+#include <tabos/application.h>
 #include <tabos/terminal.h>
+
+#include <tabos/config/console.h>
 
 #include <string.h>
 
@@ -25,6 +30,31 @@ int main(void)
     if (!tabos_runtime_start()) {
         return 1;
     }
+
+#if TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP
+    const tabos_app_descriptor_t *active = tabos_app_active();
+    if (active == NULL || strcmp(active->name, "console-test") != 0) {
+        return 1;
+    }
+    const tabos_input_event_t exit_event = {
+        .type = TABOS_INPUT_KEY_DOWN,
+        .key = TABOS_KEY_Q,
+        .modifiers = TABOS_MODIFIER_CONTROL,
+    };
+    if (!tab_input_submit(&exit_event)) {
+        return 1;
+    }
+    tabos_runtime_update();
+    int exit_status = -1;
+    if (tabos_app_is_running() || !tabos_app_last_exit_status(&exit_status) ||
+        exit_status != 0) {
+        return 1;
+    }
+#else
+    if (tabos_app_count() != 0U || tabos_app_is_running()) {
+        return 1;
+    }
+#endif
 
     if (!tabos_terminal_set_scale(4U) || tabos_terminal_get_scale() != 4U) {
         return 1;

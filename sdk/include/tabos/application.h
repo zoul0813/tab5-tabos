@@ -1,0 +1,61 @@
+#ifndef TABOS_APPLICATION_H
+#define TABOS_APPLICATION_H
+
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
+#include <tabos/console.h>
+
+#define TABOS_APPLICATION_ABI_VERSION 1U
+
+typedef uint32_t tabos_app_capabilities_t;
+
+enum {
+    TABOS_APP_CAPABILITY_NONE = 0U,
+    TABOS_APP_CAPABILITY_CONSOLE = 1U << 0,
+};
+
+typedef struct tabos_app_context tabos_app_context_t;
+
+typedef bool (*tabos_app_entry_fn)(tabos_app_context_t *context);
+typedef void (*tabos_app_update_fn)(tabos_app_context_t *context);
+typedef void (*tabos_app_cleanup_fn)(tabos_app_context_t *context, int exit_status);
+
+typedef struct {
+    uint32_t abi_version;
+    const char *name;
+    const char *version;
+    tabos_app_capabilities_t capabilities;
+    tabos_app_entry_fn entry;
+    tabos_app_update_fn update;
+    tabos_app_cleanup_fn cleanup;
+} tabos_app_descriptor_t;
+
+typedef enum {
+    TABOS_APP_RESULT_OK = 0,
+    TABOS_APP_RESULT_NOT_FOUND,
+    TABOS_APP_RESULT_BUSY,
+    TABOS_APP_RESULT_INVALID,
+    TABOS_APP_RESULT_START_FAILED,
+} tabos_app_result_t;
+
+/* Inspect applications registered with the running system. */
+size_t tabos_app_count(void);
+const tabos_app_descriptor_t *tabos_app_at(size_t index);
+const tabos_app_descriptor_t *tabos_app_find(const char *name);
+
+/* Launch one registered foreground application. */
+tabos_app_result_t tabos_app_launch(const char *name);
+bool tabos_app_is_running(void);
+const tabos_app_descriptor_t *tabos_app_active(void);
+/* Request clean exit. Cleanup occurs when control returns to lifecycle manager. */
+void tabos_app_request_exit(tabos_app_context_t *context, int exit_status);
+
+/* Access services granted from descriptor capabilities. */
+const tabos_console_session_t *tabos_app_console(const tabos_app_context_t *context);
+
+/* Read most recently completed application's status. */
+bool tabos_app_last_exit_status(int *exit_status);
+
+#endif

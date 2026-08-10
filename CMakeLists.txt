@@ -61,6 +61,7 @@ add_library(tabos_core STATIC ${TABOS_CORE_SOURCES})
 target_include_directories(tabos_core
     PUBLIC "${TABOS_ROOT}/sdk/include"
     PRIVATE
+        "${TABOS_ROOT}/apps/include"
         "${TABOS_ROOT}/apps/console_diagnostic/include"
         "${TABOS_ROOT}/console/include"
         "${TABOS_ROOT}/graphics/include"

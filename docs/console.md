@@ -53,9 +53,9 @@ Changing terminal scale rebuilds geometry, reflows retained hard and soft-wrappe
 
 ## Diagnostic Application
 
-Set `TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP=ON` when configuring a build to start a small interactive test application after boot. Option defaults to `OFF`.
+Set `TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP=ON` when configuring a build to register and start small interactive `console-test` application after boot. Option defaults to `OFF`.
 
-Diagnostic application displays a prompt, echoes text through public console API, handles Enter, Tab, and repeating Backspace, protects prompt from deletion, clears screen with Ctrl+L, and navigates history with full-keyboard navigation keys or Tab5 Ctrl+Arrow shortcuts. SDL host backend synthesizes normalized text for Enter, Tab, and repeated keys when desktop text input does not provide it. It contains no command parser and is not shell.
+Diagnostic application displays a prompt, echoes text through public console API, handles Enter, Tab, and repeating Backspace, protects prompt from deletion, clears screen with Ctrl+L, navigates history with full-keyboard navigation keys or Tab5 Ctrl+Arrow shortcuts, and exits cleanly with Ctrl+Q. Application lifecycle manager owns its foreground console session. SDL host backend synthesizes normalized text for Enter, Tab, and repeated keys when desktop text input does not provide it. It contains no command parser and is not shell.
 
 Host example:
 

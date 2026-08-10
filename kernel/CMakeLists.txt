@@ -4,6 +4,7 @@ include("${TABOS_ROOT}/cmake/TabOSSources.cmake")
 idf_component_register(
     SRCS ${TABOS_CORE_SOURCES}
     INCLUDE_DIRS
+        "${TABOS_ROOT}/apps/include"
         "${TABOS_ROOT}/console/include"
         "${TABOS_ROOT}/graphics/include"
         "${TABOS_ROOT}/input/include"

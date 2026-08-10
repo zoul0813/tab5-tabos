@@ -407,6 +407,8 @@ Current keyboard coverage includes host tests for HID-to-text translation, key/t
 
 Console tests cover exclusive foreground acquisition, background and stale-session rejection, rejected-read non-consumption, cursor pixels and blink phase, clearing, history ring overflow, Page Up/Down/Home/End navigation, automatic return to live output, and scale reflow with retained cells. Timer tests cover one-shot, repeating, late-poll skipping, and cancellation behavior with fake monotonic time. Tab5 manual validation uses Ctrl+Up/Down for Page Up/Down and Ctrl+Left/Right for Home/End because physical keyboard omits dedicated keys. `TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP=ON` provides manual cross-target keyboard-to-framebuffer validation and defaults off. Diagnostic application is not shell.
 
+Application lifecycle tests cover descriptor validation, duplicate rejection, registry lookup, missing and busy launch results, manager-owned console exclusivity, entry/update/cleanup ordering, requested exit status, startup failure cleanup, console release, and registry shutdown. Runtime smoke test verifies configured `console-test` is launched through registry and Ctrl+Q returns cleanly to idle runtime. Same portable lifecycle code compiles into host and Tab5; host executes deterministic tests while Tab5 cross-build verifies target compatibility.
+
 Manual console validation must include prompt-boundary Backspace, held Backspace, held printable keys, Enter, and Tab followed by visible text. Host backend synthesizes missing Enter/Tab/repeat text while retaining SDL text input for normal layout and IME behavior; matching SDL text events are suppressed to prevent duplicates.
 
 Desktop mouse/pointer events should be mapped into the TabOS touch event model.

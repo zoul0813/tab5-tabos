@@ -4,7 +4,10 @@ endif()
 
 set(TABOS_CORE_SOURCES
     "${TABOS_ROOT}/kernel/runtime.c"
+    "${TABOS_ROOT}/kernel/application.c"
+    "${TABOS_ROOT}/kernel/application_registry.c"
     "${TABOS_ROOT}/kernel/boot_report.c"
+    "${TABOS_ROOT}/apps/builtin_apps.c"
     "${TABOS_ROOT}/graphics/display.c"
     "${TABOS_ROOT}/graphics/font.c"
     "${TABOS_ROOT}/graphics/terminal.c"
