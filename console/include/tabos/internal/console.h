@@ -6,5 +6,6 @@
 void tab_console_init(tab_terminal_t *terminal);
 void tab_console_rebind(tab_terminal_t *terminal);
 void tab_console_shutdown(void);
+void tab_console_update(void);
 
 #endif

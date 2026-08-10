@@ -2,6 +2,9 @@
 
 #include <tabos/internal/console.h>
 #include <tabos/internal/display.h>
+#include <tabos/time.h>
+
+#include <tabos/config/console.h>
 
 #include <stdatomic.h>
 
@@ -9,6 +12,20 @@ static tab_terminal_t *active_terminal;
 static uint32_t foreground_token;
 static uint32_t next_token = 1U;
 static atomic_flag console_lock = ATOMIC_FLAG_INIT;
+static tabos_timer_t cursor_timer;
+static bool cursor_phase_visible = true;
+
+static bool restart_cursor_blink(void)
+{
+    const bool changed = !cursor_phase_visible;
+    cursor_phase_visible = true;
+    if (active_terminal != NULL) {
+        tab_terminal_set_cursor_phase(active_terminal, true);
+    }
+    tabos_timer_start(&cursor_timer, TABOS_CURSOR_BLINK_INTERVAL_MS,
+                      TABOS_CURSOR_BLINK_INTERVAL_MS);
+    return changed;
+}
 
 static void lock_console(void)
 {
@@ -32,6 +49,8 @@ void tab_console_init(tab_terminal_t *terminal)
     active_terminal = terminal;
     foreground_token = 0U;
     next_token = 1U;
+    tabos_timer_cancel(&cursor_timer);
+    cursor_phase_visible = true;
     unlock_console();
 }
 
@@ -39,6 +58,9 @@ void tab_console_rebind(tab_terminal_t *terminal)
 {
     lock_console();
     active_terminal = terminal;
+    if (foreground_token != 0U) {
+        restart_cursor_blink();
+    }
     unlock_console();
 }
 
@@ -47,6 +69,7 @@ void tab_console_shutdown(void)
     lock_console();
     active_terminal = NULL;
     foreground_token = 0U;
+    tabos_timer_cancel(&cursor_timer);
     unlock_console();
 }
 
@@ -68,11 +91,13 @@ bool tabos_console_acquire(tabos_console_session_t *session)
     foreground_token = next_token++;
     session->token = foreground_token;
     tab_terminal_set_cursor_visible(active_terminal, true);
+    restart_cursor_blink();
     const bool presented = tab_display_present();
     if (!presented) {
         tab_terminal_set_cursor_visible(active_terminal, false);
         foreground_token = 0U;
         session->token = 0U;
+        tabos_timer_cancel(&cursor_timer);
     }
     unlock_console();
     return presented;
@@ -87,6 +112,7 @@ void tabos_console_release(tabos_console_session_t *session)
     lock_console();
     if (owns_console(session)) {
         tab_terminal_set_cursor_visible(active_terminal, false);
+        tabos_timer_cancel(&cursor_timer);
         (void)tab_display_present();
         foreground_token = 0U;
     }
@@ -114,6 +140,7 @@ bool tabos_console_write(const tabos_console_session_t *session, const char *tex
         return false;
     }
     tab_terminal_write(active_terminal, text);
+    restart_cursor_blink();
     const bool presented = tab_display_present();
     unlock_console();
     return presented;
@@ -131,6 +158,7 @@ bool tabos_console_write_line(const tabos_console_session_t *session, const char
         return false;
     }
     tab_terminal_write_line(active_terminal, text);
+    restart_cursor_blink();
     const bool presented = tab_display_present();
     unlock_console();
     return presented;
@@ -144,6 +172,7 @@ bool tabos_console_clear(const tabos_console_session_t *session)
         return false;
     }
     tab_terminal_clear(active_terminal);
+    restart_cursor_blink();
     const bool presented = tab_display_present();
     unlock_console();
     return presented;
@@ -246,6 +275,11 @@ bool tabos_console_poll(const tabos_console_session_t *session, tabos_input_even
         return false;
     }
     const bool received = tabos_input_poll(event);
+    if (received) {
+        if (restart_cursor_blink()) {
+            (void)tab_display_present();
+        }
+    }
     unlock_console();
     return received;
 }
@@ -262,10 +296,25 @@ bool tabos_console_wait(const tabos_console_session_t *session, tabos_input_even
             return false;
         }
         if (tabos_input_poll(event)) {
+            if (restart_cursor_blink()) {
+                (void)tab_display_present();
+            }
             unlock_console();
             return true;
         }
         unlock_console();
         tab_platform_input_wait();
     }
+}
+
+void tab_console_update(void)
+{
+    lock_console();
+    if (active_terminal != NULL && foreground_token != 0U &&
+        tabos_timer_poll(&cursor_timer)) {
+        cursor_phase_visible = !cursor_phase_visible;
+        tab_terminal_set_cursor_phase(active_terminal, cursor_phase_visible);
+        (void)tab_display_present();
+    }
+    unlock_console();
 }

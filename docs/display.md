@@ -69,4 +69,4 @@ After flashing, verify that the boot report is readable, starts at the physical 
 
 ## Current Limits
 
-Static content is not continuously rerendered: Tab5 LCD hardware refreshes from its scanout framebuffer while platform run loop sleeps. Console changes redraw full visible terminal and present full framebuffer; damage tracking is not implemented. Display has no compositor, widgets, touch input, or general application graphics API. Shell will be built as application using console and input services, not embedded in kernel.
+Static content is not continuously rerendered: Tab5 LCD hardware refreshes from its scanout framebuffer while platform run loop sleeps. Terminal tracks dirty cells, so text and cursor changes avoid rerendering unchanged cells; viewport shifts, clear, and scale changes redraw full view. Current platform presentation contract still submits framebuffer after changes. Display has no compositor, widgets, touch input, or general application graphics API. Shell will be built as application using console and input services, not embedded in kernel.

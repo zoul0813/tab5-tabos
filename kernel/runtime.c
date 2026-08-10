@@ -186,6 +186,7 @@ void tabos_runtime_update(void)
     if (!runtime_started) {
         return;
     }
+    tab_console_update();
 #if TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP
     tab_console_diagnostic_update();
 #endif

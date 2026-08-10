@@ -17,6 +17,7 @@
 #include <esp_lcd_touch_st7123.h>
 #include <esp_ldo_regulator.h>
 #include <esp_log.h>
+#include <esp_timer.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <sdkconfig.h>
@@ -446,6 +447,11 @@ void tab_platform_log(const char *message)
     if (message != NULL) {
         ESP_LOGI(TABOS_SYSTEM_LOG_TAG, "%s", message);
     }
+}
+
+uint64_t tab_platform_time_ms(void)
+{
+    return (uint64_t)esp_timer_get_time() / 1000U;
 }
 
 void tab_platform_input_wait(void)

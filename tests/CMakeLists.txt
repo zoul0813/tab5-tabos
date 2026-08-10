@@ -41,12 +41,25 @@ target_include_directories(tabos_console_service PRIVATE
     "${TABOS_ROOT}/input/include"
     "${TABOS_ROOT}/platform/include"
     "${TABOS_ROOT}/sdk/include"
+    "${CMAKE_CURRENT_LIST_DIR}/fakes"
 )
 target_link_libraries(tabos_console_service PRIVATE tabos_core)
 tabos_enable_warnings(tabos_console_service)
 tabos_enable_sanitizers(tabos_console_service)
 
 add_test(NAME unit.console_service COMMAND tabos_console_service)
+
+add_executable(tabos_timer unit/timer.c fakes/platform_display.c)
+target_include_directories(tabos_timer PRIVATE
+    "${TABOS_ROOT}/platform/include"
+    "${TABOS_ROOT}/sdk/include"
+    "${CMAKE_CURRENT_LIST_DIR}/fakes"
+)
+target_link_libraries(tabos_timer PRIVATE tabos_core)
+tabos_enable_warnings(tabos_timer)
+tabos_enable_sanitizers(tabos_timer)
+
+add_test(NAME unit.timer COMMAND tabos_timer)
 
 add_test(NAME integration.host_smoke COMMAND tabos_host --smoke)
 set_tests_properties(integration.host_smoke PROPERTIES

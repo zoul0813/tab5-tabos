@@ -5,6 +5,8 @@
 #include <tabos/internal/input.h>
 #include <tabos/internal/terminal.h>
 
+#include "platform_test.h"
+
 #include <stdlib.h>
 
 int main(void)
@@ -30,6 +32,16 @@ int main(void)
     }
     if (!terminal.cursor_visible ||
         tab_display_framebuffer()->pixels[0] != 0xffff) {
+        return 1;
+    }
+    tab_test_platform_advance_time_ms(500U);
+    tab_console_update();
+    if (terminal.cursor_phase_visible) {
+        return 1;
+    }
+    tab_test_platform_advance_time_ms(500U);
+    tab_console_update();
+    if (!terminal.cursor_phase_visible) {
         return 1;
     }
 

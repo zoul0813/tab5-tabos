@@ -4,5 +4,6 @@
 #include <tabos/console.h>
 #include <tabos/input.h>
 #include <tabos/terminal.h>
+#include <tabos/time.h>
 
 #endif

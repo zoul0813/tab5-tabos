@@ -10,6 +10,7 @@ set(TABOS_CORE_SOURCES
     "${TABOS_ROOT}/graphics/terminal.c"
     "${TABOS_ROOT}/input/input.c"
     "${TABOS_ROOT}/console/console.c"
+    "${TABOS_ROOT}/time/time.c"
 )
 
 if(TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP)

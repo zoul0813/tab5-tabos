@@ -320,6 +320,11 @@ void tab_platform_log(const char *message)
     }
 }
 
+uint64_t tab_platform_time_ms(void)
+{
+    return SDL_GetTicks();
+}
+
 static void input_update(bool wait)
 {
     if (is_headless) {

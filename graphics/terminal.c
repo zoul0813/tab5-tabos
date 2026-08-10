@@ -49,8 +49,35 @@ static void update_cursor_row(tab_terminal_t *terminal)
 
 static void follow_live_output(tab_terminal_t *terminal)
 {
-    terminal->viewport_top = live_viewport_top(terminal);
+    const uint64_t viewport_top = live_viewport_top(terminal);
+    if (terminal->viewport_top != viewport_top) {
+        terminal->viewport_top = viewport_top;
+        terminal->full_redraw = true;
+    }
     update_cursor_row(terminal);
+}
+
+static void mark_cell(tab_terminal_t *terminal, uint64_t line, size_t column)
+{
+    if (column >= terminal->columns || line < terminal->viewport_top ||
+        line >= terminal->viewport_top + terminal->rows) {
+        return;
+    }
+    const size_t row = (size_t)(line - terminal->viewport_top);
+    terminal->dirty_cells[(row * terminal->columns) + column] = true;
+}
+
+static bool cursor_should_draw(const tab_terminal_t *terminal)
+{
+    return terminal->cursor_visible && terminal->cursor_phase_visible &&
+        terminal->viewport_top == live_viewport_top(terminal) &&
+        terminal->current_line >= terminal->viewport_top &&
+        terminal->current_line < terminal->viewport_top + terminal->rows;
+}
+
+static void mark_cursor(tab_terminal_t *terminal)
+{
+    mark_cell(terminal, terminal->current_line, terminal->column);
 }
 
 static void clear_line(tab_terminal_t *terminal, uint64_t line)
@@ -82,6 +109,7 @@ static void put_character(tab_terminal_t *terminal, char character)
         .foreground = terminal->foreground,
         .background = terminal->background,
     };
+    mark_cell(terminal, terminal->current_line, terminal->column);
     const size_t slot = line_slot(terminal, terminal->current_line);
     if (terminal->line_lengths[slot] < terminal->column + 1U) {
         terminal->line_lengths[slot] = terminal->column + 1U;
@@ -121,6 +149,7 @@ static void backspace(tab_terminal_t *terminal)
         --terminal->column;
         line_cells(terminal, terminal->current_line)[terminal->column] =
             (tab_terminal_cell_t){0};
+        mark_cell(terminal, terminal->current_line, terminal->column);
         trim_line(terminal, terminal->current_line);
     }
     follow_live_output(terminal);
@@ -155,9 +184,20 @@ static void draw_cell(tab_terminal_t *terminal, size_t column, size_t row,
     const tab_pixel_t background = cell->character == '\0'
         ? terminal->background
         : cell->background;
+    const tab_pixel_t rendered_background = cursor ? foreground : background;
+    const size_t width = cell_width(terminal);
+    const size_t height = cell_height(terminal);
+    const size_t origin_x = column * width;
+    const size_t origin_y = row * height;
+    for (size_t y = 0U; y < height; ++y) {
+        for (size_t x = 0U; x < width; ++x) {
+            terminal->framebuffer->pixels[
+                (origin_y + y) * terminal->framebuffer->stride_pixels + origin_x + x
+            ] = rendered_background;
+        }
+    }
     (void)tab_font_draw_char(terminal->framebuffer,
-                             (int)(column * cell_width(terminal)),
-                             (int)(row * cell_height(terminal)), character,
+                             (int)origin_x, (int)origin_y, character,
                              terminal->scale,
                              cursor ? background : foreground,
                              cursor ? foreground : background);
@@ -168,24 +208,45 @@ static void render(tab_terminal_t *terminal)
     if (terminal == NULL || terminal->framebuffer == NULL || terminal->cells == NULL) {
         return;
     }
-    clear_framebuffer(terminal);
-    for (size_t row = 0U; row < terminal->rows; ++row) {
-        const uint64_t line = terminal->viewport_top + row;
-        if (line < terminal->first_line || line > terminal->current_line) {
-            continue;
+    if (terminal->full_redraw) {
+        clear_framebuffer(terminal);
+        for (size_t row = 0U; row < terminal->rows; ++row) {
+            const uint64_t line = terminal->viewport_top + row;
+            if (line < terminal->first_line || line > terminal->current_line) {
+                continue;
+            }
+            const tab_terminal_cell_t *cells = const_line_cells(terminal, line);
+            const size_t length = terminal->line_lengths[line_slot(terminal, line)];
+            for (size_t column = 0U; column < length; ++column) {
+                draw_cell(terminal, column, row, &cells[column], false);
+            }
         }
-        const tab_terminal_cell_t *cells = const_line_cells(terminal, line);
-        const size_t length = terminal->line_lengths[line_slot(terminal, line)];
-        for (size_t column = 0U; column < length; ++column) {
-            draw_cell(terminal, column, row, &cells[column], false);
+        memset(terminal->dirty_cells, 0,
+               terminal->rows * terminal->columns * sizeof(*terminal->dirty_cells));
+        terminal->full_redraw = false;
+    } else {
+        for (size_t row = 0U; row < terminal->rows; ++row) {
+            const uint64_t line = terminal->viewport_top + row;
+            const tab_terminal_cell_t *cells = line <= terminal->current_line
+                ? const_line_cells(terminal, line)
+                : NULL;
+            for (size_t column = 0U; column < terminal->columns; ++column) {
+                const size_t dirty_index = (row * terminal->columns) + column;
+                if (!terminal->dirty_cells[dirty_index]) {
+                    continue;
+                }
+                const tab_terminal_cell_t empty = {0};
+                draw_cell(terminal, column, row,
+                          cells == NULL ? &empty : &cells[column], false);
+                terminal->dirty_cells[dirty_index] = false;
+            }
         }
     }
 
-    if (terminal->cursor_visible && terminal->current_line >= terminal->viewport_top &&
-        terminal->current_line < terminal->viewport_top + terminal->rows) {
-        const size_t row = (size_t)(terminal->current_line - terminal->viewport_top);
+    if (cursor_should_draw(terminal)) {
+        const size_t cursor_row = (size_t)(terminal->current_line - terminal->viewport_top);
         const tab_terminal_cell_t *cells = const_line_cells(terminal, terminal->current_line);
-        draw_cell(terminal, terminal->column, row, &cells[terminal->column], true);
+        draw_cell(terminal, terminal->column, cursor_row, &cells[terminal->column], true);
     }
 }
 
@@ -210,10 +271,12 @@ bool tab_terminal_init(tab_terminal_t *terminal, tab_framebuffer_t *framebuffer,
     tab_terminal_cell_t *cells = calloc(columns * line_capacity, sizeof(*cells));
     size_t *line_lengths = calloc(line_capacity, sizeof(*line_lengths));
     bool *hard_breaks = calloc(line_capacity, sizeof(*hard_breaks));
-    if (cells == NULL || line_lengths == NULL || hard_breaks == NULL) {
+    bool *dirty_cells = calloc(rows * columns, sizeof(*dirty_cells));
+    if (cells == NULL || line_lengths == NULL || hard_breaks == NULL || dirty_cells == NULL) {
         free(cells);
         free(line_lengths);
         free(hard_breaks);
+        free(dirty_cells);
         return false;
     }
 
@@ -227,7 +290,10 @@ bool tab_terminal_init(tab_terminal_t *terminal, tab_framebuffer_t *framebuffer,
         .cells = cells,
         .line_lengths = line_lengths,
         .hard_breaks = hard_breaks,
+        .dirty_cells = dirty_cells,
         .line_capacity = line_capacity,
+        .cursor_phase_visible = true,
+        .full_redraw = true,
     };
     render(terminal);
     return true;
@@ -241,6 +307,7 @@ void tab_terminal_shutdown(tab_terminal_t *terminal)
     free(terminal->cells);
     free(terminal->line_lengths);
     free(terminal->hard_breaks);
+    free(terminal->dirty_cells);
     *terminal = (tab_terminal_t){0};
 }
 
@@ -258,6 +325,7 @@ bool tab_terminal_resize(tab_terminal_t *terminal, tab_framebuffer_t *framebuffe
     resized.foreground = terminal->foreground;
     resized.background = terminal->background;
     resized.cursor_visible = terminal->cursor_visible;
+    resized.cursor_phase_visible = terminal->cursor_phase_visible;
 
     const uint64_t old_live_top = live_viewport_top(terminal);
     const uint64_t distance_from_end = old_live_top >= terminal->viewport_top
@@ -285,6 +353,7 @@ bool tab_terminal_resize(tab_terminal_t *terminal, tab_framebuffer_t *framebuffe
     resized.viewport_top = new_live_top -
         (distance_from_end < available ? distance_from_end : available);
     update_cursor_row(&resized);
+    resized.full_redraw = true;
     render(&resized);
 
     tab_terminal_shutdown(terminal);
@@ -308,6 +377,8 @@ void tab_terminal_clear(tab_terminal_t *terminal)
     terminal->first_line = 0U;
     terminal->current_line = 0U;
     terminal->viewport_top = 0U;
+    terminal->cursor_phase_visible = true;
+    terminal->full_redraw = true;
     render(terminal);
 }
 
@@ -325,6 +396,8 @@ void tab_terminal_write(tab_terminal_t *terminal, const char *text)
     if (terminal == NULL || terminal->cells == NULL || text == NULL) {
         return;
     }
+    mark_cursor(terminal);
+    terminal->cursor_phase_visible = true;
     while (*text != '\0') {
         if (*text == '\n') {
             append_line(terminal, true);
@@ -340,6 +413,7 @@ void tab_terminal_write(tab_terminal_t *terminal, const char *text)
         ++text;
     }
     follow_live_output(terminal);
+    mark_cursor(terminal);
     render(terminal);
 }
 
@@ -352,7 +426,22 @@ void tab_terminal_write_line(tab_terminal_t *terminal, const char *text)
 void tab_terminal_set_cursor_visible(tab_terminal_t *terminal, bool visible)
 {
     if (terminal != NULL && terminal->cursor_visible != visible) {
+        mark_cursor(terminal);
         terminal->cursor_visible = visible;
+        if (visible) {
+            terminal->cursor_phase_visible = true;
+        }
+        mark_cursor(terminal);
+        render(terminal);
+    }
+}
+
+void tab_terminal_set_cursor_phase(tab_terminal_t *terminal, bool visible)
+{
+    if (terminal != NULL && terminal->cursor_phase_visible != visible) {
+        mark_cursor(terminal);
+        terminal->cursor_phase_visible = visible;
+        mark_cursor(terminal);
         render(terminal);
     }
 }
@@ -370,7 +459,10 @@ bool tab_terminal_scroll_lines(tab_terminal_t *terminal, int lines)
     if ((uint64_t)desired > maximum) {
         desired = (int64_t)maximum;
     }
-    terminal->viewport_top = (uint64_t)desired;
+    if (terminal->viewport_top != (uint64_t)desired) {
+        terminal->viewport_top = (uint64_t)desired;
+        terminal->full_redraw = true;
+    }
     render(terminal);
     return true;
 }
@@ -400,7 +492,10 @@ bool tab_terminal_scroll_to_start(tab_terminal_t *terminal)
     if (terminal == NULL || terminal->cells == NULL) {
         return false;
     }
-    terminal->viewport_top = terminal->first_line;
+    if (terminal->viewport_top != terminal->first_line) {
+        terminal->viewport_top = terminal->first_line;
+        terminal->full_redraw = true;
+    }
     render(terminal);
     return true;
 }

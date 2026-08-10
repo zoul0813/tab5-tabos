@@ -3,6 +3,7 @@
 #include <stddef.h>
 
 static tab_pixel_t pixels[TABOS_DISPLAY_WIDTH * TABOS_DISPLAY_HEIGHT];
+static uint64_t monotonic_ms;
 
 bool tab_platform_display_init(tab_framebuffer_t *framebuffer)
 {
@@ -59,6 +60,21 @@ bool tab_platform_get_diagnostics(tab_platform_diagnostics_t *diagnostics)
 void tab_platform_log(const char *message)
 {
     (void)message;
+}
+
+uint64_t tab_platform_time_ms(void)
+{
+    return monotonic_ms;
+}
+
+void tab_test_platform_set_time_ms(uint64_t time_ms)
+{
+    monotonic_ms = time_ms;
+}
+
+void tab_test_platform_advance_time_ms(uint64_t elapsed_ms)
+{
+    monotonic_ms += elapsed_ms;
 }
 
 void tab_platform_input_wait(void)

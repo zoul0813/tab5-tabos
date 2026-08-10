@@ -476,6 +476,8 @@ Keyboard input now uses a public platform-neutral event queue with key-down, key
 
 The portable console service provides cooperative foreground ownership above this queue. One session at a time may consume console input and update framebuffer terminal. Terminal owns colored cell/history ring, live cursor, independent viewport, reflow metadata, and rendering into platform framebuffer. Session tokens reject background and stale callers but are not a security boundary. Future process manager must own foreground assignment policy. Optional console diagnostic application uses only public console API and remains outside kernel shell policy.
 
+Portable monotonic time and polling timers live behind platform clock source. Console uses repeating timer for cursor phase; service remains reusable for future runtime scheduling. Terminal tracks dirty visible cells for ordinary text/cursor changes and reserves full redraw for viewport, clear, or resize changes.
+
 ---
 
 ## 11. Graphics Architecture

@@ -41,6 +41,7 @@ tabos/
 │   ├── graphics/        Rendering and visual tests
 │   ├── integration/     Multi-subsystem integration tests
 │   └── unit/            Focused portable unit tests
+├── time/                Portable monotonic-clock and polling-timer service
 └── tools/               Project commands, including `tools/tabos`
 ```
 
