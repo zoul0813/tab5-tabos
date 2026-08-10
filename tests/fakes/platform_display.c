@@ -27,3 +27,34 @@ bool tab_platform_display_present(const tab_framebuffer_t *framebuffer)
 void tab_platform_display_shutdown(void)
 {
 }
+
+const char *tab_platform_name(void)
+{
+    return "test";
+}
+
+const char *tab_platform_display_name(void)
+{
+    return "test display";
+}
+
+bool tab_platform_get_diagnostics(tab_platform_diagnostics_t *diagnostics)
+{
+    if (diagnostics == NULL) {
+        return false;
+    }
+    *diagnostics = (tab_platform_diagnostics_t){
+        .device_name = "TEST DEVICE",
+        .cpu_cores = 2U,
+        .cpu_frequency_mhz = 100U,
+        .memory_total_bytes = 1024U,
+        .memory_free_bytes = 512U,
+        .memory_free_known = true,
+    };
+    return true;
+}
+
+void tab_platform_log(const char *message)
+{
+    (void)message;
+}

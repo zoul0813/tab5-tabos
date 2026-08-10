@@ -6,6 +6,7 @@
 #include <bsp/esp-bsp.h>
 #include <driver/i2c_master.h>
 #include <esp_cache.h>
+#include <esp_flash.h>
 #include <esp_heap_caps.h>
 #include <esp_lcd_mipi_dsi.h>
 #include <esp_lcd_panel_io.h>
@@ -17,6 +18,7 @@
 #include <esp_log.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <sdkconfig.h>
 
 #include <stddef.h>
 #include <stdlib.h>
@@ -224,6 +226,36 @@ const char *tab_platform_name(void)
 const char *tab_platform_display_name(void)
 {
     return detected_display_name;
+}
+
+bool tab_platform_get_diagnostics(tab_platform_diagnostics_t *diagnostics)
+{
+    if (diagnostics == NULL) {
+        return false;
+    }
+
+    uint32_t flash_capacity = 0U;
+    (void)esp_flash_get_size(NULL, &flash_capacity);
+    *diagnostics = (tab_platform_diagnostics_t){
+        .device_name = "ESP32-P4",
+        .cpu_cores = 2U,
+        .cpu_frequency_mhz = CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ,
+        .memory_total_bytes = heap_caps_get_total_size(MALLOC_CAP_INTERNAL),
+        .memory_free_bytes = heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+        .memory_free_known = true,
+        .external_memory_total_bytes = heap_caps_get_total_size(MALLOC_CAP_SPIRAM),
+        .external_memory_free_bytes = heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
+        .external_memory_present = true,
+        .flash_capacity_bytes = flash_capacity,
+    };
+    return true;
+}
+
+void tab_platform_log(const char *message)
+{
+    if (message != NULL) {
+        ESP_LOGI(TABOS_SYSTEM_LOG_TAG, "%s", message);
+    }
 }
 
 bool tab_platform_display_init(tab_framebuffer_t *framebuffer)

@@ -1,12 +1,20 @@
 # Display System
 
-TabOS currently provides one shared diagnostic display path across Tab5, macOS, and Linux. This is the first hardware-backed vertical slice, not a public application graphics API.
+TabOS provides one shared boot-console display path across Tab5, macOS, and Linux. This is a kernel boot facility and terminal-rendering foundation, not yet a public application graphics API.
 
 ## Logical Framebuffer
 
 Portable code renders into a 1280×720 RGB565 framebuffer. Each pixel is a 16-bit value and the framebuffer reports its width, height, and row stride through the internal platform interface.
 
-The startup diagnostic frame contains color bars, a grayscale ramp, a white border, and distinct corner markers. All targets render this exact portable frame, making orientation, color, clipping, and scaling faults visible.
+Portable graphics code supplies an original 5×7 bitmap font, scaled text rendering, and an RGB565 terminal framebuffer with cursor movement, line wrapping, color selection, clearing, and scrolling. Lowercase input currently uses uppercase glyph shapes.
+
+All targets use identical terminal scaling. Change `TABOS_TERMINAL_SCALE` in `config/Display.cmake` and rebuild to adjust the compiled default. The default is 4, producing 24×32-pixel terminal cells. Keeping this setting shared makes macOS/Linux output a faithful size and wrapping preview of Tab5 output.
+
+Software can change scale from 1 through 8 at runtime using `tabos_terminal_set_scale()` from `<tabos/terminal.h>` and inspect it with `tabos_terminal_get_scale()`. A value set before runtime startup becomes the initial boot scale. A value set after startup immediately recalculates terminal geometry and redraws the retained boot report. This runtime value is retained for the life of the running system but is not yet persisted across restarts; persistent preference storage will depend on the future filesystem/configuration service.
+
+At startup, the kernel creates one structured boot report and writes it to both the platform log and the terminal framebuffer. The report identifies the TabOS version, target, detected display, logical framebuffer, processor, memory, storage state, and kernel runtime state. Tab5 also reports internal heap availability, PSRAM availability, and physical flash capacity. This prevents serial and on-screen diagnostics from evolving as separate lists.
+
+Memory values are captured after display initialization, so Tab5 free-PSRAM reporting includes the cost of active display buffers. Flash capacity describes the physical flash chip; it is not filesystem free space. Until a filesystem is mounted, storage is explicitly reported as not mounted rather than showing an invented free-space value. Host builds report total host RAM when SDL can determine it, but label free memory as unknown because it is managed by the host operating system.
 
 ## Host Presentation
 
@@ -57,8 +65,8 @@ For container-built firmware, use local `esptool` through the standalone flash h
 
 Set `ESPPORT` when more than one serial device is connected.
 
-After flashing, verify that the full white border and all four corner markers are visible, the color bars are correct, and the frame is in landscape orientation. Automated builds validate compilation and pixel transforms, but only this hardware check can validate the physical panel path.
+After flashing, verify that the boot report is readable, starts at the physical top-left in landscape orientation, and names the detected display controller. Compare it with the corresponding report on the serial port. Automated builds validate compilation, font pixels, terminal state, and pixel transforms, but only this hardware check can validate the physical panel path.
 
 ## Current Limits
 
-The display currently presents one startup frame. It has no redraw loop, damage tracking, compositor, fonts, widgets, touch input, or public application-facing API. Those features should build on this framebuffer boundary without leaking SDL3 or ESP-IDF types into portable code.
+The display currently presents one boot-console frame. Static content is not continuously rerendered: the Tab5 LCD hardware refreshes from its scanout framebuffer while the platform run loop sleeps. It has no damage tracking, compositor, widgets, touch input, or public application-facing console API. Keyboard and application execution services will come later. The shell will be built as an application using those services, not embedded in the kernel.

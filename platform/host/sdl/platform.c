@@ -206,6 +206,31 @@ const char *tab_platform_display_name(void)
     return "SDL3 RGB565";
 }
 
+bool tab_platform_get_diagnostics(tab_platform_diagnostics_t *diagnostics)
+{
+    if (diagnostics == NULL) {
+        return false;
+    }
+
+    const int ram_mebibytes = SDL_GetSystemRAM();
+    const int cpu_cores = SDL_GetNumLogicalCPUCores();
+    *diagnostics = (tab_platform_diagnostics_t){
+        .device_name = "NATIVE HOST",
+        .cpu_cores = cpu_cores > 0 ? (unsigned int)cpu_cores : 0U,
+        .memory_total_bytes = ram_mebibytes > 0
+            ? (uint64_t)(unsigned int)ram_mebibytes * 1024U * 1024U
+            : 0U,
+    };
+    return true;
+}
+
+void tab_platform_log(const char *message)
+{
+    if (message != NULL) {
+        (void)printf("%s\n", message);
+    }
+}
+
 bool tab_platform_display_init(tab_framebuffer_t *framebuffer)
 {
     if (framebuffer == NULL) {

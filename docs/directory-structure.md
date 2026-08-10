@@ -8,10 +8,10 @@ This document describes the current TabOS repository layout. It is authoritative
 tabos/
 ├── .github/workflows/   GitHub Actions builds, tests, and artifacts
 ├── agents/              Context and implementation guidance for coding agents
-├── apps/                Future bundled TabOS applications
+├── apps/                Bundled TabOS applications, including the future shell
 ├── audio/               Portable audio subsystem
 ├── cmake/               Shared host-build CMake modules
-├── config/              Common identity, version, and visible strings
+├── config/              Common identity, visible strings, and display settings
 ├── docs/                User and contributor documentation
 ├── fs/                  Portable filesystem subsystem
 ├── graphics/            Portable framebuffer and graphics subsystem
@@ -31,7 +31,6 @@ tabos/
 │   ├── lib/             Future application libraries
 │   ├── linker/          Future linker scripts and executable-format support
 │   └── tools/           Future SDK tools
-├── shell/               Portable command shell
 ├── targets/             Buildable product entry points and target configuration
 │   ├── host/            Native entry point and host artifact packaging files
 │   └── tab5/            ESP-IDF Tab5 firmware project and entry point
@@ -45,6 +44,8 @@ tabos/
 ```
 
 Some directories contain only `.gitkeep` placeholders. Their stated responsibilities are planned boundaries; their APIs are not yet defined.
+
+The command shell will be the first official TabOS application and belongs under `apps/`. It is not part of the kernel. The kernel and portable subsystems will provide the terminal, input, process, and filesystem services used by that application.
 
 ## Targets and Platforms
 

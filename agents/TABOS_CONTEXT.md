@@ -102,6 +102,12 @@ A GUI may be added, but it should be a **client of normal TabOS services**, not 
 
 This keeps the system usable as a keyboard-driven computer and helps preserve the Zeal OS inspiration.
 
+The shell is the first planned official TabOS application. It must not be compiled into or architected as part of the kernel. Kernel and system layers provide reusable terminal, input, process, and filesystem services; the shell consumes the public application-facing forms of those services.
+
+### Current implementation: shared boot console
+
+The kernel currently constructs one structured boot report and sends it to both the platform serial/log sink and a portable framebuffer terminal. Portable graphics includes an original 5x7 bitmap font and a scaled RGB565 terminal renderer with clearing, wrapping, colored text, and scrolling. All targets use the same compiled default terminal scale from `TABOS_TERMINAL_SCALE` in `config/Display.cmake`; its default is 4. Host rendering must match Tab5 size and wrapping. The public `<tabos/terminal.h>` API can select scale 1 through 8 before or after runtime startup. The runtime retains the active scale and boot report, allowing immediate reflow/redraw; persistence across device restarts is deferred until filesystem/configuration support. Current report entries cover system version, target, detected display, framebuffer, processor, memory, storage state, and kernel runtime state. Tab5 supplies internal heap, PSRAM, and physical flash capacity. Filesystem free space must be reported only after a real filesystem mount. The static boot frame is presented once; LCD hardware performs scanout refresh while the platform loop sleeps. This boot console is infrastructure, not the shell application.
+
 ## 4. Multitasking and CPU Cores
 
 ### Decision: do not permanently dedicate one P4 core to graphics
@@ -446,7 +452,6 @@ tabos/
   graphics/
   input/
   net/
-  shell/
   libc/
   sdk/
     include/
@@ -455,6 +460,7 @@ tabos/
     tools/
   loader/
   apps/
+    shell/
   host/
   tests/
 ```

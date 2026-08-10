@@ -1,12 +1,18 @@
 cmake_minimum_required(VERSION 3.22)
 
 include("${CMAKE_CURRENT_SOURCE_DIR}/config/Identity.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/config/Display.cmake")
 project(${TABOS_CMAKE_PROJECT_NAME} VERSION ${TABOS_PROJECT_VERSION} LANGUAGES C)
 
 set(TABOS_GENERATED_INCLUDE_DIR "${CMAKE_BINARY_DIR}/generated")
 configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/config/identity.h.in"
     "${TABOS_GENERATED_INCLUDE_DIR}/tabos/config/identity.h"
+    @ONLY
+)
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/config/display.h.in"
+    "${TABOS_GENERATED_INCLUDE_DIR}/tabos/config/display.h"
     @ONLY
 )
 

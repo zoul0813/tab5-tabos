@@ -13,6 +13,7 @@ add_test(NAME unit.core_smoke COMMAND tabos_core_smoke)
 add_executable(tabos_display_diagnostic unit/display_diagnostic.c fakes/platform_display.c)
 target_include_directories(tabos_display_diagnostic PRIVATE
     "${TABOS_ROOT}/graphics/include"
+    "${TABOS_ROOT}/kernel/include"
     "${TABOS_ROOT}/platform/include"
 )
 target_link_libraries(tabos_display_diagnostic PRIVATE tabos_core)

@@ -5,5 +5,5 @@ idf_component_register(
     SRCS ${TABOS_ESP32P4_PLATFORM_SOURCES}
     INCLUDE_DIRS "${TABOS_ROOT}/platform/include"
     PRIV_INCLUDE_DIRS "${CMAKE_BINARY_DIR}/generated"
-    REQUIRES esp_driver_i2c esp_hw_support esp_lcd esp_lcd_st7121 esp_lcd_touch_gt911 esp_lcd_touch_st7123 esp_mm log m5stack_tab5_noglib
+    REQUIRES esp_driver_i2c esp_hw_support esp_lcd esp_lcd_st7121 esp_lcd_touch_gt911 esp_lcd_touch_st7123 esp_mm log m5stack_tab5_noglib spi_flash
 )

@@ -64,7 +64,7 @@ Run host tests with:
 ./tools/tabos test linux debug
 ```
 
-Tests currently cover portable runtime bootstrap, diagnostic framebuffer rendering, Tab5 display rotation, headless SDL host integration, target-selection rejection, and platform-header boundaries.
+Tests currently cover portable runtime bootstrap, bitmap font and terminal rendering, Tab5 display rotation, headless SDL host integration, target-selection rejection, and platform-header boundaries.
 
 ## Run and Flash
 
@@ -75,10 +75,10 @@ Run host display:
 ./tools/tabos run linux debug
 ```
 
-Host executable opens a resizable window containing the shared 1280x720 RGB565 diagnostic frame.
+Host executable opens a resizable window containing the shared 1280x720 RGB565 boot console.
 It remembers its last window position in the SDL per-user preferences directory. If that position is no longer visible on a connected display, normal system placement is used instead.
 
-Tab5 firmware initializes the built-in display through the official M5Stack BSP and presents the same diagnostic frame. See the [display system guide](docs/display.md) for the current contract and hardware-validation procedure.
+Tab5 firmware initializes the built-in display and presents the same structured boot report shown over serial. See the [display system guide](docs/display.md) for the current contract and hardware-validation procedure.
 
 Flash Tab5 only through explicit command:
 
@@ -109,7 +109,7 @@ Open the latest successful `build` workflow run on GitHub to download its artifa
 
 ## Architecture Boundaries
 
-- Portable TabOS code lives in subsystem directories such as `kernel/`, `fs/`, `shell/`, and `graphics/`.
+- Portable TabOS code lives in subsystem directories such as `kernel/`, `fs/`, and `graphics/`; bundled applications, including the future shell, live under `apps/`.
 - SDL3 stays inside `platform/host/`.
 - ESP-IDF and FreeRTOS stay inside `platform/esp32p4/` and `targets/tab5/`.
 - Application-facing headers belong in `sdk/include/tabos/`.

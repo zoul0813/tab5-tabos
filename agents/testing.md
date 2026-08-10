@@ -291,7 +291,7 @@ inside:
 ```text
 graphics/
 input/
-shell/
+apps/shell/
 apps/
 fs/
 kernel portable code
@@ -1146,7 +1146,6 @@ A likely layout supporting this strategy is:
 tabos/
 ├── kernel/
 ├── fs/
-├── shell/
 ├── graphics/
 ├── input/
 ├── audio/

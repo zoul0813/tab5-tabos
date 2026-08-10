@@ -2,11 +2,17 @@ cmake_minimum_required(VERSION 3.16)
 
 set(TABOS_ROOT "${CMAKE_CURRENT_LIST_DIR}/../..")
 include("${TABOS_ROOT}/config/Identity.cmake")
+include("${TABOS_ROOT}/config/Display.cmake")
 
 set(TABOS_GENERATED_INCLUDE_DIR "${CMAKE_BINARY_DIR}/generated")
 configure_file(
     "${TABOS_ROOT}/config/identity.h.in"
     "${TABOS_GENERATED_INCLUDE_DIR}/tabos/config/identity.h"
+    @ONLY
+)
+configure_file(
+    "${TABOS_ROOT}/config/display.h.in"
+    "${TABOS_GENERATED_INCLUDE_DIR}/tabos/config/display.h"
     @ONLY
 )
 

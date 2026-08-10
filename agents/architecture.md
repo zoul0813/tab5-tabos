@@ -403,6 +403,8 @@ The public API should not depend on the filesystem used underneath.
 
 The shell is a first-class TabOS application/system component.
 
+More specifically, the shell is an application, not kernel code. It belongs under `apps/` and consumes kernel/system services through application-facing APIs. The kernel may provide a boot console and terminal service, but must not own shell parsing, commands, or policy.
+
 It should use public or near-public TabOS APIs wherever practical.
 
 Conceptually:
@@ -674,7 +676,6 @@ tabos/
 ├── graphics/
 ├── audio/
 ├── net/
-├── shell/
 ├── libc/
 │
 ├── sdk/
@@ -684,6 +685,7 @@ tabos/
 │   └── tools/
 │
 ├── apps/
+│   └── shell/
 ├── tests/
 └── host/
 ```
