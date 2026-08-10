@@ -73,6 +73,7 @@ int main(void)
     if (!tab_display_present()) {
         return 1;
     }
+    tab_terminal_shutdown(&terminal);
     tab_display_shutdown();
     return 0;
 }

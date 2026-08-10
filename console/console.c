@@ -67,8 +67,15 @@ bool tabos_console_acquire(tabos_console_session_t *session)
     }
     foreground_token = next_token++;
     session->token = foreground_token;
+    tab_terminal_set_cursor_visible(active_terminal, true);
+    const bool presented = tab_display_present();
+    if (!presented) {
+        tab_terminal_set_cursor_visible(active_terminal, false);
+        foreground_token = 0U;
+        session->token = 0U;
+    }
     unlock_console();
-    return true;
+    return presented;
 }
 
 void tabos_console_release(tabos_console_session_t *session)
@@ -79,6 +86,8 @@ void tabos_console_release(tabos_console_session_t *session)
 
     lock_console();
     if (owns_console(session)) {
+        tab_terminal_set_cursor_visible(active_terminal, false);
+        (void)tab_display_present();
         foreground_token = 0U;
     }
     session->token = 0U;
@@ -154,6 +163,77 @@ bool tabos_console_get_cursor(const tabos_console_session_t *session,
     }
     *column = active_terminal->column;
     *row = active_terminal->row;
+    unlock_console();
+    return true;
+}
+
+static bool update_viewport(const tabos_console_session_t *session,
+                            bool (*operation)(tab_terminal_t *terminal))
+{
+    lock_console();
+    if (!owns_console(session) || active_terminal == NULL || !operation(active_terminal)) {
+        unlock_console();
+        return false;
+    }
+    const bool presented = tab_display_present();
+    unlock_console();
+    return presented;
+}
+
+bool tabos_console_scroll_lines(const tabos_console_session_t *session, int lines)
+{
+    lock_console();
+    if (!owns_console(session) || active_terminal == NULL ||
+        !tab_terminal_scroll_lines(active_terminal, lines)) {
+        unlock_console();
+        return false;
+    }
+    const bool presented = tab_display_present();
+    unlock_console();
+    return presented;
+}
+
+bool tabos_console_page_up(const tabos_console_session_t *session)
+{
+    return update_viewport(session, tab_terminal_page_up);
+}
+
+bool tabos_console_page_down(const tabos_console_session_t *session)
+{
+    return update_viewport(session, tab_terminal_page_down);
+}
+
+bool tabos_console_scroll_to_start(const tabos_console_session_t *session)
+{
+    return update_viewport(session, tab_terminal_scroll_to_start);
+}
+
+bool tabos_console_scroll_to_end(const tabos_console_session_t *session)
+{
+    return update_viewport(session, tab_terminal_scroll_to_end);
+}
+
+bool tabos_console_is_at_end(const tabos_console_session_t *session)
+{
+    lock_console();
+    const bool at_end = owns_console(session) && active_terminal != NULL &&
+        tab_terminal_is_at_end(active_terminal);
+    unlock_console();
+    return at_end;
+}
+
+bool tabos_console_get_history_line_count(const tabos_console_session_t *session,
+                                          size_t *line_count)
+{
+    if (line_count == NULL) {
+        return false;
+    }
+    lock_console();
+    if (!owns_console(session) || active_terminal == NULL) {
+        unlock_console();
+        return false;
+    }
+    *line_count = tab_terminal_history_line_count(active_terminal);
     unlock_console();
     return true;
 }

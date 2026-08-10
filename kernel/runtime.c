@@ -70,7 +70,11 @@ static bool render_boot_report(void)
 
     tab_terminal_clear(&terminal);
     tab_boot_report_write_terminal(&boot_report, &terminal);
-    return tab_display_present();
+    if (!tab_display_present()) {
+        tab_terminal_shutdown(&terminal);
+        return false;
+    }
+    return true;
 }
 
 bool tabos_runtime_init(void)
@@ -168,6 +172,7 @@ bool tabos_runtime_start(void)
 #if TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP
     if (!tab_console_diagnostic_start()) {
         tab_console_shutdown();
+        tab_terminal_shutdown(&terminal);
         runtime_started = false;
         tab_display_shutdown();
         return false;
@@ -193,9 +198,9 @@ void tabos_runtime_shutdown(void)
         tab_console_diagnostic_stop();
 #endif
         tab_console_shutdown();
+        tab_terminal_shutdown(&terminal);
         tab_display_shutdown();
         runtime_started = false;
-        terminal = (tab_terminal_t){0};
         boot_report = (tab_boot_report_t){0};
     }
 
@@ -217,18 +222,17 @@ bool tabos_terminal_set_scale(unsigned int scale)
         return true;
     }
 
-    const unsigned int previous_scale = terminal_scale;
-    terminal_scale = scale;
-    if (!runtime_started || render_boot_report()) {
-        if (runtime_started) {
-            tab_console_rebind(&terminal);
-        }
+    if (!runtime_started) {
+        terminal_scale = scale;
         return true;
     }
 
-    terminal_scale = previous_scale;
-    (void)render_boot_report();
-    return false;
+    if (!tab_terminal_resize(&terminal, tab_display_framebuffer(), scale)) {
+        return false;
+    }
+    terminal_scale = scale;
+    tab_console_rebind(&terminal);
+    return tab_display_present();
 }
 
 unsigned int tabos_terminal_get_scale(void)

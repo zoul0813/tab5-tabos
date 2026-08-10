@@ -64,7 +64,7 @@ Run host tests with:
 ./tools/tabos test linux debug
 ```
 
-Tests currently cover portable runtime bootstrap, bitmap font and terminal rendering, console ownership and controls, keyboard translation and queue behavior, Tab5 display rotation, headless SDL host integration, target-selection rejection, and platform-header boundaries.
+Tests currently cover portable runtime bootstrap, bitmap font and terminal rendering, colored cell history, scrollback navigation, cursor and scale reflow, console ownership and controls, keyboard translation and queue behavior, Tab5 display rotation, headless SDL host integration, target-selection rejection, and platform-header boundaries.
 
 ## Run and Flash
 

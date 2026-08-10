@@ -45,7 +45,8 @@ bool tab_console_diagnostic_start(void)
     return tabos_console_write(
         &console,
         "\n[CONSOLE TEST] TYPE TO TEST KEYBOARD AND TERMINAL\n"
-        "[CONSOLE TEST] BACKSPACE EDITS; CTRL+L CLEARS\n\n> "
+        "[CONSOLE TEST] BACKSPACE EDITS; CTRL+L CLEARS\n"
+        "[CONSOLE TEST] CTRL+ARROWS NAVIGATE HISTORY\n\n> "
     );
 }
 
@@ -64,6 +65,26 @@ void tab_console_diagnostic_update(void)
             editable_cells = 0U;
         } else if (event.type == TABOS_INPUT_KEY_DOWN && event.key == TABOS_KEY_TAB) {
             write_tab();
+        } else if (event.type == TABOS_INPUT_KEY_DOWN && event.key == TABOS_KEY_UP &&
+                   (event.modifiers & TABOS_MODIFIER_CONTROL) != 0U) {
+            (void)tabos_console_page_up(&console);
+        } else if (event.type == TABOS_INPUT_KEY_DOWN && event.key == TABOS_KEY_DOWN &&
+                   (event.modifiers & TABOS_MODIFIER_CONTROL) != 0U) {
+            (void)tabos_console_page_down(&console);
+        } else if (event.type == TABOS_INPUT_KEY_DOWN && event.key == TABOS_KEY_LEFT &&
+                   (event.modifiers & TABOS_MODIFIER_CONTROL) != 0U) {
+            (void)tabos_console_scroll_to_start(&console);
+        } else if (event.type == TABOS_INPUT_KEY_DOWN && event.key == TABOS_KEY_RIGHT &&
+                   (event.modifiers & TABOS_MODIFIER_CONTROL) != 0U) {
+            (void)tabos_console_scroll_to_end(&console);
+        } else if (event.type == TABOS_INPUT_KEY_DOWN && event.key == TABOS_KEY_PAGE_UP) {
+            (void)tabos_console_page_up(&console);
+        } else if (event.type == TABOS_INPUT_KEY_DOWN && event.key == TABOS_KEY_PAGE_DOWN) {
+            (void)tabos_console_page_down(&console);
+        } else if (event.type == TABOS_INPUT_KEY_DOWN && event.key == TABOS_KEY_HOME) {
+            (void)tabos_console_scroll_to_start(&console);
+        } else if (event.type == TABOS_INPUT_KEY_DOWN && event.key == TABOS_KEY_END) {
+            (void)tabos_console_scroll_to_end(&console);
         } else if (event.type == TABOS_INPUT_KEY_DOWN && event.key == TABOS_KEY_BACKSPACE &&
                    editable_cells > 0U) {
             (void)tabos_console_write(&console, "\b");
