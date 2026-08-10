@@ -4,6 +4,7 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/config/Identity.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/config/Display.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/config/Input.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/config/Console.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/config/Loader.cmake")
 project(${TABOS_CMAKE_PROJECT_NAME} VERSION ${TABOS_PROJECT_VERSION} LANGUAGES C)
 
 set(TABOS_GENERATED_INCLUDE_DIR "${CMAKE_BINARY_DIR}/generated")
@@ -11,6 +12,10 @@ configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/config/identity.h.in"
     "${TABOS_GENERATED_INCLUDE_DIR}/tabos/config/identity.h"
     @ONLY
+)
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/config/loader.h.in"
+    "${TABOS_GENERATED_INCLUDE_DIR}/tabos/config/loader.h"
 )
 configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/config/display.h.in"
@@ -67,6 +72,7 @@ target_include_directories(tabos_core
         "${TABOS_ROOT}/graphics/include"
         "${TABOS_ROOT}/input/include"
         "${TABOS_ROOT}/kernel/include"
+        "${TABOS_ROOT}/loader/include"
         "${TABOS_ROOT}/platform/include"
         "${TABOS_GENERATED_INCLUDE_DIR}"
 )

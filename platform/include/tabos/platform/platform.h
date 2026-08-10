@@ -46,6 +46,11 @@ const char *tab_platform_display_name(void);
 bool tab_platform_get_diagnostics(tab_platform_diagnostics_t *diagnostics);
 void tab_platform_log(const char *message);
 uint64_t tab_platform_time_ms(void);
+void *tab_platform_executable_alloc(size_t size);
+void *tab_platform_executable_prepare(void *memory, size_t size);
+const void *tab_platform_executable_data_pointer(const void *memory);
+void tab_platform_executable_free(void *memory);
+bool tab_platform_can_execute_riscv32(void);
 void tab_platform_input_wait(void);
 
 bool tab_platform_display_init(tab_framebuffer_t *framebuffer);

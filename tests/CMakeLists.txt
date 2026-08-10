@@ -78,6 +78,18 @@ tabos_enable_sanitizers(tabos_application_lifecycle)
 
 add_test(NAME unit.application_lifecycle COMMAND tabos_application_lifecycle)
 
+add_executable(tabos_elf_loader unit/elf_loader.c fakes/platform_display.c)
+target_include_directories(tabos_elf_loader PRIVATE
+    "${TABOS_ROOT}/loader/fixtures"
+    "${TABOS_ROOT}/loader/include"
+    "${TABOS_ROOT}/platform/include"
+)
+target_link_libraries(tabos_elf_loader PRIVATE tabos_core)
+tabos_enable_warnings(tabos_elf_loader)
+tabos_enable_sanitizers(tabos_elf_loader)
+
+add_test(NAME unit.elf_loader COMMAND tabos_elf_loader)
+
 add_test(NAME integration.host_smoke COMMAND tabos_host --smoke)
 set_tests_properties(integration.host_smoke PROPERTIES
     ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy"

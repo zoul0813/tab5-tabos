@@ -152,6 +152,8 @@ Programs should not require the complete TabOS firmware to be rebuilt and reflas
 
 Current first-stage implementation provides format-neutral `tabos_app_descriptor_t`, fixed built-in registry, and cooperative single-foreground lifecycle. Lifecycle manager grants console capability, invokes entry/update/cleanup callbacks, records exit status, and returns to idle runtime. This validates application/kernel ownership boundaries for statically linked host and Tab5 applications without settling ELF layout, task mapping, syscall ABI, isolation, or executable memory placement.
 
+First ELF spike accepts minimal stripped RV32 `ET_EXEC` image with bounded `PT_LOAD` segments and no relocations/dynamic linking. Loader copies image into platform-provided executable memory and invokes entry with versioned API table. Embedded hello fixture isolates executable-memory validation from filesystem. This is experiment, not final executable-format decision. ESP32-P4 path first probes byte-addressable internal executable heap; explicit MMU/PSRAM mapping remains unresolved pending hardware result.
+
 The exact mapping between a TabOS process and FreeRTOS tasks remains an implementation detail.
 
 Possible models include:

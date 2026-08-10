@@ -112,6 +112,8 @@ The public `<tabos/console.h>` API now supplies one cooperative foreground conso
 
 Portable application foundation now defines public descriptor and cooperative lifecycle API in `<tabos/application.h>`. Descriptor carries ABI version, name, version, capabilities, entry, update, and cleanup callbacks while remaining independent of future ELF container. Fixed-capacity built-in registry currently holds static descriptors. Runtime launches at most one foreground application, acquires requested console capability on its behalf, dispatches updates, honors requested exit status, calls cleanup, releases console, then remains idle for future launcher. Optional diagnostic is registered as `console-test`; Ctrl+Q exercises clean exit. This is initial host-native/built-in application mode, not final process/task or loader ABI.
 
+Experimental loader now accepts bounded little-endian RV32 `ET_EXEC` ELF with loadable segments, executable entry, and no dynamic segment or relocations. Checked-in hello fixture is independently compiled by GCC, stripped to 308 bytes, loads 85 bytes, and calls versioned API table containing console write and exit request. Host tests validate parser/copy/error behavior but cannot execute RV32. `TABOS_ENABLE_ELF_LOADER_EXPERIMENT=ON` selects `elf-hello` startup application on Tab5; it is mutually exclusive with console diagnostic. Current backend tries internal `MALLOC_CAP_EXEC | MALLOC_CAP_8BIT`; hardware test must determine whether active memory protection permits it. Do not infer PSRAM execution support from this path.
+
 ## 4. Multitasking and CPU Cores
 
 ### Decision: do not permanently dedicate one P4 core to graphics

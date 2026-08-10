@@ -1,6 +1,7 @@
 #include <tabos/platform/platform.h>
 
 #include <stddef.h>
+#include <stdlib.h>
 
 static tab_pixel_t pixels[TABOS_DISPLAY_WIDTH * TABOS_DISPLAY_HEIGHT];
 static uint64_t monotonic_ms;
@@ -65,6 +66,31 @@ void tab_platform_log(const char *message)
 uint64_t tab_platform_time_ms(void)
 {
     return monotonic_ms;
+}
+
+void *tab_platform_executable_alloc(size_t size)
+{
+    return malloc(size);
+}
+
+void *tab_platform_executable_prepare(void *memory, size_t size)
+{
+    return memory != NULL && size > 0U ? memory : NULL;
+}
+
+const void *tab_platform_executable_data_pointer(const void *memory)
+{
+    return memory;
+}
+
+void tab_platform_executable_free(void *memory)
+{
+    free(memory);
+}
+
+bool tab_platform_can_execute_riscv32(void)
+{
+    return false;
 }
 
 void tab_test_platform_set_time_ms(uint64_t time_ms)

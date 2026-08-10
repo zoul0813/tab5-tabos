@@ -5,6 +5,7 @@
 #include <tabos/terminal.h>
 
 #include <tabos/config/console.h>
+#include <tabos/config/loader.h>
 
 #include <string.h>
 
@@ -48,6 +49,12 @@ int main(void)
     int exit_status = -1;
     if (tabos_app_is_running() || !tabos_app_last_exit_status(&exit_status) ||
         exit_status != 0) {
+        return 1;
+    }
+#elif TABOS_ENABLE_ELF_LOADER_EXPERIMENT
+    int exit_status = 0;
+    if (tabos_app_count() != 1U || tabos_app_is_running() ||
+        !tabos_app_last_exit_status(&exit_status) || exit_status != 4) {
         return 1;
     }
 #else

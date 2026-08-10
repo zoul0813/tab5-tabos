@@ -9,6 +9,7 @@ This directory contains user and contributor documentation for TabOS.
 - [Keyboard Input](input.md): public events, SDL3 translation, and Tab5 Keyboard protocol.
 - [Console Service](console.md): foreground ownership, terminal controls, input, and diagnostic app.
 - [Application Lifecycle](applications.md): descriptors, built-in registry, foreground execution, and current limits.
+- [ELF Loader Experiment](elf-loader.md): stripped RV32 ELF contract, build pipeline, and Tab5 validation.
 - [Time and Timers](time.md): monotonic clock and reusable polling timers.
 
 ## Documentation Policy

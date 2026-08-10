@@ -11,14 +11,14 @@ tabos/
 ├── apps/                Built-in registry and bundled applications, including future shell
 ├── audio/               Portable audio subsystem
 ├── cmake/               Shared host-build CMake modules
-├── config/              Common identity, display, input, and console build settings
+├── config/              Common identity, display, input, console, and loader build settings
 ├── console/             Portable foreground text-console service
 ├── docs/                User and contributor documentation
 ├── fs/                  Portable filesystem subsystem
 ├── graphics/            Portable framebuffer and graphics subsystem
 ├── input/               Portable input-event subsystem
 ├── kernel/              Portable runtime, application lifecycle, registry, and service core
-├── loader/              Future application loader
+├── loader/              Experimental ELF validation, loading, fixtures, and lifecycle adapter
 ├── net/                 Portable networking subsystem
 ├── platform/            Environment-specific service implementations
 │   ├── esp32p4/         ESP32-P4, ESP-IDF, FreeRTOS, and Tab5 BSP implementation

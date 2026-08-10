@@ -17,6 +17,7 @@
 #include <esp_lcd_touch_st7123.h>
 #include <esp_ldo_regulator.h>
 #include <esp_log.h>
+#include <esp_mmu_map.h>
 #include <esp_timer.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -53,6 +54,14 @@ static bool keyboard_present;
 static uint8_t keyboard_previous_usage;
 static uint8_t keyboard_previous_modifiers;
 static char keyboard_name[40] = "TAB5 KEYBOARD NOT DETECTED";
+
+typedef struct {
+    void *writable;
+    void *executable;
+    size_t mapped_size;
+} executable_mapping_t;
+
+static executable_mapping_t executable_mapping;
 
 typedef enum {
     TAB5_PANEL_UNKNOWN = 0,
@@ -452,6 +461,96 @@ void tab_platform_log(const char *message)
 uint64_t tab_platform_time_ms(void)
 {
     return (uint64_t)esp_timer_get_time() / 1000U;
+}
+
+void *tab_platform_executable_alloc(size_t size)
+{
+    if (size == 0U || executable_mapping.writable != NULL) {
+        return NULL;
+    }
+
+    const size_t page_size = CONFIG_MMU_PAGE_SIZE;
+    const size_t mapped_size = (size + page_size - 1U) & ~(page_size - 1U);
+    void *writable = heap_caps_aligned_alloc(
+        page_size,
+        mapped_size,
+        MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT
+    );
+    if (writable == NULL) {
+        return NULL;
+    }
+
+    executable_mapping = (executable_mapping_t){
+        .writable = writable,
+        .mapped_size = mapped_size,
+    };
+    return writable;
+}
+
+void *tab_platform_executable_prepare(void *memory, size_t size)
+{
+    if (memory == NULL || memory != executable_mapping.writable || size == 0U ||
+        size > executable_mapping.mapped_size) {
+        return NULL;
+    }
+
+    esp_paddr_t physical_address = 0U;
+    mmu_target_t target = MMU_TARGET_FLASH0;
+    if (esp_cache_msync(
+            memory,
+            size,
+            ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_UNALIGNED
+        ) != ESP_OK ||
+        esp_mmu_vaddr_to_paddr(memory, &physical_address, &target) != ESP_OK ||
+        target != MMU_TARGET_PSRAM0) {
+        return NULL;
+    }
+
+    void *executable = NULL;
+    const esp_err_t map_result = esp_mmu_map(
+        physical_address,
+        executable_mapping.mapped_size,
+        MMU_TARGET_PSRAM0,
+        MMU_MEM_CAP_EXEC | MMU_MEM_CAP_READ,
+        ESP_MMU_MMAP_FLAG_PADDR_SHARED,
+        &executable
+    );
+    if (map_result != ESP_OK) {
+        ESP_LOGE(TAG, "Could not map executable PSRAM: %s", esp_err_to_name(map_result));
+        return NULL;
+    }
+
+    executable_mapping.executable = executable;
+    __builtin___clear_cache((char *)executable, (char *)executable + size);
+    return executable;
+}
+
+const void *tab_platform_executable_data_pointer(const void *memory)
+{
+    const uintptr_t address = (uintptr_t)memory;
+    const uintptr_t executable = (uintptr_t)executable_mapping.executable;
+    if (executable_mapping.executable != NULL && address >= executable &&
+        address - executable < executable_mapping.mapped_size) {
+        return (const uint8_t *)executable_mapping.writable + (address - executable);
+    }
+    return memory;
+}
+
+void tab_platform_executable_free(void *memory)
+{
+    if (memory == executable_mapping.executable && executable_mapping.executable != NULL) {
+        (void)esp_mmu_unmap(executable_mapping.executable);
+    }
+    if ((memory == executable_mapping.writable || memory == executable_mapping.executable) &&
+        executable_mapping.writable != NULL) {
+        heap_caps_free(executable_mapping.writable);
+        executable_mapping = (executable_mapping_t){0};
+    }
+}
+
+bool tab_platform_can_execute_riscv32(void)
+{
+    return true;
 }
 
 void tab_platform_input_wait(void)

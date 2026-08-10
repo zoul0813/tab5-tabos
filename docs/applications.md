@@ -57,6 +57,6 @@ Current implementation is deliberately small:
 - console is only defined capability
 - registry capacity is 16 built-in descriptors
 - no process isolation or crash containment
-- no ELF loader, relocations, arguments, filesystem loading, or external application memory management yet
+- experimental embedded ELF loader exists, but no relocations, arguments, filesystem loading, or general external application memory management yet
 
-Descriptor and public application API avoid assumptions about future executable container. Next loader experiment can map stripped ELF metadata into this lifecycle without making ELF details part of application source API.
+Descriptor and public application API avoid assumptions about executable container. Current loader experiment maps stripped ELF entry into this lifecycle without making ELF details part of normal application source API. See [ELF Loader Experiment](elf-loader.md).

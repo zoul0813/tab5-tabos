@@ -14,7 +14,15 @@ set(TABOS_CORE_SOURCES
     "${TABOS_ROOT}/input/input.c"
     "${TABOS_ROOT}/console/console.c"
     "${TABOS_ROOT}/time/time.c"
+    "${TABOS_ROOT}/loader/elf_loader.c"
+    "${TABOS_ROOT}/loader/fixtures/hello_elf.c"
 )
+
+if(TABOS_ENABLE_ELF_LOADER_EXPERIMENT)
+    list(APPEND TABOS_CORE_SOURCES
+        "${TABOS_ROOT}/loader/elf_application.c"
+    )
+endif()
 
 if(TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP)
     list(APPEND TABOS_CORE_SOURCES

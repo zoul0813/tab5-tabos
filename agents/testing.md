@@ -409,6 +409,8 @@ Console tests cover exclusive foreground acquisition, background and stale-sessi
 
 Application lifecycle tests cover descriptor validation, duplicate rejection, registry lookup, missing and busy launch results, manager-owned console exclusivity, entry/update/cleanup ordering, requested exit status, startup failure cleanup, console release, and registry shutdown. Runtime smoke test verifies configured `console-test` is launched through registry and Ctrl+Q returns cleanly to idle runtime. Same portable lifecycle code compiles into host and Tab5; host executes deterministic tests while Tab5 cross-build verifies target compatibility.
 
+ELF loader tests use real stripped RV32 fixture and cover format metadata, segment bounds, executable entry, relocation rejection, image-size limit, memory copy, unload, and malformed inputs under host sanitizers. Host never executes RV32 bytes. Tab5 experiment must verify executable allocation, instruction synchronization, API-table call, console output, return status, and cleanup on hardware. Expected success text is `HELLO FROM INDEPENDENT TABOS ELF`; `NO EXECUTABLE MEMORY` specifically means internal executable heap strategy failed and MMU mapping requires next experiment.
+
 Manual console validation must include prompt-boundary Backspace, held Backspace, held printable keys, Enter, and Tab followed by visible text. Host backend synthesizes missing Enter/Tab/repeat text while retaining SDL text input for normal layout and IME behavior; matching SDL text events are suppressed to prevent duplicates.
 
 Desktop mouse/pointer events should be mapped into the TabOS touch event model.

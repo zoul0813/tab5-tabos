@@ -5,12 +5,17 @@ include("${TABOS_ROOT}/config/Identity.cmake")
 include("${TABOS_ROOT}/config/Display.cmake")
 include("${TABOS_ROOT}/config/Input.cmake")
 include("${TABOS_ROOT}/config/Console.cmake")
+include("${TABOS_ROOT}/config/Loader.cmake")
 
 set(TABOS_GENERATED_INCLUDE_DIR "${CMAKE_BINARY_DIR}/generated")
 configure_file(
     "${TABOS_ROOT}/config/identity.h.in"
     "${TABOS_GENERATED_INCLUDE_DIR}/tabos/config/identity.h"
     @ONLY
+)
+configure_file(
+    "${TABOS_ROOT}/config/loader.h.in"
+    "${TABOS_GENERATED_INCLUDE_DIR}/tabos/config/loader.h"
 )
 configure_file(
     "${TABOS_ROOT}/config/display.h.in"

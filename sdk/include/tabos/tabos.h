@@ -3,6 +3,7 @@
 
 #include <tabos/application.h>
 #include <tabos/console.h>
+#include <tabos/elf_api.h>
 #include <tabos/input.h>
 #include <tabos/terminal.h>
 #include <tabos/time.h>
