@@ -11,7 +11,8 @@ tabos/
 ├── apps/                Bundled TabOS applications, including the future shell
 ├── audio/               Portable audio subsystem
 ├── cmake/               Shared host-build CMake modules
-├── config/              Common identity, visible strings, and display settings
+├── config/              Common identity, display, input, and console build settings
+├── console/             Portable foreground text-console service
 ├── docs/                User and contributor documentation
 ├── fs/                  Portable filesystem subsystem
 ├── graphics/            Portable framebuffer and graphics subsystem
@@ -45,7 +46,7 @@ tabos/
 
 Some directories contain only `.gitkeep` placeholders. Their stated responsibilities are planned boundaries; their APIs are not yet defined.
 
-The command shell will be the first official TabOS application and belongs under `apps/`. It is not part of the kernel. The kernel and portable subsystems will provide the terminal, input, process, and filesystem services used by that application.
+The command shell will be the first official TabOS application and belongs under `apps/`. It is not part of the kernel. Current `apps/console_diagnostic/` is an optional interactive test application, not a shell. Kernel and portable subsystems provide terminal, console, input, process, and filesystem services used by applications.
 
 ## Targets and Platforms
 

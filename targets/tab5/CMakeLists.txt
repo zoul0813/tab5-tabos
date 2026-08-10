@@ -4,6 +4,7 @@ set(TABOS_ROOT "${CMAKE_CURRENT_LIST_DIR}/../..")
 include("${TABOS_ROOT}/config/Identity.cmake")
 include("${TABOS_ROOT}/config/Display.cmake")
 include("${TABOS_ROOT}/config/Input.cmake")
+include("${TABOS_ROOT}/config/Console.cmake")
 
 set(TABOS_GENERATED_INCLUDE_DIR "${CMAKE_BINARY_DIR}/generated")
 configure_file(
@@ -19,6 +20,10 @@ configure_file(
 configure_file(
     "${TABOS_ROOT}/config/input.h.in"
     "${TABOS_GENERATED_INCLUDE_DIR}/tabos/config/input.h"
+)
+configure_file(
+    "${TABOS_ROOT}/config/console.h.in"
+    "${TABOS_GENERATED_INCLUDE_DIR}/tabos/config/console.h"
 )
 
 set(EXTRA_COMPONENT_DIRS

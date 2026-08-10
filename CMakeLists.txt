@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.22)
 include("${CMAKE_CURRENT_SOURCE_DIR}/config/Identity.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/config/Display.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/config/Input.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/config/Console.cmake")
 project(${TABOS_CMAKE_PROJECT_NAME} VERSION ${TABOS_PROJECT_VERSION} LANGUAGES C)
 
 set(TABOS_GENERATED_INCLUDE_DIR "${CMAKE_BINARY_DIR}/generated")
@@ -19,6 +20,10 @@ configure_file(
 configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/config/input.h.in"
     "${TABOS_GENERATED_INCLUDE_DIR}/tabos/config/input.h"
+)
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/config/console.h.in"
+    "${TABOS_GENERATED_INCLUDE_DIR}/tabos/config/console.h"
 )
 
 set(TABOS_TARGET "" CACHE STRING "${TABOS_SYSTEM_NAME} target platform (macos or linux)")
@@ -56,6 +61,8 @@ add_library(tabos_core STATIC ${TABOS_CORE_SOURCES})
 target_include_directories(tabos_core
     PUBLIC "${TABOS_ROOT}/sdk/include"
     PRIVATE
+        "${TABOS_ROOT}/apps/console_diagnostic/include"
+        "${TABOS_ROOT}/console/include"
         "${TABOS_ROOT}/graphics/include"
         "${TABOS_ROOT}/input/include"
         "${TABOS_ROOT}/kernel/include"

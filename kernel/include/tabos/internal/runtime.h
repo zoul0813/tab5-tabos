@@ -5,6 +5,7 @@
 
 bool tabos_runtime_init(void);
 bool tabos_runtime_start(void);
+void tabos_runtime_update(void);
 void tabos_runtime_shutdown(void);
 const char *tabos_runtime_version(void);
 

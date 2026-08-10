@@ -35,5 +35,5 @@ void app_main(void)
         tab_platform_name()
     );
 
-    (void)tab_platform_run();
+    (void)tab_platform_run(tabos_runtime_update);
 }

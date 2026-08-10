@@ -7,6 +7,7 @@ This directory contains user and contributor documentation for TabOS.
 - [Directory Structure](directory-structure.md): repository layout, directory responsibilities, and dependency boundaries.
 - [Display System](display.md): logical framebuffer contract, host presentation, and Tab5 display behavior.
 - [Keyboard Input](input.md): public events, SDL3 translation, and Tab5 Keyboard protocol.
+- [Console Service](console.md): foreground ownership, terminal controls, input, and diagnostic app.
 
 ## Documentation Policy
 

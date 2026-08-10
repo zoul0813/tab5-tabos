@@ -405,6 +405,10 @@ This section describes eventual GUI/input testing, not current implementation pr
 
 Current keyboard coverage includes host tests for HID-to-text translation, key/text event ordering, queue overflow policy, and runtime bootstrap with a fake keyboard platform. SDL3 and the Tab5 I2C backend feed the same public queue. Hardware validation must confirm that boot diagnostics show `TAB5 KEYBOARD FW ...; HID MODE`; missing keyboard must remain a warning rather than preventing boot. Builds configured with `TABOS_ENABLE_KEYBOARD_DIAGNOSTICS=ON` also log every normalized key/text event without consuming the queue; this flag defaults off. USB HID keyboards on Tab5 are not yet supported.
 
+Console tests cover exclusive foreground acquisition, background and stale-session rejection, rejected-read non-consumption, cursor controls, clearing, and scrolling. `TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP=ON` provides manual cross-target keyboard-to-framebuffer validation and defaults off. Diagnostic application is not shell.
+
+Manual console validation must include prompt-boundary Backspace, held Backspace, held printable keys, Enter, and Tab followed by visible text. Host backend synthesizes missing Enter/Tab/repeat text while retaining SDL text input for normal layout and IME behavior; matching SDL text events are suppressed to prevent duplicates.
+
 Desktop mouse/pointer events should be mapped into the TabOS touch event model.
 
 For example:

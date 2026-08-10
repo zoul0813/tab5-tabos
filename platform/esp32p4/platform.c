@@ -370,7 +370,7 @@ bool tab_platform_init(bool headless)
     return true;
 }
 
-int tab_platform_run(void)
+int tab_platform_run(tab_platform_update_fn update)
 {
     ESP_LOGI(TAG, "Tab5 platform run loop started");
     for (;;) {
@@ -392,6 +392,9 @@ int tab_platform_run(void)
                     keyboard_submit_report(report[0], report[1]);
                 }
             }
+        }
+        if (update != NULL) {
+            update();
         }
         vTaskDelay(pdMS_TO_TICKS(10));
     }

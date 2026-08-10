@@ -24,7 +24,7 @@ The queue holds 64 events and is protected for host-thread and FreeRTOS-task acc
 
 ## Host Backend
 
-SDL3 physical keyboard events become TabOS key-down/key-up events. SDL3 text input becomes TabOS UTF-8 text events. This preserves host keyboard layout and input-method behavior instead of rebuilding host text translation inside TabOS.
+SDL3 physical keyboard events become TabOS key-down/key-up events. SDL3 text input becomes TabOS UTF-8 text events. This preserves host keyboard layout and input-method behavior instead of rebuilding host text translation inside TabOS. SDL does not consistently provide text events for Enter, Tab, or operating-system key repeat, so host backend synthesizes those missing normalized text events and suppresses matching SDL duplicates.
 
 ## Tab5 Keyboard Backend
 

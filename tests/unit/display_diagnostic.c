@@ -60,6 +60,16 @@ int main(void)
         terminal.row != 1U || terminal.column != 0U) {
         return 1;
     }
+
+    tab_terminal_clear(&terminal);
+    tab_terminal_write(&terminal, "AB\tC");
+    if (terminal.column != 5U || terminal.row != 0U) {
+        return 1;
+    }
+    tab_terminal_write(&terminal, "\b");
+    if (terminal.column != 4U || terminal.row != 0U) {
+        return 1;
+    }
     if (!tab_display_present()) {
         return 1;
     }

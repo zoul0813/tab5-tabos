@@ -37,7 +37,7 @@ int main(int argc, char **argv)
 
     printf("%s %s on %s\n", TABOS_SYSTEM_NAME, tabos_runtime_version(), tab_platform_name());
 
-    const int result = tab_platform_run();
+    const int result = tab_platform_run(tabos_runtime_update);
     tabos_runtime_shutdown();
     tab_platform_shutdown();
     return result;

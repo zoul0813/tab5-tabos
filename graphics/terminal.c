@@ -39,6 +39,40 @@ static void newline(tab_terminal_t *terminal)
     }
 }
 
+static void draw_character(tab_terminal_t *terminal, char character)
+{
+    (void)tab_font_draw_char(terminal->framebuffer,
+                             (int)(terminal->column * cell_width(terminal)),
+                             (int)(terminal->row * cell_height(terminal)), character,
+                             terminal->scale, terminal->foreground, terminal->background);
+}
+
+static void backspace(tab_terminal_t *terminal)
+{
+    if (terminal->column > 0U) {
+        --terminal->column;
+    } else if (terminal->row > 0U) {
+        --terminal->row;
+        terminal->column = terminal->columns - 1U;
+    } else {
+        return;
+    }
+    draw_character(terminal, ' ');
+}
+
+static void tab(tab_terminal_t *terminal)
+{
+    enum { TAB_WIDTH = 4 };
+    const size_t spaces = TAB_WIDTH - (terminal->column % TAB_WIDTH);
+    for (size_t index = 0U; index < spaces; ++index) {
+        draw_character(terminal, ' ');
+        ++terminal->column;
+        if (terminal->column >= terminal->columns) {
+            newline(terminal);
+        }
+    }
+}
+
 bool tab_terminal_init(tab_terminal_t *terminal, tab_framebuffer_t *framebuffer, unsigned int scale)
 {
     if (terminal == NULL || framebuffer == NULL || framebuffer->pixels == NULL || scale == 0U) {
@@ -89,11 +123,12 @@ void tab_terminal_write(tab_terminal_t *terminal, const char *text)
             newline(terminal);
         } else if (*text == '\r') {
             terminal->column = 0U;
+        } else if (*text == '\b' || *text == 0x7f) {
+            backspace(terminal);
+        } else if (*text == '\t') {
+            tab(terminal);
         } else {
-            (void)tab_font_draw_char(terminal->framebuffer,
-                                     (int)(terminal->column * cell_width(terminal)),
-                                     (int)(terminal->row * cell_height(terminal)), *text,
-                                     terminal->scale, terminal->foreground, terminal->background);
+            draw_character(terminal, *text);
             ++terminal->column;
             if (terminal->column >= terminal->columns) {
                 newline(terminal);

@@ -11,6 +11,7 @@ enum {
 };
 
 typedef uint16_t tab_pixel_t;
+typedef void (*tab_platform_update_fn)(void);
 
 typedef struct {
     tab_pixel_t *pixels;
@@ -38,7 +39,7 @@ typedef struct {
 } tab_platform_diagnostics_t;
 
 bool tab_platform_init(bool headless);
-int tab_platform_run(void);
+int tab_platform_run(tab_platform_update_fn update);
 void tab_platform_shutdown(void);
 const char *tab_platform_name(void);
 const char *tab_platform_display_name(void);

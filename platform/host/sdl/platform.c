@@ -16,6 +16,7 @@ static SDL_Texture *texture;
 static tab_pixel_t *framebuffer_pixels;
 static bool is_headless;
 static bool quit_requested;
+static char synthesized_text[TABOS_INPUT_TEXT_MAX_BYTES + 1U];
 
 static void input_update(bool wait);
 
@@ -54,16 +55,38 @@ static void dispatch_event(const SDL_Event *event)
         return;
     }
     if (event->type == SDL_EVENT_KEY_DOWN || event->type == SDL_EVENT_KEY_UP) {
+        const tabos_key_t key = input_key(event->key.scancode);
+        const uint8_t modifiers = input_modifiers(event->key.mod);
         const tabos_input_event_t input_event = {
             .type = event->type == SDL_EVENT_KEY_DOWN ? TABOS_INPUT_KEY_DOWN : TABOS_INPUT_KEY_UP,
-            .key = input_key(event->key.scancode),
-            .modifiers = input_modifiers(event->key.mod),
+            .key = key,
+            .modifiers = modifiers,
             .repeat = event->key.repeat,
         };
         (void)tab_input_submit(&input_event);
+
+        if (event->type == SDL_EVENT_KEY_UP) {
+            synthesized_text[0] = '\0';
+        } else if (event->key.repeat || key == TABOS_KEY_ENTER || key == TABOS_KEY_TAB) {
+            tabos_input_event_t text_event = {
+                .type = TABOS_INPUT_TEXT,
+                .modifiers = modifiers,
+                .repeat = event->key.repeat,
+            };
+            if (tab_input_text_from_hid((uint8_t)key, modifiers, text_event.text,
+                                        sizeof(text_event.text)) > 0U) {
+                (void)tab_input_submit(&text_event);
+                (void)snprintf(synthesized_text, sizeof(synthesized_text), "%s", text_event.text);
+            }
+        }
         return;
     }
     if (event->type == SDL_EVENT_TEXT_INPUT) {
+        if (synthesized_text[0] != '\0' && strcmp(synthesized_text, event->text.text) == 0) {
+            synthesized_text[0] = '\0';
+            return;
+        }
+        synthesized_text[0] = '\0';
         tabos_input_event_t input_event = {.type = TABOS_INPUT_TEXT};
         (void)snprintf(input_event.text, sizeof(input_event.text), "%s", event->text.text);
         (void)tab_input_submit(&input_event);
@@ -181,6 +204,7 @@ bool tab_platform_init(bool headless)
 {
     is_headless = headless;
     quit_requested = false;
+    synthesized_text[0] = '\0';
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
         SDL_Log("SDL initialization failed: %s", SDL_GetError());
@@ -221,14 +245,20 @@ bool tab_platform_init(bool headless)
     return true;
 }
 
-int tab_platform_run(void)
+int tab_platform_run(tab_platform_update_fn update)
 {
     if (is_headless) {
+        if (update != NULL) {
+            update();
+        }
         return 0;
     }
 
     while (!quit_requested) {
         input_update(true);
+        if (update != NULL) {
+            update();
+        }
     }
     return 0;
 }

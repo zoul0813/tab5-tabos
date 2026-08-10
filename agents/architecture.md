@@ -474,6 +474,8 @@ Touch input is intentionally deferred until the future GUI/windowing and applica
 
 Keyboard input now uses a public platform-neutral event queue with key-down, key-up, modifier, repeat, and UTF-8 text semantics. SDL3 and the Tab5 I2C keyboard are backend producers. Future USB HID support on Tab5 must feed the same queue and may coexist with the built-in I2C keyboard; applications must not depend on input-device-specific protocols.
 
+The portable console service provides cooperative foreground ownership above this queue. One session at a time may consume console input and update framebuffer terminal. Session tokens reject background and stale callers but are not a security boundary. Future process manager must own foreground assignment policy. Optional console diagnostic application uses only public console API and remains outside kernel shell policy.
+
 ---
 
 ## 11. Graphics Architecture

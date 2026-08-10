@@ -1,6 +1,7 @@
 #include <tabos/internal/runtime.h>
 
 #include <tabos/internal/boot_report.h>
+#include <tabos/internal/console.h>
 #include <tabos/internal/display.h>
 #include <tabos/internal/input.h>
 #include <tabos/internal/terminal.h>
@@ -11,6 +12,11 @@
 
 #include <tabos/config/identity.h>
 #include <tabos/config/display.h>
+#include <tabos/config/console.h>
+
+#if TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP
+#include <tabos/internal/console_diagnostic.h>
+#endif
 
 #include <inttypes.h>
 #include <stdio.h>
@@ -157,13 +163,36 @@ bool tabos_runtime_start(void)
         return false;
     }
 
+    tab_console_init(&terminal);
     runtime_started = true;
+#if TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP
+    if (!tab_console_diagnostic_start()) {
+        tab_console_shutdown();
+        runtime_started = false;
+        tab_display_shutdown();
+        return false;
+    }
+#endif
     return true;
+}
+
+void tabos_runtime_update(void)
+{
+    if (!runtime_started) {
+        return;
+    }
+#if TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP
+    tab_console_diagnostic_update();
+#endif
 }
 
 void tabos_runtime_shutdown(void)
 {
     if (runtime_started) {
+#if TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP
+        tab_console_diagnostic_stop();
+#endif
+        tab_console_shutdown();
         tab_display_shutdown();
         runtime_started = false;
         terminal = (tab_terminal_t){0};
@@ -191,6 +220,9 @@ bool tabos_terminal_set_scale(unsigned int scale)
     const unsigned int previous_scale = terminal_scale;
     terminal_scale = scale;
     if (!runtime_started || render_boot_report()) {
+        if (runtime_started) {
+            tab_console_rebind(&terminal);
+        }
         return true;
     }
 
