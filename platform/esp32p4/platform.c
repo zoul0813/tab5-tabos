@@ -1,6 +1,7 @@
 #include <tabos/platform/platform.h>
 
 #include <tabos/config/identity.h>
+#include <tabos/internal/input.h>
 #include <tabos/platform/display_transform.h>
 
 #include <bsp/esp-bsp.h>
@@ -21,12 +22,21 @@
 #include <sdkconfig.h>
 
 #include <stddef.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 static const char *const TAG = TABOS_PLATFORM_LOG_TAG;
 
 /* M5Stack's current ST712x Tab5 reference uses 965 Mbps. */
 #define TABOS_TAB5_DSI_LANE_BITRATE_MBPS 965
+#define TABOS_KEYBOARD_I2C_ADDRESS 0x6d
+#define TABOS_KEYBOARD_I2C_FREQUENCY_HZ 400000
+#define TABOS_KEYBOARD_REG_INTERRUPT_CONFIG 0x00
+#define TABOS_KEYBOARD_REG_EVENT_COUNT 0x02
+#define TABOS_KEYBOARD_REG_MODE 0x10
+#define TABOS_KEYBOARD_REG_HID_EVENT 0x30
+#define TABOS_KEYBOARD_REG_FIRMWARE_VERSION 0xfe
+#define TABOS_KEYBOARD_MODE_HID 1
 
 static bsp_lcd_handles_t display_handles;
 static esp_ldo_channel_handle_t display_phy_power;
@@ -36,6 +46,12 @@ static bool display_created;
 static bool display_uses_bsp;
 static bool backlight_enabled;
 static const char *detected_display_name = "unknown";
+static i2c_master_bus_handle_t keyboard_bus;
+static i2c_master_dev_handle_t keyboard_device;
+static bool keyboard_present;
+static uint8_t keyboard_previous_usage;
+static uint8_t keyboard_previous_modifiers;
+static char keyboard_name[40] = "TAB5 KEYBOARD NOT DETECTED";
 
 typedef enum {
     TAB5_PANEL_UNKNOWN = 0,
@@ -43,6 +59,154 @@ typedef enum {
     TAB5_PANEL_ST7121,
     TAB5_PANEL_ST7123,
 } tab5_panel_type_t;
+
+static esp_err_t keyboard_read(uint8_t reg, void *data, size_t data_size)
+{
+    return i2c_master_transmit_receive(
+        keyboard_device,
+        &reg,
+        sizeof(reg),
+        data,
+        data_size,
+        100
+    );
+}
+
+static esp_err_t keyboard_write(uint8_t reg, uint8_t value)
+{
+    const uint8_t command[] = {reg, value};
+    return i2c_master_transmit(keyboard_device, command, sizeof(command), 100);
+}
+
+static uint8_t keyboard_modifiers(uint8_t hid_modifiers)
+{
+    uint8_t modifiers = 0U;
+    if ((hid_modifiers & 0x11U) != 0U) {
+        modifiers |= TABOS_MODIFIER_CONTROL;
+    }
+    if ((hid_modifiers & 0x22U) != 0U) {
+        modifiers |= TABOS_MODIFIER_SHIFT;
+    }
+    if ((hid_modifiers & 0x44U) != 0U) {
+        modifiers |= TABOS_MODIFIER_ALT;
+    }
+    if ((hid_modifiers & 0x88U) != 0U) {
+        modifiers |= TABOS_MODIFIER_GUI;
+    }
+    return modifiers;
+}
+
+static tabos_key_t keyboard_key(uint8_t usage)
+{
+    if ((usage >= TABOS_KEY_A && usage <= TABOS_KEY_CAPS_LOCK) ||
+        (usage >= TABOS_KEY_F1 && usage <= TABOS_KEY_F12) ||
+        (usage >= TABOS_KEY_INSERT && usage <= TABOS_KEY_UP)) {
+        return (tabos_key_t)usage;
+    }
+    return TABOS_KEY_UNKNOWN;
+}
+
+static void keyboard_submit_report(uint8_t hid_modifiers, uint8_t usage)
+{
+    const uint8_t modifiers = keyboard_modifiers(hid_modifiers);
+    if (keyboard_previous_usage != 0U && keyboard_previous_usage != usage) {
+        const tabos_input_event_t release = {
+            .type = TABOS_INPUT_KEY_UP,
+            .key = keyboard_key(keyboard_previous_usage),
+            .modifiers = keyboard_previous_modifiers,
+        };
+        (void)tab_input_submit(&release);
+    }
+
+    if (usage != 0U) {
+        const bool repeat = usage == keyboard_previous_usage;
+        const tabos_input_event_t press = {
+            .type = TABOS_INPUT_KEY_DOWN,
+            .key = keyboard_key(usage),
+            .modifiers = modifiers,
+            .repeat = repeat,
+        };
+        (void)tab_input_submit(&press);
+
+        tabos_input_event_t text = {
+            .type = TABOS_INPUT_TEXT,
+            .modifiers = modifiers,
+            .repeat = repeat,
+        };
+        if (tab_input_text_from_hid(usage, modifiers, text.text, sizeof(text.text)) > 0U) {
+            (void)tab_input_submit(&text);
+        }
+    }
+
+    keyboard_previous_usage = usage;
+    keyboard_previous_modifiers = modifiers;
+}
+
+static void keyboard_shutdown(void)
+{
+    if (keyboard_device != NULL) {
+        (void)i2c_master_bus_rm_device(keyboard_device);
+        keyboard_device = NULL;
+    }
+    if (keyboard_bus != NULL) {
+        (void)i2c_del_master_bus(keyboard_bus);
+        keyboard_bus = NULL;
+    }
+    keyboard_present = false;
+    keyboard_previous_usage = 0U;
+    keyboard_previous_modifiers = 0U;
+}
+
+static void keyboard_init(void)
+{
+    (void)snprintf(keyboard_name, sizeof(keyboard_name), "TAB5 KEYBOARD NOT DETECTED");
+    const i2c_master_bus_config_t bus_config = {
+        .i2c_port = I2C_NUM_0,
+        .sda_io_num = GPIO_NUM_0,
+        .scl_io_num = GPIO_NUM_1,
+        .clk_source = I2C_CLK_SRC_DEFAULT,
+        .glitch_ignore_cnt = 7,
+        .flags.enable_internal_pullup = true,
+    };
+    esp_err_t result = i2c_new_master_bus(&bus_config, &keyboard_bus);
+    if (result != ESP_OK) {
+        ESP_LOGW(TAG, "Could not initialize Tab5 Keyboard I2C bus: %s", esp_err_to_name(result));
+        return;
+    }
+    result = i2c_master_probe(keyboard_bus, TABOS_KEYBOARD_I2C_ADDRESS, 100);
+    if (result != ESP_OK) {
+        ESP_LOGW(TAG, "Tab5 Keyboard not detected at I2C address 0x%02x",
+                 TABOS_KEYBOARD_I2C_ADDRESS);
+        return;
+    }
+
+    const i2c_device_config_t device_config = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = TABOS_KEYBOARD_I2C_ADDRESS,
+        .scl_speed_hz = TABOS_KEYBOARD_I2C_FREQUENCY_HZ,
+    };
+    result = i2c_master_bus_add_device(keyboard_bus, &device_config, &keyboard_device);
+    if (result != ESP_OK) {
+        ESP_LOGW(TAG, "Could not attach Tab5 Keyboard I2C device: %s", esp_err_to_name(result));
+        return;
+    }
+
+    uint8_t firmware_version = 0U;
+    if (keyboard_read(TABOS_KEYBOARD_REG_FIRMWARE_VERSION, &firmware_version,
+                      sizeof(firmware_version)) != ESP_OK ||
+        keyboard_write(TABOS_KEYBOARD_REG_MODE, TABOS_KEYBOARD_MODE_HID) != ESP_OK ||
+        keyboard_write(TABOS_KEYBOARD_REG_EVENT_COUNT, 0U) != ESP_OK ||
+        keyboard_write(TABOS_KEYBOARD_REG_INTERRUPT_CONFIG, 0U) != ESP_OK) {
+        ESP_LOGW(TAG, "Could not configure Tab5 Keyboard");
+        keyboard_shutdown();
+        return;
+    }
+
+    keyboard_present = true;
+    (void)snprintf(keyboard_name, sizeof(keyboard_name), "TAB5 KEYBOARD FW %u; HID MODE",
+                   firmware_version);
+    ESP_LOGI(TAG, "Detected keyboard: %s", keyboard_name);
+}
 
 static tab5_panel_type_t tab5_detect_panel(void)
 {
@@ -202,6 +366,7 @@ static esp_err_t tab5_display_new_st7121(void)
 bool tab_platform_init(bool headless)
 {
     (void)headless;
+    keyboard_init();
     return true;
 }
 
@@ -209,13 +374,33 @@ int tab_platform_run(void)
 {
     ESP_LOGI(TAG, "Tab5 platform run loop started");
     for (;;) {
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        if (keyboard_present) {
+            uint8_t count = 0U;
+            if (keyboard_read(TABOS_KEYBOARD_REG_EVENT_COUNT, &count, sizeof(count)) == ESP_OK) {
+                if (count > 32U) {
+                    count = 32U;
+                }
+                for (uint8_t index = 0U; index < count; ++index) {
+                    uint8_t report[2] = {0xffU, 0xffU};
+                    if (keyboard_read(TABOS_KEYBOARD_REG_HID_EVENT, report, sizeof(report)) !=
+                        ESP_OK) {
+                        break;
+                    }
+                    if (report[0] == 0xffU && report[1] == 0xffU) {
+                        break;
+                    }
+                    keyboard_submit_report(report[0], report[1]);
+                }
+            }
+        }
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 
 void tab_platform_shutdown(void)
 {
     tab_platform_display_shutdown();
+    keyboard_shutdown();
 }
 
 const char *tab_platform_name(void)
@@ -247,6 +432,8 @@ bool tab_platform_get_diagnostics(tab_platform_diagnostics_t *diagnostics)
         .external_memory_free_bytes = heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
         .external_memory_present = true,
         .flash_capacity_bytes = flash_capacity,
+        .keyboard_name = keyboard_name,
+        .keyboard_present = keyboard_present,
     };
     return true;
 }
@@ -256,6 +443,11 @@ void tab_platform_log(const char *message)
     if (message != NULL) {
         ESP_LOGI(TABOS_SYSTEM_LOG_TAG, "%s", message);
     }
+}
+
+void tab_platform_input_wait(void)
+{
+    vTaskDelay(pdMS_TO_TICKS(1));
 }
 
 bool tab_platform_display_init(tab_framebuffer_t *framebuffer)

@@ -8,6 +8,7 @@ set(TABOS_CORE_SOURCES
     "${TABOS_ROOT}/graphics/display.c"
     "${TABOS_ROOT}/graphics/font.c"
     "${TABOS_ROOT}/graphics/terminal.c"
+    "${TABOS_ROOT}/input/input.c"
 )
 
 set(TABOS_HOST_PLATFORM_SOURCES

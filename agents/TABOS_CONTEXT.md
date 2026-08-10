@@ -358,6 +358,10 @@ Touch is not part of the initial terminal interface. Do not prioritize a general
 
 The current ST712x touch-controller access exists only to identify the attached display revision. Keep that narrow probe separate from future kernel touch/input support.
 
+### Current implementation: keyboard input
+
+The public `<tabos/input.h>` API exposes physical key-down/key-up events, modifiers, repeat state, UTF-8 text events, and blocking/nonblocking reads through a thread-safe 64-event queue. SDL3 supplies host physical/text events. Tab5 uses ExtPort1 I2C controller 0 on GPIO0/GPIO1, probes address `0x6D`, reports firmware register `0xFE`, and reads HID-mode reports. It polls at 10 ms; GPIO50 interrupt support is a later optimization that must not change public semantics. Tab5 text translation is currently US ANSI. Missing keyboard hardware is a boot warning, not a fatal initialization error. Optional CMake flag `TABOS_ENABLE_KEYBOARD_DIAGNOSTICS` logs normalized events without consuming them and defaults off. USB HID keyboards on Tab5 are a future backend; they should coexist with the I2C keyboard through the same queue. Touch remains excluded.
+
 ## 11. Networking
 
 ### Hardware assumption

@@ -22,6 +22,18 @@ tabos_enable_sanitizers(tabos_display_diagnostic)
 
 add_test(NAME unit.display_diagnostic COMMAND tabos_display_diagnostic)
 
+add_executable(tabos_input_queue unit/input_queue.c fakes/platform_display.c)
+target_include_directories(tabos_input_queue PRIVATE
+    "${TABOS_ROOT}/input/include"
+    "${TABOS_ROOT}/platform/include"
+    "${TABOS_ROOT}/sdk/include"
+)
+target_link_libraries(tabos_input_queue PRIVATE tabos_core)
+tabos_enable_warnings(tabos_input_queue)
+tabos_enable_sanitizers(tabos_input_queue)
+
+add_test(NAME unit.input_queue COMMAND tabos_input_queue)
+
 add_test(NAME integration.host_smoke COMMAND tabos_host --smoke)
 set_tests_properties(integration.host_smoke PROPERTIES
     ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy"

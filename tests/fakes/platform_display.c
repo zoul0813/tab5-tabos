@@ -50,6 +50,8 @@ bool tab_platform_get_diagnostics(tab_platform_diagnostics_t *diagnostics)
         .memory_total_bytes = 1024U,
         .memory_free_bytes = 512U,
         .memory_free_known = true,
+        .keyboard_name = "TEST KEYBOARD",
+        .keyboard_present = true,
     };
     return true;
 }
@@ -57,4 +59,8 @@ bool tab_platform_get_diagnostics(tab_platform_diagnostics_t *diagnostics)
 void tab_platform_log(const char *message)
 {
     (void)message;
+}
+
+void tab_platform_input_wait(void)
+{
 }

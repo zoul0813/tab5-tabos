@@ -472,6 +472,8 @@ Keyboard latency and reliability have priority because TabOS is intended to supp
 
 Touch input is intentionally deferred until the future GUI/windowing and application-input work. Initial terminal and shell milestones require keyboard support, not touch. Current ST712x I2C access in the display backend is hardware-revision detection only and must not be mistaken for a general touch subsystem.
 
+Keyboard input now uses a public platform-neutral event queue with key-down, key-up, modifier, repeat, and UTF-8 text semantics. SDL3 and the Tab5 I2C keyboard are backend producers. Future USB HID support on Tab5 must feed the same queue and may coexist with the built-in I2C keyboard; applications must not depend on input-device-specific protocols.
+
 ---
 
 ## 11. Graphics Architecture

@@ -5,6 +5,7 @@ idf_component_register(
     SRCS ${TABOS_CORE_SOURCES}
     INCLUDE_DIRS
         "${TABOS_ROOT}/graphics/include"
+        "${TABOS_ROOT}/input/include"
         "${CMAKE_CURRENT_LIST_DIR}/include"
         "${TABOS_ROOT}/sdk/include"
     PRIV_INCLUDE_DIRS

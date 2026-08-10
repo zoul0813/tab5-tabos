@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.22)
 
 include("${CMAKE_CURRENT_SOURCE_DIR}/config/Identity.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/config/Display.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/config/Input.cmake")
 project(${TABOS_CMAKE_PROJECT_NAME} VERSION ${TABOS_PROJECT_VERSION} LANGUAGES C)
 
 set(TABOS_GENERATED_INCLUDE_DIR "${CMAKE_BINARY_DIR}/generated")
@@ -14,6 +15,10 @@ configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/config/display.h.in"
     "${TABOS_GENERATED_INCLUDE_DIR}/tabos/config/display.h"
     @ONLY
+)
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/config/input.h.in"
+    "${TABOS_GENERATED_INCLUDE_DIR}/tabos/config/input.h"
 )
 
 set(TABOS_TARGET "" CACHE STRING "${TABOS_SYSTEM_NAME} target platform (macos or linux)")
@@ -52,6 +57,7 @@ target_include_directories(tabos_core
     PUBLIC "${TABOS_ROOT}/sdk/include"
     PRIVATE
         "${TABOS_ROOT}/graphics/include"
+        "${TABOS_ROOT}/input/include"
         "${TABOS_ROOT}/kernel/include"
         "${TABOS_ROOT}/platform/include"
         "${TABOS_GENERATED_INCLUDE_DIR}"
@@ -62,7 +68,10 @@ tabos_enable_sanitizers(tabos_core)
 add_library(tabos_platform_host STATIC ${TABOS_HOST_PLATFORM_SOURCES})
 target_include_directories(tabos_platform_host
     PUBLIC "${TABOS_ROOT}/platform/include"
-    PRIVATE "${TABOS_GENERATED_INCLUDE_DIR}"
+    PRIVATE
+        "${TABOS_ROOT}/input/include"
+        "${TABOS_ROOT}/sdk/include"
+        "${TABOS_GENERATED_INCLUDE_DIR}"
 )
 target_link_libraries(tabos_platform_host PRIVATE SDL3::SDL3)
 target_compile_definitions(tabos_platform_host PRIVATE TABOS_TARGET_HOST=1)

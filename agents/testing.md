@@ -403,6 +403,8 @@ Hardware-specific tests are still required for the real STM32 keyboard controlle
 
 This section describes eventual GUI/input testing, not current implementation priority. Touch and host pointer-to-touch mapping are deferred until the windowing system and application touch API. Terminal, keyboard, and shell work should not wait for touch support.
 
+Current keyboard coverage includes host tests for HID-to-text translation, key/text event ordering, queue overflow policy, and runtime bootstrap with a fake keyboard platform. SDL3 and the Tab5 I2C backend feed the same public queue. Hardware validation must confirm that boot diagnostics show `TAB5 KEYBOARD FW ...; HID MODE`; missing keyboard must remain a warning rather than preventing boot. Builds configured with `TABOS_ENABLE_KEYBOARD_DIAGNOSTICS=ON` also log every normalized key/text event without consuming the queue; this flag defaults off. USB HID keyboards on Tab5 are not yet supported.
+
 Desktop mouse/pointer events should be mapped into the TabOS touch event model.
 
 For example:

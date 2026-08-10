@@ -33,6 +33,8 @@ typedef struct {
     uint64_t storage_total_bytes;
     uint64_t storage_free_bytes;
     bool storage_mounted;
+    const char *keyboard_name;
+    bool keyboard_present;
 } tab_platform_diagnostics_t;
 
 bool tab_platform_init(bool headless);
@@ -42,6 +44,7 @@ const char *tab_platform_name(void);
 const char *tab_platform_display_name(void);
 bool tab_platform_get_diagnostics(tab_platform_diagnostics_t *diagnostics);
 void tab_platform_log(const char *message);
+void tab_platform_input_wait(void);
 
 bool tab_platform_display_init(tab_framebuffer_t *framebuffer);
 bool tab_platform_display_present(const tab_framebuffer_t *framebuffer);

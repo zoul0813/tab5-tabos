@@ -2,6 +2,7 @@
 
 #include <tabos/internal/boot_report.h>
 #include <tabos/internal/display.h>
+#include <tabos/internal/input.h>
 #include <tabos/internal/terminal.h>
 
 #include <tabos/terminal.h>
@@ -73,6 +74,7 @@ bool tabos_runtime_init(void)
     }
 
     runtime_initialized = true;
+    tab_input_init();
     return true;
 }
 
@@ -137,6 +139,14 @@ bool tabos_runtime_start(void)
             (void)tab_boot_report_add(&boot_report, "STORAGE", "FILESYSTEM NOT MOUNTED",
                                       TAB_BOOT_STATUS_WARNING);
         }
+        if (diagnostics.keyboard_name != NULL) {
+            (void)tab_boot_report_add(
+                &boot_report,
+                "KEYBOARD",
+                diagnostics.keyboard_name,
+                diagnostics.keyboard_present ? TAB_BOOT_STATUS_OK : TAB_BOOT_STATUS_WARNING
+            );
+        }
     }
     (void)tab_boot_report_add(&boot_report, "KERNEL", "RUNTIME INITIALIZED",
                               TAB_BOOT_STATUS_OK);
@@ -161,6 +171,7 @@ void tabos_runtime_shutdown(void)
     }
 
     runtime_initialized = false;
+    tab_input_shutdown();
 }
 
 const char *tabos_runtime_version(void)

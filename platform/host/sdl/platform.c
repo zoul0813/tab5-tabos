@@ -1,5 +1,7 @@
 #include <tabos/platform/platform.h>
 
+#include <tabos/internal/input.h>
+
 #include <tabos/config/identity.h>
 
 #include <SDL3/SDL.h>
@@ -13,6 +15,60 @@ static SDL_Renderer *renderer;
 static SDL_Texture *texture;
 static tab_pixel_t *framebuffer_pixels;
 static bool is_headless;
+static bool quit_requested;
+
+static void input_update(bool wait);
+
+static uint8_t input_modifiers(SDL_Keymod modifiers)
+{
+    uint8_t result = 0U;
+    if ((modifiers & SDL_KMOD_CTRL) != 0U) {
+        result |= TABOS_MODIFIER_CONTROL;
+    }
+    if ((modifiers & SDL_KMOD_SHIFT) != 0U) {
+        result |= TABOS_MODIFIER_SHIFT;
+    }
+    if ((modifiers & SDL_KMOD_ALT) != 0U) {
+        result |= TABOS_MODIFIER_ALT;
+    }
+    if ((modifiers & SDL_KMOD_GUI) != 0U) {
+        result |= TABOS_MODIFIER_GUI;
+    }
+    return result;
+}
+
+static tabos_key_t input_key(SDL_Scancode scancode)
+{
+    if ((scancode >= SDL_SCANCODE_A && scancode <= SDL_SCANCODE_CAPSLOCK) ||
+        (scancode >= SDL_SCANCODE_F1 && scancode <= SDL_SCANCODE_F12) ||
+        (scancode >= SDL_SCANCODE_INSERT && scancode <= SDL_SCANCODE_UP)) {
+        return (tabos_key_t)scancode;
+    }
+    return TABOS_KEY_UNKNOWN;
+}
+
+static void dispatch_event(const SDL_Event *event)
+{
+    if (event->type == SDL_EVENT_QUIT) {
+        quit_requested = true;
+        return;
+    }
+    if (event->type == SDL_EVENT_KEY_DOWN || event->type == SDL_EVENT_KEY_UP) {
+        const tabos_input_event_t input_event = {
+            .type = event->type == SDL_EVENT_KEY_DOWN ? TABOS_INPUT_KEY_DOWN : TABOS_INPUT_KEY_UP,
+            .key = input_key(event->key.scancode),
+            .modifiers = input_modifiers(event->key.mod),
+            .repeat = event->key.repeat,
+        };
+        (void)tab_input_submit(&input_event);
+        return;
+    }
+    if (event->type == SDL_EVENT_TEXT_INPUT) {
+        tabos_input_event_t input_event = {.type = TABOS_INPUT_TEXT};
+        (void)snprintf(input_event.text, sizeof(input_event.text), "%s", event->text.text);
+        (void)tab_input_submit(&input_event);
+    }
+}
 
 static char *window_state_path(void)
 {
@@ -124,6 +180,7 @@ static void save_window_position(void)
 bool tab_platform_init(bool headless)
 {
     is_headless = headless;
+    quit_requested = false;
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
         SDL_Log("SDL initialization failed: %s", SDL_GetError());
@@ -155,26 +212,25 @@ bool tab_platform_init(bool headless)
         return false;
     }
 
+    if (!SDL_StartTextInput(window)) {
+        SDL_Log("SDL text input initialization failed: %s", SDL_GetError());
+        tab_platform_shutdown();
+        return false;
+    }
+
     return true;
 }
 
 int tab_platform_run(void)
 {
-    SDL_Event event;
-
     if (is_headless) {
         return 0;
     }
 
-    for (;;) {
-        while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_EVENT_QUIT) {
-                return 0;
-            }
-        }
-
-        SDL_Delay(10);
+    while (!quit_requested) {
+        input_update(true);
     }
+    return 0;
 }
 
 void tab_platform_shutdown(void)
@@ -182,6 +238,7 @@ void tab_platform_shutdown(void)
     tab_platform_display_shutdown();
 
     if (window != NULL) {
+        SDL_StopTextInput(window);
         save_window_position();
         SDL_DestroyWindow(window);
         window = NULL;
@@ -220,6 +277,8 @@ bool tab_platform_get_diagnostics(tab_platform_diagnostics_t *diagnostics)
         .memory_total_bytes = ram_mebibytes > 0
             ? (uint64_t)(unsigned int)ram_mebibytes * 1024U * 1024U
             : 0U,
+        .keyboard_name = "SDL3 KEYBOARD",
+        .keyboard_present = true,
     };
     return true;
 }
@@ -229,6 +288,26 @@ void tab_platform_log(const char *message)
     if (message != NULL) {
         (void)printf("%s\n", message);
     }
+}
+
+static void input_update(bool wait)
+{
+    if (is_headless) {
+        return;
+    }
+
+    SDL_Event event;
+    if (wait && SDL_WaitEventTimeout(&event, 50)) {
+        dispatch_event(&event);
+    }
+    while (SDL_PollEvent(&event)) {
+        dispatch_event(&event);
+    }
+}
+
+void tab_platform_input_wait(void)
+{
+    SDL_Delay(1);
 }
 
 bool tab_platform_display_init(tab_framebuffer_t *framebuffer)
