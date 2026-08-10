@@ -1,10 +1,25 @@
-add_executable(tabos_core_smoke unit/core_smoke.c)
-target_include_directories(tabos_core_smoke PRIVATE "${TABOS_ROOT}/kernel/include")
+add_executable(tabos_core_smoke unit/core_smoke.c fakes/platform_display.c)
+target_include_directories(tabos_core_smoke PRIVATE
+    "${TABOS_ROOT}/graphics/include"
+    "${TABOS_ROOT}/kernel/include"
+    "${TABOS_ROOT}/platform/include"
+)
 target_link_libraries(tabos_core_smoke PRIVATE tabos_core)
 tabos_enable_warnings(tabos_core_smoke)
 tabos_enable_sanitizers(tabos_core_smoke)
 
 add_test(NAME unit.core_smoke COMMAND tabos_core_smoke)
+
+add_executable(tabos_display_diagnostic unit/display_diagnostic.c fakes/platform_display.c)
+target_include_directories(tabos_display_diagnostic PRIVATE
+    "${TABOS_ROOT}/graphics/include"
+    "${TABOS_ROOT}/platform/include"
+)
+target_link_libraries(tabos_display_diagnostic PRIVATE tabos_core)
+tabos_enable_warnings(tabos_display_diagnostic)
+tabos_enable_sanitizers(tabos_display_diagnostic)
+
+add_test(NAME unit.display_diagnostic COMMAND tabos_display_diagnostic)
 
 add_test(NAME integration.host_smoke COMMAND tabos_host --smoke)
 set_tests_properties(integration.host_smoke PROPERTIES

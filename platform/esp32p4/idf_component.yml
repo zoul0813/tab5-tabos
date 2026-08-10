@@ -1,0 +1,5 @@
+dependencies:
+  espressif/esp_lcd_st7121:
+    version: "1.0.1"
+  espressif/m5stack_tab5_noglib:
+    version: "1.2.0~1"

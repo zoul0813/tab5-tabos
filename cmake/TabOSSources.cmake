@@ -4,6 +4,7 @@ endif()
 
 set(TABOS_CORE_SOURCES
     "${TABOS_ROOT}/kernel/runtime.c"
+    "${TABOS_ROOT}/graphics/display.c"
 )
 
 set(TABOS_HOST_PLATFORM_SOURCES

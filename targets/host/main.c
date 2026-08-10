@@ -28,10 +28,17 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    if (!tabos_runtime_start()) {
+        fprintf(stderr, "%s display initialization failed\n", TABOS_SYSTEM_NAME);
+        tabos_runtime_shutdown();
+        tab_platform_shutdown();
+        return 1;
+    }
+
     printf("%s %s on %s\n", TABOS_SYSTEM_NAME, tabos_runtime_version(), tab_platform_name());
 
     const int result = tab_platform_run();
-    tab_platform_shutdown();
     tabos_runtime_shutdown();
+    tab_platform_shutdown();
     return result;
 }

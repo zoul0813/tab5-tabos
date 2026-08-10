@@ -40,7 +40,19 @@ Target device:
 - Tab5 Keyboard controller based on STM32, connected over I2C with an interrupt line
 - keyboard firmware exposes Normal, HID, and Character modes
 
-Exact board capabilities and ESP-IDF driver availability should still be verified against the hardware revision and SDK version actually used by the repository.
+### Decision: support all known Tab5 display revisions
+
+Tab5 hardware currently exists with three display-controller combinations:
+
+- ILI9881C display with GT911 touch controller
+- ST7123 display with ST712x touch firmware version 3
+- ST7121 display with ST712x touch firmware version 1
+
+The ESP-IDF platform backend must detect these at runtime so one firmware image works across revisions. Detection first probes GT911; ST712x devices are distinguished by reading touch firmware register `0x0000`. Do not rely on `m5stack_tab5_noglib` v1.2.0~1 board-version detection alone: it treats every ST712x touch address as ST7123 and therefore misidentifies ST7121 hardware.
+
+Current implementation uses the Tab5 BSP for ILI9881C and ST7123, and the official `espressif/esp_lcd_st7121` component for ST7121. ILI9881C uses the BSP 1000 Mbps DSI rate; ST7121/ST7123 use the M5Stack reference rate of 965 Mbps. Shared TabOS graphics render at 1280x720 RGB565 and the hardware backend rotates counter-clockwise into the panel's native 720x1280 scanout orientation.
+
+The detected display name must remain available through the platform API and reported over serial at info level in both debug and release builds. This information will later feed an on-screen boot driver/hardware list.
 
 ## 3. Operating-System Architecture
 
@@ -333,6 +345,12 @@ Input events should eventually cover:
 - system shortcuts
 
 The keyboard-first philosophy means reliable low-latency keyboard behavior has priority even though the Tab5 is also a touchscreen device.
+
+### Decision: touch input is deferred
+
+Touch is not part of the initial terminal interface. Do not prioritize a general touch driver, touch kernel events, host pointer emulation, or touch-facing application API while building the boot console, terminal, keyboard path, and shell. Touch support belongs later with the GUI/windowing system and application input API.
+
+The current ST712x touch-controller access exists only to identify the attached display revision. Keep that narrow probe separate from future kernel touch/input support.
 
 ## 11. Networking
 

@@ -16,6 +16,10 @@ int main(void)
         return 1;
     }
 
+    if (!tabos_runtime_start()) {
+        return 1;
+    }
+
     tabos_runtime_shutdown();
     return 0;
 }

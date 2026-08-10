@@ -82,7 +82,7 @@ jobs:
   tab5:
     name: Tab5 compile / ${{ matrix.configuration }}
     runs-on: ubuntu-24.04
-    container: espressif/idf:v5.4.2
+    container: espressif/idf:v5.4.4
     strategy:
       fail-fast: false
       matrix:

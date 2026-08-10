@@ -326,6 +326,8 @@ The hardware backend is responsible for adapting TabOS services to:
 - RTC
 - additional onboard devices
 
+The display backend currently owns runtime detection for ILI9881C, ST7123, and ST7121 Tab5 variants. It exposes the detected controller name through the platform boundary so portable boot-report code can list initialized hardware without depending on ESP-IDF types.
+
 ### 7.2 Host Backend
 
 The native host backend allows portable TabOS code to run directly on macOS.
@@ -465,6 +467,8 @@ A generic input event model should eventually support:
 - system shortcuts
 
 Keyboard latency and reliability have priority because TabOS is intended to support a keyboard-first workflow.
+
+Touch input is intentionally deferred until the future GUI/windowing and application-input work. Initial terminal and shell milestones require keyboard support, not touch. Current ST712x I2C access in the display backend is hardware-revision detection only and must not be mistaken for a general touch subsystem.
 
 ---
 

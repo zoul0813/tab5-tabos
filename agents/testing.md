@@ -4,7 +4,7 @@
 >
 > Purpose: define how TabOS should be structured, built, and tested across the real M5Stack Tab5 hardware target and native macOS/Linux development targets.
 >
-> This document is written primarily for Codex and contributors. It should be read together with `architecture.md` and `TABOS_CODEX_CONTEXT.md`.
+> This document is written primarily for Codex and contributors. It should be read together with `architecture.md` and `TABOS_CONTEXT.md`.
 
 ## 1. Goal
 
@@ -89,6 +89,16 @@ test/debug
 ```
 
 This should make normal development substantially faster.
+
+### Current verified workflow
+
+- Host targets use SDL3 and build through `./tools/tabos`.
+- Tab5 firmware requires ESP-IDF v5.4.4.
+- When ESP-IDF is not installed locally, builds use the `espressif/idf:v5.4.4` image through Podman, not Docker.
+- Hardware flashing uses local `esptool` through `./tools/flash.sh [debug|release]`; debug is the default.
+- Generated firmware lives in `build/tab5-debug/` or `build/tab5-release/` and uses `TabOS.bin` capitalization.
+- Info-level serial logging is required in debug and release so detected hardware remains visible during boot.
+- Current host suite has unit, integration, architecture-boundary, and invalid-target tests. Display transforms must remain host-unit-tested.
 
 Host builds are especially useful for:
 
@@ -390,6 +400,8 @@ Hardware-specific tests are still required for the real STM32 keyboard controlle
 ---
 
 ## 9. Touch and Pointer Simulation
+
+This section describes eventual GUI/input testing, not current implementation priority. Touch and host pointer-to-touch mapping are deferred until the windowing system and application touch API. Terminal, keyboard, and shell work should not wait for touch support.
 
 Desktop mouse/pointer events should be mapped into the TabOS touch event model.
 

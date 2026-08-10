@@ -14,13 +14,13 @@ tabos/
 ├── config/              Common identity, version, and visible strings
 ├── docs/                User and contributor documentation
 ├── fs/                  Portable filesystem subsystem
-├── graphics/            Portable graphics and composition subsystem
+├── graphics/            Portable framebuffer and graphics subsystem
 ├── input/               Portable input-event subsystem
 ├── kernel/              Portable runtime and system-service core
 ├── loader/              Future application loader
 ├── net/                 Portable networking subsystem
 ├── platform/            Environment-specific service implementations
-│   ├── esp32p4/         ESP32-P4, ESP-IDF, and FreeRTOS implementation
+│   ├── esp32p4/         ESP32-P4, ESP-IDF, FreeRTOS, and Tab5 BSP implementation
 │   ├── host/            Native host implementation
 │   │   ├── posix/       POSIX-specific host services
 │   │   └── sdl/         SDL3 display and input services
@@ -80,7 +80,8 @@ Portable code must not include SDL3, POSIX, ESP-IDF, or FreeRTOS APIs directly. 
 - `CMakeLists.txt` defines native host builds and shared portable sources.
 - `CMakePresets.json` defines macOS and Linux debug/release configurations.
 - `targets/tab5/CMakeLists.txt` is the ESP-IDF firmware project entry point.
-- `tools/tabos` is the supported command wrapper for build, test, run, and flash operations.
+- `tools/tabos` is the supported command wrapper for build, test, run, and ESP-IDF-based flash operations.
+- `tools/flash.sh` flashes an existing Tab5 debug or release image using local `esptool`, including images built in a container.
 - `AGENTS.md` directs coding agents to internal project context and documentation-maintenance requirements.
 
 Generated output belongs under `build/` or `dist/` and is ignored by Git. Source code and maintained documentation must not be placed in generated-output directories.

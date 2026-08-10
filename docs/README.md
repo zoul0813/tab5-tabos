@@ -5,6 +5,7 @@ This directory contains user and contributor documentation for TabOS.
 ## Guides
 
 - [Directory Structure](directory-structure.md): repository layout, directory responsibilities, and dependency boundaries.
+- [Display System](display.md): logical framebuffer contract, host presentation, and Tab5 display behavior.
 
 ## Documentation Policy
 

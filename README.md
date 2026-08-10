@@ -10,7 +10,7 @@ Project documentation starts in [`docs/`](docs/README.md). See the [directory st
 
 ## Targets
 
-- `tab5`: ESP32-P4 firmware built with ESP-IDF v5.4.2.
+- `tab5`: ESP32-P4 firmware built with ESP-IDF v5.4.4.
 - `macos`: Native macOS development target using SDL3.
 - `linux`: Native Linux development target using SDL3.
 
@@ -38,7 +38,7 @@ On Ubuntu 26.04 or newer:
 sudo apt-get install build-essential cmake ninja-build libsdl3-dev python3
 ```
 
-Tab5 builds require ESP-IDF v5.4.2 with its environment activated. The build rejects other ESP-IDF versions until they have been validated deliberately.
+Tab5 builds require ESP-IDF v5.4.4 with its environment activated. The build rejects other ESP-IDF versions until they have been validated deliberately.
 
 ## Build
 
@@ -64,25 +64,36 @@ Run host tests with:
 ./tools/tabos test linux debug
 ```
 
-Tests currently cover portable runtime bootstrap, headless SDL host integration, target-selection rejection, and platform-header boundaries.
+Tests currently cover portable runtime bootstrap, diagnostic framebuffer rendering, Tab5 display rotation, headless SDL host integration, target-selection rejection, and platform-header boundaries.
 
 ## Run and Flash
 
-Run host scaffold:
+Run host display:
 
 ```sh
 ./tools/tabos run macos debug
 ./tools/tabos run linux debug
 ```
 
-Host executable opens an empty resizable window with a 1280x720 logical starting size.
+Host executable opens a resizable window containing the shared 1280x720 RGB565 diagnostic frame.
 It remembers its last window position in the SDL per-user preferences directory. If that position is no longer visible on a connected display, normal system placement is used instead.
+
+Tab5 firmware initializes the built-in display through the official M5Stack BSP and presents the same diagnostic frame. See the [display system guide](docs/display.md) for the current contract and hardware-validation procedure.
 
 Flash Tab5 only through explicit command:
 
 ```sh
 ./tools/tabos flash tab5 debug
 ```
+
+When firmware was built using the ESP-IDF container, flash the generated image using a local `esptool` installation:
+
+```sh
+./tools/flash.sh
+./tools/flash.sh release
+```
+
+The script defaults to `debug` and automatically selects the serial port when exactly one supported device is connected. Set `ESPPORT=/dev/cu.usbmodem...` when automatic selection is ambiguous.
 
 Ordinary Tab5 builds never flash hardware.
 

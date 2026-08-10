@@ -20,6 +20,13 @@ void app_main(void)
         return;
     }
 
+    if (!tabos_runtime_start()) {
+        ESP_LOGE(TAG, "%s display initialization failed", TABOS_SYSTEM_NAME);
+        tabos_runtime_shutdown();
+        tab_platform_shutdown();
+        return;
+    }
+
     ESP_LOGI(
         TAG,
         "%s %s bootstrapped on %s",
@@ -27,4 +34,6 @@ void app_main(void)
         tabos_runtime_version(),
         tab_platform_name()
     );
+
+    (void)tab_platform_run();
 }

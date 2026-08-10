@@ -45,7 +45,9 @@ add_library(tabos_core STATIC ${TABOS_CORE_SOURCES})
 target_include_directories(tabos_core
     PUBLIC "${TABOS_ROOT}/sdk/include"
     PRIVATE
+        "${TABOS_ROOT}/graphics/include"
         "${TABOS_ROOT}/kernel/include"
+        "${TABOS_ROOT}/platform/include"
         "${TABOS_GENERATED_INCLUDE_DIR}"
 )
 tabos_enable_warnings(tabos_core)
@@ -70,6 +72,7 @@ tabos_enable_sanitizers(tabos_platform_host)
 
 add_executable(tabos_host targets/host/main.c)
 target_include_directories(tabos_host PRIVATE
+    "${TABOS_ROOT}/graphics/include"
     "${TABOS_ROOT}/kernel/include"
     "${TABOS_ROOT}/platform/include"
     "${TABOS_GENERATED_INCLUDE_DIR}"

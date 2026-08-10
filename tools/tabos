@@ -60,7 +60,7 @@ def host_build(target: str, configuration: str) -> None:
 
 
 def tab5_command(configuration: str, action: str) -> None:
-    idf = require_tool("idf.py", "activate the ESP-IDF v5.4.2 environment")
+    idf = require_tool("idf.py", "activate the ESP-IDF v5.4.4 environment")
     build_dir = ROOT / "build" / f"tab5-{configuration}"
     command = [
         idf,
