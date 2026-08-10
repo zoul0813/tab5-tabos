@@ -1,0 +1,148 @@
+#!/usr/bin/env python3
+
+from __future__ import annotations
+
+import argparse
+import os
+from pathlib import Path
+import platform
+import re
+import shutil
+import subprocess
+import sys
+
+
+ROOT = Path(__file__).resolve().parent.parent
+HOST_TARGETS = {"macos", "linux"}
+CONFIGURATIONS = {"debug": "Debug", "release": "Release"}
+
+
+def identity_value(name: str) -> str:
+    identity_file = ROOT / "config" / "Identity.cmake"
+    contents = identity_file.read_text(encoding="utf-8")
+    match = re.search(rf'^set\({re.escape(name)} "([^"]+)"\)$', contents, re.MULTILINE)
+    if match is None:
+        fail(f"could not read {name} from {identity_file}")
+    return match.group(1)
+
+
+def fail(message: str) -> None:
+    print(f"tabos: {message}", file=sys.stderr)
+    raise SystemExit(2)
+
+
+def require_tool(name: str, hint: str) -> str:
+    executable = shutil.which(name)
+    if executable is None:
+        fail(f"required tool '{name}' not found; {hint}")
+    return executable
+
+
+def run(command: list[str], *, env: dict[str, str] | None = None) -> None:
+    print("+", " ".join(command), flush=True)
+    subprocess.run(command, cwd=ROOT, env=env, check=True)
+
+
+def validate_host(target: str) -> None:
+    host = platform.system()
+    expected = "Darwin" if target == "macos" else "Linux"
+    if host != expected:
+        fail(f"target '{target}' requires a {expected} host; current host is {host}")
+
+
+def host_build(target: str, configuration: str) -> None:
+    validate_host(target)
+    cmake = require_tool("cmake", "install CMake 3.22 or newer")
+    require_tool("ninja", "install Ninja")
+    preset = f"{target}-{configuration}"
+    run([cmake, "--preset", preset])
+    run([cmake, "--build", "--preset", preset])
+
+
+def tab5_command(configuration: str, action: str) -> None:
+    idf = require_tool("idf.py", "activate the ESP-IDF v5.4.2 environment")
+    build_dir = ROOT / "build" / f"tab5-{configuration}"
+    command = [
+        idf,
+        "-C",
+        str(ROOT / "targets" / "tab5"),
+        "-B",
+        str(build_dir),
+        "-DIDF_TARGET=esp32p4",
+        f"-DCMAKE_BUILD_TYPE={CONFIGURATIONS[configuration]}",
+        action,
+    ]
+    run(command)
+
+
+def command_build(args: argparse.Namespace) -> None:
+    if args.target in HOST_TARGETS:
+        host_build(args.target, args.configuration)
+    else:
+        tab5_command(args.configuration, "build")
+
+
+def command_test(args: argparse.Namespace) -> None:
+    if args.target not in HOST_TARGETS:
+        fail("tests currently run only on macos and linux host targets")
+    host_build(args.target, args.configuration)
+    ctest = require_tool("ctest", "install CMake 3.22 or newer")
+    run([ctest, "--preset", f"{args.target}-{args.configuration}"])
+
+
+def command_run(args: argparse.Namespace) -> None:
+    if args.target not in HOST_TARGETS:
+        fail("run supports host targets; use 'flash tab5' for hardware")
+    host_build(args.target, args.configuration)
+    executable = ROOT / "build" / f"{args.target}-{args.configuration}" / "tabos_host"
+    run([str(executable)])
+
+
+def command_flash(args: argparse.Namespace) -> None:
+    tab5_command(args.configuration, "flash")
+
+
+def add_target_arguments(parser: argparse.ArgumentParser, *, include_tab5: bool) -> None:
+    targets = ["macos", "linux"]
+    if include_tab5:
+        targets.append("tab5")
+    parser.add_argument("target", choices=targets)
+    parser.add_argument("configuration", nargs="?", choices=CONFIGURATIONS, default="debug")
+
+
+def parse_args() -> argparse.Namespace:
+    system_name = identity_value("TABOS_SYSTEM_NAME")
+    parser = argparse.ArgumentParser(description=f"Build, test, run, and flash {system_name} targets")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    build_parser = subparsers.add_parser("build", help="build a target")
+    add_target_arguments(build_parser, include_tab5=True)
+    build_parser.set_defaults(handler=command_build)
+
+    test_parser = subparsers.add_parser("test", help="build and test a host target")
+    add_target_arguments(test_parser, include_tab5=False)
+    test_parser.set_defaults(handler=command_test)
+
+    run_parser = subparsers.add_parser("run", help="build and run a host target")
+    add_target_arguments(run_parser, include_tab5=False)
+    run_parser.set_defaults(handler=command_run)
+
+    flash_parser = subparsers.add_parser("flash", help="build and flash Tab5")
+    flash_parser.add_argument("target", choices=["tab5"])
+    flash_parser.add_argument("configuration", nargs="?", choices=CONFIGURATIONS, default="debug")
+    flash_parser.set_defaults(handler=command_flash)
+
+    return parser.parse_args()
+
+
+def main() -> int:
+    args = parse_args()
+    try:
+        args.handler(args)
+    except subprocess.CalledProcessError as error:
+        return error.returncode
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

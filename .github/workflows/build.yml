@@ -1,0 +1,116 @@
+name: build
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  macos:
+    name: macOS / ${{ matrix.configuration }}
+    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration: [debug, release]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install SDL3
+        run: brew install sdl3
+      - name: Build and test
+        run: ./tools/tabos test macos ${{ matrix.configuration }}
+      - name: Package macOS host
+        if: matrix.configuration == 'release'
+        shell: bash
+        run: |
+          package="dist/tabos-macos-arm64"
+          executable="build/macos-release/tabos_host"
+          mkdir -p "$package"
+          cp "$executable" "$package/tabos_host"
+          sdl_library="$(otool -L "$executable" | awk '/libSDL3\.0\.dylib/ { print $1; exit }')"
+          test -n "$sdl_library"
+          cp "$sdl_library" "$package/libSDL3.0.dylib"
+          cp targets/host/packaging/macos/run.sh "$package/run.sh"
+          install_name_tool -change "$sdl_library" '@executable_path/libSDL3.0.dylib' "$package/tabos_host"
+          codesign --force --sign - "$package/libSDL3.0.dylib"
+          codesign --force --sign - "$package/tabos_host"
+          chmod +x "$package/tabos_host" "$package/run.sh"
+          tar -C dist -czf dist/tabos-macos-arm64.tar.gz tabos-macos-arm64
+      - name: Upload macOS host
+        if: matrix.configuration == 'release'
+        uses: actions/upload-artifact@v7
+        with:
+          path: dist/tabos-macos-arm64.tar.gz
+          archive: false
+
+  linux:
+    name: Linux / ${{ matrix.configuration }}
+    runs-on: ubuntu-26.04
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration: [debug, release]
+    steps:
+      - name: Install SDL3
+        run: sudo apt-get update && sudo apt-get install -y libsdl3-dev
+      - uses: actions/checkout@v7
+      - name: Build and test
+        run: ./tools/tabos test linux ${{ matrix.configuration }}
+      - name: Package Linux host
+        if: matrix.configuration == 'release'
+        shell: bash
+        run: |
+          package="dist/tabos-linux-x64"
+          executable="build/linux-release/tabos_host"
+          mkdir -p "$package"
+          cp "$executable" "$package/tabos_host"
+          sdl_library="$(ldd "$executable" | awk '/libSDL3\.so/ { print $3; exit }')"
+          test -n "$sdl_library"
+          cp --dereference "$sdl_library" "$package/libSDL3.so.0"
+          cp targets/host/packaging/linux/run.sh "$package/run.sh"
+          chmod +x "$package/tabos_host" "$package/run.sh"
+          tar -C dist -czf dist/tabos-linux-x64.tar.gz tabos-linux-x64
+      - name: Upload Linux host
+        if: matrix.configuration == 'release'
+        uses: actions/upload-artifact@v7
+        with:
+          path: dist/tabos-linux-x64.tar.gz
+          archive: false
+
+  tab5:
+    name: Tab5 compile / ${{ matrix.configuration }}
+    runs-on: ubuntu-24.04
+    container: espressif/idf:v5.4.2
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration: [debug, release]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Cross-build ESP32-P4 firmware
+        shell: bash
+        run: |
+          . /opt/esp/idf/export.sh
+          ./tools/tabos build tab5 ${{ matrix.configuration }}
+      - name: Package Tab5 firmware
+        if: matrix.configuration == 'release'
+        shell: bash
+        run: |
+          build_directory="build/tab5-release"
+          mkdir -p dist
+          python -c 'import json, sys; data = json.load(open(sys.argv[1], encoding="utf-8")); print(*data["flash_files"].values(), sep="\n")' \
+            "$build_directory/flasher_args.json" > dist/flash-files.txt
+          test -s dist/flash-files.txt
+          tar -C "$build_directory" -czf "$PWD/dist/tabos-tab5-release.tar.gz" \
+            -T "$PWD/dist/flash-files.txt" \
+            flash_args \
+            flash_project_args \
+            flasher_args.json
+      - name: Upload Tab5 firmware
+        if: matrix.configuration == 'release'
+        uses: actions/upload-artifact@v7
+        with:
+          path: dist/tabos-tab5-release.tar.gz
+          archive: false
