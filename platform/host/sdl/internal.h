@@ -10,5 +10,6 @@ extern SDL_Window *tab_host_window;
 bool tab_host_is_headless(void);
 void tab_host_request_quit(void);
 void tab_host_input_update(bool wait);
+bool tab_host_capture_screenshot(void);
 
 #endif

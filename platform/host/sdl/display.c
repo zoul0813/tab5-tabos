@@ -4,11 +4,51 @@
 
 #include <tabos/config/identity.h>
 
+#include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 static SDL_Renderer *renderer;
 static SDL_Texture *texture;
 static tab_pixel_t *framebuffer_pixels;
+
+bool tab_host_capture_screenshot(void)
+{
+    if (framebuffer_pixels == NULL || tab_host_is_headless()) return false;
+    if (!SDL_CreateDirectory("screenshots")) {
+        SDL_Log("Could not create screenshot directory: %s", SDL_GetError());
+        return false;
+    }
+
+    const time_t now = time(NULL);
+    struct tm local_time;
+    if (now == (time_t)-1 || localtime_r(&now, &local_time) == NULL) {
+        SDL_Log("Could not create screenshot timestamp");
+        return false;
+    }
+    char path[80];
+    if (strftime(path, sizeof(path), "screenshots/tabos-%Y%m%d-%H%M%S.bmp", &local_time) == 0U) {
+        SDL_Log("Could not format screenshot path");
+        return false;
+    }
+
+    const int pitch = (int)(TABOS_DISPLAY_WIDTH * sizeof(*framebuffer_pixels));
+    SDL_Surface *surface = SDL_CreateSurfaceFrom(
+        TABOS_DISPLAY_WIDTH, TABOS_DISPLAY_HEIGHT, SDL_PIXELFORMAT_RGB565,
+        framebuffer_pixels, pitch);
+    if (surface == NULL) {
+        SDL_Log("Could not create screenshot surface: %s", SDL_GetError());
+        return false;
+    }
+    const bool saved = SDL_SaveBMP(surface, path);
+    SDL_DestroySurface(surface);
+    if (!saved) {
+        SDL_Log("Could not save screenshot: %s", SDL_GetError());
+        return false;
+    }
+    SDL_Log("Screenshot saved: %s", path);
+    return true;
+}
 
 const char *tab_platform_display_name(void)
 {

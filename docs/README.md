@@ -4,6 +4,7 @@ This directory contains user and contributor documentation for TabOS.
 
 ## Guides
 
+- [Project Configuration](configuration.md): persistent host and device options managed by `tools/tabos config`.
 - [Directory Structure](directory-structure.md): repository layout, directory responsibilities, and dependency boundaries.
 - [Display System](display.md): logical framebuffer contract, host presentation, and Tab5 display behavior.
 - [Keyboard Input](input.md): public events, SDL3 translation, and Tab5 Keyboard protocol.

@@ -93,6 +93,7 @@ This should make normal development substantially faster.
 ### Current verified workflow
 
 - Host targets use SDL3 and build through `./tools/tabos`.
+- `./tools/tabos config` stores TabOS-owned host and Tab5 settings in `.local/tabos.config`; wrapper commands pass them explicitly to every configuration.
 - Tab5 firmware requires ESP-IDF v5.4.4. `./tools/tabos setup` installs host prerequisites and a project-local copy under `.local/`; Tab5 wrapper commands activate it automatically when needed.
 - Project-local ESP-IDF tools live under `.local/espressif-tools`, keeping them separate from global ESP-IDF installations.
 - Hardware flashing uses local `esptool` through `./tools/flash.sh [debug|release]`; debug is the default.

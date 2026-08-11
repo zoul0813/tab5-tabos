@@ -68,6 +68,24 @@ eval "$(./tools/tabos activate-idf)"
 
 The build rejects other ESP-IDF versions until they have been validated deliberately.
 
+## Configure
+
+Configure TabOS-owned host and device behavior with:
+
+```sh
+./tools/tabos config
+```
+
+The interactive command stores project-local settings in ignored
+`.local/tabos.config`. Settings include separate host and Tab5 startup applications,
+bitmap font file and dimensions, terminal scale, scrollback capacity, and cursor
+blink interval. Every build and flash passes these values explicitly, so they survive
+`fullclean` and never depend on stale CMake cache state.
+
+ESP-IDF's own `menuconfig` remains separate for advanced hardware configuration.
+Activate the local ESP-IDF environment with `eval "$(./tools/tabos activate-idf)"`
+before invoking it directly.
+
 ## Build
 
 Use the project wrapper from the repository root:
@@ -105,6 +123,8 @@ Run host display:
 
 Host executable opens a resizable window containing the shared 1280x720 RGB565 boot console.
 It remembers its last window position in the SDL per-user preferences directory. If that position is no longer visible on a connected display, normal system placement is used instead.
+Cmd+Shift+F12 captures the logical framebuffer to a timestamped BMP under
+`screenshots/`; plain F12 remains available to TabOS applications.
 
 Tab5 firmware initializes the built-in display and presents the same structured boot report shown over serial. See the [display system guide](docs/display.md) for the current contract and hardware-validation procedure.
 

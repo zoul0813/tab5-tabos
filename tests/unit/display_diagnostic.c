@@ -23,6 +23,13 @@ int main(void)
     const tab_pixel_t expected_rotation[] = {4, 1, 5, 2, 6, 3};
     const tab_pixel_t expected_counter_rotation[] = {3, 6, 2, 5, 1, 4};
 
+    if (tab_font_glyph_index(TAB_FONT_GLYPH_COUNT - 1U) != TAB_FONT_GLYPH_COUNT - 1U ||
+        tab_font_glyph_index(TAB_FONT_GLYPH_COUNT) != 0U ||
+        tab_font_glyph_index(256U) != 0U ||
+        (TAB_FONT_GLYPH_COUNT <= 220U && tab_font_glyph_index(220U) != 0U)) {
+        return 1;
+    }
+
     if (!tab_framebuffer_rotate_clockwise(&source, rotated_pixels, 2, 3)) {
         return 1;
     }

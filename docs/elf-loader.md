@@ -28,25 +28,17 @@ Application uses `<tabos/elf_api.h>`. API version 1 contains ABI version, consol
 
 ## Tab5 Hardware Test
 
-Build experimental firmware with console diagnostic disabled:
+Run project configurator and select `elf-hello` as Tab5 startup application:
 
 ```sh
-podman run --rm --platform linux/amd64 \
-  -v "$PWD:/project" -w /project \
-  espressif/idf:v5.4.4 \
-  idf.py -C targets/tab5 -B build/tab5-debug \
-    -DIDF_TARGET=esp32p4 \
-    -DCMAKE_BUILD_TYPE=Debug \
-    -DTABOS_ENABLE_KEYBOARD_DIAGNOSTICS=OFF \
-    -DTABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP=OFF \
-    -DTABOS_ENABLE_ELF_LOADER_EXPERIMENT=ON \
-    build
+./tools/tabos config
+./tools/tabos build tab5 debug
 ```
 
-Flash already-built image:
+Build and flash can also be requested together through the wrapper:
 
 ```sh
-./tools/flash.sh debug
+./tools/tabos flash tab5 debug
 ```
 
 Successful display output includes:

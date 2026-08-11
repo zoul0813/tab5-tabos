@@ -3,10 +3,15 @@
 
 #include <stdint.h>
 
+size_t tab_font_glyph_index(unsigned int character)
+{
+    return character < TAB_FONT_GLYPH_COUNT ? character : 0U;
+}
+
 static const uint8_t *glyph_rows(char character)
 {
-    const size_t glyph = (unsigned char)character;
-    return tab_font_data + (glyph * TAB_FONT_GLYPH_HEIGHT);
+    const size_t glyph = tab_font_glyph_index((unsigned char)character);
+    return tab_font_data + (glyph * TAB_FONT_GLYPH_HEIGHT * TAB_FONT_BYTES_PER_ROW);
 }
 
 static void put_pixel(tab_framebuffer_t *framebuffer, int x, int y, tab_pixel_t color)
@@ -25,8 +30,9 @@ bool tab_font_draw_char(tab_framebuffer_t *framebuffer, int x, int y, char chara
     const uint8_t *rows = glyph_rows(character);
     for (unsigned int row = 0; row < TAB_FONT_GLYPH_HEIGHT; ++row) {
         for (unsigned int column = 0; column < TAB_FONT_GLYPH_WIDTH; ++column) {
-            const uint8_t mask = (uint8_t)(1U << (TAB_FONT_GLYPH_WIDTH - column - 1U));
-            const tab_pixel_t color = (rows[row] & mask) != 0U ? foreground : background;
+            const size_t byte = row * TAB_FONT_BYTES_PER_ROW + (column / 8U);
+            const uint8_t mask = (uint8_t)(0x80U >> (column % 8U));
+            const tab_pixel_t color = (rows[byte] & mask) != 0U ? foreground : background;
             for (unsigned int sy = 0; sy < scale; ++sy) {
                 for (unsigned int sx = 0; sx < scale; ++sx) {
                     put_pixel(framebuffer, x + (int)(column * scale + sx),

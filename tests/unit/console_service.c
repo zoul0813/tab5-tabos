@@ -1,5 +1,6 @@
 #include <tabos/console.h>
 
+#include <tabos/config/console.h>
 #include <tabos/internal/console.h>
 #include <tabos/internal/display.h>
 #include <tabos/internal/input.h>
@@ -34,12 +35,12 @@ int main(void)
         tab_display_framebuffer()->pixels[0] != 0xffff) {
         return 1;
     }
-    tab_test_platform_advance_time_ms(500U);
+    tab_test_platform_advance_time_ms(TABOS_CURSOR_BLINK_INTERVAL_MS);
     tab_console_update();
     if (terminal.cursor_phase_visible) {
         return 1;
     }
-    tab_test_platform_advance_time_ms(500U);
+    tab_test_platform_advance_time_ms(TABOS_CURSOR_BLINK_INTERVAL_MS);
     tab_console_update();
     if (!terminal.cursor_phase_visible) {
         return 1;

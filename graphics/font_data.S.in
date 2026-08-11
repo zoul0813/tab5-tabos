@@ -2,7 +2,7 @@
     .section __TEXT,__const
     .globl _tab_font_data
 _tab_font_data:
-    .incbin "@TABOS_FONT_FILE@"
+    .incbin "@TABOS_FONT_EMBED_FILE@"
     .globl _tab_font_data_end
 _tab_font_data_end:
 #else
@@ -10,7 +10,7 @@ _tab_font_data_end:
     .global tab_font_data
     .type tab_font_data, @object
 tab_font_data:
-    .incbin "@TABOS_FONT_FILE@"
+    .incbin "@TABOS_FONT_EMBED_FILE@"
     .global tab_font_data_end
     .type tab_font_data_end, @object
 tab_font_data_end:

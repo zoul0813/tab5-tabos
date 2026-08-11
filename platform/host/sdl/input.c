@@ -7,6 +7,24 @@
 #include <string.h>
 
 static char synthesized_text[TABOS_INPUT_TEXT_MAX_BYTES + 1U];
+static bool screenshot_shortcut_active;
+
+static bool handle_screenshot_shortcut(const SDL_KeyboardEvent *event)
+{
+    const bool is_f12 = event->scancode == SDL_SCANCODE_F12 || event->key == SDLK_F12;
+    if (!is_f12) return false;
+    if (event->type == SDL_EVENT_KEY_UP && screenshot_shortcut_active) {
+        screenshot_shortcut_active = false;
+        return true;
+    }
+    const SDL_Keymod modifiers = event->mod | SDL_GetModState();
+    const bool has_gui = (modifiers & SDL_KMOD_GUI) != 0U;
+    const bool has_shift = (modifiers & SDL_KMOD_SHIFT) != 0U;
+    if (event->type != SDL_EVENT_KEY_DOWN || !has_gui || !has_shift) return false;
+    screenshot_shortcut_active = true;
+    if (!event->repeat) (void)tab_host_capture_screenshot();
+    return true;
+}
 
 static uint8_t input_modifiers(SDL_Keymod modifiers)
 {
@@ -35,6 +53,7 @@ static void dispatch_event(const SDL_Event *event)
         return;
     }
     if (event->type == SDL_EVENT_KEY_DOWN || event->type == SDL_EVENT_KEY_UP) {
+        if (handle_screenshot_shortcut(&event->key)) return;
         const tabos_key_t key = input_key(event->key.scancode);
         const uint8_t modifiers = input_modifiers(event->key.mod);
         const tabos_input_event_t input_event = {

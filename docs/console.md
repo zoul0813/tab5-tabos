@@ -53,21 +53,21 @@ Changing terminal scale rebuilds geometry, reflows retained hard and soft-wrappe
 
 ## Diagnostic Application
 
-Set `TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP=ON` when configuring a build to register and start small interactive `console-test` application after boot. Option defaults to `OFF`.
+Select `console-test` as host or Tab5 startup application through `./tools/tabos config` to register and start small interactive diagnostic application after boot. Option defaults to `none`.
 
 Diagnostic application displays a prompt, echoes text through public console API, handles Enter, Tab, and repeating Backspace, protects prompt from deletion, clears screen with Ctrl+L, navigates history with full-keyboard navigation keys or Tab5 Ctrl+Arrow shortcuts, and exits cleanly with Ctrl+Q. Application lifecycle manager owns its foreground console session. SDL host backend synthesizes normalized text for Enter, Tab, and repeated keys when desktop text input does not provide it. It contains no command parser and is not shell.
 
 Host example:
 
 ```sh
-cmake --preset macos-debug -DTABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP=ON
-cmake --build --preset macos-debug
+./tools/tabos config
+./tools/tabos run macos debug
 ```
 
-Tab5 example with activated ESP-IDF v5.4.4 environment:
+Tab5 example:
 
 ```sh
-idf.py -C targets/tab5 -B build/tab5-debug \
-  -DIDF_TARGET=esp32p4 -DCMAKE_BUILD_TYPE=Debug \
-  -DTABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP=ON build
+./tools/tabos config
+./tools/tabos build tab5 debug
+./tools/tabos flash tab5 debug
 ```

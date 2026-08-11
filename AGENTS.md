@@ -5,6 +5,7 @@ Before making architectural, platform, build, or testing changes, read:
 - `agents/TABOS_CONTEXT.md`
 - `agents/architecture.md`
 - `agents/testing.md`
+- `agents/roadmap.md`
 
 Treat decisions marked `[DECIDED]` as project requirements unless
 the user explicitly asks to reconsider them.

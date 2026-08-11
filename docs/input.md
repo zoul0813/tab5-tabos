@@ -26,6 +26,11 @@ The queue holds 64 events and is protected for host-thread and FreeRTOS-task acc
 
 SDL3 physical keyboard events become TabOS key-down/key-up events. SDL3 text input becomes TabOS UTF-8 text events. This preserves host keyboard layout and input-method behavior instead of rebuilding host text translation inside TabOS. SDL does not consistently provide text events for Enter, Tab, or operating-system key repeat, so host backend synthesizes those missing normalized text events and suppresses matching SDL duplicates.
 
+Cmd+Shift+F12 on macOS (Super+Shift+F12 on Linux) saves the current logical
+1280x720 framebuffer as a timestamped BMP under `screenshots/`. The host backend
+consumes both shortcut key events, while unmodified F12 remains available to TabOS
+applications.
+
 ## Tab5 Keyboard Backend
 
 The Tab5 Keyboard is connected through ExtPort1 using SDA GPIO0, SCL GPIO1, and default I²C address `0x6D`. TabOS uses ESP32-P4 I²C controller 0 at 400 kHz; the Tab5 BSP's internal device bus remains on controller 1.

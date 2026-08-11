@@ -17,6 +17,7 @@ target_include_directories(tabos_display_diagnostic PRIVATE
     "${TABOS_ROOT}/graphics/include"
     "${TABOS_ROOT}/kernel/include"
     "${TABOS_ROOT}/platform/include"
+    "${TABOS_GENERATED_INCLUDE_DIR}"
 )
 target_link_libraries(tabos_display_diagnostic PRIVATE tabos_core)
 tabos_enable_warnings(tabos_display_diagnostic)
@@ -44,6 +45,7 @@ target_include_directories(tabos_console_service PRIVATE
     "${TABOS_ROOT}/platform/include"
     "${TABOS_ROOT}/sdk/include"
     "${CMAKE_CURRENT_LIST_DIR}/fakes"
+    "${TABOS_GENERATED_INCLUDE_DIR}"
 )
 target_link_libraries(tabos_console_service PRIVATE tabos_core)
 tabos_enable_warnings(tabos_console_service)

@@ -11,7 +11,7 @@ tabos/
 ├── apps/                Built-in registry and bundled applications, including future shell
 ├── audio/               Portable audio subsystem
 ├── cmake/               Shared host-build CMake modules
-├── config/              Common identity, display, input, console, and loader build settings
+├── config/              Common identity, display, font, input, console, and loader build settings
 ├── console/             Portable foreground text-console service
 ├── docs/                User and contributor documentation
 ├── fs/                  Portable filesystem subsystem
@@ -62,7 +62,7 @@ macOS and Linux are distinct build targets in project tooling, but currently sha
 
 Platform backends are split by service instead of collected in one large translation unit. `platform/esp32p4/` contains runtime, keyboard, display, and executable-memory modules. `platform/host/sdl/` contains runtime/window state, input, display, and executable-memory modules. Private `internal.h` files share only backend-local state and helpers.
 
-Portable `input/input.c` owns queue and HID text translation. Optional event logging lives in `input/input_diagnostic.c`, keeping diagnostic compile gating outside queue logic. `graphics/font.c` owns drawing while raw `graphics/blueterm.f12` owns replaceable CP437 bitmap data. Build-generated assembly embeds the asset directly without generating a C bitmap table.
+Portable `input/input.c` owns queue and HID text translation. Optional event logging lives in `input/input_diagnostic.c`, keeping diagnostic compile gating outside queue logic. `graphics/font.c` owns fixed-width drawing while `config/Font.cmake` describes replaceable raw bitmap data such as `graphics/blueterm.f12`. Build-generated assembly embeds configured asset directly without generating a C bitmap table.
 
 ## Dependency Direction
 
