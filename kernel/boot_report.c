@@ -81,7 +81,7 @@ void tab_boot_report_write_terminal(const tab_boot_report_t *report, tab_termina
     tab_terminal_write(terminal, report->system_name);
     tab_terminal_write(terminal, " ");
     tab_terminal_write(terminal, report->version);
-    tab_terminal_write_line(terminal, " BOOT");
+    tab_terminal_write_line(terminal, " boot report");
     tab_terminal_write_line(terminal, "");
     for (size_t index = 0; index < report->entry_count; ++index) {
         const tab_boot_entry_t *entry = &report->entries[index];

@@ -18,7 +18,17 @@ macOS and Linux build the same portable core and shared host backend. Native hos
 
 ## Prerequisites
 
-All host builds require:
+Install host build dependencies and a project-local ESP-IDF toolchain with:
+
+```sh
+./tools/tabos setup
+```
+
+On macOS, setup uses Homebrew. On Debian and Ubuntu Linux, setup uses `apt-get`
+and `sudo` when needed. It checks each prerequisite first, installs only missing
+tools, and skips the package manager entirely when host tools are ready. Before
+installing packages or downloading ESP-IDF, setup shows the commands and requires
+explicit confirmation; Enter alone aborts. All host builds require:
 
 - Python 3
 - CMake 3.22 or newer
@@ -38,7 +48,25 @@ On Ubuntu 26.04 or newer:
 sudo apt-get install build-essential cmake ninja-build libsdl3-dev python3
 ```
 
-Tab5 builds require ESP-IDF v5.4.4 with its environment activated. The build rejects other ESP-IDF versions until they have been validated deliberately.
+Tab5 builds require ESP-IDF v5.4.4. Setup installs a project-local copy and its
+tools under `.local/`:
+
+```sh
+./tools/tabos setup
+```
+
+Setup uses a depth-one clone of the v5.4.4 tag and shallow submodule clones to
+avoid downloading ESP-IDF history.
+
+Tab5 build and flash commands automatically activate this copy when a supported
+ESP-IDF environment is not already active. To activate it in the current interactive
+shell for direct use of ESP-IDF commands:
+
+```sh
+eval "$(./tools/tabos activate-idf)"
+```
+
+The build rejects other ESP-IDF versions until they have been validated deliberately.
 
 ## Build
 

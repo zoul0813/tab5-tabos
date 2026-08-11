@@ -7,8 +7,9 @@
 #include <tabos/platform/platform.h>
 
 enum {
-    TAB_FONT_GLYPH_WIDTH = 5,
-    TAB_FONT_GLYPH_HEIGHT = 7,
+    TAB_FONT_GLYPH_WIDTH = 8,
+    TAB_FONT_GLYPH_HEIGHT = 12,
+    TAB_FONT_GLYPH_COUNT = 256,
 };
 
 bool tab_font_draw_char(tab_framebuffer_t *framebuffer, int x, int y, char character,

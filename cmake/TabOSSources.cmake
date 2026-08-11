@@ -10,8 +10,10 @@ set(TABOS_CORE_SOURCES
     "${TABOS_ROOT}/apps/builtin_apps.c"
     "${TABOS_ROOT}/graphics/display.c"
     "${TABOS_ROOT}/graphics/font.c"
+    "${TABOS_GENERATED_FONT_SOURCE}"
     "${TABOS_ROOT}/graphics/terminal.c"
     "${TABOS_ROOT}/input/input.c"
+    "${TABOS_ROOT}/input/input_diagnostic.c"
     "${TABOS_ROOT}/console/console.c"
     "${TABOS_ROOT}/time/time.c"
     "${TABOS_ROOT}/loader/elf_loader.c"
@@ -31,9 +33,15 @@ if(TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP)
 endif()
 
 set(TABOS_HOST_PLATFORM_SOURCES
-    "${TABOS_ROOT}/platform/host/sdl/platform.c"
+    "${TABOS_ROOT}/platform/host/sdl/runtime.c"
+    "${TABOS_ROOT}/platform/host/sdl/input.c"
+    "${TABOS_ROOT}/platform/host/sdl/display.c"
+    "${TABOS_ROOT}/platform/host/sdl/executable.c"
 )
 
 set(TABOS_ESP32P4_PLATFORM_SOURCES
-    "${TABOS_ROOT}/platform/esp32p4/platform.c"
+    "${TABOS_ROOT}/platform/esp32p4/runtime.c"
+    "${TABOS_ROOT}/platform/esp32p4/keyboard.c"
+    "${TABOS_ROOT}/platform/esp32p4/display.c"
+    "${TABOS_ROOT}/platform/esp32p4/executable.c"
 )

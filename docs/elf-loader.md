@@ -52,16 +52,16 @@ Flash already-built image:
 Successful display output includes:
 
 ```text
-HELLO FROM INDEPENDENT TABOS ELF
+Hello from independent TabOS ELF
 ```
 
 Serial output includes loaded file/image sizes and returned status zero. Application then exits and runtime remains active without foreground cursor.
 
-If display reports `ELF LOAD FAILED: NO EXECUTABLE MEMORY`, current internal `MALLOC_CAP_EXEC | MALLOC_CAP_8BIT` allocation path is unavailable under active ESP32-P4 memory-protection configuration. This is useful experiment result, not parser failure. Next experiment must use explicit MMU mapping or another verified executable-memory arrangement.
+If display reports `ELF load FAILED: NO EXECUTABLE MEMORY`, writable PSRAM allocation failed. `PREPARE FAILED` means cache synchronization, physical-address resolution, or executable MMU alias creation failed.
 
 ## Memory Scope
 
-Current Tab5 backend requests internal byte-addressable executable heap and issues compiler instruction-cache synchronization before entry. It does not assume ordinary PSRAM is executable. ESP-IDF documents executable heap capabilities, explicit MMU execute mappings, and instruction-cache synchronization:
+Current Tab5 backend loads bytes through a writable PSRAM mapping, synchronizes cache, then creates a read/execute MMU alias for the same physical pages. API string pointers are translated back to readable data mapping. ESP-IDF documents executable heap capabilities, explicit MMU execute mappings, and instruction-cache synchronization:
 
 - [ESP32-P4 heap capabilities](https://docs.espressif.com/projects/esp-idf/en/v5.5/esp32p4/api-reference/system/mem_alloc.html)
 - [ESP32-P4 MMU-supported memory](https://docs.espressif.com/projects/esp-idf/en/v5.3/esp32p4/api-reference/system/mm.html)

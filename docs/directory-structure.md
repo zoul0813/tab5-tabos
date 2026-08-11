@@ -60,6 +60,10 @@ A target is a complete product that can be built or run. A platform is an enviro
 
 macOS and Linux are distinct build targets in project tooling, but currently share the native entry point and host platform implementation. Platform conditionals provide small operating-system-specific differences where required.
 
+Platform backends are split by service instead of collected in one large translation unit. `platform/esp32p4/` contains runtime, keyboard, display, and executable-memory modules. `platform/host/sdl/` contains runtime/window state, input, display, and executable-memory modules. Private `internal.h` files share only backend-local state and helpers.
+
+Portable `input/input.c` owns queue and HID text translation. Optional event logging lives in `input/input_diagnostic.c`, keeping diagnostic compile gating outside queue logic. `graphics/font.c` owns drawing while raw `graphics/blueterm.f12` owns replaceable CP437 bitmap data. Build-generated assembly embeds the asset directly without generating a C bitmap table.
+
 ## Dependency Direction
 
 Dependencies flow toward platform implementations:

@@ -53,10 +53,13 @@ int main(void)
     if (!tab_terminal_init(&terminal, framebuffer, 2U)) {
         return 1;
     }
+    if (terminal.columns != 80U || terminal.rows != 24U) {
+        return 1;
+    }
     tab_terminal_clear(&terminal);
     tab_terminal_write_line(&terminal, "A");
 
-    if (pixel_at(framebuffer, 4, 0) != 0xffff || pixel_at(framebuffer, 0, 0) != 0x0000 ||
+    if (pixel_at(framebuffer, 6, 2) != 0xffff || pixel_at(framebuffer, 0, 0) != 0x0000 ||
         terminal.row != 1U || terminal.column != 0U) {
         return 1;
     }

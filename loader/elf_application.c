@@ -44,17 +44,17 @@ static bool elf_entry(tabos_app_context_t *context)
                                                  &loaded_image);
     if (result != TAB_ELF_OK) {
         char message[80];
-        (void)snprintf(message, sizeof(message), "ELF LOAD FAILED: %s",
+        (void)snprintf(message, sizeof(message), "ELF load FAILED: %s",
                        tab_elf_result_name(result));
         tab_platform_log(message);
-        (void)tabos_console_write(active_console, "ELF LOAD FAILED: ");
+        (void)tabos_console_write(active_console, "ELF load FAILED: ");
         (void)tabos_console_write_line(active_console, tab_elf_result_name(result));
         tabos_app_request_exit(context, 3);
         return true;
     }
     if (!tab_platform_can_execute_riscv32()) {
         (void)tabos_console_write_line(active_console,
-                                       "ELF EXECUTION UNSUPPORTED ON THIS HOST");
+                                       "ELF execution unsupported on this host");
         tabos_app_request_exit(context, 4);
         return true;
     }

@@ -34,6 +34,7 @@ managed_components/
 
 # Local tooling caches
 .cache/
+.local/
 
 # Python bytecode and packages
 __pycache__/

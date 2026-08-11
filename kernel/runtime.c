@@ -37,10 +37,10 @@ static void format_size(char *buffer, size_t buffer_size, uint64_t bytes)
 
     if (bytes >= mebibyte) {
         const uint64_t tenths = ((bytes % mebibyte) * 10U) / mebibyte;
-        (void)snprintf(buffer, buffer_size, "%" PRIu64 ".%" PRIu64 " MIB",
+        (void)snprintf(buffer, buffer_size, "%" PRIu64 ".%" PRIu64 " MiB",
                        bytes / mebibyte, tenths);
     } else {
-        (void)snprintf(buffer, buffer_size, "%" PRIu64 " KIB", bytes / kibibyte);
+        (void)snprintf(buffer, buffer_size, "%" PRIu64 " KiB", bytes / kibibyte);
     }
 }
 
@@ -50,13 +50,13 @@ static void format_capacity(char *buffer, size_t buffer_size, uint64_t free_byte
     char total[24];
     format_size(total, sizeof(total), total_bytes);
     if (!free_known) {
-        (void)snprintf(buffer, buffer_size, "%s TOTAL; FREE UNKNOWN", total);
+        (void)snprintf(buffer, buffer_size, "%s total; free unknown", total);
         return;
     }
 
     char free_space[24];
     format_size(free_space, sizeof(free_space), free_bytes);
-    (void)snprintf(buffer, buffer_size, "%s FREE / %s TOTAL", free_space, total);
+    (void)snprintf(buffer, buffer_size, "%s free / %s total", free_space, total);
 }
 
 static bool render_boot_report(void)
@@ -103,28 +103,28 @@ bool tabos_runtime_start(void)
     tab_platform_diagnostics_t diagnostics;
 
     tab_boot_report_init(&boot_report, TABOS_SYSTEM_NAME, TABOS_RUNTIME_VERSION);
-    (void)tab_boot_report_add(&boot_report, "TARGET", tab_platform_name(), TAB_BOOT_STATUS_OK);
-    (void)tab_boot_report_add(&boot_report, "DISPLAY", tab_platform_display_name(),
+    (void)tab_boot_report_add(&boot_report, "Target", tab_platform_name(), TAB_BOOT_STATUS_OK);
+    (void)tab_boot_report_add(&boot_report, "Display", tab_platform_display_name(),
                               TAB_BOOT_STATUS_OK);
-    (void)tab_boot_report_add(&boot_report, "FRAMEBUFFER", "1280X720 RGB565",
+    (void)tab_boot_report_add(&boot_report, "Framebuffer", "1280x720 RGB565",
                               TAB_BOOT_STATUS_OK);
 
     if (tab_platform_get_diagnostics(&diagnostics)) {
         if (diagnostics.cpu_frequency_mhz > 0U) {
-            (void)snprintf(processor_detail, sizeof(processor_detail), "%s; %u CORES @ %u MHZ",
+            (void)snprintf(processor_detail, sizeof(processor_detail), "%s; %u cores @ %u MHz",
                            diagnostics.device_name, diagnostics.cpu_cores,
                            diagnostics.cpu_frequency_mhz);
         } else {
-            (void)snprintf(processor_detail, sizeof(processor_detail), "%s; %u CORES",
+            (void)snprintf(processor_detail, sizeof(processor_detail), "%s; %u cores",
                            diagnostics.device_name, diagnostics.cpu_cores);
         }
-        (void)tab_boot_report_add(&boot_report, "PROCESSOR", processor_detail,
+        (void)tab_boot_report_add(&boot_report, "Processor", processor_detail,
                                   TAB_BOOT_STATUS_OK);
 
         if (diagnostics.memory_total_bytes > 0U) {
             format_capacity(memory_detail, sizeof(memory_detail), diagnostics.memory_free_bytes,
                             diagnostics.memory_total_bytes, diagnostics.memory_free_known);
-            (void)tab_boot_report_add(&boot_report, "MEMORY", memory_detail, TAB_BOOT_STATUS_OK);
+            (void)tab_boot_report_add(&boot_report, "Memory", memory_detail, TAB_BOOT_STATUS_OK);
         }
         if (diagnostics.external_memory_present) {
             format_capacity(external_memory_detail, sizeof(external_memory_detail),
@@ -135,28 +135,28 @@ bool tabos_runtime_start(void)
         }
         if (diagnostics.flash_capacity_bytes > 0U) {
             format_size(flash_detail, sizeof(flash_detail), diagnostics.flash_capacity_bytes);
-            (void)tab_boot_report_add(&boot_report, "FLASH", flash_detail,
+            (void)tab_boot_report_add(&boot_report, "Flash", flash_detail,
                                       TAB_BOOT_STATUS_INFO);
         }
         if (diagnostics.storage_mounted) {
             format_capacity(storage_detail, sizeof(storage_detail), diagnostics.storage_free_bytes,
                             diagnostics.storage_total_bytes, true);
-            (void)tab_boot_report_add(&boot_report, "STORAGE", storage_detail,
+            (void)tab_boot_report_add(&boot_report, "Storage", storage_detail,
                                       TAB_BOOT_STATUS_OK);
         } else {
-            (void)tab_boot_report_add(&boot_report, "STORAGE", "FILESYSTEM NOT MOUNTED",
+            (void)tab_boot_report_add(&boot_report, "Storage", "Filesystem not mounted",
                                       TAB_BOOT_STATUS_WARNING);
         }
         if (diagnostics.keyboard_name != NULL) {
             (void)tab_boot_report_add(
                 &boot_report,
-                "KEYBOARD",
+                "Keyboard",
                 diagnostics.keyboard_name,
                 diagnostics.keyboard_present ? TAB_BOOT_STATUS_OK : TAB_BOOT_STATUS_WARNING
             );
         }
     }
-    (void)tab_boot_report_add(&boot_report, "KERNEL", "RUNTIME INITIALIZED",
+    (void)tab_boot_report_add(&boot_report, "Kernel", "Runtime initialized",
                               TAB_BOOT_STATUS_OK);
 
     tab_boot_report_write_serial(&boot_report);

@@ -93,8 +93,8 @@ This should make normal development substantially faster.
 ### Current verified workflow
 
 - Host targets use SDL3 and build through `./tools/tabos`.
-- Tab5 firmware requires ESP-IDF v5.4.4.
-- When ESP-IDF is not installed locally, builds use the `espressif/idf:v5.4.4` image through Podman, not Docker.
+- Tab5 firmware requires ESP-IDF v5.4.4. `./tools/tabos setup` installs host prerequisites and a project-local copy under `.local/`; Tab5 wrapper commands activate it automatically when needed.
+- Project-local ESP-IDF tools live under `.local/espressif-tools`, keeping them separate from global ESP-IDF installations.
 - Hardware flashing uses local `esptool` through `./tools/flash.sh [debug|release]`; debug is the default.
 - Generated firmware lives in `build/tab5-debug/` or `build/tab5-release/` and uses `TabOS.bin` capitalization.
 - Info-level serial logging is required in debug and release so detected hardware remains visible during boot.

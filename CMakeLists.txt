@@ -5,9 +5,20 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/config/Display.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/config/Input.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/config/Console.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/config/Loader.cmake")
-project(${TABOS_CMAKE_PROJECT_NAME} VERSION ${TABOS_PROJECT_VERSION} LANGUAGES C)
+project(${TABOS_CMAKE_PROJECT_NAME} VERSION ${TABOS_PROJECT_VERSION} LANGUAGES C ASM)
 
 set(TABOS_GENERATED_INCLUDE_DIR "${CMAKE_BINARY_DIR}/generated")
+set(TABOS_FONT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/graphics/blueterm.f12")
+set(TABOS_GENERATED_FONT_SOURCE "${CMAKE_BINARY_DIR}/generated/font_data.S")
+file(SIZE "${TABOS_FONT_FILE}" TABOS_FONT_FILE_SIZE)
+if(NOT TABOS_FONT_FILE_SIZE EQUAL 3072)
+    message(FATAL_ERROR "blueterm.f12 must contain 256 glyphs of 12 bytes each")
+endif()
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/graphics/font_data.S.in"
+    "${TABOS_GENERATED_FONT_SOURCE}"
+    @ONLY
+)
 configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/config/identity.h.in"
     "${TABOS_GENERATED_INCLUDE_DIR}/tabos/config/identity.h"

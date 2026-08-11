@@ -42,10 +42,10 @@ static bool diagnostic_entry(tabos_app_context_t *context)
     editable_cells = 0U;
     return tabos_console_write(
         console,
-        "\n[CONSOLE TEST] TYPE TO TEST KEYBOARD AND TERMINAL\n"
-        "[CONSOLE TEST] BACKSPACE EDITS; CTRL+L CLEARS\n"
-        "[CONSOLE TEST] CTRL+ARROWS NAVIGATE HISTORY\n"
-        "[CONSOLE TEST] CTRL+Q EXITS APPLICATION\n\n> "
+        "\nConsole test: Type to test keyboard and terminal\n"
+        "Console test: Backspace edits; Ctrl+L clears\n"
+        "Console test: Ctrl+arrows navigate history\n"
+        "Console test: Ctrl+Q exits application\n\n> "
     );
 }
 

@@ -8,14 +8,19 @@
 #include <stdlib.h>
 #include <string.h>
 
+enum {
+    TERMINAL_CELL_WIDTH = 8,
+    TERMINAL_CELL_HEIGHT = 15,
+};
+
 static size_t cell_width(const tab_terminal_t *terminal)
 {
-    return (TAB_FONT_GLYPH_WIDTH + 1U) * terminal->scale;
+    return TERMINAL_CELL_WIDTH * terminal->scale;
 }
 
 static size_t cell_height(const tab_terminal_t *terminal)
 {
-    return (TAB_FONT_GLYPH_HEIGHT + 1U) * terminal->scale;
+    return TERMINAL_CELL_HEIGHT * terminal->scale;
 }
 
 static size_t line_slot(const tab_terminal_t *terminal, uint64_t line)
@@ -256,8 +261,8 @@ bool tab_terminal_init(tab_terminal_t *terminal, tab_framebuffer_t *framebuffer,
         return false;
     }
 
-    const size_t columns = framebuffer->width / ((TAB_FONT_GLYPH_WIDTH + 1U) * scale);
-    const size_t rows = framebuffer->height / ((TAB_FONT_GLYPH_HEIGHT + 1U) * scale);
+    const size_t columns = framebuffer->width / (TERMINAL_CELL_WIDTH * scale);
+    const size_t rows = framebuffer->height / (TERMINAL_CELL_HEIGHT * scale);
     if (columns == 0U || rows == 0U ||
         rows > SIZE_MAX - TABOS_TERMINAL_SCROLLBACK_LINES) {
         return false;
