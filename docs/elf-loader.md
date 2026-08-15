@@ -76,9 +76,7 @@ Experiment does not yet provide:
 - relocation processing
 - imported symbol resolution
 - multiple code/data permission regions
-- PSRAM execution mapping
 - process isolation or crash containment
-- host execution of RV32 binaries
 - signing or package metadata
 
-Host tests parse and load image bytes into memory but do not execute RV32 code. Real execution remains Tab5 hardware test until CPU emulation exists.
+Host tests parse, load, and execute the same RV32 application artifact used by Tab5 through a resumable RV32IMA interpreter. Guest state persists across bounded instruction slices so host tests cover loader, ABI, output, exit status, and execution faults without replacing RV32 code with a host-native build.

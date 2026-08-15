@@ -120,6 +120,34 @@ Host builds are especially useful for:
 - error handling
 - integration tests
 
+### Persistent foreground-process validation
+
+[DECIDED] Process tests must model persistent nested execution rather than restarting
+caller after each command. Minimum scenario is shell process 0 executing child, child
+executing grandchild, then deterministic reverse-order unwind. Tests must prove:
+
+- blocked parents remain loaded and retain execution state, memory, handles, and identity
+- only top process receives focused input and foreground console ownership
+- child exit status returns to immediate parent
+- child fault cleans child and resumes parent according to defined policy
+- parent resumes at execution call site without rerunning entry point
+- executable memory remains allocated until owning process fully stops
+- cleanup cannot race active application API calls
+- process-table and nesting-depth limits fail without corrupting current foreground stack
+
+Process 0 is exceptional and must have dedicated invariant tests. Normal return, explicit
+exit request, execution fault, and forced termination must each enter kernel panic state.
+Tests must prove process 0 is neither unloaded nor restarted, panic does not attempt to
+resume nonexistent parent, and failure cause/exit status appears through both captured
+serial/log output and framebuffer console/terminal output. Panic rendering must work even
+when process-0 console session is stale or unavailable.
+
+Host RV32 tests must force multiple instruction-slice yields before child completion and
+verify retained PC, registers, memory, and parent state. Tab5 tests must keep native child
+active while independently proving keyboard polling, timer/cursor updates, display work,
+filesystem operations, and other runtime/service progress. Infinite or non-cooperative
+native application must not execute on runtime/service task.
+
 ---
 
 ## 4. Target Definitions
@@ -410,7 +438,7 @@ Console tests cover exclusive foreground acquisition, background and stale-sessi
 
 Application lifecycle tests cover descriptor validation, duplicate rejection, registry lookup, missing and busy launch results, manager-owned console exclusivity, entry/update/cleanup ordering, requested exit status, startup failure cleanup, console release, and registry shutdown. Runtime smoke test verifies configured `console-test` is launched through registry and Ctrl+Q returns cleanly to idle runtime. Same portable lifecycle code compiles into host and Tab5; host executes deterministic tests while Tab5 cross-build verifies target compatibility.
 
-ELF loader tests use real stripped RV32 fixture and cover format metadata, segment bounds, executable entry, relocation rejection, image-size limit, memory copy, unload, and malformed inputs under host sanitizers. Host never executes RV32 bytes. Tab5 experiment must verify executable allocation, instruction synchronization, API-table call, console output, return status, and cleanup on hardware. Expected success text is `HELLO FROM INDEPENDENT TABOS ELF`; `NO EXECUTABLE MEMORY` specifically means internal executable heap strategy failed and MMU mapping requires next experiment.
+ELF loader tests use real stripped RV32 fixture and cover format metadata, segment bounds, executable entry, relocation rejection, image-size limit, memory copy, unload, and malformed inputs under host sanitizers. Host executes same RV32 bytes through resumable interpreter and must cover multiple instruction slices, API-table calls, console output, return status, illegal instructions, and invalid guest memory access. Tab5 hardware validation covers executable PSRAM mapping, cache synchronization, native API-table calls, console output, return status, and cleanup. Expected success text is `Hello from independent TabOS ELF`.
 
 Manual console validation must include prompt-boundary Backspace, held Backspace, held printable keys, Enter, and Tab followed by visible text. Host backend synthesizes missing Enter/Tab/repeat text while retaining SDL text input for normal layout and IME behavior; matching SDL text events are suppressed to prevent duplicates.
 

@@ -224,8 +224,9 @@
   reopen, metadata, rename, enumeration, and cleanup through public filesystem API.
 - [x] Verify filesystem diagnostic against real controlled host root.
 - [x] Cross-build filesystem diagnostic for Tab5 Debug.
-- [ ] Flash filesystem diagnostic and verify all operations on physical microSD.
-- [ ] Verify file read/write, directory listing, seek, remount, and removal on hardware.
+- [x] Flash filesystem diagnostic and verify core operations on physical microSD.
+- [x] Verify file read/write, directory listing, seek, rename, and cleanup on hardware.
+- [ ] Verify remount and live card-removal behavior on hardware.
 - [ ] Evaluate internal flash filesystem after microSD baseline works.
 
 ## Current Milestone: Execute RV32 Applications on Host
@@ -245,6 +246,28 @@ This milestone gates filesystem-backed applications and shell utilities. Host de
 must execute the real RV32 program artifact so application, loader, and ABI behavior can
 be tested without repeated Tab5 flashing. Host-native recompilation may remain useful,
 but is not a substitute for this execution path.
+
+## Next Milestone: Persistent Nested Foreground Processes
+
+- [x] Decide initial persistent nested foreground process model.
+- [x] Decide initial Tab5 mapping of one managed FreeRTOS task per native user process.
+- [ ] Replace single active application context with fixed-capacity process table.
+- [ ] Reserve persistent shell as root process, initially process 0.
+- [ ] Enforce process-0 liveness invariant across return, exit request, fault, and forced termination.
+- [ ] Add kernel panic state that reports process-0 failure to serial and framebuffer terminal.
+- [ ] Implement foreground process stack and parent/child relationships.
+- [ ] Add synchronous child execution API that blocks parent without unloading it.
+- [ ] Transfer console and focused input ownership to stack top only.
+- [ ] Restore parent focus, execution, and child exit status when child completes.
+- [ ] Run native Tab5 ELF entry in application task while runtime/services continue.
+- [ ] Retain one independent host RV32 interpreter context per loaded process.
+- [ ] Keep executable memory, stack, heap, handles, and working state until process exits.
+- [ ] Define cooperative stop versus process-requested exit semantics.
+- [ ] Audit console, filesystem, loader, and lifecycle synchronization across tasks.
+- [ ] Validate shell -> child -> grandchild nesting and unwind order on host and Tab5.
+- [ ] Validate every process-0 termination path panics without unload or automatic restart.
+- [ ] Validate input, cursor, timers, display, filesystem, and network service progress
+  while foreground native application remains active.
 
 ## Following Milestone: Load Applications from Files
 
@@ -277,12 +300,12 @@ but is not a substitute for this execution path.
 
 ### Process and Runtime Model
 
-- [ ] Decide process-to-FreeRTOS-task mapping.
-- [ ] Replace cooperative single-application runtime where needed.
+- [x] Decide initial process-to-FreeRTOS-task mapping.
+- [ ] Replace cooperative single-application runtime with nested foreground process stack.
 - [ ] Add process identifiers or opaque process handles.
 - [ ] Add application crash/fault containment where hardware permits.
 - [ ] Define application memory ownership and cleanup guarantees.
-- [ ] Add multitasking and concurrency tests.
+- [ ] Add process nesting, service concurrency, ownership, and cleanup tests.
 - [ ] Measure SMP, memory pressure, and application failure behavior on Tab5.
 
 ### Shell Application
@@ -356,7 +379,7 @@ but is not a substitute for this execution path.
 - [ ] Add framebuffer capture and deterministic visual comparison tools.
 - [ ] Add synthetic input injection for integration tests.
 - [ ] Add controlled filesystem fixtures.
-- [ ] Decide whether actual RV32 binaries should run on host through emulator.
+- [x] Run actual RV32 binaries on host through a resumable RV32IMA interpreter.
 - [ ] Add source-level application debugging workflow.
 - [ ] Decide first-class C++ support timing.
 

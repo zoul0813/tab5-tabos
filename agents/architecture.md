@@ -150,28 +150,49 @@ TabOS API
 
 Programs should not require the complete TabOS firmware to be rebuilt and reflashed.
 
-Current first-stage implementation provides format-neutral `tabos_app_descriptor_t`, fixed built-in registry, and cooperative single-foreground lifecycle. Lifecycle manager grants console capability, invokes entry/update/cleanup callbacks, records exit status, and returns to idle runtime. This validates application/kernel ownership boundaries for statically linked host and Tab5 applications without settling ELF layout, task mapping, syscall ABI, isolation, or executable memory placement.
+Current first-stage implementation provides format-neutral `tabos_app_descriptor_t`, fixed built-in registry, and cooperative single-foreground lifecycle. Lifecycle manager grants console capability, invokes entry/update/cleanup callbacks, records exit status, and returns to idle runtime. This validates application/kernel ownership boundaries for statically linked host and Tab5 applications without settling ELF layout, syscall ABI, isolation, or executable memory placement. It predates and must be replaced by decided persistent nested foreground process/task model below.
 
-First ELF spike accepts minimal stripped RV32 `ET_EXEC` image with bounded `PT_LOAD` segments and no relocations/dynamic linking. Loader copies image into platform-provided executable memory and invokes entry with versioned API table. Embedded hello fixture isolates executable-memory validation from filesystem. ESP32-P4 hardware validation proved writable PSRAM loading plus a read/execute MMU alias of the same physical pages; host validates format and lifecycle but cannot execute RV32. This remains an experiment, not final executable-format or process-isolation decision.
+First ELF spike accepts minimal stripped RV32 `ET_EXEC` image with bounded `PT_LOAD` segments and no relocations/dynamic linking. Loader copies image into platform-provided executable memory and invokes entry with versioned API table. Embedded hello fixture isolates executable-memory validation from filesystem. ESP32-P4 hardware validation proved writable PSRAM loading plus a read/execute MMU alias of same physical pages. Host executes same RV32 artifact through resumable interpreter slices. This remains an experiment, not final executable-format or process-isolation decision.
 
-The exact mapping between a TabOS process and FreeRTOS tasks remains an implementation detail.
+[DECIDED] Initial process model uses persistent nested foreground processes. Shell is
+persistent root process, initially process 0. Executing child blocks but does not unload
+parent. Child becomes sole focused user process and may execute another child. Exit or
+fault pops child, releases its resources, returns status to parent, restores parent's
+console/input focus, and resumes parent at call site. This resembles synchronous
+spawn-and-wait even when public API is named `exec`; it does not use POSIX image-replacing
+`exec` semantics.
 
-Possible models include:
+Conceptually:
 
 ```text
-1 process = 1 task
+kernel and service tasks: always runnable
+
+foreground stack:
+    child-of-child       running; owns focus
+    child                blocked; fully retained
+    shell (process 0)    blocked; fully retained
 ```
 
-or:
+[DECIDED] Initial Tab5 mapping is one managed FreeRTOS task per native user process.
+Parent blocks through TabOS process synchronization rather than arbitrary suspension.
+Runtime/service task continues input polling, timers, display, filesystem, network, and
+lifecycle work. Native instructions still execute directly on ESP32-P4. Host represents
+each process with retained RV32 interpreter context and advances only foreground process
+in bounded instruction slices. Public application API must not expose FreeRTOS or host
+thread types.
 
-```text
-1 process
-   ├── main task
-   ├── worker task
-   └── optional additional tasks
-```
+Initial scope deliberately excludes background jobs, multiple runnable user processes,
+pipelines, signals, and worker threads inside one process. Process table and ownership
+model must leave room for these later.
 
-The application API should not depend on which model is chosen.
+[DECIDED] Process 0 is kernel-required root shell and has liveness invariant: it cannot
+exit normally. Return from entry, explicit exit request, execution fault, forced
+termination, or any other transition toward exited state must trigger kernel panic.
+Kernel must not unload or automatically restart process 0. Panic path must preserve
+enough display/runtime functionality to report clear process-0 failure, cause, and exit
+status when available through both platform serial/log output and framebuffer
+console/terminal. Panic reporting must not depend on process 0 retaining valid console
+ownership.
 
 ---
 

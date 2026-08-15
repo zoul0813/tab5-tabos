@@ -112,6 +112,30 @@ The public `<tabos/console.h>` API now supplies one cooperative foreground conso
 
 Portable application foundation now defines public descriptor and cooperative lifecycle API in `<tabos/application.h>`. Descriptor carries ABI version, name, version, capabilities, entry, update, and cleanup callbacks while remaining independent of future ELF container. Fixed-capacity built-in registry currently holds static descriptors. Runtime launches at most one foreground application, acquires requested console capability on its behalf, dispatches updates, honors requested exit status, calls cleanup, releases console, then remains idle for future launcher. Optional diagnostic is registered as `console-test`; Ctrl+Q exercises clean exit. This is initial host-native/built-in application mode, not final process/task or loader ABI.
 
+### Decision: persistent nested foreground processes
+
+TabOS will initially support multiple loaded processes but only one focused application
+at a time. Shell is persistent root process (initially process 0). When foreground
+process executes another program, parent remains loaded with all execution and resource
+state retained, blocks in background, and child becomes foreground. Child may launch
+another child using same rule. When child exits or faults, kernel unloads child, returns
+status to parent, restores parent's focus and console/input ownership, and resumes parent
+without restarting it.
+
+This is Zeal-style nested execution, not POSIX `exec()`, which replaces caller image.
+Conceptually TabOS operation is synchronous spawn-and-wait exposed as `exec`: push child
+onto foreground process stack, block parent, then pop child and wake parent. Initial
+model has no background jobs or concurrently runnable user programs. Kernel, input,
+display, timer, filesystem, network, and other system/service tasks must remain runnable
+while foreground application runs. On Tab5, native application code must therefore run
+in managed FreeRTOS application task rather than synchronously on runtime/service task.
+Host RV32 interpreter retains guest state across runtime-update slices.
+
+Process 0 is required system root and must never exit. If it returns, requests exit,
+faults, or is otherwise terminated, kernel must enter panic state rather than unload,
+restart, or normally unwind process 0. Panic must report process-0 failure and available
+cause/exit status to both serial/log sink and framebuffer console/terminal.
+
 Experimental loader now accepts bounded little-endian RV32 `ET_EXEC` ELF with loadable segments, executable entry, and no dynamic segment or relocations. Checked-in hello fixture is independently compiled by GCC for RV32IMA/`ilp32`, stripped to 348 bytes, loads 125 bytes, and calls versioned API table containing console write and exit request. Host executes same artifact through RV32 interpretation and reserved API call gates; guest CPU and memory state persist across bounded runtime-update instruction slices, so no application-lifetime instruction ceiling exists. Tab5 executes it natively. `TABOS_ENABLE_ELF_LOADER_EXPERIMENT=ON` selects `elf-hello` startup application on either target; it is mutually exclusive with console diagnostic. Hardware validation proved execution from PSRAM by loading through a writable data mapping, synchronizing cache, and creating a read/execute MMU alias for the same physical pages. API string pointers are translated back to the readable data alias. This is a proven experiment, not yet the final loader/process ABI.
 
 ## 4. Multitasking and CPU Cores
@@ -192,7 +216,7 @@ It has not yet been established whether independently loaded programs will have 
 
 Do not assume Unix-style process isolation.
 
-The ESP32-P4/ESP-IDF memory architecture, executable-from-PSRAM capabilities, MMU/cache behavior, and available protection mechanisms need to be investigated before locking the process model.
+The ESP32-P4/ESP-IDF memory architecture, executable-from-PSRAM capabilities, MMU/cache behavior, and available protection mechanisms need investigation before locking isolation and fault-containment guarantees. Initial nested foreground process/task model does not imply Unix-style memory protection.
 
 ## 6. Public API / ABI
 
@@ -530,7 +554,7 @@ These should be treated as active design work rather than silently assumed by Co
 3. **ABI:** API table, dynamic symbols, trap/syscall ABI, or another mechanism?
 4. **Memory execution:** what memory regions can safely and efficiently hold loaded executable code on ESP32-P4?
 5. **Isolation:** what practical memory/process protection can the P4 provide?
-6. **Program model:** one FreeRTOS task per application, multiple tasks per application, or a higher-level process abstraction?
+6. **Future threading:** when, if ever, may one process own worker tasks beyond its decided initial single managed application task?
 7. **Failure containment:** what happens when an application crashes?
 8. **libc:** use/newlib wrapper, custom small libc, or hybrid?
 9. **filesystem:** which filesystems and mount conventions should be standard?
