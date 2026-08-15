@@ -4,6 +4,7 @@ set(TABOS_ROOT "${CMAKE_CURRENT_LIST_DIR}/../..")
 include("${TABOS_ROOT}/config/Identity.cmake")
 include("${TABOS_ROOT}/config/Display.cmake")
 include("${TABOS_ROOT}/config/Font.cmake")
+include("${TABOS_ROOT}/config/Filesystem.cmake")
 include("${TABOS_ROOT}/config/Input.cmake")
 include("${TABOS_ROOT}/config/Console.cmake")
 include("${TABOS_ROOT}/config/Loader.cmake")
@@ -26,6 +27,11 @@ configure_file(
 configure_file(
     "${TABOS_ROOT}/config/font.h.in"
     "${TABOS_GENERATED_INCLUDE_DIR}/tabos/config/font.h"
+    @ONLY
+)
+configure_file(
+    "${TABOS_ROOT}/config/filesystem.h.in"
+    "${TABOS_GENERATED_INCLUDE_DIR}/tabos/config/filesystem.h"
     @ONLY
 )
 configure_file(

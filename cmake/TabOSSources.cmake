@@ -15,6 +15,9 @@ set(TABOS_CORE_SOURCES
     "${TABOS_ROOT}/input/input.c"
     "${TABOS_ROOT}/input/input_diagnostic.c"
     "${TABOS_ROOT}/console/console.c"
+    "${TABOS_ROOT}/fs/filesystem.c"
+    "${TABOS_ROOT}/fs/path.c"
+    "${TABOS_ROOT}/sdk/lib/posix_filesystem.c"
     "${TABOS_ROOT}/time/time.c"
     "${TABOS_ROOT}/loader/elf_loader.c"
     "${TABOS_ROOT}/loader/fixtures/hello_elf.c"
@@ -37,6 +40,8 @@ set(TABOS_HOST_PLATFORM_SOURCES
     "${TABOS_ROOT}/platform/host/sdl/input.c"
     "${TABOS_ROOT}/platform/host/sdl/display.c"
     "${TABOS_ROOT}/platform/host/sdl/executable.c"
+    "${TABOS_ROOT}/platform/host/posix/storage_backend.c"
+    "${TABOS_ROOT}/platform/posix/storage.c"
 )
 
 set(TABOS_ESP32P4_PLATFORM_SOURCES
@@ -44,4 +49,6 @@ set(TABOS_ESP32P4_PLATFORM_SOURCES
     "${TABOS_ROOT}/platform/esp32p4/keyboard.c"
     "${TABOS_ROOT}/platform/esp32p4/display.c"
     "${TABOS_ROOT}/platform/esp32p4/executable.c"
+    "${TABOS_ROOT}/platform/esp32p4/storage_backend.c"
+    "${TABOS_ROOT}/platform/posix/storage.c"
 )

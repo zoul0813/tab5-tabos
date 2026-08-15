@@ -21,12 +21,17 @@ Current settings cover:
 - terminal scale
 - terminal scrollback capacity
 - cursor blink interval
+- controlled host filesystem root
 
 The host cannot select `elf-hello` because it cannot execute an ESP32-P4 RV32 image.
 Font paths may be relative to the repository root or absolute. The configurator
 checks that the file size exactly matches the configured packed bitmap dimensions.
 Fonts with fewer than 256 glyphs are valid; character values outside their range
 use glyph 0.
+
+The host filesystem root defaults to `.local/rootfs`. Relative paths are resolved
+from the repository root. Host applications cannot escape this directory through
+`..` components or symbolic links.
 
 ESP-IDF `menuconfig` remains the advanced interface for ESP32-P4-specific settings.
 It is independent of TabOS project configuration:

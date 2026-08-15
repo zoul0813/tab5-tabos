@@ -1,6 +1,7 @@
 #include "internal.h"
 
 #include <tabos/platform/platform.h>
+#include <tabos/platform/storage.h>
 
 #include <tabos/config/identity.h>
 
@@ -164,11 +165,16 @@ bool tab_platform_get_diagnostics(tab_platform_diagnostics_t *diagnostics)
     if (diagnostics == NULL) return false;
     const int ram_mebibytes = SDL_GetSystemRAM();
     const int cpu_cores = SDL_GetNumLogicalCPUCores();
+    tab_platform_storage_info_t storage = {0};
+    (void)tab_platform_storage_info(&storage);
     *diagnostics = (tab_platform_diagnostics_t){
         .device_name = "Native host",
         .cpu_cores = cpu_cores > 0 ? (unsigned int)cpu_cores : 0U,
         .memory_total_bytes = ram_mebibytes > 0
             ? (uint64_t)(unsigned int)ram_mebibytes * 1024U * 1024U : 0U,
+        .storage_total_bytes = storage.total_bytes,
+        .storage_free_bytes = storage.free_bytes,
+        .storage_mounted = storage.mounted,
         .keyboard_name = "SDL3 keyboard",
         .keyboard_present = true,
     };

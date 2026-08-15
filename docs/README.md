@@ -12,6 +12,7 @@ This directory contains user and contributor documentation for TabOS.
 - [Application Lifecycle](applications.md): descriptors, built-in registry, foreground execution, and current limits.
 - [ELF Loader Experiment](elf-loader.md): stripped RV32 ELF contract, build pipeline, and Tab5 validation.
 - [Time and Timers](time.md): monotonic clock and reusable polling timers.
+- [Filesystem and Storage](filesystem.md): POSIX-style file API, host root, and Tab5 microSD behavior.
 
 ## Documentation Policy
 

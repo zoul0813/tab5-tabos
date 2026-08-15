@@ -104,7 +104,7 @@
 - [x] Report kernel/runtime initialization state.
 - [x] Use normal casing while retaining `OK`, `WARN`, and error status capitalization.
 - [x] Present static boot framebuffer once and rely on LCD scanout when unchanged.
-- [ ] Add mounted filesystem capacity and free-space entries after storage implementation.
+- [x] Add mounted filesystem capacity and free-space entries after storage implementation.
 - [ ] Feed future driver/service initialization records into same boot report.
 
 ### Font and Text Rendering
@@ -188,38 +188,38 @@
 
 ### Decisions and API
 
-- [ ] Decide initial filesystem error/result model.
-- [ ] Decide initial opaque file and directory handle model.
-- [ ] Define portable public filesystem API for open, close, read, write, seek, stat, and directory iteration.
-- [ ] Define portable mount and storage backend contracts.
-- [ ] Define path syntax and normalization rules.
+- [x] Decide initial filesystem error/result model.
+- [x] Decide initial opaque file and directory handle model.
+- [x] Define portable public filesystem API for open, close, read, write, seek, stat, and directory iteration.
+- [x] Define portable root-storage backend contract; multiple mounts remain future work.
+- [x] Define path syntax and normalization rules.
 - [ ] Decide initial logical mount layout; existing `/bin`, `/apps`, `/home`, `/etc`, `/tmp`, and `/dev` examples remain provisional.
-- [ ] Decide internal flash versus microSD responsibilities.
-- [ ] Define removable-media insertion/removal behavior.
-- [ ] Keep ESP-IDF, host file descriptors, and platform filesystem types out of public API.
+- [x] Use microSD for the initial Tab5 root; defer internal-flash policy.
+- [x] Treat card absence at boot as nonfatal; live removal recovery remains future work.
+- [x] Keep ESP-IDF, host file descriptors, and platform filesystem types out of public API.
 
 ### Portable Filesystem Core
 
-- [ ] Implement path validation and normalization.
+- [x] Implement path validation and normalization.
 - [ ] Implement mount table and longest-prefix resolution.
-- [ ] Implement file/directory handle ownership and cleanup.
-- [ ] Implement application-facing filesystem API dispatch.
-- [ ] Add deterministic unit tests for paths, mounts, handles, errors, and boundary cases.
+- [x] Implement file/directory handle ownership and cleanup.
+- [x] Implement application-facing filesystem API dispatch.
+- [x] Add deterministic tests for paths, handles, errors, and boundary cases.
 
 ### Host Storage Backend
 
-- [ ] Map TabOS root to controlled host directory rather than exposing host filesystem.
-- [ ] Prevent path escape outside configured host root.
-- [ ] Support files, directories, metadata, and required seek semantics.
-- [ ] Create deterministic temporary-root component tests.
+- [x] Map TabOS root to controlled host directory rather than exposing host filesystem.
+- [x] Prevent path escape outside configured host root.
+- [x] Support files, directories, metadata, and required seek semantics.
+- [x] Create deterministic temporary-root component tests.
 - [ ] Verify identical behavior on macOS and Linux.
 
 ### Tab5 Storage Backend
 
-- [ ] Bring up microSD hardware through ESP-IDF platform backend.
-- [ ] Select and mount initial on-disk filesystem.
-- [ ] Handle absent card as nonfatal boot condition.
-- [ ] Report mounted capacity and free space through boot diagnostics.
+- [x] Implement microSD bring-up through ESP-IDF platform backend.
+- [x] Select BSP microSD FAT as initial on-disk filesystem.
+- [x] Handle absent card as nonfatal boot condition.
+- [x] Report mounted capacity and free space through boot diagnostics.
 - [ ] Verify file read/write, directory listing, seek, remount, and removal on hardware.
 - [ ] Evaluate internal flash filesystem after microSD baseline works.
 

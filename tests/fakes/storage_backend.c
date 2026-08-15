@@ -1,0 +1,47 @@
+#define _POSIX_C_SOURCE 200809L
+#define _DARWIN_C_SOURCE
+
+#include <tabos/platform/storage_backend.h>
+
+#include "platform_test.h"
+
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/statvfs.h>
+
+static char storage_root[] = "/tmp/tabos-filesystem-test.XXXXXX";
+
+bool tab_storage_backend_mount(char *root, size_t root_size,
+                               bool *removable, const char **name)
+{
+    if (root == NULL || removable == NULL || name == NULL || mkdtemp(storage_root) == NULL) {
+        return false;
+    }
+    const size_t length = strlen(storage_root);
+    if (length >= root_size) return false;
+    memcpy(root, storage_root, length + 1U);
+    *removable = false;
+    *name = "Test filesystem";
+    return true;
+}
+
+void tab_storage_backend_unmount(void)
+{
+    (void)rmdir(storage_root);
+}
+
+bool tab_storage_backend_info(uint64_t *total_bytes, uint64_t *free_bytes)
+{
+    if (total_bytes == NULL || free_bytes == NULL) return false;
+    struct statvfs status;
+    if (statvfs(storage_root, &status) != 0) return false;
+    *total_bytes = (uint64_t)status.f_blocks * (uint64_t)status.f_frsize;
+    *free_bytes = (uint64_t)status.f_bavail * (uint64_t)status.f_frsize;
+    return true;
+}
+
+const char *tab_test_storage_root(void)
+{
+    return storage_root;
+}

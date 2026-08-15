@@ -6,6 +6,7 @@ idf_component_register(
     INCLUDE_DIRS
         "${TABOS_ROOT}/apps/include"
         "${TABOS_ROOT}/console/include"
+        "${TABOS_ROOT}/fs/include"
         "${TABOS_ROOT}/graphics/include"
         "${TABOS_ROOT}/input/include"
         "${TABOS_ROOT}/loader/include"

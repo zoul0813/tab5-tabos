@@ -2,7 +2,7 @@
 
 TabOS is a Zeal OS-inspired, keyboard-first operating environment for the M5Stack Tab5 and Tab5 Keyboard. It runs on ESP-IDF and FreeRTOS while presenting applications with a small TabOS-owned API.
 
-This repository currently contains a buildable scaffold with early terminal, foreground console, and keyboard input APIs. Executable format, filesystem policy, and most hardware services are not implemented or frozen.
+This repository currently contains a buildable scaffold with terminal, foreground console, keyboard input, application lifecycle, experimental ELF loading, and an initial POSIX-style filesystem API. Most hardware services and the final executable ABI are not yet implemented or frozen.
 
 Project identity, version, window title, preference names, target display names, and log tags are centralized in `config/Identity.cmake`. CMake generates a private C header from these values for every platform build.
 

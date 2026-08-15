@@ -401,6 +401,14 @@ The implementation may delegate actual storage to FAT, LittleFS, or other ESP-ID
 
 The public API should not depend on the filesystem used underneath.
 
+[DECIDED] The initial application surface is a deliberately bounded POSIX source-compatible
+subset. SDK compatibility headers map familiar names such as `open`, `read`, and
+`stat` to a TabOS-owned prefixed ABI; TabOS does not expose host or ESP-IDF libc
+objects as its ABI. The portable core owns path normalization, descriptors, errors,
+and dispatch. Initial deployment exposes one root: a controlled host directory on
+macOS/Linux and BSP-mounted microSD FAT on Tab5. An absent card is nonfatal. A mount
+table, internal-flash policy, permissions, links, and removal recovery are deferred.
+
 ---
 
 ## 9. Shell Architecture

@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.22)
 include("${CMAKE_CURRENT_SOURCE_DIR}/config/Identity.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/config/Display.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/config/Font.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/config/Filesystem.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/config/Input.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/config/Console.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/config/Loader.cmake")
@@ -26,6 +27,11 @@ configure_file(
 configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/config/font.h.in"
     "${TABOS_GENERATED_INCLUDE_DIR}/tabos/config/font.h"
+    @ONLY
+)
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/config/filesystem.h.in"
+    "${TABOS_GENERATED_INCLUDE_DIR}/tabos/config/filesystem.h"
     @ONLY
 )
 configure_file(
@@ -84,6 +90,7 @@ target_include_directories(tabos_core
         "${TABOS_ROOT}/apps/include"
         "${TABOS_ROOT}/apps/console_diagnostic/include"
         "${TABOS_ROOT}/console/include"
+        "${TABOS_ROOT}/fs/include"
         "${TABOS_ROOT}/graphics/include"
         "${TABOS_ROOT}/input/include"
         "${TABOS_ROOT}/kernel/include"

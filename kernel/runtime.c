@@ -5,6 +5,7 @@
 #include <tabos/internal/builtin_apps.h>
 #include <tabos/internal/console.h>
 #include <tabos/internal/display.h>
+#include <tabos/internal/filesystem.h>
 #include <tabos/internal/input.h>
 #include <tabos/internal/terminal.h>
 
@@ -94,6 +95,10 @@ bool tabos_runtime_start(void)
 
     if (runtime_started) {
         return true;
+    }
+
+    if (!tab_fs_init()) {
+        return false;
     }
 
     if (!tab_display_init()) {
@@ -207,6 +212,7 @@ void tabos_runtime_shutdown(void)
         boot_report = (tab_boot_report_t){0};
     }
 
+    tab_fs_shutdown();
     runtime_initialized = false;
     tab_input_shutdown();
 }

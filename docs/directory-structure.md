@@ -25,11 +25,13 @@ tabos/
 │   ├── host/            Native host implementation
 │   │   ├── posix/       POSIX-specific host services
 │   │   └── sdl/         SDL3 display and input services
-│   └── include/         Internal platform interface used by portable code
+│   ├── include/         Internal platform interface used by portable code
+│   └── posix/           Shared native POSIX storage adapter
 ├── rootfs/              Future default TabOS filesystem contents
 ├── sdk/                 Public application-development surface
 │   ├── include/         Public TabOS headers
-│   ├── lib/             Future application libraries
+│   ├── lib/             Application-facing compatibility wrappers
+│   ├── posix/include/   POSIX source-compatibility headers
 │   ├── linker/          Future linker scripts and executable-format support
 │   └── tools/           Future SDK tools
 ├── targets/             Buildable product entry points and target configuration

@@ -22,6 +22,7 @@ LOCAL_IDF = LOCAL_DIR / "esp-idf"
 LOCAL_IDF_TOOLS = LOCAL_DIR / "espressif-tools"
 LOCAL_CONFIG = LOCAL_DIR / "tabos.config"
 CONFIG_DEFAULTS = {
+    "TABOS_HOST_ROOTFS": ".local/rootfs",
     "TABOS_FONT_FILE": "graphics/blueterm.f12",
     "TABOS_FONT_GLYPH_WIDTH": "8",
     "TABOS_FONT_GLYPH_HEIGHT": "12",
@@ -105,6 +106,8 @@ def validate_project_config(config: dict[str, str]) -> None:
         fail(f"unknown option in {LOCAL_CONFIG}: {unknown[0]}")
     if not re.fullmatch(r"[1-8]", config["TABOS_TERMINAL_SCALE"]):
         fail("TABOS_TERMINAL_SCALE must be an integer from 1 through 8")
+    if not config["TABOS_HOST_ROOTFS"]:
+        fail("TABOS_HOST_ROOTFS must not be empty")
     for name in (
         "TABOS_FONT_GLYPH_WIDTH",
         "TABOS_FONT_GLYPH_HEIGHT",
@@ -194,6 +197,9 @@ def command_config(_args: argparse.Namespace) -> None:
         config["TABOS_TAB5_STARTUP_APP"] = prompt_choice(
             "Tab5 startup app", config["TABOS_TAB5_STARTUP_APP"], ("none", "console-test", "elf-hello")
         )
+        config["TABOS_HOST_ROOTFS"] = prompt_text(
+            "Host root filesystem directory", config["TABOS_HOST_ROOTFS"]
+        )
         config["TABOS_FONT_FILE"] = prompt_text("Bitmap font file", config["TABOS_FONT_FILE"])
         config["TABOS_FONT_GLYPH_WIDTH"] = prompt_integer(
             "Font glyph width (pixels)", config["TABOS_FONT_GLYPH_WIDTH"], 1
@@ -240,7 +246,11 @@ def project_cmake_arguments(target: str) -> list[str]:
     font_path = Path(config["TABOS_FONT_FILE"])
     if not font_path.is_absolute():
         font_path = ROOT / font_path
+    host_rootfs = Path(config["TABOS_HOST_ROOTFS"])
+    if not host_rootfs.is_absolute():
+        host_rootfs = ROOT / host_rootfs
     return [
+        f"-DTABOS_HOST_ROOTFS={host_rootfs}",
         f"-DTABOS_FONT_FILE={font_path}",
         f"-DTABOS_FONT_GLYPH_WIDTH={config['TABOS_FONT_GLYPH_WIDTH']}",
         f"-DTABOS_FONT_GLYPH_HEIGHT={config['TABOS_FONT_GLYPH_HEIGHT']}",
