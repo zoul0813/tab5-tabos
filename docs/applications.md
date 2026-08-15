@@ -60,7 +60,8 @@ Current implementation is deliberately small:
 - built-in root callbacks currently run in runtime loop rather than separate tasks
 - console is only defined capability
 - registry capacity is 16 built-in descriptors
-- fixed-capacity process table currently supports one foreground PID 0; child nesting is not implemented yet
+- fixed-capacity process table supports nested foreground processes; blocked parents retain state and resume after child exit
+- child launch is currently an internal built-in-test primitive; public synchronous execution API and RV32 call gate remain pending
 - PID 0 exit enters kernel-panic state and retains its process record; memory isolation remains unavailable
 - experimental embedded ELF loader exists, but no relocations, arguments, filesystem loading, or general external application memory management yet
 

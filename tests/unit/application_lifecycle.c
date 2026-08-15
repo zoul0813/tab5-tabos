@@ -11,6 +11,74 @@ static unsigned int update_calls;
 static unsigned int cleanup_calls;
 static int cleanup_status;
 static tabos_process_id_t entry_process_id;
+static unsigned int root_stage;
+static unsigned int child_stage;
+static bool nested_complete;
+
+static bool nested_entry(tabos_app_context_t *context)
+{
+    return tabos_app_console(context) != NULL;
+}
+
+static void root_update(tabos_app_context_t *context)
+{
+    if (root_stage++ == 0U) {
+        if (kernel_process_launch_child(context, "nested-child") != TABOS_APP_RESULT_OK) {
+            tabos_app_request_exit(context, 90);
+        }
+        return;
+    }
+    int status = 0;
+    if (kernel_process_take_child_status(context, &status) && status == 22) {
+        nested_complete = true;
+    }
+}
+
+static void child_update(tabos_app_context_t *context)
+{
+    if (child_stage++ == 0U) {
+        if (kernel_process_launch_child(context, "nested-grandchild") != TABOS_APP_RESULT_OK) {
+            tabos_app_request_exit(context, 91);
+        }
+        return;
+    }
+    int status = 0;
+    if (kernel_process_take_child_status(context, &status) && status == 33) {
+        tabos_app_request_exit(context, 22);
+    }
+}
+
+static void grandchild_update(tabos_app_context_t *context)
+{
+    tabos_app_request_exit(context, 33);
+}
+
+static const tabos_app_descriptor_t root_app = {
+    .abi_version = TABOS_APPLICATION_ABI_VERSION,
+    .name = "nested-root",
+    .version = "1.0.0",
+    .capabilities = TABOS_APP_CAPABILITY_CONSOLE,
+    .entry = nested_entry,
+    .update = root_update,
+};
+
+static const tabos_app_descriptor_t child_app = {
+    .abi_version = TABOS_APPLICATION_ABI_VERSION,
+    .name = "nested-child",
+    .version = "1.0.0",
+    .capabilities = TABOS_APP_CAPABILITY_CONSOLE,
+    .entry = nested_entry,
+    .update = child_update,
+};
+
+static const tabos_app_descriptor_t grandchild_app = {
+    .abi_version = TABOS_APPLICATION_ABI_VERSION,
+    .name = "nested-grandchild",
+    .version = "1.0.0",
+    .capabilities = TABOS_APP_CAPABILITY_CONSOLE,
+    .entry = nested_entry,
+    .update = grandchild_update,
+};
 
 static bool test_entry(tabos_app_context_t *context)
 {
@@ -72,6 +140,38 @@ int main(void)
     console_init(&terminal);
     kernel_application_system_init();
 
+    if (!application_registry_register(&root_app) ||
+        !application_registry_register(&child_app) ||
+        !application_registry_register(&grandchild_app) ||
+        tabos_app_launch("nested-root") != TABOS_APP_RESULT_OK) {
+        return 1;
+    }
+    kernel_application_system_update();
+    tabos_process_info_t process_info;
+    if (tabos_process_count() != 2U ||
+        !tabos_process_info(0U, &process_info) ||
+        process_info.state != TABOS_PROCESS_BLOCKED ||
+        !tabos_process_info(1U, &process_info) || process_info.parent_id != 0U ||
+        process_info.state != TABOS_PROCESS_RUNNING) {
+        return 1;
+    }
+    kernel_application_system_update();
+    if (tabos_process_count() != 3U ||
+        !tabos_process_info(2U, &process_info) || process_info.parent_id != 1U ||
+        process_info.state != TABOS_PROCESS_RUNNING) {
+        return 1;
+    }
+    kernel_application_system_update();
+    kernel_application_system_update();
+    kernel_application_system_update();
+    if (!nested_complete || tabos_process_count() != 1U ||
+        !tabos_process_info(0U, &process_info) ||
+        process_info.state != TABOS_PROCESS_RUNNING || tabos_process_system_panicked()) {
+        return 1;
+    }
+    kernel_application_system_shutdown();
+    kernel_application_system_init();
+
     tabos_app_descriptor_t invalid = test_app;
     invalid.abi_version = TABOS_APPLICATION_ABI_VERSION + 1U;
     if (application_registry_register(&invalid) ||
@@ -99,7 +199,6 @@ int main(void)
         return 1;
     }
 
-    tabos_process_info_t process_info;
     if (!tabos_process_info(0U, &process_info) || process_info.id != 0U ||
         process_info.parent_id != TABOS_PROCESS_ID_INVALID ||
         process_info.state != TABOS_PROCESS_RUNNING ||

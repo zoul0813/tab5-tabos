@@ -255,10 +255,10 @@ but is not a substitute for this execution path.
 - [ ] Reserve persistent shell as root process, initially process 0.
 - [ ] Enforce process-0 liveness invariant across return, exit request, fault, and forced termination.
 - [ ] Add kernel panic state that reports process-0 failure to serial and framebuffer terminal.
-- [ ] Implement foreground process stack and parent/child relationships.
+- [x] Implement foreground process stack and parent/child relationships.
 - [ ] Add synchronous child execution API that blocks parent without unloading it.
-- [ ] Transfer console and focused input ownership to stack top only.
-- [ ] Restore parent focus, execution, and child exit status when child completes.
+- [x] Transfer console and focused input ownership to stack top only.
+- [x] Restore parent focus, execution, and child exit status when child completes.
 - [ ] Run native Tab5 ELF entry in application task while runtime/services continue.
 - [ ] Retain one independent host RV32 interpreter context per loaded process.
 - [ ] Keep executable memory, stack, heap, handles, and working state until process exits.
