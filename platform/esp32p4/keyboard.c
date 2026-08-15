@@ -5,6 +5,8 @@
 
 #include <driver/i2c_master.h>
 #include <esp_log.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 #include <stdint.h>
 #include <stdio.h>
@@ -24,6 +26,7 @@ static i2c_master_dev_handle_t keyboard_device;
 static bool keyboard_present;
 static uint8_t previous_usage;
 static uint8_t previous_modifiers;
+static bool delete_held;
 static char keyboard_name[40] = "Tab5 keyboard not detected";
 
 static esp_err_t keyboard_read(uint8_t reg, void *data, size_t size)
@@ -88,6 +91,20 @@ static void submit_report(uint8_t hid_modifiers, uint8_t usage)
     }
     previous_usage = usage;
     previous_modifiers = modifiers;
+    delete_held = usage == TABOS_KEY_DELETE;
+}
+
+static void capture_boot_delete(void)
+{
+    uint8_t count = 0U;
+    if (keyboard_read(KEYBOARD_REG_EVENT_COUNT, &count, sizeof(count)) != ESP_OK) return;
+    if (count > 32U) count = 32U;
+    for (uint8_t index = 0U; index < count; ++index) {
+        uint8_t report[2] = {0xffU, 0xffU};
+        if (keyboard_read(KEYBOARD_REG_HID_EVENT, report, sizeof(report)) != ESP_OK ||
+            (report[0] == 0xffU && report[1] == 0xffU)) break;
+        delete_held = report[1] == TABOS_KEY_DELETE;
+    }
 }
 
 void tab5_keyboard_shutdown(void)
@@ -103,6 +120,7 @@ void tab5_keyboard_shutdown(void)
     keyboard_present = false;
     previous_usage = 0U;
     previous_modifiers = 0U;
+    delete_held = false;
 }
 
 bool tab5_keyboard_init(void)
@@ -138,8 +156,13 @@ bool tab5_keyboard_init(void)
     }
     uint8_t firmware_version = 0U;
     if (keyboard_read(KEYBOARD_REG_FIRMWARE_VERSION, &firmware_version, sizeof(firmware_version)) != ESP_OK ||
-        keyboard_write(KEYBOARD_REG_MODE, KEYBOARD_MODE_HID) != ESP_OK ||
-        keyboard_write(KEYBOARD_REG_EVENT_COUNT, 0U) != ESP_OK ||
+        keyboard_write(KEYBOARD_REG_MODE, KEYBOARD_MODE_HID) != ESP_OK) {
+        ESP_LOGW(TAG, "Could not configure Tab5 Keyboard");
+        tab5_keyboard_shutdown();
+        return false;
+    }
+    capture_boot_delete();
+    if (keyboard_write(KEYBOARD_REG_EVENT_COUNT, 0U) != ESP_OK ||
         keyboard_write(KEYBOARD_REG_INTERRUPT_CONFIG, 0U) != ESP_OK) {
         ESP_LOGW(TAG, "Could not configure Tab5 Keyboard");
         tab5_keyboard_shutdown();
@@ -175,4 +198,17 @@ const char *tab5_keyboard_name(void)
 bool tab5_keyboard_present(void)
 {
     return keyboard_present;
+}
+
+bool tab5_keyboard_delete_held(uint32_t window_ms)
+{
+    if (!keyboard_present) return false;
+    const TickType_t delay = pdMS_TO_TICKS(10U);
+    const TickType_t deadline = xTaskGetTickCount() + pdMS_TO_TICKS(window_ms);
+    do {
+        tab5_keyboard_poll();
+        if (delete_held) return true;
+        vTaskDelay(delay);
+    } while ((int32_t)(deadline - xTaskGetTickCount()) > 0);
+    return false;
 }

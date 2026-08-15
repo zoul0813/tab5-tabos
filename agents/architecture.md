@@ -515,6 +515,31 @@ Touch input is intentionally deferred until the future GUI/windowing and applica
 
 Keyboard input now uses a public platform-neutral event queue with key-down, key-up, modifier, repeat, and UTF-8 text semantics. SDL3 and the Tab5 I2C keyboard are backend producers. Future USB HID support on Tab5 must feed the same queue and may coexist with the built-in I2C keyboard; applications must not depend on input-device-specific protocols.
 
+### Tab5 boot-time USB storage mode
+
+[DECIDED] The Tab5 platform supports an early boot-mode selection before the
+kernel mounts filesystems. Holding the built-in keyboard Delete key selects USB
+mass-storage mode. This path initializes only the services needed to detect the
+boot request, present a status screen, and export the TF/microSD block device as
+`T:` through USB MSC. It does not start the normal application runtime.
+The ESP32-P4 high-speed OTG controller is physically routed to the Tab5 USB-A
+connector, so this mode disables that connector's host-mode 5 V output before
+starting TinyUSB device mode. The host must supply VBUS through a data cable;
+the Tab5 USB-C programming/power connection does not enumerate this device.
+
+[DECIDED] USB-A VBUS is safe-off by default. The board power switch remains off
+at reset, and early platform initialization explicitly drives its enable low.
+No general boot or peripheral initialization path may enable it. Only the USB
+host service may enable USB-A 5 V after acquiring exclusive port ownership and
+configuring host mode; stopping that service must disable 5 V again.
+
+Storage ownership is exclusive: the filesystem core must not mount `T:` while
+USB MSC owns its block device. A confirmed host safe-eject request causes a
+controlled system restart. USB disconnect must have an explicitly tested safe
+fallback because host operating systems do not all report eject identically.
+The future `usb-storage` application must call the same service and follow the
+same ownership transition.
+
 The portable console service provides cooperative foreground ownership above this queue. One session at a time may consume console input and update framebuffer terminal. Terminal owns colored cell/history ring, live cursor, independent viewport, reflow metadata, and rendering into platform framebuffer. Session tokens reject background and stale callers but are not a security boundary. Future process manager must own foreground assignment policy. Optional console diagnostic application uses only public console API and remains outside kernel shell policy.
 
 Portable monotonic time and polling timers live behind platform clock source. Console uses repeating timer for cursor phase; service remains reusable for future runtime scheduling. Terminal tracks dirty visible cells for ordinary text/cursor changes and reserves full redraw for viewport, clear, or resize changes.

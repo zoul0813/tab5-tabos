@@ -9,6 +9,7 @@ from tabos_tools.build import (
     CONFIGURATIONS,
     command_build,
     command_flash,
+    command_monitor,
     command_run,
     command_test,
 )
@@ -23,6 +24,7 @@ def command_target(args: argparse.Namespace) -> None:
         "test": command_test,
         "run": command_run,
         "flash": command_flash,
+        "monitor": command_monitor,
     }
     handlers[args.action](args)
 
@@ -39,7 +41,7 @@ def normalize_target_arguments(args: argparse.Namespace) -> None:
 
     if args.configuration not in CONFIGURATIONS:
         fail("configuration must be debug or release")
-    actions = {"build", "flash"} if args.target == "tab5" else {"build", "test", "run"}
+    actions = {"build", "flash", "monitor"} if args.target == "tab5" else {"build", "test", "run"}
     if args.action not in actions:
         fail(f"target '{args.target}' action must be one of: {', '.join(sorted(actions))}")
 
@@ -53,7 +55,7 @@ def parse_args() -> argparse.Namespace:
 
     for target in ("macos", "linux", "tab5"):
         target_parser = subparsers.add_parser(target, help=f"operate on {target} target")
-        actions = ("build", "flash") if target == "tab5" else ("build", "test", "run")
+        actions = ("build", "flash", "monitor") if target == "tab5" else ("build", "test", "run")
         target_parser.add_argument(
             "target_arguments",
             nargs="+",

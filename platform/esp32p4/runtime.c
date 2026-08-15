@@ -19,6 +19,10 @@ static const char *const TAG = TABOS_PLATFORM_LOG_TAG;
 bool platform_init(bool headless)
 {
     (void)headless;
+    if (!platform_usb_port_disable_host_power()) {
+        ESP_LOGE(TAG, "Could not place USB-A port in safe unpowered state");
+        return false;
+    }
     (void)tab5_keyboard_init();
     return true;
 }

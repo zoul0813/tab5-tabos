@@ -70,6 +70,27 @@ Tab5 reserves an 8 KiB startup-task stack for current built-in applications. Thi
 accommodates nested filesystem and FatFs VFS calls until applications receive
 their own runtime tasks and stack budgets.
 
+### Boot USB Storage Mode
+
+Hold the built-in keyboard Delete key while starting or resetting the Tab5. TabOS
+checks for the key during a 750 ms early-boot window, before mounting `T:`, and
+enters USB mass-storage mode. Connect the **Tab5 USB-A port** to a USB-C port on
+the host with a USB-A-to-USB-C data cable. The TF/microSD card appears as a
+removable USB disk, and the Tab5 screen reports that USB storage mode is active.
+The Tab5 USB-C power/programming port does not carry the mass-storage device.
+TabOS disables USB-A host power in this mode so the connected host safely
+supplies VBUS.
+
+USB-A host power is also disabled during every normal TabOS startup. It is only
+enabled when a USB-host service deliberately takes ownership of the port. This
+makes a restart after eject safe while both the USB-C power/programming cable
+and USB-A data cable are still attached.
+
+TabOS does not mount or access `T:` while the host owns it. Eject the removable
+disk through the host operating system before disconnecting it. A safe eject or
+USB disconnect ends storage mode and restarts the Tab5; normal boot then mounts
+the card as `T:` again. Internal flash is not exported.
+
 ## Platform Diagnostic
 
 Select `filesystem-test` as startup application with:

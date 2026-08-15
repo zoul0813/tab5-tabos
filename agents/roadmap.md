@@ -41,6 +41,7 @@
 - [x] Provide `./tools/tabos` setup, configuration, build, test, and clean workflow.
 - [x] Install and activate project-local ESP-IDF v5.4.4 through `./tools/tabos`.
 - [x] Provide `tools/flash.sh [debug|release]`, defaulting to Debug.
+- [x] Provide Tab5 serial monitoring through `./tools/tabos tab5 [debug|release] monitor`.
 - [x] Keep generated build output and local tool state ignored by Git.
 - [x] Centralize project identity and common strings under `config/`.
 - [x] Document repository structure and supported commands for users under `docs/`.
@@ -234,6 +235,21 @@
 - [x] Verify file read/write, directory listing, seek, rename, and cleanup on hardware.
 - [ ] Verify remount and live card-removal behavior on hardware.
 - [ ] Evaluate internal flash filesystem after microSD baseline works.
+
+### Tab5 USB Storage Mode
+
+- [x] Decide Delete-held-at-boot behavior for pre-shell USB storage access.
+- [x] Add an early Tab5 boot-key sampling window before mounting `T:`.
+- [x] Add ESP32-P4 TinyUSB MSC device service backed by the TF/microSD block device.
+- [x] Keep `T:` unmounted and inaccessible to TabOS for the full export session.
+- [x] Display a dedicated full-screen USB storage mode and safe-eject message.
+- [x] Detect host safe eject and restart the Tab5 into normal boot.
+- [x] Define USB disconnect as the fallback when the host sends no eject event.
+- [ ] Validate safe-eject and USB-disconnect restart behavior on macOS hardware.
+- [ ] Test repeated export, write, eject, restart, remount, and filesystem integrity on hardware.
+- [ ] Reuse the service from the future shell-launched `usb-storage` application.
+- [ ] After `A:` exists, optionally export its data partition as another selectable MSC LUN.
+- [ ] Never expose firmware, bootloader, partition-table, or NVS flash regions.
 
 ## Current Milestone: Execute RV32 Applications on Host
 

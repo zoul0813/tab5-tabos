@@ -97,6 +97,7 @@ This should make normal development substantially faster.
 - Tab5 firmware requires ESP-IDF v5.4.4. `./tools/tabos setup` installs host prerequisites and a project-local copy under `.local/`; Tab5 wrapper commands activate it automatically when needed.
 - Project-local ESP-IDF tools live under `.local/espressif-tools`, keeping them separate from global ESP-IDF installations.
 - Hardware flashing uses local `esptool` through `./tools/flash.sh [debug|release]`; debug is the default.
+- Hardware serial monitoring uses `./tools/tabos tab5 [debug|release] monitor`; debug is the default and `ESPPORT` selects a device when needed.
 - Generated firmware lives in `build/tab5-debug/` or `build/tab5-release/` and uses `TabOS.bin` capitalization.
 - Info-level serial logging is required in debug and release so detected hardware remains visible during boot.
 - Current host suite has unit, integration, architecture-boundary, and invalid-target tests. Display transforms must remain host-unit-tested.

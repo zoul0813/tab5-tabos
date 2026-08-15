@@ -53,6 +53,7 @@ set(TABOS_HOST_PLATFORM_SOURCES
 set(TABOS_ESP32P4_PLATFORM_SOURCES
     "${TABOS_ROOT}/platform/esp32p4/runtime.c"
     "${TABOS_ROOT}/platform/esp32p4/keyboard.c"
+    "${TABOS_ROOT}/platform/esp32p4/usb_storage.c"
     "${TABOS_ROOT}/platform/esp32p4/display.c"
     "${TABOS_ROOT}/platform/esp32p4/executable.c"
     "${TABOS_ROOT}/platform/esp32p4/storage_backend.c"

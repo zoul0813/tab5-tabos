@@ -74,3 +74,7 @@ def command_run(args: argparse.Namespace) -> None:
 
 def command_flash(args: argparse.Namespace) -> None:
     tab5_command(args.configuration, "flash")
+
+
+def command_monitor(args: argparse.Namespace) -> None:
+    tab5_command(args.configuration, "monitor")

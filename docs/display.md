@@ -62,6 +62,14 @@ Flashing remains an explicit hardware action:
 ./tools/tabos tab5 debug flash
 ```
 
+Monitor Tab5 serial output using matching build configuration. Debug is default, and
+`ESPPORT` may select device when automatic detection is ambiguous. Exit with `Ctrl+]`:
+
+```sh
+./tools/tabos tab5 monitor
+ESPPORT=/dev/cu.usbmodem211201 ./tools/tabos tab5 release monitor
+```
+
 For container-built firmware, use local `esptool` through the standalone flash helper. It defaults to the debug image:
 
 ```sh

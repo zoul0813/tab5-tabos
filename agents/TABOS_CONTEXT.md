@@ -268,6 +268,35 @@ A filesystem and command-line environment are fundamental TabOS services.
 
 microSD is expected to be an important user/program storage device.
 
+### Decision: Tab5 boot-time USB storage mode
+
+[DECIDED] Until the shell can launch a `usb-storage` application, holding the
+Tab5 keyboard Delete key during early boot selects a dedicated USB mass-storage
+mode. The boot path must detect the request before mounting `T:`, export only
+the TF/microSD volume through the high-speed OTG controller wired to the Tab5
+USB-A connector, and display a
+clear full-screen message that TabOS is in USB storage mode. Normal kernel
+applications and the shell do not start in this mode.
+
+TabOS must disable the USB-A connector's host-mode 5 V supply before enabling
+USB device mode. The attached host supplies VBUS. The Tab5 USB-C connector is
+the power/programming connection and does not carry this TinyUSB MSC device.
+USB-A host power is off at hardware reset and TabOS must explicitly drive it
+off during early platform initialization. Only the future USB-host service may
+enable 5 V, after it owns the port and is ready to operate it in host mode.
+
+The host exclusively owns the exported filesystem. TabOS must not mount or
+otherwise access `T:` while it is exported. A host safe-eject request ends USB
+storage mode and restarts the Tab5 so normal boot can remount the card. Because
+host eject behavior can vary, implementation must also define and test a safe
+USB-disconnect fallback without allowing concurrent filesystem ownership.
+
+Later, the shell-launched `usb-storage` application should reuse the same
+platform USB-storage service rather than implementing a second export path.
+Internal flash `A:` may later be exported as another selectable MSC logical
+unit, but only its filesystem data partition may be exposed; firmware, NVS,
+partition-table, and bootloader regions must never be exported.
+
 ### Decision: drive-letter storage namespace
 
 Expose hierarchical filesystems through DOS/CP/M/Zeal-style drive letters rather than one Unix mount tree. Internal Tab5 flash is assigned `A:` and the TF/microSD card is assigned `T:`. Other storage drivers, including future USB mass-storage drivers, own assignment of their drive letters. Paths use forms such as `A:/bin/shell.elf` and `T:/apps/game.elf`.
