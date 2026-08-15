@@ -8,7 +8,12 @@ This document describes the current TabOS repository layout. It is authoritative
 tabos/
 ├── .github/workflows/   GitHub Actions builds, tests, and artifacts
 ├── agents/              Context and implementation guidance for coding agents
-├── apps/                Built-in registry and bundled applications, including future shell
+├── apps/                Application sources
+│   ├── diag/            Optional built-in diagnostics and diagnostic registry
+│   │   ├── console/     Console/input diagnostic
+│   │   ├── elf_loader/  Embedded-ELF loader/execution diagnostic
+│   │   └── filesystem/  Filesystem/storage diagnostic
+│   └── hello_elf/       Independently built ELF example application
 ├── audio/               Portable audio subsystem
 ├── cmake/               Shared host-build CMake modules
 ├── config/              Common identity, display, font, input, console, and loader build settings
@@ -49,7 +54,7 @@ tabos/
 
 Some directories contain only `.gitkeep` placeholders. Their stated responsibilities are planned boundaries; their APIs are not yet defined.
 
-The command shell will be the first official TabOS application and belongs under `apps/`. It is not part of the kernel. Current `apps/console_diagnostic/` and `apps/filesystem_diagnostic/` are optional test applications, not a shell. Kernel and portable subsystems provide terminal, console, input, process, and filesystem services used by applications.
+The command shell will be the first official TabOS application and belongs under `apps/`. It is not part of the kernel. Built-in diagnostic applications live under `apps/diag/`; they are optional test applications compiled into the firmware, not independently loaded programs. Independently built ELF applications, such as `apps/hello_elf/`, remain separate. Kernel and portable subsystems provide terminal, console, input, process, and filesystem services used by applications.
 
 ## Targets and Platforms
 

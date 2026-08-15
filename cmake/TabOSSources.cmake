@@ -7,7 +7,7 @@ set(TABOS_CORE_SOURCES
     "${TABOS_ROOT}/kernel/application.c"
     "${TABOS_ROOT}/kernel/application_registry.c"
     "${TABOS_ROOT}/kernel/boot_report.c"
-    "${TABOS_ROOT}/apps/builtin_apps.c"
+    "${TABOS_ROOT}/apps/diag/diagnostic_apps.c"
     "${TABOS_ROOT}/graphics/display.c"
     "${TABOS_ROOT}/graphics/font.c"
     "${TABOS_GENERATED_FONT_SOURCE}"
@@ -25,19 +25,19 @@ set(TABOS_CORE_SOURCES
 
 if(TABOS_ENABLE_ELF_LOADER_EXPERIMENT)
     list(APPEND TABOS_CORE_SOURCES
-        "${TABOS_ROOT}/loader/elf_application.c"
+        "${TABOS_ROOT}/apps/diag/elf_loader/elf_loader_diagnostic.c"
     )
 endif()
 
 if(TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP)
     list(APPEND TABOS_CORE_SOURCES
-        "${TABOS_ROOT}/apps/console_diagnostic/console_diagnostic.c"
+        "${TABOS_ROOT}/apps/diag/console/console_diagnostic.c"
     )
 endif()
 
 if(TABOS_ENABLE_FILESYSTEM_DIAGNOSTIC_APP)
     list(APPEND TABOS_CORE_SOURCES
-        "${TABOS_ROOT}/apps/filesystem_diagnostic/filesystem_diagnostic.c"
+        "${TABOS_ROOT}/apps/diag/filesystem/filesystem_diagnostic.c"
     )
 endif()
 

@@ -96,15 +96,17 @@ add_library(tabos_core STATIC ${TABOS_CORE_SOURCES})
 target_include_directories(tabos_core
     PUBLIC "${TABOS_ROOT}/sdk/include"
     PRIVATE
-        "${TABOS_ROOT}/apps/include"
-        "${TABOS_ROOT}/apps/console_diagnostic/include"
-        "${TABOS_ROOT}/apps/filesystem_diagnostic/include"
+        "${TABOS_ROOT}/apps/diag/include"
+        "${TABOS_ROOT}/apps/diag/console/include"
+        "${TABOS_ROOT}/apps/diag/filesystem/include"
+        "${TABOS_ROOT}/apps/diag/elf_loader/include"
         "${TABOS_ROOT}/console/include"
         "${TABOS_ROOT}/fs/include"
         "${TABOS_ROOT}/graphics/include"
         "${TABOS_ROOT}/input/include"
         "${TABOS_ROOT}/kernel/include"
         "${TABOS_ROOT}/loader/include"
+        "${TABOS_ROOT}/loader/fixtures"
         "${TABOS_ROOT}/platform/include"
         "${TABOS_GENERATED_INCLUDE_DIR}"
 )

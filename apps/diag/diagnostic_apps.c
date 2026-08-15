@@ -1,4 +1,4 @@
-#include <tabos/internal/builtin_apps.h>
+#include <tabos/internal/diagnostic_apps.h>
 
 #include <tabos/internal/application.h>
 
@@ -15,30 +15,30 @@
 #endif
 
 #if TABOS_ENABLE_ELF_LOADER_EXPERIMENT
-#include <tabos/internal/elf_application.h>
+#include <tabos/internal/elf_loader_diagnostic.h>
 #endif
 
-bool tab_builtin_apps_register(void)
+bool tab_diagnostic_apps_register(void)
 {
 #if TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP
     return tab_app_registry_register(&tab_console_diagnostic_app);
 #elif TABOS_ENABLE_FILESYSTEM_DIAGNOSTIC_APP
     return tab_app_registry_register(&tab_filesystem_diagnostic_app);
 #elif TABOS_ENABLE_ELF_LOADER_EXPERIMENT
-    return tab_app_registry_register(&tab_elf_experiment_app);
+    return tab_app_registry_register(&tab_elf_loader_diagnostic_app);
 #else
     return true;
 #endif
 }
 
-const char *tab_builtin_startup_app(void)
+const char *tab_diagnostic_startup_app(void)
 {
 #if TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP
     return tab_console_diagnostic_app.name;
 #elif TABOS_ENABLE_FILESYSTEM_DIAGNOSTIC_APP
     return tab_filesystem_diagnostic_app.name;
 #elif TABOS_ENABLE_ELF_LOADER_EXPERIMENT
-    return tab_elf_experiment_app.name;
+    return tab_elf_loader_diagnostic_app.name;
 #else
     return NULL;
 #endif

@@ -1,11 +1,11 @@
-#include <tabos/internal/elf_application.h>
+#include <tabos/internal/elf_loader_diagnostic.h>
 
 #include <tabos/elf_api.h>
 #include <tabos/internal/elf_loader.h>
 
 #include <tabos/platform/platform.h>
 
-#include "fixtures/hello_elf.h"
+#include "hello_elf.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -120,7 +120,7 @@ static void elf_cleanup(tabos_app_context_t *context, int exit_status)
     elf_exit_requested = false;
 }
 
-const tabos_app_descriptor_t tab_elf_experiment_app = {
+const tabos_app_descriptor_t tab_elf_loader_diagnostic_app = {
     .abi_version = TABOS_APPLICATION_ABI_VERSION,
     .name = "elf-hello",
     .version = "0.1.0",
