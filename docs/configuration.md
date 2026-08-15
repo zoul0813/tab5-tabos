@@ -13,7 +13,7 @@ cache contents.
 
 Current settings cover:
 
-- host startup application: `none`, `console-test`, or `filesystem-test`
+- host startup application: `none`, `console-test`, `filesystem-test`, or `elf-hello`
 - Tab5 startup application: `none`, `console-test`, `filesystem-test`, or `elf-hello`
 - raw bitmap font file
 - font glyph width, height, and glyph count (1 through 256)
@@ -23,7 +23,7 @@ Current settings cover:
 - cursor blink interval
 - controlled host filesystem root
 
-The host cannot select `elf-hello` because it cannot execute an ESP32-P4 RV32 image.
+The host executes `elf-hello` through bounded RV32 interpretation using same application artifact as Tab5.
 Font paths may be relative to the repository root or absolute. The configurator
 checks that the file size exactly matches the configured packed bitmap dimensions.
 Fonts with fewer than 256 glyphs are valid; character values outside their range

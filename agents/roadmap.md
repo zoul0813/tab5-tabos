@@ -228,11 +228,29 @@
 - [ ] Verify file read/write, directory listing, seek, remount, and removal on hardware.
 - [ ] Evaluate internal flash filesystem after microSD baseline works.
 
+## Current Milestone: Execute RV32 Applications on Host
+
+- [x] Decide that host simulation executes the same RV32 artifact used by Tab5.
+- [x] Select a small permissively licensed RV32 interpreter for initial host execution.
+- [x] Integrate a pinned RV32IMA interpreter behind the platform executable boundary.
+- [x] Bridge the experimental TabOS ELF API table without adopting Linux syscalls.
+- [x] Execute `hello_elf` completely in host tests and verify output and exit status.
+- [x] Bound guest instruction execution so runaway applications cannot hang host tests.
+- [x] Retain guest CPU and memory state across bounded runtime-update slices.
+- [x] Report illegal instructions and invalid guest memory accesses without crashing host.
+- [ ] Add optional instruction/register tracing for application debugging.
+- [ ] Evaluate GDB remote debugging after basic interpreter execution is stable.
+
+This milestone gates filesystem-backed applications and shell utilities. Host development
+must execute the real RV32 program artifact so application, loader, and ABI behavior can
+be tested without repeated Tab5 flashing. Host-native recompilation may remain useful,
+but is not a substitute for this execution path.
+
 ## Following Milestone: Load Applications from Files
 
 - [ ] Make loader consume filesystem handles rather than embedded byte arrays.
 - [ ] Preserve bounded reads and executable image size limits.
-- [ ] Load independent hello application from host controlled root.
+- [ ] Load and execute independent RV32 hello application from host controlled root.
 - [ ] Load independent hello application from Tab5 microSD.
 - [ ] Define application file naming and discovery rules.
 - [ ] Add application metadata validation.
@@ -248,7 +266,8 @@
 - [ ] Freeze first supported application ABI version after filesystem-backed loader validation.
 - [ ] Publish public application headers independent from ESP-IDF and FreeRTOS.
 - [ ] Provide compiler, linker, strip, and packaging workflow for external applications.
-- [ ] Provide host-native application build mode using same source and public APIs.
+- [ ] Optionally provide host-native application build mode for sanitizer-heavy source tests;
+  keep RV32 execution as canonical binary/ABI validation.
 - [ ] Add argument passing and application-visible exit status.
 - [ ] Decide libc/newlib wrapper strategy.
 - [ ] Add memory allocation API.

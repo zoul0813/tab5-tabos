@@ -1,6 +1,6 @@
 # ELF Loader Experiment
 
-TabOS includes first executable-loader feasibility experiment. It validates and loads independently compiled, stripped RV32 ELF image, then executes it on Tab5 through minimal versioned API table. Experiment intentionally excludes filesystem and shell.
+TabOS includes first executable-loader feasibility experiment. It validates and loads independently compiled, stripped RV32 ELF image, then executes same artifact on Tab5 or through bounded RV32 interpretation on host. Experiment intentionally excludes filesystem and shell.
 
 ## Current ELF Contract
 
@@ -16,7 +16,15 @@ Accepted image must be:
 - no `SHT_REL` or `SHT_RELA` relocations
 - at most 1 MiB loaded image
 
-Current hello fixture is 308-byte stripped ELF containing 85-byte load image, one load segment, and no relocations. Source lives in `apps/hello_elf/hello.c`. Linker configuration lives in `sdk/linker/app-riscv32.ld`.
+Current hello fixture is 348-byte stripped ELF containing 125-byte load image, one load segment, and no relocations. Source lives in `apps/hello_elf/hello.c`. Linker configuration lives in `sdk/linker/app-riscv32.ld`.
+
+Application payloads currently target RV32IMA with integer ABI `ilp32`. This subset runs natively on ESP32-P4 and through pinned `mini-rv32ima` interpreter on macOS and Linux. Host execution uses reserved guest call gates to bridge experimental TabOS API table; it does not provide Linux system calls.
+
+Host execution is resumable. Each application update executes at most 10,000 guest
+instructions, then yields to normal TabOS input, display, timer, and application work.
+Guest registers and memory persist into next update. This is scheduling quantum, not
+application lifetime limit: long-running and interactive programs continue until they
+return, request exit, fault, or are stopped by lifecycle manager.
 
 Build standalone fixture inside activated ESP-IDF v5.4.4 environment:
 

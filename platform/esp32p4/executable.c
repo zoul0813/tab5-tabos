@@ -9,6 +9,8 @@
 #include <sdkconfig.h>
 
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 
 typedef struct {
     void *writable;
@@ -18,6 +20,13 @@ typedef struct {
 
 static executable_mapping_t mapping;
 static const char *const TAG = TABOS_PLATFORM_LOG_TAG;
+
+struct tab_platform_riscv32_context {
+    tabos_elf_entry_fn entry;
+    tabos_elf_api_t api;
+    bool finished;
+    int returned_status;
+};
 
 void *tab_platform_executable_alloc(size_t size)
 {
@@ -82,4 +91,47 @@ void tab_platform_executable_free(void *memory)
 bool tab_platform_can_execute_riscv32(void)
 {
     return true;
+}
+
+tab_platform_riscv32_context_t *tab_platform_riscv32_create(
+    const void *entry,
+    const void *memory,
+    size_t memory_size,
+    uint32_t minimum_address,
+    const tabos_elf_api_t *api)
+{
+    (void)memory;
+    (void)memory_size;
+    (void)minimum_address;
+    if (entry == NULL || api == NULL) return NULL;
+    tab_platform_riscv32_context_t *context = calloc(1U, sizeof(*context));
+    if (context == NULL) return NULL;
+    tabos_elf_entry_fn entry_function = NULL;
+    _Static_assert(sizeof(entry_function) == sizeof(entry),
+                   "ELF entry pointer must match data pointer size");
+    memcpy(&entry_function, &entry, sizeof(entry_function));
+    context->entry = entry_function;
+    context->api = *api;
+    return context;
+}
+
+tab_platform_riscv32_result_t tab_platform_riscv32_step(
+    tab_platform_riscv32_context_t *context,
+    unsigned int instruction_budget,
+    int *returned_status)
+{
+    if (context == NULL || instruction_budget == 0U || returned_status == NULL) {
+        return TAB_PLATFORM_RISCV32_FAULT;
+    }
+    if (!context->finished) {
+        context->returned_status = context->entry(&context->api);
+        context->finished = true;
+    }
+    *returned_status = context->returned_status;
+    return TAB_PLATFORM_RISCV32_RETURNED;
+}
+
+void tab_platform_riscv32_destroy(tab_platform_riscv32_context_t *context)
+{
+    free(context);
 }

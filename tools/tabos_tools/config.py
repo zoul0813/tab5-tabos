@@ -64,8 +64,10 @@ def validate_project_config(config: dict[str, str]) -> None:
     for name in ("TABOS_TERMINAL_SCROLLBACK_LINES", "TABOS_CURSOR_BLINK_INTERVAL_MS"):
         if not re.fullmatch(r"[1-9][0-9]*", config[name]):
             fail(f"{name} must be a positive integer")
-    if config["TABOS_HOST_STARTUP_APP"] not in {"none", "console-test", "filesystem-test"}:
-        fail("TABOS_HOST_STARTUP_APP must be none, console-test, or filesystem-test")
+    if config["TABOS_HOST_STARTUP_APP"] not in {
+        "none", "console-test", "filesystem-test", "elf-hello"
+    }:
+        fail("TABOS_HOST_STARTUP_APP must be none, console-test, filesystem-test, or elf-hello")
     if config["TABOS_TAB5_STARTUP_APP"] not in {
         "none", "console-test", "filesystem-test", "elf-hello"
     }:
@@ -120,7 +122,7 @@ def command_config(_args: argparse.Namespace) -> None:
     try:
         config["TABOS_HOST_STARTUP_APP"] = prompt_choice(
             "Host startup app", config["TABOS_HOST_STARTUP_APP"],
-            ("none", "console-test", "filesystem-test")
+            ("none", "console-test", "filesystem-test", "elf-hello")
         )
         config["TABOS_TAB5_STARTUP_APP"] = prompt_choice(
             "Tab5 startup app", config["TABOS_TAB5_STARTUP_APP"],

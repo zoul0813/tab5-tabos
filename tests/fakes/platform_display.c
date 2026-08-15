@@ -93,6 +93,37 @@ bool tab_platform_can_execute_riscv32(void)
     return false;
 }
 
+tab_platform_riscv32_context_t *tab_platform_riscv32_create(
+    const void *entry,
+    const void *memory,
+    size_t memory_size,
+    uint32_t minimum_address,
+    const tabos_elf_api_t *api)
+{
+    (void)entry;
+    (void)memory;
+    (void)memory_size;
+    (void)minimum_address;
+    (void)api;
+    return NULL;
+}
+
+tab_platform_riscv32_result_t tab_platform_riscv32_step(
+    tab_platform_riscv32_context_t *context,
+    unsigned int instruction_budget,
+    int *returned_status)
+{
+    (void)context;
+    (void)instruction_budget;
+    (void)returned_status;
+    return TAB_PLATFORM_RISCV32_FAULT;
+}
+
+void tab_platform_riscv32_destroy(tab_platform_riscv32_context_t *context)
+{
+    (void)context;
+}
+
 void tab_test_platform_set_time_ms(uint64_t time_ms)
 {
     monotonic_ms = time_ms;

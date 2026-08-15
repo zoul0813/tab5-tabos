@@ -5,6 +5,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <tabos/elf_api.h>
+
 enum {
     TABOS_DISPLAY_WIDTH = 1280,
     TABOS_DISPLAY_HEIGHT = 720,
@@ -12,6 +14,13 @@ enum {
 
 typedef uint16_t tab_pixel_t;
 typedef void (*tab_platform_update_fn)(void);
+typedef struct tab_platform_riscv32_context tab_platform_riscv32_context_t;
+
+typedef enum {
+    TAB_PLATFORM_RISCV32_YIELDED = 0,
+    TAB_PLATFORM_RISCV32_RETURNED,
+    TAB_PLATFORM_RISCV32_FAULT,
+} tab_platform_riscv32_result_t;
 
 typedef struct {
     tab_pixel_t *pixels;
@@ -51,6 +60,17 @@ void *tab_platform_executable_prepare(void *memory, size_t size);
 const void *tab_platform_executable_data_pointer(const void *memory);
 void tab_platform_executable_free(void *memory);
 bool tab_platform_can_execute_riscv32(void);
+tab_platform_riscv32_context_t *tab_platform_riscv32_create(
+    const void *entry,
+    const void *memory,
+    size_t memory_size,
+    uint32_t minimum_address,
+    const tabos_elf_api_t *api);
+tab_platform_riscv32_result_t tab_platform_riscv32_step(
+    tab_platform_riscv32_context_t *context,
+    unsigned int instruction_budget,
+    int *returned_status);
+void tab_platform_riscv32_destroy(tab_platform_riscv32_context_t *context);
 void tab_platform_input_wait(void);
 
 bool tab_platform_display_init(tab_framebuffer_t *framebuffer);

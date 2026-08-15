@@ -83,6 +83,15 @@ include("${TABOS_ROOT}/cmake/TabOSSources.cmake")
 
 find_package(SDL3 REQUIRED CONFIG COMPONENTS SDL3)
 
+include(FetchContent)
+FetchContent_Declare(
+    mini_rv32ima
+    GIT_REPOSITORY https://github.com/cnlohr/mini-rv32ima.git
+    GIT_TAG 84858f58cb41899705e2ff2d6ee3b2d5c0795bfe
+    GIT_SHALLOW FALSE
+)
+FetchContent_MakeAvailable(mini_rv32ima)
+
 add_library(tabos_core STATIC ${TABOS_CORE_SOURCES})
 target_include_directories(tabos_core
     PUBLIC "${TABOS_ROOT}/sdk/include"
@@ -109,6 +118,7 @@ target_include_directories(tabos_platform_host
         "${TABOS_ROOT}/input/include"
         "${TABOS_ROOT}/sdk/include"
         "${TABOS_GENERATED_INCLUDE_DIR}"
+        "${mini_rv32ima_SOURCE_DIR}/mini-rv32ima"
 )
 target_link_libraries(tabos_platform_host PRIVATE SDL3::SDL3)
 target_compile_definitions(tabos_platform_host PRIVATE TABOS_TARGET_HOST=1)

@@ -94,6 +94,20 @@ tabos_enable_sanitizers(tabos_elf_loader)
 
 add_test(NAME unit.elf_loader COMMAND tabos_elf_loader)
 
+add_executable(tabos_rv32_execution component/rv32_execution.c)
+target_include_directories(tabos_rv32_execution PRIVATE
+    "${TABOS_ROOT}/loader/fixtures"
+    "${TABOS_ROOT}/loader/include"
+    "${TABOS_ROOT}/platform/include"
+)
+target_link_libraries(tabos_rv32_execution PRIVATE
+    tabos_core tabos_platform_host SDL3::SDL3
+)
+tabos_enable_warnings(tabos_rv32_execution)
+tabos_enable_sanitizers(tabos_rv32_execution)
+
+add_test(NAME component.rv32_execution COMMAND tabos_rv32_execution)
+
 add_executable(tabos_filesystem
     component/filesystem.c
     fakes/storage_backend.c

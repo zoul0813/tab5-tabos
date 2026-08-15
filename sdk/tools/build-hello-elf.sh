@@ -8,7 +8,7 @@ unstripped=${output%.elf}-unstripped.elf
 
 mkdir -p "$(dirname -- "$output")"
 riscv32-esp-elf-gcc \
-    -march=rv32imafc_zicsr_zifencei -mabi=ilp32f -Os \
+    -march=rv32ima_zicsr_zifencei -mabi=ilp32 -Os \
     -ffreestanding -fPIC -fno-stack-protector -fno-asynchronous-unwind-tables \
     -nostdlib -I "$root/sdk/include" \
     -Wl,-T,"$root/sdk/linker/app-riscv32.ld" \

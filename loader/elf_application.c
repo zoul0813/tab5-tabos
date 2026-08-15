@@ -13,7 +13,12 @@
 static tabos_app_context_t *active_context;
 static const tabos_console_session_t *active_console;
 static tab_elf_image_t loaded_image;
+static tab_platform_riscv32_context_t *execution_context;
 static bool elf_exit_requested;
+
+enum {
+    ELF_INSTRUCTIONS_PER_UPDATE = 10000,
+};
 
 static void elf_console_write(const char *text)
 {
@@ -66,16 +71,34 @@ static bool elf_entry(tabos_app_context_t *context)
                    (unsigned int)loaded_image.memory_size);
     tab_platform_log(load_message);
 
-    tabos_elf_entry_fn entry = NULL;
-    _Static_assert(sizeof(entry) == sizeof(loaded_image.entry),
-                   "ELF entry pointer must match data pointer size");
-    memcpy(&entry, &loaded_image.entry, sizeof(entry));
     const tabos_elf_api_t api = {
         .abi_version = TABOS_ELF_API_VERSION,
         .console_write = elf_console_write,
         .request_exit = elf_request_exit,
     };
-    const int returned_status = entry(&api);
+    execution_context = tab_platform_riscv32_create(
+        loaded_image.entry, loaded_image.memory, loaded_image.memory_size,
+        loaded_image.info.minimum_address, &api);
+    if (execution_context == NULL) {
+        (void)tabos_console_write_line(active_console, "ELF execution FAILED");
+        tabos_app_request_exit(context, 5);
+    }
+    return true;
+}
+
+static void elf_update(tabos_app_context_t *context)
+{
+    int returned_status = 0;
+    const tab_platform_riscv32_result_t result = tab_platform_riscv32_step(
+        execution_context, ELF_INSTRUCTIONS_PER_UPDATE, &returned_status);
+    if (result == TAB_PLATFORM_RISCV32_YIELDED) {
+        return;
+    }
+    if (result == TAB_PLATFORM_RISCV32_FAULT) {
+        (void)tabos_console_write_line(active_console, "ELF execution FAILED");
+        tabos_app_request_exit(context, 5);
+        return;
+    }
     char exit_message[56];
     (void)snprintf(exit_message, sizeof(exit_message),
                    "ELF entry returned status %d", returned_status);
@@ -83,13 +106,14 @@ static bool elf_entry(tabos_app_context_t *context)
     if (!elf_exit_requested) {
         tabos_app_request_exit(context, returned_status);
     }
-    return true;
 }
 
 static void elf_cleanup(tabos_app_context_t *context, int exit_status)
 {
     (void)context;
     (void)exit_status;
+    tab_platform_riscv32_destroy(execution_context);
+    execution_context = NULL;
     tab_elf_unload(&loaded_image);
     active_context = NULL;
     active_console = NULL;
@@ -102,5 +126,6 @@ const tabos_app_descriptor_t tab_elf_experiment_app = {
     .version = "0.1.0",
     .capabilities = TABOS_APP_CAPABILITY_CONSOLE,
     .entry = elf_entry,
+    .update = elf_update,
     .cleanup = elf_cleanup,
 };
