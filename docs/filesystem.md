@@ -29,16 +29,22 @@ The initial subset supports:
 - opening and iterating directories
 - fixed TabOS error numbers through `errno`
 
-Paths use `/`, may be absolute or relative to the process-wide current directory,
-collapse repeated separators and `.`, and resolve `..` without allowing traversal
-above the TabOS root. The initial implementation has one mounted root filesystem.
-Per-application working directories, permissions, links, and multiple mount points
-are not implemented yet.
+Storage uses drive letters. Canonical absolute paths use `A:/path` form. `/path` is
+absolute on current drive and `path` is relative to current working directory. A bare
+`A:` selects that drive's root. Drive letters are case-insensitive and normalized to
+uppercase. DOS-style `A:relative` paths are rejected. Repeated separators and `.` are
+collapsed; `..` cannot traverse above drive root. Cross-drive rename returns `EXDEV`.
+
+Use `tabos_fs_drive_count()` and `tabos_fs_drive_info()` to enumerate available drives,
+their letters, names, removable status, capacity, and free space.
+Boot diagnostics list every available drive on its own line with the same letter,
+filesystem/backend name, and capacity. Unavailable drives are omitted.
 
 ## Host Storage
 
-macOS and Linux map `/` to the controlled directory selected by
-`TABOS_HOST_ROOTFS`. The default is `.local/rootfs`; change it with:
+macOS and Linux expose `A:` and `T:` beneath controlled directory selected by
+`TABOS_HOST_ROOTFS`. Defaults are `.local/rootfs/A/` and `.local/rootfs/T/`; change
+container directory with:
 
 ```sh
 ./tools/tabos config
@@ -50,13 +56,13 @@ instead create isolated temporary roots.
 
 ## Tab5 Storage
 
-Tab5 uses the BSP microSD mount at `/sdcard` as the backing store for the TabOS
-root. A missing or unmountable card is a nonfatal boot condition: filesystem calls
-report `ENODEV`, while boot diagnostics report storage as not mounted. When a card
-mounts, the boot report includes filesystem capacity and free space.
+Tab5 exposes BSP-mounted TF/microSD card as `T:`. `T:/` maps internally to `/sdcard`.
+A missing or unmountable card is nonfatal: filesystem calls report `ENODEV`. When a
+card mounts, boot diagnostics list `T:/`, its FAT filesystem, capacity, and free space.
 
-The initial disk format is the FAT filesystem supported by the Tab5 BSP. Internal
-flash storage and live card-removal handling remain future work. Tab5 FAT enables
+Disk format is FAT filesystem supported by Tab5 BSP. `A:` is unavailable until internal
+flash filesystem is implemented, then appears separately in boot diagnostics. Live
+card-removal handling is not implemented. Tab5 FAT enables
 heap-backed long filename support through 255 characters, matching
 `TABOS_FS_NAME_MAX`; the default ESP-IDF 8.3-only mode is not used.
 
@@ -80,7 +86,7 @@ Then run host target or build and flash Tab5:
 ./tools/tabos tab5 flash
 ```
 
-Diagnostic uses only `/tabos-fs-test`. It creates a directory and file, writes and
+Diagnostic uses `tabos-fs-test` on current drive (`A:` host, `T:` Tab5). It creates a directory and file, writes and
 verifies known data, seeks, closes and reopens, checks metadata, renames, enumerates,
 and removes test contents. Each step prints `[OK]` or `[FAIL]` with TabOS error number.
 Successful run ends with `Filesystem diagnostic passed`. Failure leaves remaining

@@ -21,7 +21,7 @@ Current settings cover:
 - terminal scale
 - terminal scrollback capacity
 - cursor blink interval
-- controlled host filesystem root
+- controlled host drive-container directory
 
 The host executes `elf-hello` through bounded RV32 interpretation using same application artifact as Tab5.
 Font paths may be relative to the repository root or absolute. The configurator

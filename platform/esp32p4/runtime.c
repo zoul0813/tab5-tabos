@@ -1,7 +1,6 @@
 #include "internal.h"
 
 #include <tabos/platform/platform.h>
-#include <tabos/platform/storage.h>
 
 #include <tabos/config/identity.h>
 
@@ -50,8 +49,6 @@ bool platform_get_diagnostics(platform_diagnostics_t *diagnostics)
     if (diagnostics == NULL) return false;
     uint32_t flash_capacity = 0U;
     (void)esp_flash_get_size(NULL, &flash_capacity);
-    platform_storage_info_t storage = {0};
-    (void)platform_storage_info(&storage);
     *diagnostics = (platform_diagnostics_t){
         .device_name = "ESP32-P4",
         .cpu_cores = 2U,
@@ -63,9 +60,6 @@ bool platform_get_diagnostics(platform_diagnostics_t *diagnostics)
         .external_memory_free_bytes = heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
         .external_memory_present = true,
         .flash_capacity_bytes = flash_capacity,
-        .storage_total_bytes = storage.total_bytes,
-        .storage_free_bytes = storage.free_bytes,
-        .storage_mounted = storage.mounted,
         .keyboard_name = tab5_keyboard_name(),
         .keyboard_present = tab5_keyboard_present(),
     };

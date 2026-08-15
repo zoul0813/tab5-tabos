@@ -10,6 +10,7 @@
 #include <tabos/internal/terminal.h>
 
 #include <tabos/terminal.h>
+#include <tabos/filesystem.h>
 
 #include <tabos/platform/platform.h>
 
@@ -29,7 +30,7 @@ static char processor_detail[80];
 static char memory_detail[80];
 static char external_memory_detail[80];
 static char flash_detail[48];
-static char storage_detail[80];
+static char storage_detail[512];
 
 static void format_size(char *buffer, size_t buffer_size, uint64_t bytes)
 {
@@ -58,6 +59,37 @@ static void format_capacity(char *buffer, size_t buffer_size, uint64_t free_byte
     char free_space[24];
     format_size(free_space, sizeof(free_space), free_bytes);
     (void)snprintf(buffer, buffer_size, "%s free / %s total", free_space, total);
+}
+
+static bool add_storage_report(void)
+{
+    const size_t drive_count = tabos_fs_drive_count();
+    if (drive_count == 0U) {
+        return kernel_boot_report_add(&boot_report, "Storage", "\n  No drives available",
+                                      KERNEL_BOOT_STATUS_WARNING);
+    }
+
+    size_t used = 0U;
+    size_t listed = 0U;
+    storage_detail[0] = '\0';
+    for (size_t index = 0U; index < drive_count; ++index) {
+        tabos_drive_info_t drive;
+        if (!tabos_fs_drive_info(index, &drive)) continue;
+        char capacity[64];
+        format_capacity(capacity, sizeof(capacity), drive.free_bytes, drive.total_bytes, true);
+        const int written = snprintf(storage_detail + used, sizeof(storage_detail) - used,
+            "\n  %c:/ %s %s", drive.letter,
+            drive.name != NULL ? drive.name : "Filesystem", capacity);
+        if (written < 0 || (size_t)written >= sizeof(storage_detail) - used) break;
+        used += (size_t)written;
+        listed++;
+    }
+    if (listed == 0U) {
+        return kernel_boot_report_add(&boot_report, "Storage", "\n  No drives available",
+                                      KERNEL_BOOT_STATUS_WARNING);
+    }
+    return kernel_boot_report_add(&boot_report, "Storage", storage_detail,
+                                  KERNEL_BOOT_STATUS_OK);
 }
 
 static bool render_boot_report(void)
@@ -143,15 +175,6 @@ bool kernel_runtime_start(void)
             (void)kernel_boot_report_add(&boot_report, "Flash", flash_detail,
                                       KERNEL_BOOT_STATUS_INFO);
         }
-        if (diagnostics.storage_mounted) {
-            format_capacity(storage_detail, sizeof(storage_detail), diagnostics.storage_free_bytes,
-                            diagnostics.storage_total_bytes, true);
-            (void)kernel_boot_report_add(&boot_report, "Storage", storage_detail,
-                                      KERNEL_BOOT_STATUS_OK);
-        } else {
-            (void)kernel_boot_report_add(&boot_report, "Storage", "Filesystem not mounted",
-                                      KERNEL_BOOT_STATUS_WARNING);
-        }
         if (diagnostics.keyboard_name != NULL) {
             (void)kernel_boot_report_add(
                 &boot_report,
@@ -161,6 +184,7 @@ bool kernel_runtime_start(void)
             );
         }
     }
+    (void)add_storage_report();
     (void)kernel_boot_report_add(&boot_report, "Kernel", "Runtime initialized",
                               KERNEL_BOOT_STATUS_OK);
 

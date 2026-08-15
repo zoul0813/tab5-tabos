@@ -12,10 +12,28 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-static char storage_root[TABOS_FS_PATH_MAX];
-static bool storage_mounted;
-static bool storage_removable;
-static const char *storage_name = "Filesystem";
+enum { PLATFORM_STORAGE_MAX_DRIVES = 26 };
+
+typedef struct {
+    char root[TABOS_FS_PATH_MAX];
+    bool mounted;
+    bool removable;
+    const char *name;
+    char letter;
+} storage_drive_t;
+
+static storage_drive_t storage_drives[PLATFORM_STORAGE_MAX_DRIVES];
+static size_t storage_drive_count;
+
+static storage_drive_t *find_drive(char letter)
+{
+    for (size_t index = 0U; index < storage_drive_count; ++index) {
+        if (storage_drives[index].mounted && storage_drives[index].letter == letter) {
+            return &storage_drives[index];
+        }
+    }
+    return NULL;
+}
 
 static int map_error(int error)
 {
@@ -46,26 +64,31 @@ static int map_error(int error)
     }
 }
 
-static bool translate_path(const char *path, char output[TABOS_FS_PATH_MAX])
+static bool translate_path(char drive_letter, const char *path,
+                           char output[TABOS_FS_PATH_MAX], const char **drive_root)
 {
-    if (!storage_mounted || path == NULL || path[0] != '/') return false;
-    const size_t root_length = strlen(storage_root);
+    storage_drive_t *drive = find_drive(drive_letter);
+    if (drive == NULL || path == NULL || path[0] != '/') return false;
+    const size_t root_length = strlen(drive->root);
     const size_t path_length = strlen(path);
     if (root_length + path_length >= TABOS_FS_PATH_MAX) return false;
-    memcpy(output, storage_root, root_length);
+    memcpy(output, drive->root, root_length);
     memcpy(output + root_length, path, path_length + 1U);
+    if (drive_root != NULL) *drive_root = drive->root;
     return true;
 }
 
-static int reject_symlink_components(const char *translated, bool allow_missing_final)
+static int reject_symlink_components(const char *root, const char *translated,
+                                     bool allow_missing_final)
 {
 #ifdef ESP_PLATFORM
+    (void)root;
     (void)translated;
     (void)allow_missing_final;
     /* ESP-IDF FAT VFS has no symbolic-link support or lstat(). */
     return 0;
 #else
-    const size_t root_length = strlen(storage_root);
+    const size_t root_length = strlen(root);
     char partial[TABOS_FS_PATH_MAX];
     const size_t length = strlen(translated);
     if (length >= sizeof(partial)) return TABOS_ENAMETOOLONG;
@@ -105,42 +128,69 @@ static void map_status(const struct stat *source, tabos_stat_t *destination)
 
 bool platform_storage_init(void)
 {
-    if (storage_mounted) return true;
-    storage_root[0] = '\0';
-    storage_removable = false;
-    storage_name = "Filesystem";
-    storage_mounted = storage_backend_mount(
-        storage_root, sizeof(storage_root), &storage_removable, &storage_name);
-    if (!storage_mounted) storage_root[0] = '\0';
-    return storage_mounted;
+    if (storage_drive_count > 0U) return true;
+    memset(storage_drives, 0, sizeof(storage_drives));
+    const size_t count = storage_backend_drive_count();
+    for (size_t index = 0U; index < count && storage_drive_count < PLATFORM_STORAGE_MAX_DRIVES;
+         ++index) {
+        storage_drive_t drive = {.name = "Filesystem"};
+        if (!storage_backend_mount(index, &drive.letter, drive.root, sizeof(drive.root),
+                                   &drive.removable, &drive.name)) continue;
+        if (drive.letter < 'A' || drive.letter > 'Z' || find_drive(drive.letter) != NULL) {
+            storage_backend_unmount(drive.letter);
+            continue;
+        }
+        drive.mounted = true;
+        storage_drives[storage_drive_count++] = drive;
+    }
+    return storage_drive_count > 0U;
 }
 
 void platform_storage_shutdown(void)
 {
-    if (storage_mounted) storage_backend_unmount();
-    storage_mounted = false;
-    storage_root[0] = '\0';
+    for (size_t index = storage_drive_count; index > 0U; --index) {
+        storage_backend_unmount(storage_drives[index - 1U].letter);
+    }
+    memset(storage_drives, 0, sizeof(storage_drives));
+    storage_drive_count = 0U;
 }
 
-bool platform_storage_info(platform_storage_info_t *info)
+size_t platform_storage_drive_count(void)
 {
-    if (info == NULL) return false;
-    *info = (platform_storage_info_t){
-        .mounted = storage_mounted,
-        .removable = storage_removable,
-        .name = storage_name,
-    };
-    if (!storage_mounted) return true;
-    return storage_backend_info(&info->total_bytes, &info->free_bytes);
+    return storage_drive_count;
 }
 
-int platform_storage_open(const char *path, int flags, uint32_t mode,
+bool platform_storage_info(size_t index, platform_storage_info_t *info)
+{
+    if (info == NULL || index >= storage_drive_count) return false;
+    const storage_drive_t *drive = &storage_drives[index];
+    *info = (platform_storage_info_t){
+        .mounted = drive->mounted,
+        .removable = drive->removable,
+        .name = drive->name,
+        .letter = drive->letter,
+    };
+    return storage_backend_info(drive->letter, &info->total_bytes, &info->free_bytes);
+}
+
+bool platform_storage_has_drive(char letter)
+{
+    return find_drive(letter) != NULL;
+}
+
+char platform_storage_default_drive(void)
+{
+    return storage_drive_count > 0U ? storage_drives[0].letter : '\0';
+}
+
+int platform_storage_open(char drive, const char *path, int flags, uint32_t mode,
                               platform_file_t *file)
 {
     if (file == NULL || (flags & TABOS_O_ACCMODE) > TABOS_O_RDWR) return TABOS_EINVAL;
     char translated[TABOS_FS_PATH_MAX];
-    if (!translate_path(path, translated)) return TABOS_ENAMETOOLONG;
-    int error = reject_symlink_components(translated, (flags & TABOS_O_CREAT) != 0);
+    const char *root = NULL;
+    if (!translate_path(drive, path, translated, &root)) return TABOS_ENODEV;
+    int error = reject_symlink_components(root, translated, (flags & TABOS_O_CREAT) != 0);
     if (error != 0) return error;
     int native_flags = O_RDONLY;
     if ((flags & TABOS_O_ACCMODE) == TABOS_O_WRONLY) native_flags = O_WRONLY;
@@ -196,12 +246,13 @@ int platform_storage_seek(platform_file_t file, tabos_off_t offset, int whence,
     return 0;
 }
 
-int platform_storage_stat(const char *path, tabos_stat_t *status)
+int platform_storage_stat(char drive, const char *path, tabos_stat_t *status)
 {
     if (status == NULL) return TABOS_EINVAL;
     char translated[TABOS_FS_PATH_MAX];
-    if (!translate_path(path, translated)) return TABOS_ENAMETOOLONG;
-    int error = reject_symlink_components(translated, false);
+    const char *root = NULL;
+    if (!translate_path(drive, path, translated, &root)) return TABOS_ENODEV;
+    int error = reject_symlink_components(root, translated, false);
     if (error != 0) return error;
     struct stat native_status;
     if (stat(translated, &native_status) != 0) return map_error(errno);
@@ -218,53 +269,58 @@ int platform_storage_fstat(platform_file_t file, tabos_stat_t *status)
     return 0;
 }
 
-static int translated_operation(const char *path, int (*operation)(const char *))
+static int translated_operation(char drive, const char *path, int (*operation)(const char *))
 {
     char translated[TABOS_FS_PATH_MAX];
-    if (!translate_path(path, translated)) return TABOS_ENAMETOOLONG;
-    const int error = reject_symlink_components(translated, false);
+    const char *root = NULL;
+    if (!translate_path(drive, path, translated, &root)) return TABOS_ENODEV;
+    const int error = reject_symlink_components(root, translated, false);
     if (error != 0) return error;
     return operation(translated) == 0 ? 0 : map_error(errno);
 }
 
-int platform_storage_unlink(const char *path)
+int platform_storage_unlink(char drive, const char *path)
 {
-    return translated_operation(path, unlink);
+    return translated_operation(drive, path, unlink);
 }
 
-int platform_storage_rmdir(const char *path)
+int platform_storage_rmdir(char drive, const char *path)
 {
-    return translated_operation(path, rmdir);
+    return translated_operation(drive, path, rmdir);
 }
 
-int platform_storage_mkdir(const char *path, uint32_t mode)
+int platform_storage_mkdir(char drive, const char *path, uint32_t mode)
 {
     char translated[TABOS_FS_PATH_MAX];
-    if (!translate_path(path, translated)) return TABOS_ENAMETOOLONG;
-    const int error = reject_symlink_components(translated, true);
+    const char *root = NULL;
+    if (!translate_path(drive, path, translated, &root)) return TABOS_ENODEV;
+    const int error = reject_symlink_components(root, translated, true);
     if (error != 0) return error;
     return mkdir(translated, (mode_t)(mode & 0777U)) == 0 ? 0 : map_error(errno);
 }
 
-int platform_storage_rename(const char *old_path, const char *new_path)
+int platform_storage_rename(char drive, const char *old_path, const char *new_path)
 {
     char old_translated[TABOS_FS_PATH_MAX];
     char new_translated[TABOS_FS_PATH_MAX];
-    if (!translate_path(old_path, old_translated) || !translate_path(new_path, new_translated)) {
-        return TABOS_ENAMETOOLONG;
+    const char *root = NULL;
+    if (!translate_path(drive, old_path, old_translated, &root) ||
+        !translate_path(drive, new_path, new_translated, NULL)) {
+        return TABOS_ENODEV;
     }
-    int error = reject_symlink_components(old_translated, false);
-    if (error == 0) error = reject_symlink_components(new_translated, true);
+    int error = reject_symlink_components(root, old_translated, false);
+    if (error == 0) error = reject_symlink_components(root, new_translated, true);
     if (error != 0) return error;
     return rename(old_translated, new_translated) == 0 ? 0 : map_error(errno);
 }
 
-int platform_storage_opendir(const char *path, platform_dir_t *directory)
+int platform_storage_opendir(char drive, const char *path, platform_dir_t *directory)
 {
     if (directory == NULL) return TABOS_EINVAL;
     char translated[TABOS_FS_PATH_MAX];
-    if (!translate_path(path, translated)) return TABOS_ENAMETOOLONG;
-    const int error = reject_symlink_components(translated, false);
+    const char *root = NULL;
+    if (!translate_path(drive, path, translated, &root)) return TABOS_ENODEV;
+    const int error = reject_symlink_components(root, translated, false);
     if (error != 0) return error;
     DIR *native_directory = opendir(translated);
     if (native_directory == NULL) return map_error(errno);

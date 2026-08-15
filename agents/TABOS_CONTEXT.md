@@ -268,9 +268,11 @@ A filesystem and command-line environment are fundamental TabOS services.
 
 microSD is expected to be an important user/program storage device.
 
-### Proposed
+### Decision: drive-letter storage namespace
 
-Expose a conventional hierarchical filesystem API to applications even if the implementation uses ESP-IDF filesystem components underneath.
+Expose hierarchical filesystems through DOS/CP/M/Zeal-style drive letters rather than one Unix mount tree. Internal Tab5 flash is assigned `A:` and the TF/microSD card is assigned `T:`. Other storage drivers, including future USB mass-storage drivers, own assignment of their drive letters. Paths use forms such as `A:/bin/shell.elf` and `T:/apps/game.elf`.
+
+Initial syntax supports drive-qualified absolute paths, absolute paths on current drive, and relative paths on current drive. Defer DOS `A:relative` per-drive-current-directory semantics until explicitly needed.
 
 Potential logical areas include:
 
@@ -291,7 +293,7 @@ Still to decide:
 
 - primary on-disk filesystem
 - internal flash vs microSD responsibilities
-- mount model
+- drive registration and assignment policy for storage beyond `A:` and `T:`
 - current-working-directory semantics
 - device namespace
 - removable-media behavior

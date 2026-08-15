@@ -13,18 +13,26 @@ void platform_storage_shutdown(void)
 {
 }
 
-bool platform_storage_info(platform_storage_info_t *info)
+size_t platform_storage_drive_count(void)
+{
+    return 0U;
+}
+
+bool platform_storage_info(size_t index, platform_storage_info_t *info)
 {
     if (info == NULL) return false;
     *info = (platform_storage_info_t){0};
     return true;
 }
 
+bool platform_storage_has_drive(char letter) { return false; }
+char platform_storage_default_drive(void) { return '\0'; }
+
 #define TABOS_FAKE_STORAGE_ERROR_FUNCTION(name, arguments) \
     int name arguments { return TABOS_ENOTSUP; }
 
 TABOS_FAKE_STORAGE_ERROR_FUNCTION(platform_storage_open,
-    (const char *path, int flags, uint32_t mode, platform_file_t *file))
+    (char drive, const char *path, int flags, uint32_t mode, platform_file_t *file))
 TABOS_FAKE_STORAGE_ERROR_FUNCTION(platform_storage_close, (platform_file_t file))
 TABOS_FAKE_STORAGE_ERROR_FUNCTION(platform_storage_read,
     (platform_file_t file, void *buffer, size_t count, size_t *bytes_read))
@@ -33,17 +41,17 @@ TABOS_FAKE_STORAGE_ERROR_FUNCTION(platform_storage_write,
 TABOS_FAKE_STORAGE_ERROR_FUNCTION(platform_storage_seek,
     (platform_file_t file, tabos_off_t offset, int whence, tabos_off_t *position))
 TABOS_FAKE_STORAGE_ERROR_FUNCTION(platform_storage_stat,
-    (const char *path, tabos_stat_t *status))
+    (char drive, const char *path, tabos_stat_t *status))
 TABOS_FAKE_STORAGE_ERROR_FUNCTION(platform_storage_fstat,
     (platform_file_t file, tabos_stat_t *status))
-TABOS_FAKE_STORAGE_ERROR_FUNCTION(platform_storage_unlink, (const char *path))
+TABOS_FAKE_STORAGE_ERROR_FUNCTION(platform_storage_unlink, (char drive, const char *path))
 TABOS_FAKE_STORAGE_ERROR_FUNCTION(platform_storage_rename,
-    (const char *old_path, const char *new_path))
+    (char drive, const char *old_path, const char *new_path))
 TABOS_FAKE_STORAGE_ERROR_FUNCTION(platform_storage_mkdir,
-    (const char *path, uint32_t mode))
-TABOS_FAKE_STORAGE_ERROR_FUNCTION(platform_storage_rmdir, (const char *path))
+    (char drive, const char *path, uint32_t mode))
+TABOS_FAKE_STORAGE_ERROR_FUNCTION(platform_storage_rmdir, (char drive, const char *path))
 TABOS_FAKE_STORAGE_ERROR_FUNCTION(platform_storage_opendir,
-    (const char *path, platform_dir_t *directory))
+    (char drive, const char *path, platform_dir_t *directory))
 TABOS_FAKE_STORAGE_ERROR_FUNCTION(platform_storage_readdir,
     (platform_dir_t directory, tabos_dirent_t *entry, bool *end))
 TABOS_FAKE_STORAGE_ERROR_FUNCTION(platform_storage_closedir,

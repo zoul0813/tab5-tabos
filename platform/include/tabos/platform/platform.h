@@ -40,9 +40,6 @@ typedef struct {
     uint64_t external_memory_free_bytes;
     bool external_memory_present;
     uint64_t flash_capacity_bytes;
-    uint64_t storage_total_bytes;
-    uint64_t storage_free_bytes;
-    bool storage_mounted;
     const char *keyboard_name;
     bool keyboard_present;
 } platform_diagnostics_t;

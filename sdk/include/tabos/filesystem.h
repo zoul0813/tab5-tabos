@@ -1,6 +1,7 @@
 #ifndef TABOS_FILESYSTEM_H
 #define TABOS_FILESYSTEM_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -40,6 +41,7 @@ enum {
     TABOS_ENOMEM = 12,
     TABOS_EACCES = 13,
     TABOS_EEXIST = 17,
+    TABOS_EXDEV = 18,
     TABOS_ENODEV = 19,
     TABOS_ENOTDIR = 20,
     TABOS_EISDIR = 21,
@@ -69,7 +71,18 @@ typedef struct {
     char name[TABOS_FS_NAME_MAX + 1];
 } tabos_dirent_t;
 
+typedef struct {
+    uint64_t total_bytes;
+    uint64_t free_bytes;
+    const char *name;
+    char letter;
+    bool mounted;
+    bool removable;
+} tabos_drive_info_t;
+
 int *tabos_errno_location(void);
+size_t tabos_fs_drive_count(void);
+bool tabos_fs_drive_info(size_t index, tabos_drive_info_t *info);
 
 tabos_fd_t tabos_fs_open(const char *path, int flags, uint32_t mode);
 int tabos_fs_close(tabos_fd_t descriptor);

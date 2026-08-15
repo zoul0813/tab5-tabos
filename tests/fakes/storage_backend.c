@@ -12,28 +12,36 @@
 
 static char storage_root[] = "/tmp/tabos-filesystem-test.XXXXXX";
 
-bool storage_backend_mount(char *root, size_t root_size,
-                               bool *removable, const char **name)
+size_t storage_backend_drive_count(void)
 {
-    if (root == NULL || removable == NULL || name == NULL || mkdtemp(storage_root) == NULL) {
+    return 1U;
+}
+
+bool storage_backend_mount(size_t index, char *letter, char *root, size_t root_size,
+                           bool *removable, const char **name)
+{
+    if (index != 0U || letter == NULL || root == NULL || removable == NULL || name == NULL ||
+        mkdtemp(storage_root) == NULL) {
         return false;
     }
     const size_t length = strlen(storage_root);
     if (length >= root_size) return false;
     memcpy(root, storage_root, length + 1U);
+    *letter = 'A';
     *removable = false;
     *name = "Test filesystem";
     return true;
 }
 
-void storage_backend_unmount(void)
+void storage_backend_unmount(char letter)
 {
+    (void)letter;
     (void)rmdir(storage_root);
 }
 
-bool storage_backend_info(uint64_t *total_bytes, uint64_t *free_bytes)
+bool storage_backend_info(char letter, uint64_t *total_bytes, uint64_t *free_bytes)
 {
-    if (total_bytes == NULL || free_bytes == NULL) return false;
+    if (letter != 'A' || total_bytes == NULL || free_bytes == NULL) return false;
     struct statvfs status;
     if (statvfs(storage_root, &status) != 0) return false;
     *total_bytes = (uint64_t)status.f_blocks * (uint64_t)status.f_frsize;

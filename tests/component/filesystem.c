@@ -25,19 +25,28 @@ static bool has_entry(tabos_dir_t directory, const char *name)
 int main(void)
 {
     char normalized[TABOS_FS_PATH_MAX];
-    if (!filesystem_normalize_path("/apps//./bin/../hello", "/", normalized,
+    if (!filesystem_normalize_path("/apps//./bin/../hello", "A:/", normalized,
                                sizeof(normalized)) ||
-        strcmp(normalized, "/apps/hello") != 0 ||
-        !filesystem_normalize_path("../../etc", "/home/user", normalized,
+        strcmp(normalized, "A:/apps/hello") != 0 ||
+        !filesystem_normalize_path("../../etc", "A:/home/user", normalized,
                                sizeof(normalized)) ||
-        strcmp(normalized, "/etc") != 0 ||
-        filesystem_normalize_path("", "/", normalized, sizeof(normalized))) {
+        strcmp(normalized, "A:/etc") != 0 ||
+        !filesystem_normalize_path("t:/apps", "A:/", normalized, sizeof(normalized)) ||
+        strcmp(normalized, "T:/apps") != 0 ||
+        filesystem_normalize_path("A:relative", "A:/", normalized, sizeof(normalized)) ||
+        filesystem_normalize_path("", "A:/", normalized, sizeof(normalized))) {
         return 1;
     }
 
     if (!filesystem_init() || !filesystem_is_mounted()) return 1;
+    tabos_drive_info_t drive;
+    if (tabos_fs_drive_count() != 1U || !tabos_fs_drive_info(0U, &drive) ||
+        drive.letter != 'A' || !drive.mounted || drive.name == NULL ||
+        tabos_fs_drive_info(1U, &drive)) {
+        return 1;
+    }
     platform_storage_info_t storage;
-    if (!platform_storage_info(&storage) || !storage.mounted ||
+    if (!platform_storage_info(0U, &storage) || !storage.mounted || storage.letter != 'A' ||
         storage.total_bytes == 0U || storage.name == NULL) {
         return 1;
     }
@@ -45,7 +54,7 @@ int main(void)
     if (tabos_fs_mkdir("/apps", 0755U) != 0 || tabos_fs_chdir("/apps") != 0) return 1;
     char working_directory[TABOS_FS_PATH_MAX];
     if (tabos_fs_getcwd(working_directory, sizeof(working_directory)) == NULL ||
-        strcmp(working_directory, "/apps") != 0) {
+        strcmp(working_directory, "A:/apps") != 0) {
         return 1;
     }
 
@@ -63,6 +72,10 @@ int main(void)
         return 1;
     }
     tabos_stat_t status;
+    if (tabos_fs_stat("T:/missing", &status) == 0 ||
+        *tabos_errno_location() != TABOS_ENODEV) {
+        return 1;
+    }
     if (tabos_fs_fstat(descriptor, &status) != 0 || status.size != sizeof(message) ||
         (status.mode & TABOS_S_IFREG) == 0U || tabos_fs_close(descriptor) != 0 ||
         tabos_fs_close(descriptor) == 0 || *tabos_errno_location() != TABOS_EBADF) {

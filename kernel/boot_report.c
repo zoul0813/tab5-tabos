@@ -61,7 +61,7 @@ void kernel_boot_report_write_serial(const kernel_boot_report_t *report)
     if (report == NULL) {
         return;
     }
-    char line[160];
+    char line[640];
     (void)snprintf(line, sizeof(line), "%s %s boot report", report->system_name, report->version);
     platform_log(line);
     for (size_t index = 0; index < report->entry_count; ++index) {

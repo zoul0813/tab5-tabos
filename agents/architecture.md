@@ -391,7 +391,7 @@ The filesystem is a core operating-system service.
 
 Applications should interact with TabOS filesystem APIs rather than ESP-IDF filesystem APIs.
 
-A likely logical namespace is:
+A logical namespace exists separately within each assigned drive:
 
 ```text
 /
@@ -411,7 +411,7 @@ The filesystem layer should handle:
 
 - pathname resolution
 - current working directory
-- mount points
+- drive registration and routing
 - file access
 - directories
 - metadata
@@ -422,13 +422,13 @@ The implementation may delegate actual storage to FAT, LittleFS, or other ESP-ID
 
 The public API should not depend on the filesystem used underneath.
 
+[DECIDED] Storage uses a drive-letter namespace. Internal Tab5 flash is `A:` and TF/microSD is `T:`. Other storage backends assign letters in their respective drivers. Canonical paths use `A:/path` form. `/path` means absolute path on current drive and `path` means relative path on current drive. DOS-style `A:relative` semantics are deferred.
+
 [DECIDED] The initial application surface is a deliberately bounded POSIX source-compatible
 subset. SDK compatibility headers map familiar names such as `open`, `read`, and
 `stat` to a TabOS-owned prefixed ABI; TabOS does not expose host or ESP-IDF libc
 objects as its ABI. The portable core owns path normalization, descriptors, errors,
-and dispatch. Initial deployment exposes one root: a controlled host directory on
-macOS/Linux and BSP-mounted microSD FAT on Tab5. An absent card is nonfatal. A mount
-table, internal-flash policy, permissions, links, and removal recovery are deferred.
+and dispatch. Drive table enumerates backend-owned letters; host exposes controlled `A:` and `T:` directories, while Tab5 currently exposes BSP-mounted microSD FAT as `T:`. Missing drives return `ENODEV`; cross-drive rename returns `EXDEV`. Internal-flash `A:` implementation, permissions, links, and removal recovery remain pending.
 Tab5 FAT uses heap-backed long-filename buffers with a 255-character maximum so
 the backend honors the public filesystem name limit instead of silently imposing
 8.3 names.

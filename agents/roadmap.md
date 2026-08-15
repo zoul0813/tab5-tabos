@@ -191,17 +191,23 @@
 - [x] Decide initial filesystem error/result model.
 - [x] Decide initial opaque file and directory handle model.
 - [x] Define portable public filesystem API for open, close, read, write, seek, stat, and directory iteration.
-- [x] Define portable root-storage backend contract; multiple mounts remain future work.
+- [x] Define backend-owned drive registration contract.
 - [x] Define path syntax and normalization rules.
-- [ ] Decide initial logical mount layout; existing `/bin`, `/apps`, `/home`, `/etc`, `/tmp`, and `/dev` examples remain provisional.
-- [x] Use microSD for the initial Tab5 root; defer internal-flash policy.
+- [x] Choose drive-letter namespace instead of Unix mount points.
+- [x] Reserve `A:` for internal flash and `T:` for TF/microSD.
+- [x] Implement drive table and backend-owned drive registration.
+- [x] Migrate path normalization to drive-qualified paths.
+- [x] Map host `A:` and `T:` to isolated controlled directories.
+- [x] Expose Tab5 TF/microSD as `T:`.
+- [ ] Add Tab5 internal-flash filesystem as `A:`.
+- [x] Use `T:` microSD as initial available Tab5 drive.
 - [x] Treat card absence at boot as nonfatal; live removal recovery remains future work.
 - [x] Keep ESP-IDF, host file descriptors, and platform filesystem types out of public API.
 
 ### Portable Filesystem Core
 
 - [x] Implement path validation and normalization.
-- [ ] Implement mount table and longest-prefix resolution.
+- [x] Implement drive-letter routing.
 - [x] Implement file/directory handle ownership and cleanup.
 - [x] Implement application-facing filesystem API dispatch.
 - [x] Add deterministic tests for paths, handles, errors, and boundary cases.
