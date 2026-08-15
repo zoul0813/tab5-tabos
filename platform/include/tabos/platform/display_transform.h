@@ -6,9 +6,9 @@
 
 #include <tabos/platform/platform.h>
 
-static inline bool tab_framebuffer_rotate_clockwise(
-    const tab_framebuffer_t *source,
-    tab_pixel_t *destination,
+static inline bool platform_framebuffer_rotate_clockwise(
+    const platform_framebuffer_t *source,
+    platform_pixel_t *destination,
     size_t destination_width,
     size_t destination_height
 )
@@ -31,9 +31,9 @@ static inline bool tab_framebuffer_rotate_clockwise(
     return true;
 }
 
-static inline bool tab_framebuffer_rotate_counter_clockwise(
-    const tab_framebuffer_t *source,
-    tab_pixel_t *destination,
+static inline bool platform_framebuffer_rotate_counter_clockwise(
+    const platform_framebuffer_t *source,
+    platform_pixel_t *destination,
     size_t destination_width,
     size_t destination_height
 )

@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-SDL_Window *tab_host_window;
+SDL_Window *host_window;
 static bool is_headless;
 static bool quit_requested;
 
@@ -63,7 +63,7 @@ static void restore_window_position(void)
     const int values_read = fscanf(state, "%d %d", &x, &y);
     (void)fclose(state);
     if (values_read == 2 && position_is_visible(x, y) &&
-        !SDL_SetWindowPosition(tab_host_window, x, y)) {
+        !SDL_SetWindowPosition(host_window, x, y)) {
         SDL_Log("Could not restore window position: %s", SDL_GetError());
     }
 }
@@ -72,7 +72,7 @@ static void save_window_position(void)
 {
     int x = 0;
     int y = 0;
-    if (tab_host_window == NULL || !SDL_GetWindowPosition(tab_host_window, &x, &y)) return;
+    if (host_window == NULL || !SDL_GetWindowPosition(host_window, &x, &y)) return;
     char *path = window_state_path();
     if (path == NULL) return;
     FILE *state = fopen(path, "w");
@@ -82,17 +82,17 @@ static void save_window_position(void)
     (void)fclose(state);
 }
 
-bool tab_host_is_headless(void)
+bool host_is_headless(void)
 {
     return is_headless;
 }
 
-void tab_host_request_quit(void)
+void host_request_quit(void)
 {
     quit_requested = true;
 }
 
-bool tab_platform_init(bool headless)
+bool platform_init(bool headless)
 {
     is_headless = headless;
     quit_requested = false;
@@ -101,55 +101,55 @@ bool tab_platform_init(bool headless)
         return false;
     }
     if (is_headless) return true;
-    tab_host_window = SDL_CreateWindow(TABOS_HOST_WINDOW_TITLE,
+    host_window = SDL_CreateWindow(TABOS_HOST_WINDOW_TITLE,
         TABOS_DISPLAY_WIDTH, TABOS_DISPLAY_HEIGHT, SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN);
-    if (tab_host_window == NULL) {
+    if (host_window == NULL) {
         SDL_Log("SDL window creation failed: %s", SDL_GetError());
         SDL_Quit();
         return false;
     }
     restore_window_position();
-    if (!SDL_ShowWindow(tab_host_window)) {
+    if (!SDL_ShowWindow(host_window)) {
         SDL_Log("SDL window display failed: %s", SDL_GetError());
-        SDL_DestroyWindow(tab_host_window);
-        tab_host_window = NULL;
+        SDL_DestroyWindow(host_window);
+        host_window = NULL;
         SDL_Quit();
         return false;
     }
-    if (!SDL_StartTextInput(tab_host_window)) {
+    if (!SDL_StartTextInput(host_window)) {
         SDL_Log("SDL text input initialization failed: %s", SDL_GetError());
-        tab_platform_shutdown();
+        platform_shutdown();
         return false;
     }
     return true;
 }
 
-int tab_platform_run(tab_platform_update_fn update)
+int platform_run(platform_update_fn update)
 {
     if (is_headless) {
         if (update != NULL) update();
         return 0;
     }
     while (!quit_requested) {
-        tab_host_input_update(true);
+        host_input_update(true);
         if (update != NULL) update();
     }
     return 0;
 }
 
-void tab_platform_shutdown(void)
+void platform_shutdown(void)
 {
-    tab_platform_display_shutdown();
-    if (tab_host_window != NULL) {
-        SDL_StopTextInput(tab_host_window);
+    platform_display_shutdown();
+    if (host_window != NULL) {
+        SDL_StopTextInput(host_window);
         save_window_position();
-        SDL_DestroyWindow(tab_host_window);
-        tab_host_window = NULL;
+        SDL_DestroyWindow(host_window);
+        host_window = NULL;
     }
     SDL_Quit();
 }
 
-const char *tab_platform_name(void)
+const char *platform_name(void)
 {
 #if defined(TABOS_HOST_MACOS)
     return TABOS_TARGET_NAME_MACOS;
@@ -160,14 +160,14 @@ const char *tab_platform_name(void)
 #endif
 }
 
-bool tab_platform_get_diagnostics(tab_platform_diagnostics_t *diagnostics)
+bool platform_get_diagnostics(platform_diagnostics_t *diagnostics)
 {
     if (diagnostics == NULL) return false;
     const int ram_mebibytes = SDL_GetSystemRAM();
     const int cpu_cores = SDL_GetNumLogicalCPUCores();
-    tab_platform_storage_info_t storage = {0};
-    (void)tab_platform_storage_info(&storage);
-    *diagnostics = (tab_platform_diagnostics_t){
+    platform_storage_info_t storage = {0};
+    (void)platform_storage_info(&storage);
+    *diagnostics = (platform_diagnostics_t){
         .device_name = "Native host",
         .cpu_cores = cpu_cores > 0 ? (unsigned int)cpu_cores : 0U,
         .memory_total_bytes = ram_mebibytes > 0
@@ -181,12 +181,12 @@ bool tab_platform_get_diagnostics(tab_platform_diagnostics_t *diagnostics)
     return true;
 }
 
-void tab_platform_log(const char *message)
+void platform_log(const char *message)
 {
     if (message != NULL) (void)printf("%s\n", message);
 }
 
-uint64_t tab_platform_time_ms(void)
+uint64_t platform_time_ms(void)
 {
     return SDL_GetTicks();
 }

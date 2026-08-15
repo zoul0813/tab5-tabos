@@ -21,26 +21,26 @@ int main(int argc, char **argv)
 {
     const bool headless = is_smoke_test(argc, argv);
 
-    if (!tabos_runtime_init()) {
+    if (!kernel_runtime_init()) {
         fprintf(stderr, "%s runtime initialization failed\n", TABOS_SYSTEM_NAME);
         return 1;
     }
 
-    if (!tab_platform_init(headless)) {
-        tabos_runtime_shutdown();
+    if (!platform_init(headless)) {
+        kernel_runtime_shutdown();
         return 1;
     }
 
-    if (!tabos_runtime_start()) {
+    if (!kernel_runtime_start()) {
         fprintf(stderr, "%s display initialization failed\n", TABOS_SYSTEM_NAME);
-        tabos_runtime_shutdown();
-        tab_platform_shutdown();
+        kernel_runtime_shutdown();
+        platform_shutdown();
         return 1;
     }
 
-    printf("%s %s on %s\n", TABOS_SYSTEM_NAME, tabos_runtime_version(), tab_platform_name());
+    printf("%s %s on %s\n", TABOS_SYSTEM_NAME, kernel_runtime_version(), platform_name());
 
-    int result = tab_platform_run(tabos_runtime_update);
+    int result = platform_run(kernel_runtime_update);
 #if TABOS_ENABLE_FILESYSTEM_DIAGNOSTIC_APP
     int diagnostic_status = -1;
     if (!tabos_app_last_exit_status(&diagnostic_status) || diagnostic_status != 0) {
@@ -48,7 +48,7 @@ int main(int argc, char **argv)
         result = 1;
     }
 #endif
-    tabos_runtime_shutdown();
-    tab_platform_shutdown();
+    kernel_runtime_shutdown();
+    platform_shutdown();
     return result;
 }

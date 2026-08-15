@@ -3,9 +3,9 @@
 
 #include <tabos/internal/terminal.h>
 
-void tab_console_init(tab_terminal_t *terminal);
-void tab_console_rebind(tab_terminal_t *terminal);
-void tab_console_shutdown(void);
-void tab_console_update(void);
+void console_init(terminal_t *terminal);
+void console_rebind(terminal_t *terminal);
+void console_shutdown(void);
+void console_update(void);
 
 #endif

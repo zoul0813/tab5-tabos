@@ -5,9 +5,9 @@
 
 #include <tabos/platform/platform.h>
 
-bool tab_display_init(void);
-bool tab_display_present(void);
-tab_framebuffer_t *tab_display_framebuffer(void);
-void tab_display_shutdown(void);
+bool display_init(void);
+bool display_present(void);
+platform_framebuffer_t *display_framebuffer(void);
+void display_shutdown(void);
 
 #endif

@@ -6,17 +6,17 @@
 #include <stdint.h>
 
 typedef enum {
-    TAB_ELF_OK = 0,
-    TAB_ELF_INVALID_ARGUMENT,
-    TAB_ELF_TRUNCATED,
-    TAB_ELF_UNSUPPORTED_FORMAT,
-    TAB_ELF_UNSUPPORTED_RELOCATION,
-    TAB_ELF_INVALID_SEGMENT,
-    TAB_ELF_INVALID_ENTRY,
-    TAB_ELF_IMAGE_TOO_LARGE,
-    TAB_ELF_NO_EXECUTABLE_MEMORY,
-    TAB_ELF_PREPARE_FAILED,
-} tab_elf_result_t;
+    LOADER_ELF_OK = 0,
+    LOADER_ELF_INVALID_ARGUMENT,
+    LOADER_ELF_TRUNCATED,
+    LOADER_ELF_UNSUPPORTED_FORMAT,
+    LOADER_ELF_UNSUPPORTED_RELOCATION,
+    LOADER_ELF_INVALID_SEGMENT,
+    LOADER_ELF_INVALID_ENTRY,
+    LOADER_ELF_IMAGE_TOO_LARGE,
+    LOADER_ELF_NO_EXECUTABLE_MEMORY,
+    LOADER_ELF_PREPARE_FAILED,
+} loader_elf_result_t;
 
 typedef struct {
     uint32_t entry_address;
@@ -24,18 +24,18 @@ typedef struct {
     uint32_t maximum_address;
     size_t image_size;
     size_t load_segment_count;
-} tab_elf_info_t;
+} loader_elf_info_t;
 
 typedef struct {
     void *memory;
     size_t memory_size;
     void *entry;
-    tab_elf_info_t info;
-} tab_elf_image_t;
+    loader_elf_info_t info;
+} loader_elf_image_t;
 
-tab_elf_result_t tab_elf_inspect(const uint8_t *data, size_t size, tab_elf_info_t *info);
-tab_elf_result_t tab_elf_load(const uint8_t *data, size_t size, tab_elf_image_t *image);
-void tab_elf_unload(tab_elf_image_t *image);
-const char *tab_elf_result_name(tab_elf_result_t result);
+loader_elf_result_t loader_elf_inspect(const uint8_t *data, size_t size, loader_elf_info_t *info);
+loader_elf_result_t loader_elf_load(const uint8_t *data, size_t size, loader_elf_image_t *image);
+void loader_elf_unload(loader_elf_image_t *image);
+const char *loader_elf_result_name(loader_elf_result_t result);
 
 #endif

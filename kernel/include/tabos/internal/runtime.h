@@ -3,10 +3,10 @@
 
 #include <stdbool.h>
 
-bool tabos_runtime_init(void);
-bool tabos_runtime_start(void);
-void tabos_runtime_update(void);
-void tabos_runtime_shutdown(void);
-const char *tabos_runtime_version(void);
+bool kernel_runtime_init(void);
+bool kernel_runtime_start(void);
+void kernel_runtime_update(void);
+void kernel_runtime_shutdown(void);
+const char *kernel_runtime_version(void);
 
 #endif

@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include <stdio.h>
 
-enum { TAB_PROCESS_CAPACITY = 16 };
+enum { KERNEL_PROCESS_CAPACITY = 16 };
 
 typedef struct {
     bool occupied;
@@ -13,14 +13,14 @@ typedef struct {
     tabos_process_id_t parent_id;
     tabos_process_state_t state;
     tabos_app_context_t context;
-} tab_process_t;
+} kernel_process_t;
 
-static tab_process_t processes[TAB_PROCESS_CAPACITY];
-static tab_process_t *foreground_process;
+static kernel_process_t processes[KERNEL_PROCESS_CAPACITY];
+static kernel_process_t *foreground_process;
 static bool last_exit_valid;
 static int last_exit_status;
 
-static void panic_root_process(tab_process_t *process)
+static void panic_root_process(kernel_process_t *process)
 {
     char message[96];
     process->state = TABOS_PROCESS_PANICKED;
@@ -30,14 +30,14 @@ static void panic_root_process(tab_process_t *process)
     (void)snprintf(message, sizeof(message),
         "KERNEL PANIC: process 0 (%s) exited with status %d",
         process->context.descriptor->name, process->context.exit_status);
-    tab_platform_log(message);
+    platform_log(message);
     if (process->context.console_owned) {
         (void)tabos_console_write(&process->context.console, "\n[KERNEL PANIC] ");
         (void)tabos_console_write_line(&process->context.console, message + 14);
     }
 }
 
-static void release_process(tab_process_t *process)
+static void release_process(kernel_process_t *process)
 {
     if (process == NULL || !process->occupied) {
         return;
@@ -53,24 +53,24 @@ static void release_process(tab_process_t *process)
         tabos_console_release(&context->console);
     }
 
-    *process = (tab_process_t){0};
+    *process = (kernel_process_t){0};
     if (foreground_process == process) foreground_process = NULL;
     last_exit_status = status;
     last_exit_valid = true;
 }
 
-void tab_app_system_init(void)
+void kernel_application_system_init(void)
 {
-    for (size_t index = 0U; index < TAB_PROCESS_CAPACITY; ++index) {
-        processes[index] = (tab_process_t){0};
+    for (size_t index = 0U; index < KERNEL_PROCESS_CAPACITY; ++index) {
+        processes[index] = (kernel_process_t){0};
     }
     foreground_process = NULL;
     last_exit_valid = false;
     last_exit_status = 0;
-    tab_app_registry_reset();
+    application_registry_reset();
 }
 
-void tab_app_system_update(void)
+void kernel_application_system_update(void)
 {
     if (foreground_process == NULL) {
         return;
@@ -85,12 +85,12 @@ void tab_app_system_update(void)
     }
 }
 
-void tab_app_system_shutdown(void)
+void kernel_application_system_shutdown(void)
 {
-    for (size_t index = TAB_PROCESS_CAPACITY; index > 0U; --index) {
+    for (size_t index = KERNEL_PROCESS_CAPACITY; index > 0U; --index) {
         if (processes[index - 1U].occupied) release_process(&processes[index - 1U]);
     }
-    tab_app_registry_reset();
+    application_registry_reset();
 }
 
 tabos_app_result_t tabos_app_launch(const char *name)
@@ -106,8 +106,8 @@ tabos_app_result_t tabos_app_launch(const char *name)
         return TABOS_APP_RESULT_NOT_FOUND;
     }
 
-    tab_process_t *process = &processes[0];
-    *process = (tab_process_t){
+    kernel_process_t *process = &processes[0];
+    *process = (kernel_process_t){
         .occupied = true,
         .id = 0U,
         .parent_id = TABOS_PROCESS_ID_INVALID,
@@ -120,7 +120,7 @@ tabos_app_result_t tabos_app_launch(const char *name)
     tabos_app_context_t *context = &process->context;
     if ((descriptor->capabilities & TABOS_APP_CAPABILITY_CONSOLE) != 0U) {
         if (!tabos_console_acquire(&context->console)) {
-            *process = (tab_process_t){0};
+            *process = (kernel_process_t){0};
             return TABOS_APP_RESULT_START_FAILED;
         }
         context->console_owned = true;
@@ -172,7 +172,7 @@ tabos_process_id_t tabos_app_process_id(const tabos_app_context_t *context)
 size_t tabos_process_count(void)
 {
     size_t count = 0U;
-    for (size_t index = 0U; index < TAB_PROCESS_CAPACITY; ++index) {
+    for (size_t index = 0U; index < KERNEL_PROCESS_CAPACITY; ++index) {
         if (processes[index].occupied) ++count;
     }
     return count;
@@ -181,8 +181,8 @@ size_t tabos_process_count(void)
 bool tabos_process_info(tabos_process_id_t id, tabos_process_info_t *info)
 {
     if (info == NULL) return false;
-    for (size_t index = 0U; index < TAB_PROCESS_CAPACITY; ++index) {
-        const tab_process_t *process = &processes[index];
+    for (size_t index = 0U; index < KERNEL_PROCESS_CAPACITY; ++index) {
+        const kernel_process_t *process = &processes[index];
         if (process->occupied && process->id == id) {
             *info = (tabos_process_info_t){
                 .id = process->id,
@@ -202,7 +202,7 @@ bool tabos_process_system_panicked(void)
         foreground_process->state == TABOS_PROCESS_PANICKED;
 }
 
-void tab_app_report_diagnostic_result(tabos_app_context_t *context, int status)
+void application_report_diagnostic_result(tabos_app_context_t *context, int status)
 {
     if (foreground_process != NULL && context == &foreground_process->context) {
         last_exit_status = status;

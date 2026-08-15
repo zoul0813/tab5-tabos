@@ -246,18 +246,18 @@ Portable code should consume a TabOS platform interface.
 Conceptually:
 
 ```c
-tab_platform_init();
-tab_platform_shutdown();
+platform_init();
+platform_shutdown();
 
-tab_platform_time_us();
+platform_time_us();
 
-tab_platform_display_present(...);
+platform_display_present(...);
 
-tab_platform_input_poll(...);
+platform_input_poll(...);
 
-tab_platform_audio_write(...);
+platform_audio_write(...);
 
-tab_platform_storage_open(...);
+platform_storage_open(...);
 ```
 
 These names are illustrative and are not a frozen API.
@@ -809,8 +809,8 @@ Portable input behavior should support synthetic events.
 For example:
 
 ```c
-tab_test_input_key_down(...);
-tab_test_input_key_up(...);
+test_input_key_down(...);
+test_input_key_up(...);
 ```
 
 or an equivalent internal testing interface.
@@ -1051,7 +1051,7 @@ SDL_EVENT_KEY_DOWN
        ↓
 host SDL adapter
        ↓
-TAB_INPUT_KEY_DOWN
+TABOS_INPUT_KEY_DOWN
 ```
 
 A test of that translation may use SDL-specific structures.
@@ -1059,7 +1059,7 @@ A test of that translation may use SDL-specific structures.
 A test of TabOS key handling should begin with:
 
 ```text
-TAB_INPUT_KEY_DOWN
+TABOS_INPUT_KEY_DOWN
 ```
 
 and remain SDL-independent.
@@ -1124,7 +1124,7 @@ For example:
 #include <tabos/tabos.h>
 
 int main(int argc, char **argv) {
-    tab_printf("Hello, TabOS!\n");
+    tabos_printf("Hello, TabOS!\n");
     return 0;
 }
 ```
@@ -1439,6 +1439,19 @@ When implementing TabOS, Codex should preserve the following testing and portabi
 ---
 
 ## 43. Testing North Star
+
+### Symbol-boundary checks
+
+Architecture tests should enforce decided naming direction during migration:
+
+- public SDK declarations use `tabos_*`
+- public SDK headers do not expose internal layer/subsystem symbols
+- new internal declarations do not use generic `tab_*`
+- internal-only declarations do not claim `tabos_*` without explicit ABI decision
+- shared ESP code, chip-specific code, and Tab5 board code use matching ownership prefix
+
+Migration checks may allow explicit legacy inventory temporarily, but allowlist must only
+shrink. Mechanical renames must preserve behavior and pass all target builds/tests.
 
 The desired development model is:
 

@@ -25,19 +25,19 @@ static bool has_entry(tabos_dir_t directory, const char *name)
 int main(void)
 {
     char normalized[TABOS_FS_PATH_MAX];
-    if (!tab_fs_normalize_path("/apps//./bin/../hello", "/", normalized,
+    if (!filesystem_normalize_path("/apps//./bin/../hello", "/", normalized,
                                sizeof(normalized)) ||
         strcmp(normalized, "/apps/hello") != 0 ||
-        !tab_fs_normalize_path("../../etc", "/home/user", normalized,
+        !filesystem_normalize_path("../../etc", "/home/user", normalized,
                                sizeof(normalized)) ||
         strcmp(normalized, "/etc") != 0 ||
-        tab_fs_normalize_path("", "/", normalized, sizeof(normalized))) {
+        filesystem_normalize_path("", "/", normalized, sizeof(normalized))) {
         return 1;
     }
 
-    if (!tab_fs_init() || !tab_fs_is_mounted()) return 1;
-    tab_platform_storage_info_t storage;
-    if (!tab_platform_storage_info(&storage) || !storage.mounted ||
+    if (!filesystem_init() || !filesystem_is_mounted()) return 1;
+    platform_storage_info_t storage;
+    if (!platform_storage_info(&storage) || !storage.mounted ||
         storage.total_bytes == 0U || storage.name == NULL) {
         return 1;
     }
@@ -81,7 +81,7 @@ int main(void)
 
     char symlink_path[TABOS_FS_PATH_MAX];
     const int printed = snprintf(symlink_path, sizeof(symlink_path), "%s/apps/escape",
-                                 tab_test_storage_root());
+                                 test_storage_root());
     if (printed <= 0 || (size_t)printed >= sizeof(symlink_path) ||
         symlink("/tmp", symlink_path) != 0 ||
         tabos_fs_stat("escape", &status) == 0 || *tabos_errno_location() != TABOS_EACCES ||
@@ -95,6 +95,6 @@ int main(void)
         return 1;
     }
 
-    tab_fs_shutdown();
+    filesystem_shutdown();
     return 0;
 }

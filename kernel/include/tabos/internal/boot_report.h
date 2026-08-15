@@ -7,31 +7,31 @@
 #include <tabos/internal/terminal.h>
 
 typedef enum {
-    TAB_BOOT_STATUS_INFO,
-    TAB_BOOT_STATUS_OK,
-    TAB_BOOT_STATUS_WARNING,
-    TAB_BOOT_STATUS_ERROR,
-} tab_boot_status_t;
+    KERNEL_BOOT_STATUS_INFO,
+    KERNEL_BOOT_STATUS_OK,
+    KERNEL_BOOT_STATUS_WARNING,
+    KERNEL_BOOT_STATUS_ERROR,
+} kernel_boot_status_t;
 
 typedef struct {
     const char *component;
     const char *detail;
-    tab_boot_status_t status;
-} tab_boot_entry_t;
+    kernel_boot_status_t status;
+} kernel_boot_entry_t;
 
-enum { TAB_BOOT_REPORT_MAX_ENTRIES = 12 };
+enum { KERNEL_BOOT_REPORT_MAX_ENTRIES = 12 };
 
 typedef struct {
     const char *system_name;
     const char *version;
-    tab_boot_entry_t entries[TAB_BOOT_REPORT_MAX_ENTRIES];
+    kernel_boot_entry_t entries[KERNEL_BOOT_REPORT_MAX_ENTRIES];
     size_t entry_count;
-} tab_boot_report_t;
+} kernel_boot_report_t;
 
-void tab_boot_report_init(tab_boot_report_t *report, const char *system_name, const char *version);
-bool tab_boot_report_add(tab_boot_report_t *report, const char *component, const char *detail,
-                         tab_boot_status_t status);
-void tab_boot_report_write_serial(const tab_boot_report_t *report);
-void tab_boot_report_write_terminal(const tab_boot_report_t *report, tab_terminal_t *terminal);
+void kernel_boot_report_init(kernel_boot_report_t *report, const char *system_name, const char *version);
+bool kernel_boot_report_add(kernel_boot_report_t *report, const char *component, const char *detail,
+                         kernel_boot_status_t status);
+void kernel_boot_report_write_serial(const kernel_boot_report_t *report);
+void kernel_boot_report_write_terminal(const kernel_boot_report_t *report, terminal_t *terminal);
 
 #endif

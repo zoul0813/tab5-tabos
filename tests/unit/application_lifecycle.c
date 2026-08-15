@@ -60,24 +60,24 @@ static const tabos_app_descriptor_t failing_app = {
 
 int main(void)
 {
-    tab_input_init();
-    if (!tab_display_init()) {
+    input_init();
+    if (!display_init()) {
         return 1;
     }
 
-    tab_terminal_t terminal;
-    if (!tab_terminal_init(&terminal, tab_display_framebuffer(), 2U)) {
+    terminal_t terminal;
+    if (!terminal_init(&terminal, display_framebuffer(), 2U)) {
         return 1;
     }
-    tab_console_init(&terminal);
-    tab_app_system_init();
+    console_init(&terminal);
+    kernel_application_system_init();
 
     tabos_app_descriptor_t invalid = test_app;
     invalid.abi_version = TABOS_APPLICATION_ABI_VERSION + 1U;
-    if (tab_app_registry_register(&invalid) ||
-        !tab_app_registry_register(&test_app) ||
-        tab_app_registry_register(&test_app) ||
-        !tab_app_registry_register(&failing_app) ||
+    if (application_registry_register(&invalid) ||
+        !application_registry_register(&test_app) ||
+        application_registry_register(&test_app) ||
+        !application_registry_register(&failing_app) ||
         tabos_app_count() != 2U || tabos_app_at(2U) != NULL ||
         tabos_app_find("lifecycle-test") != &test_app ||
         tabos_app_launch(NULL) != TABOS_APP_RESULT_INVALID ||
@@ -112,7 +112,7 @@ int main(void)
         return 1;
     }
 
-    tab_app_system_update();
+    kernel_application_system_update();
     if (tabos_app_is_running() || tabos_app_active() != &test_app || update_calls != 1U ||
         cleanup_calls != 1U || tabos_process_count() != 1U ||
         !tabos_process_system_panicked() ||
@@ -123,16 +123,16 @@ int main(void)
         return 1;
     }
 
-    tab_app_system_shutdown();
+    kernel_application_system_shutdown();
     if (tabos_app_count() != 0U || tabos_process_count() != 0U ||
         cleanup_calls != 2U || cleanup_status != 7 ||
         !tabos_console_acquire(&denied)) {
         return 1;
     }
     tabos_console_release(&denied);
-    tab_console_shutdown();
-    tab_terminal_shutdown(&terminal);
-    tab_display_shutdown();
-    tab_input_shutdown();
+    console_shutdown();
+    terminal_shutdown(&terminal);
+    display_shutdown();
+    input_shutdown();
     return 0;
 }

@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-extern const uint8_t tab_font_data[];
-extern const uint8_t tab_font_data_end[];
+extern const uint8_t font_data[];
+extern const uint8_t font_data_end[];
 
 #endif

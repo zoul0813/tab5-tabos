@@ -12,17 +12,17 @@
 
 int main(void)
 {
-    tab_input_init();
-    if (!tab_display_init()) {
+    input_init();
+    if (!display_init()) {
         return 1;
     }
 
-    tab_terminal_t terminal;
-    if (!tab_terminal_init(&terminal, tab_display_framebuffer(), 2U)) {
+    terminal_t terminal;
+    if (!terminal_init(&terminal, display_framebuffer(), 2U)) {
         return 1;
     }
-    tab_terminal_clear(&terminal);
-    tab_console_init(&terminal);
+    terminal_clear(&terminal);
+    console_init(&terminal);
 
     tabos_console_session_t foreground = {0};
     tabos_console_session_t background = {0};
@@ -32,16 +32,16 @@ int main(void)
         return 1;
     }
     if (!terminal.cursor_visible ||
-        tab_display_framebuffer()->pixels[0] != 0xffff) {
+        display_framebuffer()->pixels[0] != 0xffff) {
         return 1;
     }
-    tab_test_platform_advance_time_ms(TABOS_CURSOR_BLINK_INTERVAL_MS);
-    tab_console_update();
+    test_platform_advance_time_ms(TABOS_CURSOR_BLINK_INTERVAL_MS);
+    console_update();
     if (terminal.cursor_phase_visible) {
         return 1;
     }
-    tab_test_platform_advance_time_ms(TABOS_CURSOR_BLINK_INTERVAL_MS);
-    tab_console_update();
+    test_platform_advance_time_ms(TABOS_CURSOR_BLINK_INTERVAL_MS);
+    console_update();
     if (!terminal.cursor_phase_visible) {
         return 1;
     }
@@ -60,7 +60,7 @@ int main(void)
         .type = TABOS_INPUT_KEY_DOWN,
         .key = TABOS_KEY_A,
     };
-    if (!tab_input_submit(&submitted)) {
+    if (!input_submit(&submitted)) {
         return 1;
     }
     tabos_input_event_t received;
@@ -115,16 +115,16 @@ int main(void)
 
     if (!tabos_console_clear(&background) ||
         !tabos_console_write(&background, "SCALE") ||
-        !tab_terminal_resize(&terminal, tab_display_framebuffer(), 4U) ||
+        !terminal_resize(&terminal, display_framebuffer(), 4U) ||
         terminal.scale != 4U || terminal.column != 5U ||
         terminal.cells[0].character != 'S' || terminal.cells[4].character != 'E') {
         return 1;
     }
 
     tabos_console_release(&background);
-    tab_console_shutdown();
-    tab_terminal_shutdown(&terminal);
-    tab_display_shutdown();
-    tab_input_shutdown();
+    console_shutdown();
+    terminal_shutdown(&terminal);
+    display_shutdown();
+    input_shutdown();
     return 0;
 }

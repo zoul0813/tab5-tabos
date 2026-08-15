@@ -22,7 +22,7 @@ static bool handle_screenshot_shortcut(const SDL_KeyboardEvent *event)
     const bool has_shift = (modifiers & SDL_KMOD_SHIFT) != 0U;
     if (event->type != SDL_EVENT_KEY_DOWN || !has_gui || !has_shift) return false;
     screenshot_shortcut_active = true;
-    if (!event->repeat) (void)tab_host_capture_screenshot();
+    if (!event->repeat) (void)host_capture_screenshot();
     return true;
 }
 
@@ -49,7 +49,7 @@ static tabos_key_t input_key(SDL_Scancode scancode)
 static void dispatch_event(const SDL_Event *event)
 {
     if (event->type == SDL_EVENT_QUIT) {
-        tab_host_request_quit();
+        host_request_quit();
         return;
     }
     if (event->type == SDL_EVENT_KEY_DOWN || event->type == SDL_EVENT_KEY_UP) {
@@ -62,7 +62,7 @@ static void dispatch_event(const SDL_Event *event)
             .modifiers = modifiers,
             .repeat = event->key.repeat,
         };
-        (void)tab_input_submit(&input_event);
+        (void)input_submit(&input_event);
         if (event->type == SDL_EVENT_KEY_UP) {
             synthesized_text[0] = '\0';
         } else if (event->key.repeat || key == TABOS_KEY_ENTER || key == TABOS_KEY_TAB) {
@@ -71,9 +71,9 @@ static void dispatch_event(const SDL_Event *event)
                 .modifiers = modifiers,
                 .repeat = event->key.repeat,
             };
-            if (tab_input_text_from_hid((uint8_t)key, modifiers, text_event.text,
+            if (input_text_from_hid((uint8_t)key, modifiers, text_event.text,
                                         sizeof(text_event.text)) > 0U) {
-                (void)tab_input_submit(&text_event);
+                (void)input_submit(&text_event);
                 (void)snprintf(synthesized_text, sizeof(synthesized_text), "%s", text_event.text);
             }
         }
@@ -87,19 +87,19 @@ static void dispatch_event(const SDL_Event *event)
         synthesized_text[0] = '\0';
         tabos_input_event_t input_event = {.type = TABOS_INPUT_TEXT};
         (void)snprintf(input_event.text, sizeof(input_event.text), "%s", event->text.text);
-        (void)tab_input_submit(&input_event);
+        (void)input_submit(&input_event);
     }
 }
 
-void tab_host_input_update(bool wait)
+void host_input_update(bool wait)
 {
-    if (tab_host_is_headless()) return;
+    if (host_is_headless()) return;
     SDL_Event event;
     if (wait && SDL_WaitEventTimeout(&event, 50)) dispatch_event(&event);
     while (SDL_PollEvent(&event)) dispatch_event(&event);
 }
 
-void tab_platform_input_wait(void)
+void platform_input_wait(void)
 {
     SDL_Delay(1);
 }

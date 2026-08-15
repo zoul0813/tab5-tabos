@@ -3,6 +3,6 @@
 
 #include <tabos/application.h>
 
-extern const tabos_app_descriptor_t tab_elf_loader_diagnostic_app;
+extern const tabos_app_descriptor_t elf_loader_diagnostic_app;
 
 #endif

@@ -12,22 +12,22 @@ enum {
     TABOS_DISPLAY_HEIGHT = 720,
 };
 
-typedef uint16_t tab_pixel_t;
-typedef void (*tab_platform_update_fn)(void);
-typedef struct tab_platform_riscv32_context tab_platform_riscv32_context_t;
+typedef uint16_t platform_pixel_t;
+typedef void (*platform_update_fn)(void);
+typedef struct platform_riscv32_context platform_riscv32_context_t;
 
 typedef enum {
-    TAB_PLATFORM_RISCV32_YIELDED = 0,
-    TAB_PLATFORM_RISCV32_RETURNED,
-    TAB_PLATFORM_RISCV32_FAULT,
-} tab_platform_riscv32_result_t;
+    PLATFORM_RISCV32_YIELDED = 0,
+    PLATFORM_RISCV32_RETURNED,
+    PLATFORM_RISCV32_FAULT,
+} platform_riscv32_result_t;
 
 typedef struct {
-    tab_pixel_t *pixels;
+    platform_pixel_t *pixels;
     size_t width;
     size_t height;
     size_t stride_pixels;
-} tab_framebuffer_t;
+} platform_framebuffer_t;
 
 typedef struct {
     const char *device_name;
@@ -45,36 +45,36 @@ typedef struct {
     bool storage_mounted;
     const char *keyboard_name;
     bool keyboard_present;
-} tab_platform_diagnostics_t;
+} platform_diagnostics_t;
 
-bool tab_platform_init(bool headless);
-int tab_platform_run(tab_platform_update_fn update);
-void tab_platform_shutdown(void);
-const char *tab_platform_name(void);
-const char *tab_platform_display_name(void);
-bool tab_platform_get_diagnostics(tab_platform_diagnostics_t *diagnostics);
-void tab_platform_log(const char *message);
-uint64_t tab_platform_time_ms(void);
-void *tab_platform_executable_alloc(size_t size);
-void *tab_platform_executable_prepare(void *memory, size_t size);
-const void *tab_platform_executable_data_pointer(const void *memory);
-void tab_platform_executable_free(void *memory);
-bool tab_platform_can_execute_riscv32(void);
-tab_platform_riscv32_context_t *tab_platform_riscv32_create(
+bool platform_init(bool headless);
+int platform_run(platform_update_fn update);
+void platform_shutdown(void);
+const char *platform_name(void);
+const char *platform_display_name(void);
+bool platform_get_diagnostics(platform_diagnostics_t *diagnostics);
+void platform_log(const char *message);
+uint64_t platform_time_ms(void);
+void *platform_executable_alloc(size_t size);
+void *platform_executable_prepare(void *memory, size_t size);
+const void *platform_executable_data_pointer(const void *memory);
+void platform_executable_free(void *memory);
+bool platform_can_execute_riscv32(void);
+platform_riscv32_context_t *platform_riscv32_create(
     const void *entry,
     const void *memory,
     size_t memory_size,
     uint32_t minimum_address,
     const tabos_elf_api_t *api);
-tab_platform_riscv32_result_t tab_platform_riscv32_step(
-    tab_platform_riscv32_context_t *context,
+platform_riscv32_result_t platform_riscv32_step(
+    platform_riscv32_context_t *context,
     unsigned int instruction_budget,
     int *returned_status);
-void tab_platform_riscv32_destroy(tab_platform_riscv32_context_t *context);
-void tab_platform_input_wait(void);
+void platform_riscv32_destroy(platform_riscv32_context_t *context);
+void platform_input_wait(void);
 
-bool tab_platform_display_init(tab_framebuffer_t *framebuffer);
-bool tab_platform_display_present(const tab_framebuffer_t *framebuffer);
-void tab_platform_display_shutdown(void);
+bool platform_display_init(platform_framebuffer_t *framebuffer);
+bool platform_display_present(const platform_framebuffer_t *framebuffer);
+void platform_display_shutdown(void);
 
 #endif

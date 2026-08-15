@@ -21,14 +21,14 @@ typedef struct {
 static executable_mapping_t mapping;
 static const char *const TAG = TABOS_PLATFORM_LOG_TAG;
 
-struct tab_platform_riscv32_context {
+struct platform_riscv32_context {
     tabos_elf_entry_fn entry;
     tabos_elf_api_t api;
     bool finished;
     int returned_status;
 };
 
-void *tab_platform_executable_alloc(size_t size)
+void *platform_executable_alloc(size_t size)
 {
     if (size == 0U || mapping.writable != NULL) return NULL;
     const size_t page_size = CONFIG_MMU_PAGE_SIZE;
@@ -40,7 +40,7 @@ void *tab_platform_executable_alloc(size_t size)
     return writable;
 }
 
-void *tab_platform_executable_prepare(void *memory, size_t size)
+void *platform_executable_prepare(void *memory, size_t size)
 {
     if (memory == NULL || memory != mapping.writable || size == 0U || size > mapping.mapped_size) {
         return NULL;
@@ -66,7 +66,7 @@ void *tab_platform_executable_prepare(void *memory, size_t size)
     return executable;
 }
 
-const void *tab_platform_executable_data_pointer(const void *memory)
+const void *platform_executable_data_pointer(const void *memory)
 {
     const uintptr_t address = (uintptr_t)memory;
     const uintptr_t executable = (uintptr_t)mapping.executable;
@@ -77,7 +77,7 @@ const void *tab_platform_executable_data_pointer(const void *memory)
     return memory;
 }
 
-void tab_platform_executable_free(void *memory)
+void platform_executable_free(void *memory)
 {
     if (memory == mapping.executable && mapping.executable != NULL) {
         (void)esp_mmu_unmap(mapping.executable);
@@ -88,12 +88,12 @@ void tab_platform_executable_free(void *memory)
     }
 }
 
-bool tab_platform_can_execute_riscv32(void)
+bool platform_can_execute_riscv32(void)
 {
     return true;
 }
 
-tab_platform_riscv32_context_t *tab_platform_riscv32_create(
+platform_riscv32_context_t *platform_riscv32_create(
     const void *entry,
     const void *memory,
     size_t memory_size,
@@ -104,7 +104,7 @@ tab_platform_riscv32_context_t *tab_platform_riscv32_create(
     (void)memory_size;
     (void)minimum_address;
     if (entry == NULL || api == NULL) return NULL;
-    tab_platform_riscv32_context_t *context = calloc(1U, sizeof(*context));
+    platform_riscv32_context_t *context = calloc(1U, sizeof(*context));
     if (context == NULL) return NULL;
     tabos_elf_entry_fn entry_function = NULL;
     _Static_assert(sizeof(entry_function) == sizeof(entry),
@@ -115,23 +115,23 @@ tab_platform_riscv32_context_t *tab_platform_riscv32_create(
     return context;
 }
 
-tab_platform_riscv32_result_t tab_platform_riscv32_step(
-    tab_platform_riscv32_context_t *context,
+platform_riscv32_result_t platform_riscv32_step(
+    platform_riscv32_context_t *context,
     unsigned int instruction_budget,
     int *returned_status)
 {
     if (context == NULL || instruction_budget == 0U || returned_status == NULL) {
-        return TAB_PLATFORM_RISCV32_FAULT;
+        return PLATFORM_RISCV32_FAULT;
     }
     if (!context->finished) {
         context->returned_status = context->entry(&context->api);
         context->finished = true;
     }
     *returned_status = context->returned_status;
-    return TAB_PLATFORM_RISCV32_RETURNED;
+    return PLATFORM_RISCV32_RETURNED;
 }
 
-void tab_platform_riscv32_destroy(tab_platform_riscv32_context_t *context)
+void platform_riscv32_destroy(platform_riscv32_context_t *context)
 {
     free(context);
 }

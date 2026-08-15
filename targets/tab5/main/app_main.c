@@ -9,21 +9,21 @@ static const char *const TAG = TABOS_SYSTEM_LOG_TAG;
 
 void app_main(void)
 {
-    if (!tabos_runtime_init()) {
+    if (!kernel_runtime_init()) {
         ESP_LOGE(TAG, "%s runtime initialization failed", TABOS_SYSTEM_NAME);
         return;
     }
 
-    if (!tab_platform_init(false)) {
+    if (!platform_init(false)) {
         ESP_LOGE(TAG, "%s platform initialization failed", TABOS_SYSTEM_NAME);
-        tabos_runtime_shutdown();
+        kernel_runtime_shutdown();
         return;
     }
 
-    if (!tabos_runtime_start()) {
+    if (!kernel_runtime_start()) {
         ESP_LOGE(TAG, "%s display initialization failed", TABOS_SYSTEM_NAME);
-        tabos_runtime_shutdown();
-        tab_platform_shutdown();
+        kernel_runtime_shutdown();
+        platform_shutdown();
         return;
     }
 
@@ -31,9 +31,9 @@ void app_main(void)
         TAG,
         "%s %s bootstrapped on %s",
         TABOS_SYSTEM_NAME,
-        tabos_runtime_version(),
-        tab_platform_name()
+        kernel_runtime_version(),
+        platform_name()
     );
 
-    (void)tab_platform_run(tabos_runtime_update);
+    (void)platform_run(kernel_runtime_update);
 }

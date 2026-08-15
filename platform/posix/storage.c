@@ -103,39 +103,39 @@ static void map_status(const struct stat *source, tabos_stat_t *destination)
     };
 }
 
-bool tab_platform_storage_init(void)
+bool platform_storage_init(void)
 {
     if (storage_mounted) return true;
     storage_root[0] = '\0';
     storage_removable = false;
     storage_name = "Filesystem";
-    storage_mounted = tab_storage_backend_mount(
+    storage_mounted = storage_backend_mount(
         storage_root, sizeof(storage_root), &storage_removable, &storage_name);
     if (!storage_mounted) storage_root[0] = '\0';
     return storage_mounted;
 }
 
-void tab_platform_storage_shutdown(void)
+void platform_storage_shutdown(void)
 {
-    if (storage_mounted) tab_storage_backend_unmount();
+    if (storage_mounted) storage_backend_unmount();
     storage_mounted = false;
     storage_root[0] = '\0';
 }
 
-bool tab_platform_storage_info(tab_platform_storage_info_t *info)
+bool platform_storage_info(platform_storage_info_t *info)
 {
     if (info == NULL) return false;
-    *info = (tab_platform_storage_info_t){
+    *info = (platform_storage_info_t){
         .mounted = storage_mounted,
         .removable = storage_removable,
         .name = storage_name,
     };
     if (!storage_mounted) return true;
-    return tab_storage_backend_info(&info->total_bytes, &info->free_bytes);
+    return storage_backend_info(&info->total_bytes, &info->free_bytes);
 }
 
-int tab_platform_storage_open(const char *path, int flags, uint32_t mode,
-                              tab_platform_file_t *file)
+int platform_storage_open(const char *path, int flags, uint32_t mode,
+                              platform_file_t *file)
 {
     if (file == NULL || (flags & TABOS_O_ACCMODE) > TABOS_O_RDWR) return TABOS_EINVAL;
     char translated[TABOS_FS_PATH_MAX];
@@ -154,16 +154,16 @@ int tab_platform_storage_open(const char *path, int flags, uint32_t mode,
 #endif
     const int descriptor = open(translated, native_flags, (mode_t)(mode & 0777U));
     if (descriptor < 0) return map_error(errno);
-    *file = (tab_platform_file_t)(unsigned int)descriptor;
+    *file = (platform_file_t)(unsigned int)descriptor;
     return 0;
 }
 
-int tab_platform_storage_close(tab_platform_file_t file)
+int platform_storage_close(platform_file_t file)
 {
     return close((int)file) == 0 ? 0 : map_error(errno);
 }
 
-int tab_platform_storage_read(tab_platform_file_t file, void *buffer, size_t count,
+int platform_storage_read(platform_file_t file, void *buffer, size_t count,
                               size_t *bytes_read)
 {
     if (bytes_read == NULL) return TABOS_EINVAL;
@@ -173,7 +173,7 @@ int tab_platform_storage_read(tab_platform_file_t file, void *buffer, size_t cou
     return 0;
 }
 
-int tab_platform_storage_write(tab_platform_file_t file, const void *buffer, size_t count,
+int platform_storage_write(platform_file_t file, const void *buffer, size_t count,
                                size_t *bytes_written)
 {
     if (bytes_written == NULL) return TABOS_EINVAL;
@@ -183,7 +183,7 @@ int tab_platform_storage_write(tab_platform_file_t file, const void *buffer, siz
     return 0;
 }
 
-int tab_platform_storage_seek(tab_platform_file_t file, tabos_off_t offset, int whence,
+int platform_storage_seek(platform_file_t file, tabos_off_t offset, int whence,
                               tabos_off_t *position)
 {
     if (position == NULL || (whence != TABOS_SEEK_SET && whence != TABOS_SEEK_CUR &&
@@ -196,7 +196,7 @@ int tab_platform_storage_seek(tab_platform_file_t file, tabos_off_t offset, int 
     return 0;
 }
 
-int tab_platform_storage_stat(const char *path, tabos_stat_t *status)
+int platform_storage_stat(const char *path, tabos_stat_t *status)
 {
     if (status == NULL) return TABOS_EINVAL;
     char translated[TABOS_FS_PATH_MAX];
@@ -209,7 +209,7 @@ int tab_platform_storage_stat(const char *path, tabos_stat_t *status)
     return 0;
 }
 
-int tab_platform_storage_fstat(tab_platform_file_t file, tabos_stat_t *status)
+int platform_storage_fstat(platform_file_t file, tabos_stat_t *status)
 {
     if (status == NULL) return TABOS_EINVAL;
     struct stat native_status;
@@ -227,17 +227,17 @@ static int translated_operation(const char *path, int (*operation)(const char *)
     return operation(translated) == 0 ? 0 : map_error(errno);
 }
 
-int tab_platform_storage_unlink(const char *path)
+int platform_storage_unlink(const char *path)
 {
     return translated_operation(path, unlink);
 }
 
-int tab_platform_storage_rmdir(const char *path)
+int platform_storage_rmdir(const char *path)
 {
     return translated_operation(path, rmdir);
 }
 
-int tab_platform_storage_mkdir(const char *path, uint32_t mode)
+int platform_storage_mkdir(const char *path, uint32_t mode)
 {
     char translated[TABOS_FS_PATH_MAX];
     if (!translate_path(path, translated)) return TABOS_ENAMETOOLONG;
@@ -246,7 +246,7 @@ int tab_platform_storage_mkdir(const char *path, uint32_t mode)
     return mkdir(translated, (mode_t)(mode & 0777U)) == 0 ? 0 : map_error(errno);
 }
 
-int tab_platform_storage_rename(const char *old_path, const char *new_path)
+int platform_storage_rename(const char *old_path, const char *new_path)
 {
     char old_translated[TABOS_FS_PATH_MAX];
     char new_translated[TABOS_FS_PATH_MAX];
@@ -259,7 +259,7 @@ int tab_platform_storage_rename(const char *old_path, const char *new_path)
     return rename(old_translated, new_translated) == 0 ? 0 : map_error(errno);
 }
 
-int tab_platform_storage_opendir(const char *path, tab_platform_dir_t *directory)
+int platform_storage_opendir(const char *path, platform_dir_t *directory)
 {
     if (directory == NULL) return TABOS_EINVAL;
     char translated[TABOS_FS_PATH_MAX];
@@ -268,11 +268,11 @@ int tab_platform_storage_opendir(const char *path, tab_platform_dir_t *directory
     if (error != 0) return error;
     DIR *native_directory = opendir(translated);
     if (native_directory == NULL) return map_error(errno);
-    *directory = (tab_platform_dir_t)native_directory;
+    *directory = (platform_dir_t)native_directory;
     return 0;
 }
 
-int tab_platform_storage_readdir(tab_platform_dir_t directory, tabos_dirent_t *entry,
+int platform_storage_readdir(platform_dir_t directory, tabos_dirent_t *entry,
                                  bool *end)
 {
     if (entry == NULL || end == NULL) return TABOS_EINVAL;
@@ -300,7 +300,7 @@ int tab_platform_storage_readdir(tab_platform_dir_t directory, tabos_dirent_t *e
     return 0;
 }
 
-int tab_platform_storage_closedir(tab_platform_dir_t directory)
+int platform_storage_closedir(platform_dir_t directory)
 {
     return closedir((DIR *)directory) == 0 ? 0 : map_error(errno);
 }

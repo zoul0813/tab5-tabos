@@ -46,7 +46,7 @@ static bool consume_path(const char *path, char *output, size_t output_size, siz
     return true;
 }
 
-bool tab_fs_normalize_path(const char *path, const char *working_directory,
+bool filesystem_normalize_path(const char *path, const char *working_directory,
                            char *output, size_t output_size)
 {
     if (path == NULL || working_directory == NULL || output == NULL || output_size < 2U ||

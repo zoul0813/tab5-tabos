@@ -593,6 +593,13 @@ Before building large subsystems, validate these assumptions with small spikes:
 
 When modifying TabOS:
 
+- Public API/ABI symbols use `tabos_*`.
+- Internal cross-file symbols use descriptive owner prefixes such as `kernel_*`,
+  `platform_*`, `host_*`, `espidf_*`, `esp32_*`, `esp32p4_*`, `tab5_*`, `console_*`, and
+  `filesystem_*`; do not add new generic `tab_*` symbols.
+- Shared ESP32-family code uses `esp32_*`; generic ESP-IDF glue uses `espidf_*`;
+  model-specific code names exact chip; Tab5 board integration uses `tab5_*`.
+
 - Preserve the decisions above unless the task explicitly changes them.
 - Clearly distinguish portable TabOS code from ESP-IDF platform code.
 - Do not expose FreeRTOS or ESP-IDF types in public application headers unless explicitly approved.

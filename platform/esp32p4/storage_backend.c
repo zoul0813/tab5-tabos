@@ -10,7 +10,7 @@
 static const char *const TAG = "tabos_storage";
 static bool mounted;
 
-bool tab_storage_backend_mount(char *root, size_t root_size,
+bool storage_backend_mount(char *root, size_t root_size,
                                bool *removable, const char **name)
 {
     if (root == NULL || removable == NULL || name == NULL) return false;
@@ -32,14 +32,14 @@ bool tab_storage_backend_mount(char *root, size_t root_size,
     return true;
 }
 
-void tab_storage_backend_unmount(void)
+void storage_backend_unmount(void)
 {
     if (!mounted) return;
     (void)bsp_sdcard_unmount();
     mounted = false;
 }
 
-bool tab_storage_backend_info(uint64_t *total_bytes, uint64_t *free_bytes)
+bool storage_backend_info(uint64_t *total_bytes, uint64_t *free_bytes)
 {
     if (!mounted || total_bytes == NULL || free_bytes == NULL) return false;
     return esp_vfs_fat_info(BSP_SD_MOUNT_POINT, total_bytes, free_bytes) == ESP_OK;

@@ -2,9 +2,9 @@
 
 #include <string.h>
 
-enum { TAB_APP_REGISTRY_CAPACITY = 16 };
+enum { APPLICATION_REGISTRY_CAPACITY = 16 };
 
-static const tabos_app_descriptor_t *applications[TAB_APP_REGISTRY_CAPACITY];
+static const tabos_app_descriptor_t *applications[APPLICATION_REGISTRY_CAPACITY];
 static size_t application_count;
 
 static bool descriptor_valid(const tabos_app_descriptor_t *descriptor)
@@ -16,9 +16,9 @@ static bool descriptor_valid(const tabos_app_descriptor_t *descriptor)
         descriptor->entry != NULL && (descriptor->capabilities & ~supported) == 0U;
 }
 
-bool tab_app_registry_register(const tabos_app_descriptor_t *descriptor)
+bool application_registry_register(const tabos_app_descriptor_t *descriptor)
 {
-    if (!descriptor_valid(descriptor) || application_count >= TAB_APP_REGISTRY_CAPACITY ||
+    if (!descriptor_valid(descriptor) || application_count >= APPLICATION_REGISTRY_CAPACITY ||
         tabos_app_find(descriptor->name) != NULL) {
         return false;
     }
@@ -26,7 +26,7 @@ bool tab_app_registry_register(const tabos_app_descriptor_t *descriptor)
     return true;
 }
 
-void tab_app_registry_reset(void)
+void application_registry_reset(void)
 {
     memset(applications, 0, sizeof(applications));
     application_count = 0U;

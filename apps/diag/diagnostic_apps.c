@@ -18,27 +18,27 @@
 #include <tabos/internal/elf_loader_diagnostic.h>
 #endif
 
-bool tab_diagnostic_apps_register(void)
+bool diagnostic_apps_register(void)
 {
 #if TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP
-    return tab_app_registry_register(&tab_console_diagnostic_app);
+    return application_registry_register(&console_diagnostic_app);
 #elif TABOS_ENABLE_FILESYSTEM_DIAGNOSTIC_APP
-    return tab_app_registry_register(&tab_filesystem_diagnostic_app);
+    return application_registry_register(&filesystem_diagnostic_app);
 #elif TABOS_ENABLE_ELF_LOADER_EXPERIMENT
-    return tab_app_registry_register(&tab_elf_loader_diagnostic_app);
+    return application_registry_register(&elf_loader_diagnostic_app);
 #else
     return true;
 #endif
 }
 
-const char *tab_diagnostic_startup_app(void)
+const char *diagnostic_startup_app(void)
 {
 #if TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP
-    return tab_console_diagnostic_app.name;
+    return console_diagnostic_app.name;
 #elif TABOS_ENABLE_FILESYSTEM_DIAGNOSTIC_APP
-    return tab_filesystem_diagnostic_app.name;
+    return filesystem_diagnostic_app.name;
 #elif TABOS_ENABLE_ELF_LOADER_EXPERIMENT
-    return tab_elf_loader_diagnostic_app.name;
+    return elf_loader_diagnostic_app.name;
 #else
     return NULL;
 #endif

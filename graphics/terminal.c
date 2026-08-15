@@ -8,32 +8,32 @@
 #include <stdlib.h>
 #include <string.h>
 
-static size_t cell_width(const tab_terminal_t *terminal)
+static size_t cell_width(const terminal_t *terminal)
 {
     return TABOS_FONT_CELL_WIDTH * terminal->scale;
 }
 
-static size_t cell_height(const tab_terminal_t *terminal)
+static size_t cell_height(const terminal_t *terminal)
 {
     return TABOS_FONT_CELL_HEIGHT * terminal->scale;
 }
 
-static size_t line_slot(const tab_terminal_t *terminal, uint64_t line)
+static size_t line_slot(const terminal_t *terminal, uint64_t line)
 {
     return (size_t)(line % terminal->line_capacity);
 }
 
-static tab_terminal_cell_t *line_cells(tab_terminal_t *terminal, uint64_t line)
+static terminal_cell_t *line_cells(terminal_t *terminal, uint64_t line)
 {
     return terminal->cells + (line_slot(terminal, line) * terminal->columns);
 }
 
-static const tab_terminal_cell_t *const_line_cells(const tab_terminal_t *terminal, uint64_t line)
+static const terminal_cell_t *const_line_cells(const terminal_t *terminal, uint64_t line)
 {
     return terminal->cells + (line_slot(terminal, line) * terminal->columns);
 }
 
-static uint64_t live_viewport_top(const tab_terminal_t *terminal)
+static uint64_t live_viewport_top(const terminal_t *terminal)
 {
     const uint64_t visible_rows = terminal->rows;
     const uint64_t first_visible = terminal->current_line + 1U > visible_rows
@@ -42,12 +42,12 @@ static uint64_t live_viewport_top(const tab_terminal_t *terminal)
     return first_visible > terminal->first_line ? first_visible : terminal->first_line;
 }
 
-static void update_cursor_row(tab_terminal_t *terminal)
+static void update_cursor_row(terminal_t *terminal)
 {
     terminal->row = (size_t)(terminal->current_line - live_viewport_top(terminal));
 }
 
-static void follow_live_output(tab_terminal_t *terminal)
+static void follow_live_output(terminal_t *terminal)
 {
     const uint64_t viewport_top = live_viewport_top(terminal);
     if (terminal->viewport_top != viewport_top) {
@@ -57,7 +57,7 @@ static void follow_live_output(tab_terminal_t *terminal)
     update_cursor_row(terminal);
 }
 
-static void mark_cell(tab_terminal_t *terminal, uint64_t line, size_t column)
+static void mark_cell(terminal_t *terminal, uint64_t line, size_t column)
 {
     if (column >= terminal->columns || line < terminal->viewport_top ||
         line >= terminal->viewport_top + terminal->rows) {
@@ -67,7 +67,7 @@ static void mark_cell(tab_terminal_t *terminal, uint64_t line, size_t column)
     terminal->dirty_cells[(row * terminal->columns) + column] = true;
 }
 
-static bool cursor_should_draw(const tab_terminal_t *terminal)
+static bool cursor_should_draw(const terminal_t *terminal)
 {
     return terminal->cursor_visible && terminal->cursor_phase_visible &&
         terminal->viewport_top == live_viewport_top(terminal) &&
@@ -75,12 +75,12 @@ static bool cursor_should_draw(const tab_terminal_t *terminal)
         terminal->current_line < terminal->viewport_top + terminal->rows;
 }
 
-static void mark_cursor(tab_terminal_t *terminal)
+static void mark_cursor(terminal_t *terminal)
 {
     mark_cell(terminal, terminal->current_line, terminal->column);
 }
 
-static void clear_line(tab_terminal_t *terminal, uint64_t line)
+static void clear_line(terminal_t *terminal, uint64_t line)
 {
     const size_t slot = line_slot(terminal, line);
     memset(terminal->cells + (slot * terminal->columns), 0,
@@ -89,7 +89,7 @@ static void clear_line(tab_terminal_t *terminal, uint64_t line)
     terminal->hard_breaks[slot] = false;
 }
 
-static void append_line(tab_terminal_t *terminal, bool hard_break)
+static void append_line(terminal_t *terminal, bool hard_break)
 {
     terminal->hard_breaks[line_slot(terminal, terminal->current_line)] = hard_break;
     ++terminal->current_line;
@@ -101,10 +101,10 @@ static void append_line(tab_terminal_t *terminal, bool hard_break)
     follow_live_output(terminal);
 }
 
-static void put_character(tab_terminal_t *terminal, char character)
+static void put_character(terminal_t *terminal, char character)
 {
-    tab_terminal_cell_t *cells = line_cells(terminal, terminal->current_line);
-    cells[terminal->column] = (tab_terminal_cell_t){
+    terminal_cell_t *cells = line_cells(terminal, terminal->current_line);
+    cells[terminal->column] = (terminal_cell_t){
         .character = character,
         .foreground = terminal->foreground,
         .background = terminal->background,
@@ -120,17 +120,17 @@ static void put_character(tab_terminal_t *terminal, char character)
     }
 }
 
-static void trim_line(tab_terminal_t *terminal, uint64_t line)
+static void trim_line(terminal_t *terminal, uint64_t line)
 {
     const size_t slot = line_slot(terminal, line);
-    tab_terminal_cell_t *cells = line_cells(terminal, line);
+    terminal_cell_t *cells = line_cells(terminal, line);
     while (terminal->line_lengths[slot] > 0U &&
            cells[terminal->line_lengths[slot] - 1U].character == '\0') {
         --terminal->line_lengths[slot];
     }
 }
 
-static void backspace(tab_terminal_t *terminal)
+static void backspace(terminal_t *terminal)
 {
     if (terminal->column == 0U) {
         if (terminal->current_line == terminal->first_line) {
@@ -148,23 +148,23 @@ static void backspace(tab_terminal_t *terminal)
     if (terminal->column > 0U) {
         --terminal->column;
         line_cells(terminal, terminal->current_line)[terminal->column] =
-            (tab_terminal_cell_t){0};
+            (terminal_cell_t){0};
         mark_cell(terminal, terminal->current_line, terminal->column);
         trim_line(terminal, terminal->current_line);
     }
     follow_live_output(terminal);
 }
 
-static void tab(tab_terminal_t *terminal)
+static void tab(terminal_t *terminal)
 {
-    enum { TAB_WIDTH = 4 };
-    const size_t spaces = TAB_WIDTH - (terminal->column % TAB_WIDTH);
+    enum { TEST_WIDTH = 4 };
+    const size_t spaces = TEST_WIDTH - (terminal->column % TEST_WIDTH);
     for (size_t index = 0U; index < spaces; ++index) {
         put_character(terminal, ' ');
     }
 }
 
-static void clear_framebuffer(tab_terminal_t *terminal)
+static void clear_framebuffer(terminal_t *terminal)
 {
     for (size_t y = 0U; y < terminal->framebuffer->height; ++y) {
         for (size_t x = 0U; x < terminal->framebuffer->width; ++x) {
@@ -174,17 +174,17 @@ static void clear_framebuffer(tab_terminal_t *terminal)
     }
 }
 
-static void draw_cell(tab_terminal_t *terminal, size_t column, size_t row,
-                      const tab_terminal_cell_t *cell, bool cursor)
+static void draw_cell(terminal_t *terminal, size_t column, size_t row,
+                      const terminal_cell_t *cell, bool cursor)
 {
     const char character = cell->character == '\0' ? ' ' : cell->character;
-    const tab_pixel_t foreground = cell->character == '\0'
+    const platform_pixel_t foreground = cell->character == '\0'
         ? terminal->foreground
         : cell->foreground;
-    const tab_pixel_t background = cell->character == '\0'
+    const platform_pixel_t background = cell->character == '\0'
         ? terminal->background
         : cell->background;
-    const tab_pixel_t rendered_background = cursor ? foreground : background;
+    const platform_pixel_t rendered_background = cursor ? foreground : background;
     const size_t width = cell_width(terminal);
     const size_t height = cell_height(terminal);
     const size_t origin_x = column * width;
@@ -196,14 +196,14 @@ static void draw_cell(tab_terminal_t *terminal, size_t column, size_t row,
             ] = rendered_background;
         }
     }
-    (void)tab_font_draw_char(terminal->framebuffer,
+    (void)font_draw_char(terminal->framebuffer,
                              (int)origin_x, (int)origin_y, character,
                              terminal->scale,
                              cursor ? background : foreground,
                              cursor ? foreground : background);
 }
 
-static void render(tab_terminal_t *terminal)
+static void render(terminal_t *terminal)
 {
     if (terminal == NULL || terminal->framebuffer == NULL || terminal->cells == NULL) {
         return;
@@ -215,7 +215,7 @@ static void render(tab_terminal_t *terminal)
             if (line < terminal->first_line || line > terminal->current_line) {
                 continue;
             }
-            const tab_terminal_cell_t *cells = const_line_cells(terminal, line);
+            const terminal_cell_t *cells = const_line_cells(terminal, line);
             const size_t length = terminal->line_lengths[line_slot(terminal, line)];
             for (size_t column = 0U; column < length; ++column) {
                 draw_cell(terminal, column, row, &cells[column], false);
@@ -227,7 +227,7 @@ static void render(tab_terminal_t *terminal)
     } else {
         for (size_t row = 0U; row < terminal->rows; ++row) {
             const uint64_t line = terminal->viewport_top + row;
-            const tab_terminal_cell_t *cells = line <= terminal->current_line
+            const terminal_cell_t *cells = line <= terminal->current_line
                 ? const_line_cells(terminal, line)
                 : NULL;
             for (size_t column = 0U; column < terminal->columns; ++column) {
@@ -235,7 +235,7 @@ static void render(tab_terminal_t *terminal)
                 if (!terminal->dirty_cells[dirty_index]) {
                     continue;
                 }
-                const tab_terminal_cell_t empty = {0};
+                const terminal_cell_t empty = {0};
                 draw_cell(terminal, column, row,
                           cells == NULL ? &empty : &cells[column], false);
                 terminal->dirty_cells[dirty_index] = false;
@@ -245,12 +245,12 @@ static void render(tab_terminal_t *terminal)
 
     if (cursor_should_draw(terminal)) {
         const size_t cursor_row = (size_t)(terminal->current_line - terminal->viewport_top);
-        const tab_terminal_cell_t *cells = const_line_cells(terminal, terminal->current_line);
+        const terminal_cell_t *cells = const_line_cells(terminal, terminal->current_line);
         draw_cell(terminal, terminal->column, cursor_row, &cells[terminal->column], true);
     }
 }
 
-bool tab_terminal_init(tab_terminal_t *terminal, tab_framebuffer_t *framebuffer, unsigned int scale)
+bool terminal_init(terminal_t *terminal, platform_framebuffer_t *framebuffer, unsigned int scale)
 {
     if (terminal == NULL || framebuffer == NULL || framebuffer->pixels == NULL || scale == 0U) {
         return false;
@@ -264,11 +264,11 @@ bool tab_terminal_init(tab_terminal_t *terminal, tab_framebuffer_t *framebuffer,
     }
     const size_t line_capacity = rows + TABOS_TERMINAL_SCROLLBACK_LINES;
     if (columns > SIZE_MAX / line_capacity ||
-        columns * line_capacity > SIZE_MAX / sizeof(tab_terminal_cell_t)) {
+        columns * line_capacity > SIZE_MAX / sizeof(terminal_cell_t)) {
         return false;
     }
 
-    tab_terminal_cell_t *cells = calloc(columns * line_capacity, sizeof(*cells));
+    terminal_cell_t *cells = calloc(columns * line_capacity, sizeof(*cells));
     size_t *line_lengths = calloc(line_capacity, sizeof(*line_lengths));
     bool *hard_breaks = calloc(line_capacity, sizeof(*hard_breaks));
     bool *dirty_cells = calloc(rows * columns, sizeof(*dirty_cells));
@@ -280,7 +280,7 @@ bool tab_terminal_init(tab_terminal_t *terminal, tab_framebuffer_t *framebuffer,
         return false;
     }
 
-    *terminal = (tab_terminal_t){
+    *terminal = (terminal_t){
         .framebuffer = framebuffer,
         .columns = columns,
         .rows = rows,
@@ -299,7 +299,7 @@ bool tab_terminal_init(tab_terminal_t *terminal, tab_framebuffer_t *framebuffer,
     return true;
 }
 
-void tab_terminal_shutdown(tab_terminal_t *terminal)
+void terminal_shutdown(terminal_t *terminal)
 {
     if (terminal == NULL) {
         return;
@@ -308,18 +308,18 @@ void tab_terminal_shutdown(tab_terminal_t *terminal)
     free(terminal->line_lengths);
     free(terminal->hard_breaks);
     free(terminal->dirty_cells);
-    *terminal = (tab_terminal_t){0};
+    *terminal = (terminal_t){0};
 }
 
-bool tab_terminal_resize(tab_terminal_t *terminal, tab_framebuffer_t *framebuffer,
+bool terminal_resize(terminal_t *terminal, platform_framebuffer_t *framebuffer,
                          unsigned int scale)
 {
     if (terminal == NULL || terminal->cells == NULL) {
         return false;
     }
 
-    tab_terminal_t resized;
-    if (!tab_terminal_init(&resized, framebuffer, scale)) {
+    terminal_t resized;
+    if (!terminal_init(&resized, framebuffer, scale)) {
         return false;
     }
     resized.foreground = terminal->foreground;
@@ -334,9 +334,9 @@ bool tab_terminal_resize(tab_terminal_t *terminal, tab_framebuffer_t *framebuffe
 
     for (uint64_t line = terminal->first_line; line <= terminal->current_line; ++line) {
         const size_t slot = line_slot(terminal, line);
-        const tab_terminal_cell_t *cells = const_line_cells(terminal, line);
+        const terminal_cell_t *cells = const_line_cells(terminal, line);
         for (size_t column = 0U; column < terminal->line_lengths[slot]; ++column) {
-            const tab_terminal_cell_t *cell = &cells[column];
+            const terminal_cell_t *cell = &cells[column];
             resized.foreground = cell->foreground;
             resized.background = cell->background;
             put_character(&resized, cell->character == '\0' ? ' ' : cell->character);
@@ -356,12 +356,12 @@ bool tab_terminal_resize(tab_terminal_t *terminal, tab_framebuffer_t *framebuffe
     resized.full_redraw = true;
     render(&resized);
 
-    tab_terminal_shutdown(terminal);
+    terminal_shutdown(terminal);
     *terminal = resized;
     return true;
 }
 
-void tab_terminal_clear(tab_terminal_t *terminal)
+void terminal_clear(terminal_t *terminal)
 {
     if (terminal == NULL || terminal->cells == NULL) {
         return;
@@ -382,8 +382,8 @@ void tab_terminal_clear(tab_terminal_t *terminal)
     render(terminal);
 }
 
-void tab_terminal_set_colors(tab_terminal_t *terminal, tab_pixel_t foreground,
-                             tab_pixel_t background)
+void terminal_set_colors(terminal_t *terminal, platform_pixel_t foreground,
+                             platform_pixel_t background)
 {
     if (terminal != NULL) {
         terminal->foreground = foreground;
@@ -391,7 +391,7 @@ void tab_terminal_set_colors(tab_terminal_t *terminal, tab_pixel_t foreground,
     }
 }
 
-void tab_terminal_write(tab_terminal_t *terminal, const char *text)
+void terminal_write(terminal_t *terminal, const char *text)
 {
     if (terminal == NULL || terminal->cells == NULL || text == NULL) {
         return;
@@ -417,13 +417,13 @@ void tab_terminal_write(tab_terminal_t *terminal, const char *text)
     render(terminal);
 }
 
-void tab_terminal_write_line(tab_terminal_t *terminal, const char *text)
+void terminal_write_line(terminal_t *terminal, const char *text)
 {
-    tab_terminal_write(terminal, text);
-    tab_terminal_write(terminal, "\n");
+    terminal_write(terminal, text);
+    terminal_write(terminal, "\n");
 }
 
-void tab_terminal_set_cursor_visible(tab_terminal_t *terminal, bool visible)
+void terminal_set_cursor_visible(terminal_t *terminal, bool visible)
 {
     if (terminal != NULL && terminal->cursor_visible != visible) {
         mark_cursor(terminal);
@@ -436,7 +436,7 @@ void tab_terminal_set_cursor_visible(tab_terminal_t *terminal, bool visible)
     }
 }
 
-void tab_terminal_set_cursor_phase(tab_terminal_t *terminal, bool visible)
+void terminal_set_cursor_phase(terminal_t *terminal, bool visible)
 {
     if (terminal != NULL && terminal->cursor_phase_visible != visible) {
         mark_cursor(terminal);
@@ -446,7 +446,7 @@ void tab_terminal_set_cursor_phase(tab_terminal_t *terminal, bool visible)
     }
 }
 
-bool tab_terminal_scroll_lines(tab_terminal_t *terminal, int lines)
+bool terminal_scroll_lines(terminal_t *terminal, int lines)
 {
     if (terminal == NULL || terminal->cells == NULL) {
         return false;
@@ -467,27 +467,27 @@ bool tab_terminal_scroll_lines(tab_terminal_t *terminal, int lines)
     return true;
 }
 
-bool tab_terminal_page_up(tab_terminal_t *terminal)
+bool terminal_page_up(terminal_t *terminal)
 {
     if (terminal == NULL || terminal->rows == 0U) {
         return false;
     }
     const size_t amount = terminal->rows > 1U ? terminal->rows - 1U : 1U;
     const int lines = amount > (size_t)INT32_MAX ? INT32_MIN + 1 : -(int)amount;
-    return tab_terminal_scroll_lines(terminal, lines);
+    return terminal_scroll_lines(terminal, lines);
 }
 
-bool tab_terminal_page_down(tab_terminal_t *terminal)
+bool terminal_page_down(terminal_t *terminal)
 {
     if (terminal == NULL || terminal->rows == 0U) {
         return false;
     }
     const size_t amount = terminal->rows > 1U ? terminal->rows - 1U : 1U;
     const int lines = amount > (size_t)INT32_MAX ? INT32_MAX : (int)amount;
-    return tab_terminal_scroll_lines(terminal, lines);
+    return terminal_scroll_lines(terminal, lines);
 }
 
-bool tab_terminal_scroll_to_start(tab_terminal_t *terminal)
+bool terminal_scroll_to_start(terminal_t *terminal)
 {
     if (terminal == NULL || terminal->cells == NULL) {
         return false;
@@ -500,7 +500,7 @@ bool tab_terminal_scroll_to_start(tab_terminal_t *terminal)
     return true;
 }
 
-bool tab_terminal_scroll_to_end(tab_terminal_t *terminal)
+bool terminal_scroll_to_end(terminal_t *terminal)
 {
     if (terminal == NULL || terminal->cells == NULL) {
         return false;
@@ -510,13 +510,13 @@ bool tab_terminal_scroll_to_end(tab_terminal_t *terminal)
     return true;
 }
 
-bool tab_terminal_is_at_end(const tab_terminal_t *terminal)
+bool terminal_is_at_end(const terminal_t *terminal)
 {
     return terminal != NULL && terminal->cells != NULL &&
         terminal->viewport_top == live_viewport_top(terminal);
 }
 
-size_t tab_terminal_history_line_count(const tab_terminal_t *terminal)
+size_t terminal_history_line_count(const terminal_t *terminal)
 {
     return terminal == NULL || terminal->cells == NULL
         ? 0U

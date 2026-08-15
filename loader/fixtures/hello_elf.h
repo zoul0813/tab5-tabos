@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-extern const uint8_t tab_hello_elf[];
-extern const size_t tab_hello_elf_size;
+extern const uint8_t loader_hello_elf[];
+extern const size_t loader_hello_elf_size;
 
 #endif

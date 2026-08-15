@@ -14,12 +14,12 @@ struct tabos_app_context {
     int exit_status;
 };
 
-void tab_app_system_init(void);
-void tab_app_system_update(void);
-void tab_app_system_shutdown(void);
+void kernel_application_system_init(void);
+void kernel_application_system_update(void);
+void kernel_application_system_shutdown(void);
 
-bool tab_app_registry_register(const tabos_app_descriptor_t *descriptor);
-void tab_app_registry_reset(void);
-void tab_app_report_diagnostic_result(tabos_app_context_t *context, int status);
+bool application_registry_register(const tabos_app_descriptor_t *descriptor);
+void application_registry_reset(void);
+void application_report_diagnostic_result(tabos_app_context_t *context, int status);
 
 #endif

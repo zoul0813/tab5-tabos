@@ -25,8 +25,8 @@
 static const char *const TAG = TABOS_PLATFORM_LOG_TAG;
 static bsp_lcd_handles_t display_handles;
 static esp_ldo_channel_handle_t display_phy_power;
-static tab_pixel_t *logical_pixels;
-static tab_pixel_t *native_pixels;
+static platform_pixel_t *logical_pixels;
+static platform_pixel_t *native_pixels;
 static bool display_created;
 static bool display_uses_bsp;
 static bool backlight_enabled;
@@ -148,22 +148,22 @@ static esp_err_t create_st7121(void)
     return result;
 }
 
-const char *tab_platform_display_name(void)
+const char *platform_display_name(void)
 {
     return detected_display_name;
 }
 
-bool tab_platform_display_init(tab_framebuffer_t *framebuffer)
+bool platform_display_init(platform_framebuffer_t *framebuffer)
 {
     if (framebuffer == NULL) return false;
     const tab5_panel_type_t panel_type = detect_panel();
     if (panel_type == TAB5_PANEL_UNKNOWN) return false;
-    ESP_LOGI(TAG, "Detected display: %s", tab_platform_display_name());
+    ESP_LOGI(TAG, "Detected display: %s", platform_display_name());
     const size_t pixel_count = (size_t)TABOS_DISPLAY_WIDTH * TABOS_DISPLAY_HEIGHT;
     logical_pixels = heap_caps_calloc(pixel_count, sizeof(*logical_pixels), MALLOC_CAP_SPIRAM);
     if (logical_pixels == NULL) {
         ESP_LOGE(TAG, "Could not allocate logical display buffer in PSRAM");
-        tab_platform_display_shutdown();
+        platform_display_shutdown();
         return false;
     }
     esp_err_t create_result;
@@ -185,24 +185,24 @@ bool tab_platform_display_init(tab_framebuffer_t *framebuffer)
     }
     if (create_result != ESP_OK) {
         ESP_LOGE(TAG, "Could not initialize Tab5 display: %s", esp_err_to_name(create_result));
-        tab_platform_display_shutdown();
+        platform_display_shutdown();
         return false;
     }
     const esp_err_t framebuffer_result = esp_lcd_dpi_panel_get_frame_buffer(
         display_handles.panel, 1, (void **)&native_pixels);
     if (framebuffer_result != ESP_OK || native_pixels == NULL) {
         ESP_LOGE(TAG, "Could not access Tab5 scanout framebuffer: %s", esp_err_to_name(framebuffer_result));
-        tab_platform_display_shutdown();
+        platform_display_shutdown();
         return false;
     }
     const esp_err_t panel_result = esp_lcd_panel_disp_on_off(display_handles.panel, true);
     if (panel_result != ESP_OK) {
         ESP_LOGE(TAG, "Could not enable Tab5 display panel: %s", esp_err_to_name(panel_result));
-        tab_platform_display_shutdown();
+        platform_display_shutdown();
         return false;
     }
     vTaskDelay(pdMS_TO_TICKS(100));
-    *framebuffer = (tab_framebuffer_t){
+    *framebuffer = (platform_framebuffer_t){
         .pixels = logical_pixels,
         .width = TABOS_DISPLAY_WIDTH,
         .height = TABOS_DISPLAY_HEIGHT,
@@ -212,10 +212,10 @@ bool tab_platform_display_init(tab_framebuffer_t *framebuffer)
     return true;
 }
 
-bool tab_platform_display_present(const tab_framebuffer_t *framebuffer)
+bool platform_display_present(const platform_framebuffer_t *framebuffer)
 {
     if (!display_created || framebuffer == NULL || framebuffer->pixels != logical_pixels) return false;
-    if (!tab_framebuffer_rotate_counter_clockwise(
+    if (!platform_framebuffer_rotate_counter_clockwise(
             framebuffer, native_pixels, TABOS_DISPLAY_HEIGHT, TABOS_DISPLAY_WIDTH)) {
         ESP_LOGE(TAG, "Could not rotate Tab5 framebuffer");
         return false;
@@ -245,7 +245,7 @@ bool tab_platform_display_present(const tab_framebuffer_t *framebuffer)
     return true;
 }
 
-void tab_platform_display_shutdown(void)
+void platform_display_shutdown(void)
 {
     if (backlight_enabled) {
         (void)bsp_display_backlight_off();

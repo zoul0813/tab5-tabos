@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 
-bool tab_diagnostic_apps_register(void);
-const char *tab_diagnostic_startup_app(void);
+bool diagnostic_apps_register(void);
+const char *diagnostic_startup_app(void);
 
 #endif

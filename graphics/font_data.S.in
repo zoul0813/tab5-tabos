@@ -1,20 +1,20 @@
 #if defined(__APPLE__)
     .section __TEXT,__const
-    .globl _tab_font_data
-_tab_font_data:
+    .globl _font_data
+_font_data:
     .incbin "@TABOS_FONT_EMBED_FILE@"
-    .globl _tab_font_data_end
-_tab_font_data_end:
+    .globl _font_data_end
+_font_data_end:
 #else
     .section .rodata
-    .global tab_font_data
-    .type tab_font_data, @object
-tab_font_data:
+    .global font_data
+    .type font_data, @object
+font_data:
     .incbin "@TABOS_FONT_EMBED_FILE@"
-    .global tab_font_data_end
-    .type tab_font_data_end, @object
-tab_font_data_end:
-    .size tab_font_data, tab_font_data_end - tab_font_data
+    .global font_data_end
+    .type font_data_end, @object
+font_data_end:
+    .size font_data, font_data_end - font_data
 
     .section .note.GNU-stack,"",@progbits
 #endif

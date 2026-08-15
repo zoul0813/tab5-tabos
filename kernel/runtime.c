@@ -23,8 +23,8 @@
 static bool runtime_initialized;
 static bool runtime_started;
 static unsigned int terminal_scale = TABOS_TERMINAL_SCALE;
-static tab_terminal_t terminal;
-static tab_boot_report_t boot_report;
+static terminal_t terminal;
+static kernel_boot_report_t boot_report;
 static char processor_detail[80];
 static char memory_detail[80];
 static char external_memory_detail[80];
@@ -62,32 +62,32 @@ static void format_capacity(char *buffer, size_t buffer_size, uint64_t free_byte
 
 static bool render_boot_report(void)
 {
-    tab_framebuffer_t *framebuffer = tab_display_framebuffer();
-    if (framebuffer == NULL || !tab_terminal_init(&terminal, framebuffer, terminal_scale)) {
+    platform_framebuffer_t *framebuffer = display_framebuffer();
+    if (framebuffer == NULL || !terminal_init(&terminal, framebuffer, terminal_scale)) {
         return false;
     }
 
-    tab_terminal_clear(&terminal);
-    tab_boot_report_write_terminal(&boot_report, &terminal);
-    if (!tab_display_present()) {
-        tab_terminal_shutdown(&terminal);
+    terminal_clear(&terminal);
+    kernel_boot_report_write_terminal(&boot_report, &terminal);
+    if (!display_present()) {
+        terminal_shutdown(&terminal);
         return false;
     }
     return true;
 }
 
-bool tabos_runtime_init(void)
+bool kernel_runtime_init(void)
 {
     if (runtime_initialized) {
         return true;
     }
 
     runtime_initialized = true;
-    tab_input_init();
+    input_init();
     return true;
 }
 
-bool tabos_runtime_start(void)
+bool kernel_runtime_start(void)
 {
     if (!runtime_initialized) {
         return false;
@@ -97,24 +97,24 @@ bool tabos_runtime_start(void)
         return true;
     }
 
-    if (!tab_fs_init()) {
+    if (!filesystem_init()) {
         return false;
     }
 
-    if (!tab_display_init()) {
+    if (!display_init()) {
         return false;
     }
 
-    tab_platform_diagnostics_t diagnostics;
+    platform_diagnostics_t diagnostics;
 
-    tab_boot_report_init(&boot_report, TABOS_SYSTEM_NAME, TABOS_RUNTIME_VERSION);
-    (void)tab_boot_report_add(&boot_report, "Target", tab_platform_name(), TAB_BOOT_STATUS_OK);
-    (void)tab_boot_report_add(&boot_report, "Display", tab_platform_display_name(),
-                              TAB_BOOT_STATUS_OK);
-    (void)tab_boot_report_add(&boot_report, "Framebuffer", "1280x720 RGB565",
-                              TAB_BOOT_STATUS_OK);
+    kernel_boot_report_init(&boot_report, TABOS_SYSTEM_NAME, TABOS_RUNTIME_VERSION);
+    (void)kernel_boot_report_add(&boot_report, "Target", platform_name(), KERNEL_BOOT_STATUS_OK);
+    (void)kernel_boot_report_add(&boot_report, "Display", platform_display_name(),
+                              KERNEL_BOOT_STATUS_OK);
+    (void)kernel_boot_report_add(&boot_report, "Framebuffer", "1280x720 RGB565",
+                              KERNEL_BOOT_STATUS_OK);
 
-    if (tab_platform_get_diagnostics(&diagnostics)) {
+    if (platform_get_diagnostics(&diagnostics)) {
         if (diagnostics.cpu_frequency_mhz > 0U) {
             (void)snprintf(processor_detail, sizeof(processor_detail), "%s; %u cores @ %u MHz",
                            diagnostics.device_name, diagnostics.cpu_cores,
@@ -123,101 +123,101 @@ bool tabos_runtime_start(void)
             (void)snprintf(processor_detail, sizeof(processor_detail), "%s; %u cores",
                            diagnostics.device_name, diagnostics.cpu_cores);
         }
-        (void)tab_boot_report_add(&boot_report, "Processor", processor_detail,
-                                  TAB_BOOT_STATUS_OK);
+        (void)kernel_boot_report_add(&boot_report, "Processor", processor_detail,
+                                  KERNEL_BOOT_STATUS_OK);
 
         if (diagnostics.memory_total_bytes > 0U) {
             format_capacity(memory_detail, sizeof(memory_detail), diagnostics.memory_free_bytes,
                             diagnostics.memory_total_bytes, diagnostics.memory_free_known);
-            (void)tab_boot_report_add(&boot_report, "Memory", memory_detail, TAB_BOOT_STATUS_OK);
+            (void)kernel_boot_report_add(&boot_report, "Memory", memory_detail, KERNEL_BOOT_STATUS_OK);
         }
         if (diagnostics.external_memory_present) {
             format_capacity(external_memory_detail, sizeof(external_memory_detail),
                             diagnostics.external_memory_free_bytes,
                             diagnostics.external_memory_total_bytes, true);
-            (void)tab_boot_report_add(&boot_report, "PSRAM", external_memory_detail,
-                                      TAB_BOOT_STATUS_OK);
+            (void)kernel_boot_report_add(&boot_report, "PSRAM", external_memory_detail,
+                                      KERNEL_BOOT_STATUS_OK);
         }
         if (diagnostics.flash_capacity_bytes > 0U) {
             format_size(flash_detail, sizeof(flash_detail), diagnostics.flash_capacity_bytes);
-            (void)tab_boot_report_add(&boot_report, "Flash", flash_detail,
-                                      TAB_BOOT_STATUS_INFO);
+            (void)kernel_boot_report_add(&boot_report, "Flash", flash_detail,
+                                      KERNEL_BOOT_STATUS_INFO);
         }
         if (diagnostics.storage_mounted) {
             format_capacity(storage_detail, sizeof(storage_detail), diagnostics.storage_free_bytes,
                             diagnostics.storage_total_bytes, true);
-            (void)tab_boot_report_add(&boot_report, "Storage", storage_detail,
-                                      TAB_BOOT_STATUS_OK);
+            (void)kernel_boot_report_add(&boot_report, "Storage", storage_detail,
+                                      KERNEL_BOOT_STATUS_OK);
         } else {
-            (void)tab_boot_report_add(&boot_report, "Storage", "Filesystem not mounted",
-                                      TAB_BOOT_STATUS_WARNING);
+            (void)kernel_boot_report_add(&boot_report, "Storage", "Filesystem not mounted",
+                                      KERNEL_BOOT_STATUS_WARNING);
         }
         if (diagnostics.keyboard_name != NULL) {
-            (void)tab_boot_report_add(
+            (void)kernel_boot_report_add(
                 &boot_report,
                 "Keyboard",
                 diagnostics.keyboard_name,
-                diagnostics.keyboard_present ? TAB_BOOT_STATUS_OK : TAB_BOOT_STATUS_WARNING
+                diagnostics.keyboard_present ? KERNEL_BOOT_STATUS_OK : KERNEL_BOOT_STATUS_WARNING
             );
         }
     }
-    (void)tab_boot_report_add(&boot_report, "Kernel", "Runtime initialized",
-                              TAB_BOOT_STATUS_OK);
+    (void)kernel_boot_report_add(&boot_report, "Kernel", "Runtime initialized",
+                              KERNEL_BOOT_STATUS_OK);
 
-    tab_boot_report_write_serial(&boot_report);
+    kernel_boot_report_write_serial(&boot_report);
     if (!render_boot_report()) {
-        tab_display_shutdown();
+        display_shutdown();
         return false;
     }
 
-    tab_console_init(&terminal);
-    tab_app_system_init();
-    if (!tab_diagnostic_apps_register()) {
-        tab_app_system_shutdown();
-        tab_console_shutdown();
-        tab_terminal_shutdown(&terminal);
-        tab_display_shutdown();
+    console_init(&terminal);
+    kernel_application_system_init();
+    if (!diagnostic_apps_register()) {
+        kernel_application_system_shutdown();
+        console_shutdown();
+        terminal_shutdown(&terminal);
+        display_shutdown();
         return false;
     }
     runtime_started = true;
-    const char *startup_app = tab_diagnostic_startup_app();
+    const char *startup_app = diagnostic_startup_app();
     if (startup_app != NULL && tabos_app_launch(startup_app) != TABOS_APP_RESULT_OK) {
-        tab_app_system_shutdown();
-        tab_console_shutdown();
-        tab_terminal_shutdown(&terminal);
+        kernel_application_system_shutdown();
+        console_shutdown();
+        terminal_shutdown(&terminal);
         runtime_started = false;
-        tab_display_shutdown();
+        display_shutdown();
         return false;
     }
     return true;
 }
 
-void tabos_runtime_update(void)
+void kernel_runtime_update(void)
 {
     if (!runtime_started) {
         return;
     }
-    tab_console_update();
-    tab_app_system_update();
+    console_update();
+    kernel_application_system_update();
 }
 
-void tabos_runtime_shutdown(void)
+void kernel_runtime_shutdown(void)
 {
     if (runtime_started) {
-        tab_app_system_shutdown();
-        tab_console_shutdown();
-        tab_terminal_shutdown(&terminal);
-        tab_display_shutdown();
+        kernel_application_system_shutdown();
+        console_shutdown();
+        terminal_shutdown(&terminal);
+        display_shutdown();
         runtime_started = false;
-        boot_report = (tab_boot_report_t){0};
+        boot_report = (kernel_boot_report_t){0};
     }
 
-    tab_fs_shutdown();
+    filesystem_shutdown();
     runtime_initialized = false;
-    tab_input_shutdown();
+    input_shutdown();
 }
 
-const char *tabos_runtime_version(void)
+const char *kernel_runtime_version(void)
 {
     return TABOS_RUNTIME_VERSION;
 }
@@ -236,12 +236,12 @@ bool tabos_terminal_set_scale(unsigned int scale)
         return true;
     }
 
-    if (!tab_terminal_resize(&terminal, tab_display_framebuffer(), scale)) {
+    if (!terminal_resize(&terminal, display_framebuffer(), scale)) {
         return false;
     }
     terminal_scale = scale;
-    tab_console_rebind(&terminal);
-    return tab_display_present();
+    console_rebind(&terminal);
+    return display_present();
 }
 
 unsigned int tabos_terminal_get_scale(void)

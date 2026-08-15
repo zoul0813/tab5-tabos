@@ -653,11 +653,11 @@ For example, applications should not receive a FreeRTOS queue handle.
 Prefer TabOS-owned abstractions:
 
 ```c
-tab_handle_t
-tab_file_t
-tab_process_t
-tab_surface_t
-tab_timer_t
+tabos_handle_t
+tabos_file_t
+tabos_process_t
+tabos_surface_t
+tabos_timer_t
 ```
 
 or similar.
@@ -685,7 +685,7 @@ Do not expose ESP-IDF `esp_err_t` directly through public application APIs.
 For example:
 
 ```c
-tab_result_t result;
+tabos_result_t result;
 ```
 
 or a small errno-like model.
@@ -1063,7 +1063,7 @@ Build a tiny external program such as:
 
 ```c
 int main(void) {
-    tab_printf("Hello from TabOS\n");
+    tabos_printf("Hello from TabOS\n");
     return 0;
 }
 ```
@@ -1094,6 +1094,49 @@ That is the first major milestone proving the intended architecture.
 
 ## 27. Rules for Codex
 
+### 27.1 Symbol naming
+
+[DECIDED] Public application API and ABI symbols use `tabos_`. Internal symbols do
+not use a single abbreviated project prefix. Cross-file internal names identify owning
+architectural layer or subsystem directly:
+
+```text
+tabos_*       public application API and ABI
+kernel_*      kernel, process, scheduling, and lifecycle internals
+application_* built-in application registry/adapter internals
+console_*     console service internals
+terminal_*    terminal model and renderer internals
+display_*     portable display/graphics internals
+input_*       portable input internals
+filesystem_*  portable filesystem internals
+loader_*      executable loader internals
+platform_*    portable platform contract implemented by selected backend
+host_*        host-only backend helpers
+espidf_*      ESP-IDF framework glue independent of specific chip behavior
+esp32_*       helpers shared across supported ESP32-family chips
+esp32p4_*     ESP32-P4-specific helpers
+esp32c6_*     ESP32-C6-specific helpers
+esp32s3_*     ESP32-S3-specific helpers
+tab5_*        M5Stack Tab5 board-specific helpers
+test_*        shared test helpers
+```
+
+Use `esp32_*` only when implementation genuinely applies across relevant ESP32 chips.
+Use `espidf_*` for ESP-IDF framework adaptation that does not encode chip behavior.
+Use exact model prefix when code depends on that model's CPU, memory map, peripheral,
+cache/MMU, ROM, or errata. Use board prefix such as `tab5_*` for wiring, controller,
+display-revision, keyboard, or other board integration even when underlying chip is P4.
+Do not label board-specific code merely `esp32_*` or `esp32p4_*`.
+
+Public and internal types follow same ownership rule: `tabos_process_id_t` is public,
+while `kernel_process_t`, `platform_riscv32_context_t`, and `tab5_display_revision_t`
+are internal. File-local `static` helpers need no project/layer prefix when name is clear
+within file. Avoid leading-underscore and double-underscore project identifiers.
+
+Existing generic `tab_*` and internal-only `tabos_*` names were migrated to this
+convention. Preserve public `tabos_*` ABI names and keep future internal symbols in
+owning layer/subsystem namespace.
+
 When implementing or modifying TabOS, Codex should follow these rules:
 
 - Preserve subsystem boundaries.
@@ -1110,6 +1153,7 @@ When implementing or modifying TabOS, Codex should follow these rules:
 - Keep board-specific behavior out of generic subsystems.
 - Prefer experiments over speculative abstractions where hardware behavior is unknown.
 - Update this document when an unresolved architecture item becomes an agreed decision.
+- Follow symbol ownership prefixes above; do not introduce new generic `tab_*` symbols.
 
 ---
 

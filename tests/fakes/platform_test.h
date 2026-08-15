@@ -3,8 +3,8 @@
 
 #include <stdint.h>
 
-void tab_test_platform_set_time_ms(uint64_t time_ms);
-void tab_test_platform_advance_time_ms(uint64_t elapsed_ms);
-const char *tab_test_storage_root(void);
+void test_platform_set_time_ms(uint64_t time_ms);
+void test_platform_advance_time_ms(uint64_t elapsed_ms);
+const char *test_storage_root(void);
 
 #endif

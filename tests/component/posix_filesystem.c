@@ -10,7 +10,7 @@
 
 int main(void)
 {
-    if (!tab_fs_init() || mkdir("/portable", 0755U) != 0) return 1;
+    if (!filesystem_init() || mkdir("/portable", 0755U) != 0) return 1;
     const int descriptor = open("/portable/example.txt", O_CREAT | O_RDWR | O_TRUNC, 0644U);
     static const char message[] = "POSIX-compatible TabOS source";
     char buffer[sizeof(message)] = {0};
@@ -33,7 +33,7 @@ int main(void)
         return 1;
     }
     if (open("/missing", O_RDONLY) >= 0 || errno != ENOENT) return 1;
-    tab_fs_shutdown();
+    filesystem_shutdown();
     if (open("/portable/example.txt", O_RDONLY) >= 0 || errno != ENODEV) return 1;
     return 0;
 }

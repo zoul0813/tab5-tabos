@@ -42,41 +42,41 @@ static bool table_valid(uint32_t offset, uint16_t count, uint16_t entry_size, si
          range_valid(offset, (size_t)count * entry_size, total));
 }
 
-static tab_elf_result_t inspect_sections(const uint8_t *data, size_t size)
+static loader_elf_result_t inspect_sections(const uint8_t *data, size_t size)
 {
     const uint32_t section_offset = read_u32(data + 32U);
     const uint16_t section_entry_size = read_u16(data + 46U);
     const uint16_t section_count = read_u16(data + 48U);
     if (!table_valid(section_offset, section_count, section_entry_size, size) ||
         (section_count > 0U && section_entry_size != ELF_SECTION_HEADER_SIZE)) {
-        return TAB_ELF_TRUNCATED;
+        return LOADER_ELF_TRUNCATED;
     }
     for (uint16_t index = 0U; index < section_count; ++index) {
         const uint8_t *section = data + section_offset + ((size_t)index * section_entry_size);
         const uint32_t type = read_u32(section + 4U);
         const uint32_t section_size = read_u32(section + 20U);
         if ((type == ELF_SECTION_REL || type == ELF_SECTION_RELA) && section_size > 0U) {
-            return TAB_ELF_UNSUPPORTED_RELOCATION;
+            return LOADER_ELF_UNSUPPORTED_RELOCATION;
         }
     }
-    return TAB_ELF_OK;
+    return LOADER_ELF_OK;
 }
 
-tab_elf_result_t tab_elf_inspect(const uint8_t *data, size_t size, tab_elf_info_t *info)
+loader_elf_result_t loader_elf_inspect(const uint8_t *data, size_t size, loader_elf_info_t *info)
 {
     if (data == NULL || info == NULL) {
-        return TAB_ELF_INVALID_ARGUMENT;
+        return LOADER_ELF_INVALID_ARGUMENT;
     }
-    *info = (tab_elf_info_t){0};
+    *info = (loader_elf_info_t){0};
     if (size < ELF_HEADER_SIZE) {
-        return TAB_ELF_TRUNCATED;
+        return LOADER_ELF_TRUNCATED;
     }
     if (data[0] != 0x7fU || data[1] != 'E' || data[2] != 'L' || data[3] != 'F' ||
         data[4] != 1U || data[5] != 1U || data[6] != 1U ||
         read_u16(data + 16U) != ELF_TYPE_EXECUTABLE ||
         read_u16(data + 18U) != ELF_MACHINE_RISCV || read_u32(data + 20U) != 1U ||
         read_u16(data + 40U) != ELF_HEADER_SIZE) {
-        return TAB_ELF_UNSUPPORTED_FORMAT;
+        return LOADER_ELF_UNSUPPORTED_FORMAT;
     }
 
     const uint32_t program_offset = read_u32(data + 28U);
@@ -84,10 +84,10 @@ tab_elf_result_t tab_elf_inspect(const uint8_t *data, size_t size, tab_elf_info_
     const uint16_t program_count = read_u16(data + 44U);
     if (program_count == 0U || program_entry_size != ELF_PROGRAM_HEADER_SIZE ||
         !table_valid(program_offset, program_count, program_entry_size, size)) {
-        return TAB_ELF_TRUNCATED;
+        return LOADER_ELF_TRUNCATED;
     }
-    const tab_elf_result_t section_result = inspect_sections(data, size);
-    if (section_result != TAB_ELF_OK) {
+    const loader_elf_result_t section_result = inspect_sections(data, size);
+    if (section_result != LOADER_ELF_OK) {
         return section_result;
     }
 
@@ -99,7 +99,7 @@ tab_elf_result_t tab_elf_inspect(const uint8_t *data, size_t size, tab_elf_info_
         const uint8_t *program = data + program_offset + ((size_t)index * program_entry_size);
         const uint32_t type = read_u32(program);
         if (type == ELF_PROGRAM_DYNAMIC) {
-            return TAB_ELF_UNSUPPORTED_RELOCATION;
+            return LOADER_ELF_UNSUPPORTED_RELOCATION;
         }
         if (type != ELF_PROGRAM_LOAD) {
             continue;
@@ -114,7 +114,7 @@ tab_elf_result_t tab_elf_inspect(const uint8_t *data, size_t size, tab_elf_info_
             memory_size == 0U || virtual_address > UINT32_MAX - memory_size ||
             (alignment > 1U && ((alignment & (alignment - 1U)) != 0U ||
                                (file_offset % alignment) != (virtual_address % alignment)))) {
-            return TAB_ELF_INVALID_SEGMENT;
+            return LOADER_ELF_INVALID_SEGMENT;
         }
         const uint32_t end = virtual_address + memory_size;
         if (virtual_address < minimum) {
@@ -129,40 +129,40 @@ tab_elf_result_t tab_elf_inspect(const uint8_t *data, size_t size, tab_elf_info_
         ++info->load_segment_count;
     }
     if (info->load_segment_count == 0U || minimum == UINT32_MAX || maximum <= minimum) {
-        return TAB_ELF_INVALID_SEGMENT;
+        return LOADER_ELF_INVALID_SEGMENT;
     }
     if (!executable_entry) {
-        return TAB_ELF_INVALID_ENTRY;
+        return LOADER_ELF_INVALID_ENTRY;
     }
     const uint32_t image_size = maximum - minimum;
     if (image_size > ELF_MAX_IMAGE_SIZE) {
-        return TAB_ELF_IMAGE_TOO_LARGE;
+        return LOADER_ELF_IMAGE_TOO_LARGE;
     }
-    *info = (tab_elf_info_t){
+    *info = (loader_elf_info_t){
         .entry_address = entry,
         .minimum_address = minimum,
         .maximum_address = maximum,
         .image_size = image_size,
         .load_segment_count = info->load_segment_count,
     };
-    return TAB_ELF_OK;
+    return LOADER_ELF_OK;
 }
 
-tab_elf_result_t tab_elf_load(const uint8_t *data, size_t size, tab_elf_image_t *image)
+loader_elf_result_t loader_elf_load(const uint8_t *data, size_t size, loader_elf_image_t *image)
 {
     if (image == NULL) {
-        return TAB_ELF_INVALID_ARGUMENT;
+        return LOADER_ELF_INVALID_ARGUMENT;
     }
-    *image = (tab_elf_image_t){0};
-    tab_elf_info_t info;
-    const tab_elf_result_t result = tab_elf_inspect(data, size, &info);
-    if (result != TAB_ELF_OK) {
+    *image = (loader_elf_image_t){0};
+    loader_elf_info_t info;
+    const loader_elf_result_t result = loader_elf_inspect(data, size, &info);
+    if (result != LOADER_ELF_OK) {
         return result;
     }
 
-    void *memory = tab_platform_executable_alloc(info.image_size);
+    void *memory = platform_executable_alloc(info.image_size);
     if (memory == NULL) {
-        return TAB_ELF_NO_EXECUTABLE_MEMORY;
+        return LOADER_ELF_NO_EXECUTABLE_MEMORY;
     }
     memset(memory, 0, info.image_size);
 
@@ -180,31 +180,31 @@ tab_elf_result_t tab_elf_load(const uint8_t *data, size_t size, tab_elf_image_t 
         memcpy((uint8_t *)memory + (virtual_address - info.minimum_address),
                data + file_offset, file_size);
     }
-    void *executable_memory = tab_platform_executable_prepare(memory, info.image_size);
+    void *executable_memory = platform_executable_prepare(memory, info.image_size);
     if (executable_memory == NULL) {
-        tab_platform_executable_free(memory);
-        return TAB_ELF_PREPARE_FAILED;
+        platform_executable_free(memory);
+        return LOADER_ELF_PREPARE_FAILED;
     }
 
-    *image = (tab_elf_image_t){
+    *image = (loader_elf_image_t){
         .memory = executable_memory,
         .memory_size = info.image_size,
         .entry = (uint8_t *)executable_memory +
             (info.entry_address - info.minimum_address),
         .info = info,
     };
-    return TAB_ELF_OK;
+    return LOADER_ELF_OK;
 }
 
-void tab_elf_unload(tab_elf_image_t *image)
+void loader_elf_unload(loader_elf_image_t *image)
 {
     if (image != NULL) {
-        tab_platform_executable_free(image->memory);
-        *image = (tab_elf_image_t){0};
+        platform_executable_free(image->memory);
+        *image = (loader_elf_image_t){0};
     }
 }
 
-const char *tab_elf_result_name(tab_elf_result_t result)
+const char *loader_elf_result_name(loader_elf_result_t result)
 {
     static const char *const names[] = {
         "OK", "INVALID ARGUMENT", "TRUNCATED", "UNSUPPORTED FORMAT",

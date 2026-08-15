@@ -402,6 +402,14 @@ but is not a substitute for this execution path.
 
 ## Maintenance and Technical Debt
 
+- [x] Migrate existing generic `tab_*` and internal-only `tabos_*` symbols to decided
+  layer/subsystem prefixes without changing public `tabos_*` ABI.
+- [x] Rename portable platform contract from `tab_platform_*` to `platform_*`.
+- [x] Distinguish generic `espidf_*`, shared `esp32_*`, chip-specific `esp32p4_*`, and
+  board-specific `tab5_*` helpers during platform rename.
+- [x] Add architecture lint rejecting new generic `tab_*` declarations and internal-only
+  declarations using public `tabos_*` prefix.
+
 - [ ] Keep `agents/roadmap.md` synchronized after every milestone.
 - [ ] Keep `agents/TABOS_CONTEXT.md`, `agents/architecture.md`, and `agents/testing.md` synchronized when decisions change.
 - [ ] Keep user-facing `docs/` synchronized when commands, APIs, structure, or behavior change.

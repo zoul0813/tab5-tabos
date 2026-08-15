@@ -12,15 +12,15 @@
 
 int main(void)
 {
-    if (!tabos_runtime_init()) {
+    if (!kernel_runtime_init()) {
         return 1;
     }
 
-    if (!tabos_runtime_init()) {
+    if (!kernel_runtime_init()) {
         return 1;
     }
 
-    if (strlen(tabos_runtime_version()) == 0U) {
+    if (strlen(kernel_runtime_version()) == 0U) {
         return 1;
     }
 
@@ -29,7 +29,7 @@ int main(void)
         return 1;
     }
 
-    if (!tabos_runtime_start()) {
+    if (!kernel_runtime_start()) {
         return 1;
     }
 
@@ -43,10 +43,10 @@ int main(void)
         .key = TABOS_KEY_Q,
         .modifiers = TABOS_MODIFIER_CONTROL,
     };
-    if (!tab_input_submit(&exit_event)) {
+    if (!input_submit(&exit_event)) {
         return 1;
     }
-    tabos_runtime_update();
+    kernel_runtime_update();
     int exit_status = -1;
     if (!tabos_app_is_running() || tabos_process_count() != 1U ||
         tabos_process_system_panicked() ||
@@ -77,6 +77,6 @@ int main(void)
         return 1;
     }
 
-    tabos_runtime_shutdown();
+    kernel_runtime_shutdown();
     return 0;
 }

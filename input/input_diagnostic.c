@@ -68,7 +68,7 @@ static void append_modifier(char *line, size_t line_size, const char *name, bool
     *first = false;
 }
 
-void tab_input_diagnostic_log(const tabos_input_event_t *event)
+void input_diagnostic_log(const tabos_input_event_t *event)
 {
     char line[192];
     if (event->type == TABOS_INPUT_TEXT) {
@@ -103,10 +103,10 @@ void tab_input_diagnostic_log(const tabos_input_event_t *event)
         (void)snprintf(line + used, sizeof(line) - used, " repeat=%s",
             event->repeat ? "yes" : "no");
     }
-    tab_platform_log(line);
+    platform_log(line);
 }
 #else
-void tab_input_diagnostic_log(const tabos_input_event_t *event)
+void input_diagnostic_log(const tabos_input_event_t *event)
 {
     (void)event;
 }

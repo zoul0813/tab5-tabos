@@ -7,7 +7,7 @@
 
 uint64_t tabos_time_monotonic_ms(void)
 {
-    return tab_platform_time_ms();
+    return platform_time_ms();
 }
 
 void tabos_timer_start(tabos_timer_t *timer, uint64_t delay_ms, uint64_t interval_ms)

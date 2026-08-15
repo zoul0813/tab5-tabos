@@ -23,7 +23,7 @@ static void unlock_queue(void)
     atomic_flag_clear_explicit(&queue_lock, memory_order_release);
 }
 
-void tab_input_init(void)
+void input_init(void)
 {
     lock_queue();
     queue_head = 0U;
@@ -31,12 +31,12 @@ void tab_input_init(void)
     unlock_queue();
 }
 
-void tab_input_shutdown(void)
+void input_shutdown(void)
 {
-    tab_input_init();
+    input_init();
 }
 
-bool tab_input_submit(const tabos_input_event_t *event)
+bool input_submit(const tabos_input_event_t *event)
 {
     if (event == NULL) {
         return false;
@@ -50,7 +50,7 @@ bool tab_input_submit(const tabos_input_event_t *event)
     event_queue[tail] = *event;
     ++queue_count;
     unlock_queue();
-    tab_input_diagnostic_log(event);
+    input_diagnostic_log(event);
     return true;
 }
 
@@ -82,12 +82,12 @@ bool tabos_input_wait(tabos_input_event_t *event)
         return false;
     }
     while (!pop_event(event)) {
-        tab_platform_input_wait();
+        platform_input_wait();
     }
     return true;
 }
 
-size_t tab_input_text_from_hid(uint8_t usage, uint8_t modifiers, char *text, size_t text_size)
+size_t input_text_from_hid(uint8_t usage, uint8_t modifiers, char *text, size_t text_size)
 {
     if (text == NULL || text_size < 2U ||
         (modifiers & (TABOS_MODIFIER_CONTROL | TABOS_MODIFIER_ALT | TABOS_MODIFIER_GUI)) != 0U) {

@@ -66,7 +66,7 @@ static void submit_report(uint8_t hid_modifiers, uint8_t usage)
             .key = normalized_key(previous_usage),
             .modifiers = previous_modifiers,
         };
-        (void)tab_input_submit(&release);
+        (void)input_submit(&release);
     }
     if (usage != 0U) {
         const bool repeat = usage == previous_usage;
@@ -76,21 +76,21 @@ static void submit_report(uint8_t hid_modifiers, uint8_t usage)
             .modifiers = modifiers,
             .repeat = repeat,
         };
-        (void)tab_input_submit(&press);
+        (void)input_submit(&press);
         tabos_input_event_t text = {
             .type = TABOS_INPUT_TEXT,
             .modifiers = modifiers,
             .repeat = repeat,
         };
-        if (tab_input_text_from_hid(usage, modifiers, text.text, sizeof(text.text)) > 0U) {
-            (void)tab_input_submit(&text);
+        if (input_text_from_hid(usage, modifiers, text.text, sizeof(text.text)) > 0U) {
+            (void)input_submit(&text);
         }
     }
     previous_usage = usage;
     previous_modifiers = modifiers;
 }
 
-void tab_esp32p4_keyboard_shutdown(void)
+void tab5_keyboard_shutdown(void)
 {
     if (keyboard_device != NULL) {
         (void)i2c_master_bus_rm_device(keyboard_device);
@@ -105,7 +105,7 @@ void tab_esp32p4_keyboard_shutdown(void)
     previous_modifiers = 0U;
 }
 
-bool tab_esp32p4_keyboard_init(void)
+bool tab5_keyboard_init(void)
 {
     (void)snprintf(keyboard_name, sizeof(keyboard_name), "Tab5 keyboard not detected");
     const i2c_master_bus_config_t bus_config = {
@@ -142,7 +142,7 @@ bool tab_esp32p4_keyboard_init(void)
         keyboard_write(KEYBOARD_REG_EVENT_COUNT, 0U) != ESP_OK ||
         keyboard_write(KEYBOARD_REG_INTERRUPT_CONFIG, 0U) != ESP_OK) {
         ESP_LOGW(TAG, "Could not configure Tab5 Keyboard");
-        tab_esp32p4_keyboard_shutdown();
+        tab5_keyboard_shutdown();
         return false;
     }
     keyboard_present = true;
@@ -151,7 +151,7 @@ bool tab_esp32p4_keyboard_init(void)
     return true;
 }
 
-void tab_esp32p4_keyboard_poll(void)
+void tab5_keyboard_poll(void)
 {
     if (!keyboard_present) return;
     uint8_t count = 0U;
@@ -167,12 +167,12 @@ void tab_esp32p4_keyboard_poll(void)
     }
 }
 
-const char *tab_esp32p4_keyboard_name(void)
+const char *tab5_keyboard_name(void)
 {
     return keyboard_name;
 }
 
-bool tab_esp32p4_keyboard_present(void)
+bool tab5_keyboard_present(void)
 {
     return keyboard_present;
 }

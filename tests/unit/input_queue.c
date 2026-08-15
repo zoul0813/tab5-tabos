@@ -5,22 +5,22 @@
 int main(void)
 {
     char text[4];
-    if (tab_input_text_from_hid(TABOS_KEY_A, 0U, text, sizeof(text)) != 1U ||
+    if (input_text_from_hid(TABOS_KEY_A, 0U, text, sizeof(text)) != 1U ||
         strcmp(text, "a") != 0 ||
-        tab_input_text_from_hid(TABOS_KEY_A, TABOS_MODIFIER_SHIFT, text, sizeof(text)) != 1U ||
+        input_text_from_hid(TABOS_KEY_A, TABOS_MODIFIER_SHIFT, text, sizeof(text)) != 1U ||
         strcmp(text, "A") != 0 ||
-        tab_input_text_from_hid(TABOS_KEY_1, TABOS_MODIFIER_SHIFT, text, sizeof(text)) != 1U ||
+        input_text_from_hid(TABOS_KEY_1, TABOS_MODIFIER_SHIFT, text, sizeof(text)) != 1U ||
         strcmp(text, "!") != 0 ||
-        tab_input_text_from_hid(TABOS_KEY_A, TABOS_MODIFIER_CONTROL, text, sizeof(text)) != 0U) {
+        input_text_from_hid(TABOS_KEY_A, TABOS_MODIFIER_CONTROL, text, sizeof(text)) != 0U) {
         return 1;
     }
 
-    tab_input_init();
+    input_init();
     const tabos_input_event_t key = {
         .type = TABOS_INPUT_KEY_DOWN,
         .key = TABOS_KEY_A,
     };
-    if (!tab_input_submit(&key)) {
+    if (!input_submit(&key)) {
         return 1;
     }
     tabos_input_event_t received;
@@ -35,7 +35,7 @@ int main(void)
             .key = TABOS_KEY_B,
             .modifiers = (uint8_t)index,
         };
-        if (!tab_input_submit(&event)) {
+        if (!input_submit(&event)) {
             return 1;
         }
     }

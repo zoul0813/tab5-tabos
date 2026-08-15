@@ -166,6 +166,13 @@ add_test(
 )
 
 add_test(
+    NAME architecture.symbol_naming
+    COMMAND "${CMAKE_COMMAND}"
+        "-DTABOS_SOURCE_DIR=${TABOS_ROOT}"
+        -P "${CMAKE_CURRENT_LIST_DIR}/check_naming.cmake"
+)
+
+add_test(
     NAME build.invalid_host_target
     COMMAND "${CMAKE_COMMAND}"
         "-DTABOS_SOURCE_DIR=${TABOS_ROOT}"

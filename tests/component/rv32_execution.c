@@ -23,7 +23,7 @@ static void test_request_exit(int status)
     requested_status = status;
 }
 
-static tab_platform_riscv32_result_t execute_raw(
+static platform_riscv32_result_t execute_raw(
     const uint32_t *instructions,
     size_t size,
     unsigned int budget)
@@ -34,19 +34,19 @@ static tab_platform_riscv32_result_t execute_raw(
         .request_exit = test_request_exit,
     };
     int returned_status = -1;
-    tab_platform_riscv32_context_t *context = tab_platform_riscv32_create(
+    platform_riscv32_context_t *context = platform_riscv32_create(
         instructions, instructions, size, 0U, &api);
-    if (context == NULL) return TAB_PLATFORM_RISCV32_FAULT;
-    const tab_platform_riscv32_result_t result =
-        tab_platform_riscv32_step(context, budget, &returned_status);
-    tab_platform_riscv32_destroy(context);
+    if (context == NULL) return PLATFORM_RISCV32_FAULT;
+    const platform_riscv32_result_t result =
+        platform_riscv32_step(context, budget, &returned_status);
+    platform_riscv32_destroy(context);
     return result;
 }
 
 int main(void)
 {
-    tab_elf_image_t image;
-    if (tab_elf_load(tab_hello_elf, tab_hello_elf_size, &image) != TAB_ELF_OK) return 1;
+    loader_elf_image_t image;
+    if (loader_elf_load(loader_hello_elf, loader_hello_elf_size, &image) != LOADER_ELF_OK) return 1;
 
     const tabos_elf_api_t api = {
         .abi_version = TABOS_ELF_API_VERSION,
@@ -54,16 +54,16 @@ int main(void)
         .request_exit = test_request_exit,
     };
     int returned_status = -1;
-    tab_platform_riscv32_context_t *context = tab_platform_riscv32_create(
+    platform_riscv32_context_t *context = platform_riscv32_create(
         image.entry, image.memory, image.memory_size, image.info.minimum_address, &api);
-    tab_platform_riscv32_result_t result = TAB_PLATFORM_RISCV32_FAULT;
+    platform_riscv32_result_t result = PLATFORM_RISCV32_FAULT;
     if (context != NULL) {
-        result = tab_platform_riscv32_step(context, 10000U, &returned_status);
+        result = platform_riscv32_step(context, 10000U, &returned_status);
     }
-    tab_platform_riscv32_destroy(context);
-    tab_elf_unload(&image);
+    platform_riscv32_destroy(context);
+    loader_elf_unload(&image);
 
-    if (result != TAB_PLATFORM_RISCV32_RETURNED || !wrote_expected_message || !requested_exit ||
+    if (result != PLATFORM_RISCV32_RETURNED || !wrote_expected_message || !requested_exit ||
         requested_status != 0 || returned_status != 0) {
         return 1;
     }
@@ -81,21 +81,21 @@ int main(void)
         UINT32_C(0x00000013), /* nop */
         UINT32_C(0x00008067), /* ret */
     };
-    tab_platform_riscv32_context_t *resumable = tab_platform_riscv32_create(
+    platform_riscv32_context_t *resumable = platform_riscv32_create(
         resumable_program, resumable_program, sizeof(resumable_program), 0U, &api);
     int resumable_status = -1;
     const bool resumed = resumable != NULL &&
-        tab_platform_riscv32_step(resumable, 2U, &resumable_status) ==
-            TAB_PLATFORM_RISCV32_YIELDED &&
-        tab_platform_riscv32_step(resumable, 2U, &resumable_status) ==
-            TAB_PLATFORM_RISCV32_RETURNED;
-    tab_platform_riscv32_destroy(resumable);
+        platform_riscv32_step(resumable, 2U, &resumable_status) ==
+            PLATFORM_RISCV32_YIELDED &&
+        platform_riscv32_step(resumable, 2U, &resumable_status) ==
+            PLATFORM_RISCV32_RETURNED;
+    platform_riscv32_destroy(resumable);
 
     return resumed &&
         execute_raw(illegal_instruction, sizeof(illegal_instruction), 1U) ==
-            TAB_PLATFORM_RISCV32_FAULT &&
+            PLATFORM_RISCV32_FAULT &&
         execute_raw(invalid_load, sizeof(invalid_load), 2U) ==
-            TAB_PLATFORM_RISCV32_FAULT &&
+            PLATFORM_RISCV32_FAULT &&
         execute_raw(runaway_loop, sizeof(runaway_loop), 1000U) ==
-            TAB_PLATFORM_RISCV32_YIELDED ? 0 : 1;
+            PLATFORM_RISCV32_YIELDED ? 0 : 1;
 }

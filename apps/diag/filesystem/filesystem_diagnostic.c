@@ -143,7 +143,7 @@ static bool diagnostic_entry(tabos_app_context_t *context)
     const bool passed = run_diagnostic();
     (void)tabos_console_write(console,
         passed ? "Filesystem diagnostic passed\n" : "Filesystem diagnostic failed\n");
-    tab_app_report_diagnostic_result(context, passed ? 0 : 1);
+    application_report_diagnostic_result(context, passed ? 0 : 1);
     return true;
 }
 
@@ -154,7 +154,7 @@ static void diagnostic_cleanup(tabos_app_context_t *context, int exit_status)
     console = NULL;
 }
 
-const tabos_app_descriptor_t tab_filesystem_diagnostic_app = {
+const tabos_app_descriptor_t filesystem_diagnostic_app = {
     .abi_version = TABOS_APPLICATION_ABI_VERSION,
     .name = "filesystem-test",
     .version = "1.0.0",

@@ -7,10 +7,10 @@
 
 #include <tabos/input.h>
 
-void tab_input_init(void);
-void tab_input_shutdown(void);
-bool tab_input_submit(const tabos_input_event_t *event);
-void tab_input_diagnostic_log(const tabos_input_event_t *event);
-size_t tab_input_text_from_hid(uint8_t usage, uint8_t modifiers, char *text, size_t text_size);
+void input_init(void);
+void input_shutdown(void);
+bool input_submit(const tabos_input_event_t *event);
+void input_diagnostic_log(const tabos_input_event_t *event);
+size_t input_text_from_hid(uint8_t usage, uint8_t modifiers, char *text, size_t text_size);
 
 #endif

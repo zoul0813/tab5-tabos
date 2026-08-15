@@ -99,7 +99,7 @@ static void diagnostic_update(tabos_app_context_t *context)
                    (event.modifiers & TABOS_MODIFIER_CONTROL) != 0U) {
             (void)tabos_console_write(console,
                 "\nConsole diagnostic complete; PID 0 remains active\n> ");
-            tab_app_report_diagnostic_result(context, 0);
+            application_report_diagnostic_result(context, 0);
             editable_cells = 0U;
             return;
         }
@@ -115,7 +115,7 @@ static void diagnostic_cleanup(tabos_app_context_t *context, int exit_status)
     editable_cells = 0U;
 }
 
-const tabos_app_descriptor_t tab_console_diagnostic_app = {
+const tabos_app_descriptor_t console_diagnostic_app = {
     .abi_version = TABOS_APPLICATION_ABI_VERSION,
     .name = "console-test",
     .version = "1.0.0",

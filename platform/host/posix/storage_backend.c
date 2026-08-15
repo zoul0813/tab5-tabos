@@ -10,7 +10,7 @@
 #include <sys/stat.h>
 #include <sys/statvfs.h>
 
-bool tab_storage_backend_mount(char *root, size_t root_size,
+bool storage_backend_mount(char *root, size_t root_size,
                                bool *removable, const char **name)
 {
     if (root == NULL || removable == NULL || name == NULL) return false;
@@ -23,11 +23,11 @@ bool tab_storage_backend_mount(char *root, size_t root_size,
     return true;
 }
 
-void tab_storage_backend_unmount(void)
+void storage_backend_unmount(void)
 {
 }
 
-bool tab_storage_backend_info(uint64_t *total_bytes, uint64_t *free_bytes)
+bool storage_backend_info(uint64_t *total_bytes, uint64_t *free_bytes)
 {
     if (total_bytes == NULL || free_bytes == NULL) return false;
     struct statvfs status;
