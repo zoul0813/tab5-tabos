@@ -251,7 +251,7 @@ but is not a substitute for this execution path.
 
 - [x] Decide initial persistent nested foreground process model.
 - [x] Decide initial Tab5 mapping of one managed FreeRTOS task per native user process.
-- [ ] Replace single active application context with fixed-capacity process table.
+- [x] Replace single active application context with fixed-capacity process table.
 - [ ] Reserve persistent shell as root process, initially process 0.
 - [ ] Enforce process-0 liveness invariant across return, exit request, fault, and forced termination.
 - [ ] Add kernel panic state that reports process-0 failure to serial and framebuffer terminal.

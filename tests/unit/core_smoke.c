@@ -48,19 +48,22 @@ int main(void)
     }
     tabos_runtime_update();
     int exit_status = -1;
-    if (tabos_app_is_running() || !tabos_app_last_exit_status(&exit_status) ||
-        exit_status != 0) {
+    if (!tabos_app_is_running() || tabos_process_count() != 1U ||
+        tabos_process_system_panicked() ||
+        !tabos_app_last_exit_status(&exit_status) || exit_status != 0) {
         return 1;
     }
 #elif TABOS_ENABLE_FILESYSTEM_DIAGNOSTIC_APP
     int exit_status = 0;
-    if (tabos_app_count() != 1U || tabos_app_is_running() ||
+    if (tabos_app_count() != 1U || !tabos_app_is_running() ||
+        tabos_process_count() != 1U || tabos_process_system_panicked() ||
         !tabos_app_last_exit_status(&exit_status) || exit_status != 1) {
         return 1;
     }
 #elif TABOS_ENABLE_ELF_LOADER_EXPERIMENT
     int exit_status = 0;
     if (tabos_app_count() != 1U || tabos_app_is_running() ||
+        tabos_process_count() != 1U || !tabos_process_system_panicked() ||
         !tabos_app_last_exit_status(&exit_status) || exit_status != 4) {
         return 1;
     }

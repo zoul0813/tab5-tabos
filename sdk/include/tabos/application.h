@@ -17,6 +17,22 @@ enum {
 };
 
 typedef struct tabos_app_context tabos_app_context_t;
+typedef uint32_t tabos_process_id_t;
+
+#define TABOS_PROCESS_ID_INVALID UINT32_MAX
+
+typedef enum {
+    TABOS_PROCESS_RUNNING = 0,
+    TABOS_PROCESS_BLOCKED,
+    TABOS_PROCESS_PANICKED,
+} tabos_process_state_t;
+
+typedef struct {
+    tabos_process_id_t id;
+    tabos_process_id_t parent_id;
+    tabos_process_state_t state;
+    const char *name;
+} tabos_process_info_t;
 
 typedef bool (*tabos_app_entry_fn)(tabos_app_context_t *context);
 typedef void (*tabos_app_update_fn)(tabos_app_context_t *context);
@@ -54,6 +70,12 @@ void tabos_app_request_exit(tabos_app_context_t *context, int exit_status);
 
 /* Access services granted from descriptor capabilities. */
 const tabos_console_session_t *tabos_app_console(const tabos_app_context_t *context);
+tabos_process_id_t tabos_app_process_id(const tabos_app_context_t *context);
+
+/* Inspect currently loaded processes. */
+size_t tabos_process_count(void);
+bool tabos_process_info(tabos_process_id_t id, tabos_process_info_t *info);
+bool tabos_process_system_panicked(void);
 
 /* Read most recently completed application's status. */
 bool tabos_app_last_exit_status(int *exit_status);

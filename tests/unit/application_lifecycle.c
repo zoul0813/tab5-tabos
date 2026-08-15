@@ -10,10 +10,12 @@ static unsigned int entry_calls;
 static unsigned int update_calls;
 static unsigned int cleanup_calls;
 static int cleanup_status;
+static tabos_process_id_t entry_process_id;
 
 static bool test_entry(tabos_app_context_t *context)
 {
     ++entry_calls;
+    entry_process_id = tabos_app_process_id(context);
     const tabos_console_session_t *console = tabos_app_console(context);
     return console != NULL && tabos_console_write(console, "APP STARTED");
 }
@@ -83,10 +85,25 @@ int main(void)
         return 1;
     }
 
+    int exit_status = 0;
+    if (tabos_app_launch("failing-test") != TABOS_APP_RESULT_START_FAILED ||
+        tabos_process_count() != 0U || cleanup_calls != 1U || cleanup_status != -1 ||
+        !tabos_app_last_exit_status(&exit_status) || exit_status != -1) {
+        return 1;
+    }
+
     if (tabos_app_launch("lifecycle-test") != TABOS_APP_RESULT_OK ||
         !tabos_app_is_running() || tabos_app_active() != &test_app ||
-        entry_calls != 1U ||
+        entry_calls != 1U || entry_process_id != 0U || tabos_process_count() != 1U ||
         tabos_app_launch("failing-test") != TABOS_APP_RESULT_BUSY) {
+        return 1;
+    }
+
+    tabos_process_info_t process_info;
+    if (!tabos_process_info(0U, &process_info) || process_info.id != 0U ||
+        process_info.parent_id != TABOS_PROCESS_ID_INVALID ||
+        process_info.state != TABOS_PROCESS_RUNNING ||
+        process_info.name != test_app.name || tabos_process_info(1U, &process_info)) {
         return 1;
     }
 
@@ -96,27 +113,23 @@ int main(void)
     }
 
     tab_app_system_update();
-    int exit_status = 0;
-    if (tabos_app_is_running() || tabos_app_active() != NULL || update_calls != 1U ||
-        cleanup_calls != 1U || cleanup_status != 7 ||
+    if (tabos_app_is_running() || tabos_app_active() != &test_app || update_calls != 1U ||
+        cleanup_calls != 1U || tabos_process_count() != 1U ||
+        !tabos_process_system_panicked() ||
+        !tabos_process_info(0U, &process_info) ||
+        process_info.state != TABOS_PROCESS_PANICKED ||
         !tabos_app_last_exit_status(&exit_status) || exit_status != 7 ||
-        !tabos_console_acquire(&denied)) {
+        tabos_console_acquire(&denied)) {
         return 1;
     }
-    tabos_console_release(&denied);
-
-    if (tabos_app_launch("failing-test") != TABOS_APP_RESULT_START_FAILED ||
-        tabos_app_is_running() || cleanup_calls != 2U || cleanup_status != -1 ||
-        !tabos_app_last_exit_status(&exit_status) || exit_status != -1 ||
-        !tabos_console_acquire(&denied)) {
-        return 1;
-    }
-    tabos_console_release(&denied);
 
     tab_app_system_shutdown();
-    if (tabos_app_count() != 0U) {
+    if (tabos_app_count() != 0U || tabos_process_count() != 0U ||
+        cleanup_calls != 2U || cleanup_status != 7 ||
+        !tabos_console_acquire(&denied)) {
         return 1;
     }
+    tabos_console_release(&denied);
     tab_console_shutdown();
     tab_terminal_shutdown(&terminal);
     tab_display_shutdown();

@@ -1,4 +1,5 @@
 #include <tabos/internal/console_diagnostic.h>
+#include <tabos/internal/application.h>
 
 #include <tabos/tabos.h>
 
@@ -45,7 +46,7 @@ static bool diagnostic_entry(tabos_app_context_t *context)
         "\nConsole test: Type to test keyboard and terminal\n"
         "Console test: Backspace edits; Ctrl+L clears\n"
         "Console test: Ctrl+arrows navigate history\n"
-        "Console test: Ctrl+Q exits application\n\n> "
+        "Console test: Ctrl+Q reports completion\n\n> "
     );
 }
 
@@ -96,7 +97,10 @@ static void diagnostic_update(tabos_app_context_t *context)
             }
         } else if (event.type == TABOS_INPUT_KEY_DOWN && event.key == TABOS_KEY_Q &&
                    (event.modifiers & TABOS_MODIFIER_CONTROL) != 0U) {
-            tabos_app_request_exit(context, 0);
+            (void)tabos_console_write(console,
+                "\nConsole diagnostic complete; PID 0 remains active\n> ");
+            tab_app_report_diagnostic_result(context, 0);
+            editable_cells = 0U;
             return;
         }
     }

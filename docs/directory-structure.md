@@ -32,6 +32,7 @@ tabos/
 │   │   └── sdl/         SDL3 display and input services
 │   ├── include/         Internal platform interface used by portable code
 │   └── posix/           Shared native POSIX storage adapter
+├── process/             Portable process table, PID, lifecycle, and focus management
 ├── rootfs/              Future default TabOS filesystem contents
 ├── sdk/                 Public application-development surface
 │   ├── include/         Public TabOS headers

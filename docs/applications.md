@@ -45,7 +45,7 @@ Registry rejects invalid ABI versions, unsupported capabilities, duplicate names
 
 ## Console Test Application
 
-When `TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP=ON`, built-in `console-test` application is registered and selected as startup application. It receives console ownership from lifecycle manager instead of acquiring console itself. Press Ctrl+Q to exit cleanly. Runtime remains active with no foreground application, ready for future launcher or shell.
+When `TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP=ON`, built-in `console-test` application is registered and selected as persistent PID 0. It receives console ownership from process manager instead of acquiring console itself. Ctrl+Q reports diagnostic completion but leaves PID 0 active.
 
 When `TABOS_ENABLE_FILESYSTEM_DIAGNOSTIC_APP=ON`, built-in `filesystem-test`
 application validates real mounted storage through public TabOS filesystem API,
@@ -57,10 +57,11 @@ Current implementation is deliberately small:
 
 - built-in applications are statically linked
 - one cooperative foreground application runs at a time
-- update callbacks run in runtime loop rather than separate tasks
+- built-in root callbacks currently run in runtime loop rather than separate tasks
 - console is only defined capability
 - registry capacity is 16 built-in descriptors
-- no process isolation or crash containment
+- fixed-capacity process table currently supports one foreground PID 0; child nesting is not implemented yet
+- PID 0 exit enters kernel-panic state and retains its process record; memory isolation remains unavailable
 - experimental embedded ELF loader exists, but no relocations, arguments, filesystem loading, or general external application memory management yet
 
 Descriptor and public application API avoid assumptions about executable container. Current loader experiment maps stripped ELF entry into this lifecycle without making ELF details part of normal application source API. See [ELF Loader Experiment](elf-loader.md).
