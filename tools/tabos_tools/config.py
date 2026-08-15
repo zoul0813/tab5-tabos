@@ -64,10 +64,12 @@ def validate_project_config(config: dict[str, str]) -> None:
     for name in ("TABOS_TERMINAL_SCROLLBACK_LINES", "TABOS_CURSOR_BLINK_INTERVAL_MS"):
         if not re.fullmatch(r"[1-9][0-9]*", config[name]):
             fail(f"{name} must be a positive integer")
-    if config["TABOS_HOST_STARTUP_APP"] not in {"none", "console-test"}:
-        fail("TABOS_HOST_STARTUP_APP must be none or console-test")
-    if config["TABOS_TAB5_STARTUP_APP"] not in {"none", "console-test", "elf-hello"}:
-        fail("TABOS_TAB5_STARTUP_APP must be none, console-test, or elf-hello")
+    if config["TABOS_HOST_STARTUP_APP"] not in {"none", "console-test", "filesystem-test"}:
+        fail("TABOS_HOST_STARTUP_APP must be none, console-test, or filesystem-test")
+    if config["TABOS_TAB5_STARTUP_APP"] not in {
+        "none", "console-test", "filesystem-test", "elf-hello"
+    }:
+        fail("TABOS_TAB5_STARTUP_APP must be none, console-test, filesystem-test, or elf-hello")
 
 
 def load_project_config() -> dict[str, str]:
@@ -117,11 +119,12 @@ def command_config(_args: argparse.Namespace) -> None:
     print("Press Enter to keep current value. Ctrl+C aborts without saving.\n")
     try:
         config["TABOS_HOST_STARTUP_APP"] = prompt_choice(
-            "Host startup app", config["TABOS_HOST_STARTUP_APP"], ("none", "console-test")
+            "Host startup app", config["TABOS_HOST_STARTUP_APP"],
+            ("none", "console-test", "filesystem-test")
         )
         config["TABOS_TAB5_STARTUP_APP"] = prompt_choice(
             "Tab5 startup app", config["TABOS_TAB5_STARTUP_APP"],
-            ("none", "console-test", "elf-hello")
+            ("none", "console-test", "filesystem-test", "elf-hello")
         )
         config["TABOS_HOST_ROOTFS"] = prompt_text(
             "Host root filesystem directory", config["TABOS_HOST_ROOTFS"]
@@ -187,5 +190,6 @@ def project_cmake_arguments(target: str) -> list[str]:
         f"-DTABOS_TERMINAL_SCROLLBACK_LINES={config['TABOS_TERMINAL_SCROLLBACK_LINES']}",
         f"-DTABOS_CURSOR_BLINK_INTERVAL_MS={config['TABOS_CURSOR_BLINK_INTERVAL_MS']}",
         f"-DTABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP={'ON' if startup_app == 'console-test' else 'OFF'}",
+        f"-DTABOS_ENABLE_FILESYSTEM_DIAGNOSTIC_APP={'ON' if startup_app == 'filesystem-test' else 'OFF'}",
         f"-DTABOS_ENABLE_ELF_LOADER_EXPERIMENT={'ON' if startup_app == 'elf-hello' else 'OFF'}",
     ]

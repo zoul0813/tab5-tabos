@@ -13,8 +13,8 @@ cache contents.
 
 Current settings cover:
 
-- host startup application: `none` or `console-test`
-- Tab5 startup application: `none`, `console-test`, or `elf-hello`
+- host startup application: `none`, `console-test`, or `filesystem-test`
+- Tab5 startup application: `none`, `console-test`, `filesystem-test`, or `elf-hello`
 - raw bitmap font file
 - font glyph width, height, and glyph count (1 through 256)
 - terminal font cell width and height

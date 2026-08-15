@@ -47,6 +47,10 @@ Registry rejects invalid ABI versions, unsupported capabilities, duplicate names
 
 When `TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP=ON`, built-in `console-test` application is registered and selected as startup application. It receives console ownership from lifecycle manager instead of acquiring console itself. Press Ctrl+Q to exit cleanly. Runtime remains active with no foreground application, ready for future launcher or shell.
 
+When `TABOS_ENABLE_FILESYSTEM_DIAGNOSTIC_APP=ON`, built-in `filesystem-test`
+application validates real mounted storage through public TabOS filesystem API,
+prints each result, cleans its dedicated test directory after success, and exits.
+
 ## Current Limits
 
 Current implementation is deliberately small:

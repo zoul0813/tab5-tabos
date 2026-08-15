@@ -14,6 +14,7 @@ idf_component_register(
         "${TABOS_ROOT}/sdk/include"
     PRIV_INCLUDE_DIRS
         "${TABOS_ROOT}/apps/console_diagnostic/include"
+        "${TABOS_ROOT}/apps/filesystem_diagnostic/include"
         "${TABOS_ROOT}/platform/include"
         "${CMAKE_BINARY_DIR}/generated"
     PRIV_REQUIRES esp32p4

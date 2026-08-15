@@ -35,6 +35,12 @@ if(TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP)
     )
 endif()
 
+if(TABOS_ENABLE_FILESYSTEM_DIAGNOSTIC_APP)
+    list(APPEND TABOS_CORE_SOURCES
+        "${TABOS_ROOT}/apps/filesystem_diagnostic/filesystem_diagnostic.c"
+    )
+endif()
+
 set(TABOS_HOST_PLATFORM_SOURCES
     "${TABOS_ROOT}/platform/host/sdl/runtime.c"
     "${TABOS_ROOT}/platform/host/sdl/input.c"

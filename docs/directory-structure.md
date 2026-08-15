@@ -49,7 +49,7 @@ tabos/
 
 Some directories contain only `.gitkeep` placeholders. Their stated responsibilities are planned boundaries; their APIs are not yet defined.
 
-The command shell will be the first official TabOS application and belongs under `apps/`. It is not part of the kernel. Current `apps/console_diagnostic/` is an optional interactive test application, not a shell. Kernel and portable subsystems provide terminal, console, input, process, and filesystem services used by applications.
+The command shell will be the first official TabOS application and belongs under `apps/`. It is not part of the kernel. Current `apps/console_diagnostic/` and `apps/filesystem_diagnostic/` are optional test applications, not a shell. Kernel and portable subsystems provide terminal, console, input, process, and filesystem services used by applications.
 
 ## Targets and Platforms
 

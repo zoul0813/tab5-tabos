@@ -56,4 +56,33 @@ report `ENODEV`, while boot diagnostics report storage as not mounted. When a ca
 mounts, the boot report includes filesystem capacity and free space.
 
 The initial disk format is the FAT filesystem supported by the Tab5 BSP. Internal
-flash storage and live card-removal handling remain future work.
+flash storage and live card-removal handling remain future work. Tab5 FAT enables
+heap-backed long filename support through 255 characters, matching
+`TABOS_FS_NAME_MAX`; the default ESP-IDF 8.3-only mode is not used.
+
+Tab5 reserves an 8 KiB startup-task stack for current built-in applications. This
+accommodates nested filesystem and FatFs VFS calls until applications receive
+their own runtime tasks and stack budgets.
+
+## Platform Diagnostic
+
+Select `filesystem-test` as startup application with:
+
+```sh
+./tools/tabos config
+```
+
+Then run host target or build and flash Tab5:
+
+```sh
+./tools/tabos macos run
+./tools/tabos tab5 build
+./tools/tabos tab5 flash
+```
+
+Diagnostic uses only `/tabos-fs-test`. It creates a directory and file, writes and
+verifies known data, seeks, closes and reopens, checks metadata, renames, enumerates,
+and removes test contents. Each step prints `[OK]` or `[FAIL]` with TabOS error number.
+Successful run ends with `Filesystem diagnostic passed`. Failure leaves remaining
+test contents available for inspection; next run removes old diagnostic contents
+before starting.

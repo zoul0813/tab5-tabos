@@ -89,6 +89,7 @@ target_include_directories(tabos_core
     PRIVATE
         "${TABOS_ROOT}/apps/include"
         "${TABOS_ROOT}/apps/console_diagnostic/include"
+        "${TABOS_ROOT}/apps/filesystem_diagnostic/include"
         "${TABOS_ROOT}/console/include"
         "${TABOS_ROOT}/fs/include"
         "${TABOS_ROOT}/graphics/include"

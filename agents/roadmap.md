@@ -220,6 +220,11 @@
 - [x] Select BSP microSD FAT as initial on-disk filesystem.
 - [x] Handle absent card as nonfatal boot condition.
 - [x] Report mounted capacity and free space through boot diagnostics.
+- [x] Add opt-in `filesystem-test` application covering create, write, seek, read,
+  reopen, metadata, rename, enumeration, and cleanup through public filesystem API.
+- [x] Verify filesystem diagnostic against real controlled host root.
+- [x] Cross-build filesystem diagnostic for Tab5 Debug.
+- [ ] Flash filesystem diagnostic and verify all operations on physical microSD.
 - [ ] Verify file read/write, directory listing, seek, remount, and removal on hardware.
 - [ ] Evaluate internal flash filesystem after microSD baseline works.
 

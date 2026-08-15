@@ -408,6 +408,14 @@ objects as its ABI. The portable core owns path normalization, descriptors, erro
 and dispatch. Initial deployment exposes one root: a controlled host directory on
 macOS/Linux and BSP-mounted microSD FAT on Tab5. An absent card is nonfatal. A mount
 table, internal-flash policy, permissions, links, and removal recovery are deferred.
+Tab5 FAT uses heap-backed long-filename buffers with a 255-character maximum so
+the backend honors the public filesystem name limit instead of silently imposing
+8.3 names.
+
+Current built-in startup applications execute synchronously on ESP-IDF main task.
+Tab5 reserves an 8192-byte main-task stack because nested TabOS filesystem calls
+enter FatFs VFS formatting code that exceeds ESP-IDF's 3584-byte default. Future
+application-task model must assign explicit per-application stack budgets instead.
 
 ---
 
