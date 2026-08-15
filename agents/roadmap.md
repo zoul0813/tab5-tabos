@@ -293,8 +293,8 @@ but is not a substitute for this execution path.
 
 ## Following Milestone: Load Applications from Files
 
-- [ ] Make loader consume filesystem handles rather than embedded byte arrays.
-- [ ] Preserve bounded reads and executable image size limits.
+- [x] Make loader consume filesystem handles rather than embedded byte arrays.
+- [x] Preserve bounded reads and executable image size limits.
 - [ ] Load and execute independent RV32 hello application from host controlled root.
 - [ ] Load independent hello application from Tab5 microSD.
 - [ ] Define application file naming and discovery rules.

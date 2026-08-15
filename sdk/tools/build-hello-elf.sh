@@ -4,9 +4,10 @@ set -eu
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 root=$(CDPATH= cd -- "$script_dir/../.." && pwd)
 output=${1:-"$root/build/elf-spike/hello-stripped.elf"}
-unstripped=${output%.elf}-unstripped.elf
+unstripped="$root/build/elf-spike/hello-unstripped.elf"
 
 mkdir -p "$(dirname -- "$output")"
+mkdir -p "$(dirname -- "$unstripped")"
 riscv32-esp-elf-gcc \
     -march=rv32ima_zicsr_zifencei -mabi=ilp32 -Os \
     -ffreestanding -fPIC -fno-stack-protector -fno-asynchronous-unwind-tables \

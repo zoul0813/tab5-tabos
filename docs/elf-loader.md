@@ -1,6 +1,8 @@
 # ELF Loader Experiment
 
-TabOS includes first executable-loader feasibility experiment. It validates and loads independently compiled, stripped RV32 ELF image, then executes same artifact on Tab5 or through bounded RV32 interpretation on host. Experiment intentionally excludes filesystem and shell.
+TabOS validates and loads independently compiled, stripped RV32 ELF images from TabOS
+storage, then executes the same artifact on Tab5 or through bounded RV32 interpretation
+on host. Shell integration is not implemented yet.
 
 ## Current ELF Contract
 
@@ -14,6 +16,7 @@ Accepted image must be:
 - entry point inside executable load segment
 - no dynamic segment
 - no `SHT_REL` or `SHT_RELA` relocations
+- at most 2 MiB ELF file size
 - at most 1 MiB loaded image
 
 Current hello fixture is 348-byte stripped ELF containing 125-byte load image, one load segment, and no relocations. Source lives in `apps/hello_elf/hello.c`. Linker configuration lives in `sdk/linker/app-riscv32.ld`.
@@ -26,17 +29,28 @@ Guest registers and memory persist into next update. This is scheduling quantum,
 application lifetime limit: long-running and interactive programs continue until they
 return, request exit, fault, or are stopped by lifecycle manager.
 
-Build standalone fixture inside activated ESP-IDF v5.4.4 environment:
+Build standalone fixture inside activated ESP-IDF v5.4.4 environment. Default output is
+`build/elf-spike/hello-stripped.elf`; an optional argument selects another output path:
 
 ```sh
 ./sdk/tools/build-hello-elf.sh
+./sdk/tools/build-hello-elf.sh .local/rootfs/T/bin/hello.bin
 ```
+
+Unstripped linker output remains under `build/elf-spike/hello-unstripped.elf` for
+debugging. Only stripped runnable output is written to selected destination.
 
 Application uses `<tabos/elf_api.h>`. API version 1 contains ABI version, console-write function, and clean-exit request function. This small table is experimental and not frozen as final TabOS ABI.
 
 ## Tab5 Hardware Test
 
-Run project configurator and select `elf-hello` as Tab5 startup application:
+Filesystem-backed loader diagnostic reads `T:/bin/hello.bin` by default. On host, copy
+file to `.local/rootfs/T/bin/hello.bin`. For Tab5, copy same file to `bin/hello.bin` on
+TF card, using MSC mode or another card reader. Extension is `.bin` for current workflow,
+but contents remain ELF.
+
+Run project configurator, select `elf-hello` as startup application, and change startup
+path if needed:
 
 ```sh
 ./tools/tabos config
@@ -55,7 +69,9 @@ Successful display output includes:
 Hello from independent TabOS ELF
 ```
 
-Serial output includes loaded file/image sizes and returned status zero. Application then exits and runtime remains active without foreground cursor.
+Serial output includes source path, loaded image size, and returned status zero.
+Because diagnostic starts as process 0, its successful exit then intentionally exercises
+current process-0 panic behavior. Future shell will run file-backed programs as children.
 
 If display reports `ELF load FAILED: NO EXECUTABLE MEMORY`, writable PSRAM allocation failed. `PREPARE FAILED` means cache synchronization, physical-address resolution, or executable MMU alias creation failed.
 
@@ -69,14 +85,13 @@ Current Tab5 backend loads bytes through a writable PSRAM mapping, synchronizes 
 
 ## Deferred Work
 
-Experiment does not yet provide:
+Loader does not yet provide:
 
-- filesystem ELF loading
 - application arguments
 - relocation processing
 - imported symbol resolution
 - multiple code/data permission regions
 - process isolation or crash containment
-- signing or package metadata
+- signing, discovery, or package metadata
 
 Host tests parse, load, and execute the same RV32 application artifact used by Tab5 through a resumable RV32IMA interpreter. Guest state persists across bounded instruction slices so host tests cover loader, ABI, output, exit status, and execution faults without replacing RV32 code with a host-native build.

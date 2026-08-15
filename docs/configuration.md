@@ -22,8 +22,10 @@ Current settings cover:
 - terminal scrollback capacity
 - cursor blink interval
 - controlled host drive-container directory
+- filesystem-backed ELF startup path, defaulting to `T:/bin/hello.bin`
 
-The host executes `elf-hello` through bounded RV32 interpretation using same application artifact as Tab5.
+The host executes `elf-hello` from configured TabOS drive through bounded RV32
+interpretation using same application artifact as Tab5.
 Font paths may be relative to the repository root or absolute. The configurator
 checks that the file size exactly matches the configured packed bitmap dimensions.
 Fonts with fewer than 256 glyphs are valid; character values outside their range

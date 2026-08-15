@@ -63,6 +63,10 @@ Current implementation is deliberately small:
 - fixed-capacity process table supports nested foreground processes; blocked parents retain state and resume after child exit
 - child launch is currently an internal built-in-test primitive; public synchronous execution API and RV32 call gate remain pending
 - PID 0 exit enters kernel-panic state and retains its process record; memory isolation remains unavailable
-- experimental embedded ELF loader exists, but no relocations, arguments, filesystem loading, or general external application memory management yet
+- experimental filesystem-backed ELF loader exists, but no relocations, arguments,
+  discovery, or general external application memory management yet
 
-Descriptor and public application API avoid assumptions about executable container. Current loader experiment maps stripped ELF entry into this lifecycle without making ELF details part of normal application source API. See [ELF Loader Experiment](elf-loader.md).
+Descriptor and public application API avoid assumptions about executable container.
+Current loader diagnostic reads stripped ELF through TabOS filesystem API and maps its
+entry into this lifecycle without making ELF details part of normal application source
+API. See [ELF Loader Experiment](elf-loader.md).

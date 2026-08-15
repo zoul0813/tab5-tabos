@@ -94,6 +94,26 @@ tabos_enable_sanitizers(tabos_elf_loader)
 
 add_test(NAME unit.elf_loader COMMAND tabos_elf_loader)
 
+add_executable(tabos_file_elf_loader
+    component/file_elf_loader.c
+    fakes/platform_display.c
+    fakes/storage_backend.c
+    "${TABOS_ROOT}/platform/posix/storage.c"
+)
+target_include_directories(tabos_file_elf_loader PRIVATE
+    "${TABOS_ROOT}/fs/include"
+    "${TABOS_ROOT}/loader/fixtures"
+    "${TABOS_ROOT}/loader/include"
+    "${TABOS_ROOT}/platform/include"
+    "${TABOS_ROOT}/sdk/include"
+    "${CMAKE_CURRENT_LIST_DIR}/fakes"
+)
+target_link_libraries(tabos_file_elf_loader PRIVATE tabos_core)
+tabos_enable_warnings(tabos_file_elf_loader)
+tabos_enable_sanitizers(tabos_file_elf_loader)
+
+add_test(NAME component.file_elf_loader COMMAND tabos_file_elf_loader)
+
 add_executable(tabos_rv32_execution component/rv32_execution.c)
 target_include_directories(tabos_rv32_execution PRIVATE
     "${TABOS_ROOT}/loader/fixtures"

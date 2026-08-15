@@ -1,8 +1,10 @@
 #include <tabos/internal/elf_loader.h>
 
+#include <tabos/filesystem.h>
 #include <tabos/platform/platform.h>
 
 #include <limits.h>
+#include <stdlib.h>
 #include <string.h>
 
 enum {
@@ -17,6 +19,7 @@ enum {
     ELF_SECTION_RELA = 4,
     ELF_SECTION_REL = 9,
     ELF_MAX_IMAGE_SIZE = 1024 * 1024,
+    ELF_MAX_FILE_SIZE = 2 * 1024 * 1024,
 };
 
 static uint16_t read_u16(const uint8_t *value)
@@ -196,6 +199,56 @@ loader_elf_result_t loader_elf_load(const uint8_t *data, size_t size, loader_elf
     return LOADER_ELF_OK;
 }
 
+loader_elf_result_t loader_elf_load_file(const char *path, loader_elf_image_t *image)
+{
+    if (path == NULL || path[0] == '\0' || image == NULL) {
+        return LOADER_ELF_INVALID_ARGUMENT;
+    }
+    *image = (loader_elf_image_t){0};
+
+    const tabos_fd_t file = tabos_fs_open(path, TABOS_O_RDONLY, 0U);
+    if (file < 0) {
+        return LOADER_ELF_FILE_OPEN_FAILED;
+    }
+
+    tabos_stat_t status;
+    if (tabos_fs_fstat(file, &status) != 0 || (status.mode & TABOS_S_IFREG) == 0U ||
+        status.size == 0U || status.size > SIZE_MAX) {
+        (void)tabos_fs_close(file);
+        return LOADER_ELF_FILE_INVALID;
+    }
+    if (status.size > ELF_MAX_FILE_SIZE) {
+        (void)tabos_fs_close(file);
+        return LOADER_ELF_FILE_TOO_LARGE;
+    }
+
+    const size_t size = (size_t)status.size;
+    uint8_t *data = malloc(size);
+    if (data == NULL) {
+        (void)tabos_fs_close(file);
+        return LOADER_ELF_NO_FILE_MEMORY;
+    }
+
+    size_t used = 0U;
+    while (used < size) {
+        const tabos_ssize_t count = tabos_fs_read(file, data + used, size - used);
+        if (count <= 0 || (size_t)count > size - used) {
+            free(data);
+            (void)tabos_fs_close(file);
+            return LOADER_ELF_FILE_READ_FAILED;
+        }
+        used += (size_t)count;
+    }
+    if (tabos_fs_close(file) != 0) {
+        free(data);
+        return LOADER_ELF_FILE_READ_FAILED;
+    }
+
+    const loader_elf_result_t result = loader_elf_load(data, size, image);
+    free(data);
+    return result;
+}
+
 void loader_elf_unload(loader_elf_image_t *image)
 {
     if (image != NULL) {
@@ -210,6 +263,8 @@ const char *loader_elf_result_name(loader_elf_result_t result)
         "OK", "INVALID ARGUMENT", "TRUNCATED", "UNSUPPORTED FORMAT",
         "UNSUPPORTED RELOCATION", "INVALID SEGMENT", "INVALID ENTRY",
         "IMAGE TOO LARGE", "NO EXECUTABLE MEMORY", "PREPARE FAILED",
+        "FILE OPEN FAILED", "INVALID FILE", "FILE TOO LARGE", "NO FILE MEMORY",
+        "FILE READ FAILED",
     };
     return (unsigned int)result < (sizeof(names) / sizeof(names[0]))
         ? names[result]

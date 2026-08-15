@@ -136,7 +136,20 @@ faults, or is otherwise terminated, kernel must enter panic state rather than un
 restart, or normally unwind process 0. Panic must report process-0 failure and available
 cause/exit status to both serial/log sink and framebuffer console/terminal.
 
-Experimental loader now accepts bounded little-endian RV32 `ET_EXEC` ELF with loadable segments, executable entry, and no dynamic segment or relocations. Checked-in hello fixture is independently compiled by GCC for RV32IMA/`ilp32`, stripped to 348 bytes, loads 125 bytes, and calls versioned API table containing console write and exit request. Host executes same artifact through RV32 interpretation and reserved API call gates; guest CPU and memory state persist across bounded runtime-update instruction slices, so no application-lifetime instruction ceiling exists. Tab5 executes it natively. `TABOS_ENABLE_ELF_LOADER_EXPERIMENT=ON` selects `elf-hello` startup application on either target; it is mutually exclusive with console diagnostic. Hardware validation proved execution from PSRAM by loading through a writable data mapping, synchronizing cache, and creating a read/execute MMU alias for the same physical pages. API string pointers are translated back to the readable data alias. This is a proven experiment, not yet the final loader/process ABI.
+Experimental loader now accepts bounded little-endian RV32 `ET_EXEC` ELF with loadable
+segments, executable entry, and no dynamic segment or relocations. It can read a bounded
+ELF file through TabOS filesystem API; checked-in hello bytes remain loader/test fixture
+only. Hello is independently compiled by GCC for RV32IMA/`ilp32`, stripped to 348 bytes,
+loads 125 bytes, and calls versioned API table containing console write and exit request.
+Host executes same artifact through RV32 interpretation and reserved API call gates;
+guest CPU and memory state persist across bounded runtime-update instruction slices, so
+no application-lifetime instruction ceiling exists. Tab5 executes it natively.
+`TABOS_ENABLE_ELF_LOADER_EXPERIMENT=ON` selects filesystem-backed `elf-hello` startup
+application on either target; `TABOS_ELF_STARTUP_PATH` defaults to `T:/bin/hello.bin`.
+Hardware validation proved execution from PSRAM by loading through writable data mapping,
+synchronizing cache, and creating read/execute MMU alias for same physical pages. API
+string pointers are translated back to readable data alias. This is proven experiment,
+not yet final loader/process ABI.
 
 ## 4. Multitasking and CPU Cores
 

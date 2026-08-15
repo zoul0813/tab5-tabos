@@ -3,9 +3,8 @@
 #include <tabos/elf_api.h>
 #include <tabos/internal/elf_loader.h>
 
+#include <tabos/config/loader.h>
 #include <tabos/platform/platform.h>
-
-#include "hello_elf.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -45,8 +44,8 @@ static bool elf_entry(tabos_app_context_t *context)
         return false;
     }
 
-    const loader_elf_result_t result = loader_elf_load(loader_hello_elf, loader_hello_elf_size,
-                                                 &loaded_image);
+    const loader_elf_result_t result = loader_elf_load_file(TABOS_ELF_STARTUP_PATH,
+                                                            &loaded_image);
     if (result != LOADER_ELF_OK) {
         char message[80];
         (void)snprintf(message, sizeof(message), "ELF load FAILED: %s",
@@ -66,8 +65,8 @@ static bool elf_entry(tabos_app_context_t *context)
 
     char load_message[80];
     (void)snprintf(load_message, sizeof(load_message),
-                   "ELF image loaded: %u file bytes, %u memory bytes",
-                   (unsigned int)loader_hello_elf_size,
+                   "ELF image loaded from %s: %u memory bytes",
+                   TABOS_ELF_STARTUP_PATH,
                    (unsigned int)loaded_image.memory_size);
     platform_log(load_message);
 

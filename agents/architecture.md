@@ -152,7 +152,14 @@ Programs should not require the complete TabOS firmware to be rebuilt and reflas
 
 Current process foundation provides a fixed-capacity process table, stable process IDs, parent/state metadata, and nested foreground stack. Launching built-in child blocks and retains parent, transfers console focus, permits further nesting, then restores parent and child status during reverse-order unwind. This internal request/resume mechanism deliberately does not expose asynchronous public API as substitute for future synchronous `exec`. Selected console and filesystem diagnostics remain persistent temporary PID 0 programs. Selecting independent `hello_elf` as PID 0 intentionally exercises root-exit panic. RV32 call-gate integration and managed Tab5 application tasks remain next work.
 
-First ELF spike accepts minimal stripped RV32 `ET_EXEC` image with bounded `PT_LOAD` segments and no relocations/dynamic linking. Loader copies image into platform-provided executable memory and invokes entry with versioned API table. Embedded hello fixture isolates executable-memory validation from filesystem. ESP32-P4 hardware validation proved writable PSRAM loading plus a read/execute MMU alias of same physical pages. Host executes same RV32 artifact through resumable interpreter slices. This remains an experiment, not final executable-format or process-isolation decision.
+First ELF implementation accepts minimal stripped RV32 `ET_EXEC` image with bounded
+`PT_LOAD` segments and no relocations/dynamic linking. Loader can consume a bounded file
+through TabOS filesystem API, copies its image into platform-provided executable memory,
+and invokes entry with versioned API table. Checked-in hello bytes remain only a focused
+loader/test fixture. ESP32-P4 hardware validation proved writable PSRAM loading plus a
+read/execute MMU alias of same physical pages. Host executes same RV32 artifact through
+resumable interpreter slices. This remains experimental, not final executable-format or
+process-isolation decision.
 
 [DECIDED] Initial process model uses persistent nested foreground processes. Shell is
 persistent root process, initially process 0. Executing child blocks but does not unload
