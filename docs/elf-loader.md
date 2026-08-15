@@ -32,13 +32,13 @@ Run project configurator and select `elf-hello` as Tab5 startup application:
 
 ```sh
 ./tools/tabos config
-./tools/tabos build tab5 debug
+./tools/tabos tab5 debug build
 ```
 
 Build and flash can also be requested together through the wrapper:
 
 ```sh
-./tools/tabos flash tab5 debug
+./tools/tabos tab5 debug flash
 ```
 
 Successful display output includes:

@@ -20,7 +20,7 @@ jobs:
       - name: Install SDL3
         run: brew install sdl3
       - name: Build and test
-        run: ./tools/tabos test macos ${{ matrix.configuration }}
+        run: ./tools/tabos macos ${{ matrix.configuration }} test
       - name: Package macOS host
         if: matrix.configuration == 'release'
         shell: bash
@@ -57,7 +57,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libsdl3-dev
       - uses: actions/checkout@v7
       - name: Build and test
-        run: ./tools/tabos test linux ${{ matrix.configuration }}
+        run: ./tools/tabos linux ${{ matrix.configuration }} test
       - name: Package Linux host
         if: matrix.configuration == 'release'
         shell: bash
@@ -93,7 +93,7 @@ jobs:
         shell: bash
         run: |
           . /opt/esp/idf/export.sh
-          ./tools/tabos build tab5 ${{ matrix.configuration }}
+          ./tools/tabos tab5 ${{ matrix.configuration }} build
       - name: Package Tab5 firmware
         if: matrix.configuration == 'release'
         shell: bash

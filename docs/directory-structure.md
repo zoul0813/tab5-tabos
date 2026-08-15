@@ -44,7 +44,7 @@ tabos/
 │   ├── integration/     Multi-subsystem integration tests
 │   └── unit/            Focused portable unit tests
 ├── time/                Portable monotonic-clock and polling-timer service
-└── tools/               Project commands, including `tools/tabos`
+└── tools/               Thin `tools/tabos` CLI and maintainable Python support modules
 ```
 
 Some directories contain only `.gitkeep` placeholders. Their stated responsibilities are planned boundaries; their APIs are not yet defined.
@@ -89,7 +89,7 @@ Portable code must not include SDL3, POSIX, ESP-IDF, or FreeRTOS APIs directly. 
 - `CMakeLists.txt` defines native host builds and shared portable sources.
 - `CMakePresets.json` defines macOS and Linux debug/release configurations.
 - `targets/tab5/CMakeLists.txt` is the ESP-IDF firmware project entry point.
-- `tools/tabos` is the supported command wrapper for build, test, run, and ESP-IDF-based flash operations.
+- `tools/tabos` is the supported thin command wrapper for configuration, setup, build, test, run, and ESP-IDF-based flash operations. Its implementation is split by responsibility under `tools/tabos_tools/`: configuration schema and persistence, environment setup, target orchestration, and shared process helpers.
 - `tools/flash.sh` flashes an existing Tab5 debug or release image using local `esptool`, including images built in a container.
 - `AGENTS.md` directs coding agents to internal project context and documentation-maintenance requirements.
 

@@ -90,13 +90,16 @@ before invoking it directly.
 
 Use the project wrapper from the repository root:
 
+Target commands use `./tools/tabos <target> [debug|release] <action>`. Configuration
+defaults to `debug` when omitted.
+
 ```sh
-./tools/tabos build macos debug
-./tools/tabos build macos release
-./tools/tabos build linux debug
-./tools/tabos build linux release
-./tools/tabos build tab5 debug
-./tools/tabos build tab5 release
+./tools/tabos macos debug build
+./tools/tabos macos release build
+./tools/tabos linux debug build
+./tools/tabos linux release build
+./tools/tabos tab5 debug build
+./tools/tabos tab5 release build
 ```
 
 A host target must be built on its matching operating system. Build output goes under `build/<target>-<configuration>/`.
@@ -106,8 +109,8 @@ A host target must be built on its matching operating system. Build output goes 
 Run host tests with:
 
 ```sh
-./tools/tabos test macos debug
-./tools/tabos test linux debug
+./tools/tabos macos debug test
+./tools/tabos linux debug test
 ```
 
 Tests currently cover portable runtime bootstrap, bitmap font and terminal rendering, colored cell history, scrollback navigation, cursor and scale reflow, console ownership and controls, keyboard translation and queue behavior, Tab5 display rotation, headless SDL host integration, target-selection rejection, and platform-header boundaries.
@@ -117,8 +120,8 @@ Tests currently cover portable runtime bootstrap, bitmap font and terminal rende
 Run host display:
 
 ```sh
-./tools/tabos run macos debug
-./tools/tabos run linux debug
+./tools/tabos macos debug run
+./tools/tabos linux debug run
 ```
 
 Host executable opens a resizable window containing the shared 1280x720 RGB565 boot console.
@@ -131,7 +134,7 @@ Tab5 firmware initializes the built-in display and presents the same structured 
 Flash Tab5 only through explicit command:
 
 ```sh
-./tools/tabos flash tab5 debug
+./tools/tabos tab5 debug flash
 ```
 
 When firmware was built using the ESP-IDF container, flash the generated image using a local `esptool` installation:

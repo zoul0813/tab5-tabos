@@ -61,13 +61,13 @@ Host example:
 
 ```sh
 ./tools/tabos config
-./tools/tabos run macos debug
+./tools/tabos macos debug run
 ```
 
 Tab5 example:
 
 ```sh
 ./tools/tabos config
-./tools/tabos build tab5 debug
-./tools/tabos flash tab5 debug
+./tools/tabos tab5 debug build
+./tools/tabos tab5 debug flash
 ```

@@ -43,9 +43,9 @@ The BSP integration deliberately excludes LVGL. UI composition remains owned by 
 Build and test the host path:
 
 ```sh
-./tools/tabos build macos debug
-./tools/tabos test macos debug
-./tools/tabos run macos debug
+./tools/tabos macos debug build
+./tools/tabos macos debug test
+./tools/tabos macos debug run
 ```
 
 Use `linux` in place of `macos` on Ubuntu.
@@ -53,13 +53,13 @@ Use `linux` in place of `macos` on Ubuntu.
 Build the firmware with the ESP-IDF v5.4.4 environment activated:
 
 ```sh
-./tools/tabos build tab5 debug
+./tools/tabos tab5 debug build
 ```
 
 Flashing remains an explicit hardware action:
 
 ```sh
-./tools/tabos flash tab5 debug
+./tools/tabos tab5 debug flash
 ```
 
 For container-built firmware, use local `esptool` through the standalone flash helper. It defaults to the debug image:

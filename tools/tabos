@@ -3,497 +3,68 @@
 from __future__ import annotations
 
 import argparse
-import os
-from pathlib import Path
-import platform
-import re
-import shlex
-import shutil
 import subprocess
-import sys
+
+from tabos_tools.build import (
+    CONFIGURATIONS,
+    command_build,
+    command_flash,
+    command_run,
+    command_test,
+)
+from tabos_tools.common import ESP_IDF_VERSION, fail, identity_value
+from tabos_tools.config import command_config
+from tabos_tools.environment import command_activate_idf, command_setup
 
 
-ROOT = Path(__file__).resolve().parent.parent
-HOST_TARGETS = {"macos", "linux"}
-CONFIGURATIONS = {"debug": "Debug", "release": "Release"}
-ESP_IDF_VERSION = "v5.4.4"
-LOCAL_DIR = ROOT / ".local"
-LOCAL_IDF = LOCAL_DIR / "esp-idf"
-LOCAL_IDF_TOOLS = LOCAL_DIR / "espressif-tools"
-LOCAL_CONFIG = LOCAL_DIR / "tabos.config"
-CONFIG_DEFAULTS = {
-    "TABOS_HOST_ROOTFS": ".local/rootfs",
-    "TABOS_FONT_FILE": "graphics/blueterm.f12",
-    "TABOS_FONT_GLYPH_WIDTH": "8",
-    "TABOS_FONT_GLYPH_HEIGHT": "12",
-    "TABOS_FONT_GLYPH_COUNT": "256",
-    "TABOS_FONT_CELL_WIDTH": "8",
-    "TABOS_FONT_CELL_HEIGHT": "15",
-    "TABOS_TERMINAL_SCALE": "2",
-    "TABOS_TERMINAL_SCROLLBACK_LINES": "256",
-    "TABOS_CURSOR_BLINK_INTERVAL_MS": "500",
-    "TABOS_HOST_STARTUP_APP": "none",
-    "TABOS_TAB5_STARTUP_APP": "none",
-}
-
-
-def identity_value(name: str) -> str:
-    identity_file = ROOT / "config" / "Identity.cmake"
-    contents = identity_file.read_text(encoding="utf-8")
-    match = re.search(rf'^set\({re.escape(name)} "([^"]+)"\)$', contents, re.MULTILINE)
-    if match is None:
-        fail(f"could not read {name} from {identity_file}")
-    return match.group(1)
-
-
-def fail(message: str) -> None:
-    print(f"tabos: {message}", file=sys.stderr)
-    raise SystemExit(2)
-
-
-def require_tool(name: str, hint: str) -> str:
-    executable = shutil.which(name)
-    if executable is None:
-        fail(f"required tool '{name}' not found; {hint}")
-    return executable
-
-
-def run(command: list[str], *, env: dict[str, str] | None = None) -> None:
-    print("+", " ".join(command), flush=True)
-    subprocess.run(command, cwd=ROOT, env=env, check=True)
-
-
-def command_succeeds(command: list[str]) -> bool:
-    return subprocess.run(
-        command,
-        cwd=ROOT,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        check=False,
-    ).returncode == 0
-
-
-def confirm_commands(summary: str, commands: list[list[str]]) -> None:
-    print(f"tabos: {summary}")
-    for command in commands:
-        print("  " + shlex.join(command))
-    try:
-        answer = input("Continue? [y/N] ").strip().lower()
-    except EOFError:
-        answer = ""
-    if answer not in {"y", "yes"}:
-        print("tabos: setup aborted")
-        raise SystemExit(0)
-
-
-def cmake_is_supported() -> bool:
-    cmake = shutil.which("cmake")
-    if cmake is None:
-        return False
-    result = subprocess.run([cmake, "--version"], capture_output=True, text=True, check=False)
-    match = re.search(r"cmake version (\d+)\.(\d+)", result.stdout)
-    return match is not None and tuple(map(int, match.groups())) >= (3, 22)
-
-
-def sdl3_is_available() -> bool:
-    pkg_config = shutil.which("pkg-config")
-    return pkg_config is not None and command_succeeds([pkg_config, "--exists", "sdl3"])
-
-
-def validate_project_config(config: dict[str, str]) -> None:
-    unknown = sorted(set(config) - set(CONFIG_DEFAULTS))
-    if unknown:
-        fail(f"unknown option in {LOCAL_CONFIG}: {unknown[0]}")
-    if not re.fullmatch(r"[1-8]", config["TABOS_TERMINAL_SCALE"]):
-        fail("TABOS_TERMINAL_SCALE must be an integer from 1 through 8")
-    if not config["TABOS_HOST_ROOTFS"]:
-        fail("TABOS_HOST_ROOTFS must not be empty")
-    for name in (
-        "TABOS_FONT_GLYPH_WIDTH",
-        "TABOS_FONT_GLYPH_HEIGHT",
-        "TABOS_FONT_CELL_WIDTH",
-        "TABOS_FONT_CELL_HEIGHT",
-    ):
-        if not re.fullmatch(r"[1-9][0-9]*", config[name]):
-            fail(f"{name} must be a positive integer")
-    if not re.fullmatch(r"(?:[1-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-6])",
-                        config["TABOS_FONT_GLYPH_COUNT"]):
-        fail("TABOS_FONT_GLYPH_COUNT must be an integer from 1 through 256")
-    glyph_width = int(config["TABOS_FONT_GLYPH_WIDTH"])
-    glyph_height = int(config["TABOS_FONT_GLYPH_HEIGHT"])
-    glyph_count = int(config["TABOS_FONT_GLYPH_COUNT"])
-    if int(config["TABOS_FONT_CELL_WIDTH"]) < glyph_width or \
-            int(config["TABOS_FONT_CELL_HEIGHT"]) < glyph_height:
-        fail("font cell dimensions must contain the configured glyph dimensions")
-    font_path = Path(config["TABOS_FONT_FILE"])
-    if not font_path.is_absolute():
-        font_path = ROOT / font_path
-    if not font_path.is_file():
-        fail(f"TABOS_FONT_FILE does not exist: {font_path}")
-    expected_size = ((glyph_width + 7) // 8) * glyph_height * glyph_count
-    if font_path.stat().st_size != expected_size:
-        fail(
-            f"TABOS_FONT_FILE is {font_path.stat().st_size} bytes; expected {expected_size} "
-            f"for {glyph_count} glyphs of {glyph_width}x{glyph_height}"
-        )
-    for name in ("TABOS_TERMINAL_SCROLLBACK_LINES", "TABOS_CURSOR_BLINK_INTERVAL_MS"):
-        if not re.fullmatch(r"[1-9][0-9]*", config[name]):
-            fail(f"{name} must be a positive integer")
-    if config["TABOS_HOST_STARTUP_APP"] not in {"none", "console-test"}:
-        fail("TABOS_HOST_STARTUP_APP must be none or console-test")
-    if config["TABOS_TAB5_STARTUP_APP"] not in {"none", "console-test", "elf-hello"}:
-        fail("TABOS_TAB5_STARTUP_APP must be none, console-test, or elf-hello")
-
-
-def load_project_config() -> dict[str, str]:
-    config = CONFIG_DEFAULTS.copy()
-    if LOCAL_CONFIG.exists():
-        for line_number, raw_line in enumerate(LOCAL_CONFIG.read_text(encoding="utf-8").splitlines(), 1):
-            line = raw_line.strip()
-            if not line or line.startswith("#"):
-                continue
-            if "=" not in line:
-                fail(f"invalid line {line_number} in {LOCAL_CONFIG}")
-            name, value = line.split("=", 1)
-            config[name.strip()] = value.strip()
-    validate_project_config(config)
-    return config
-
-
-def prompt_choice(label: str, current: str, choices: tuple[str, ...]) -> str:
-    while True:
-        value = input(f"{label} ({'/'.join(choices)}) [{current}]: ").strip()
-        if not value:
-            return current
-        if value in choices:
-            return value
-        print(f"tabos: choose one of: {', '.join(choices)}")
-
-
-def prompt_integer(label: str, current: str, minimum: int, maximum: int | None = None) -> str:
-    while True:
-        value = input(f"{label} [{current}]: ").strip()
-        if not value:
-            return current
-        if value.isdigit() and int(value) >= minimum and (maximum is None or int(value) <= maximum):
-            return value
-        limit = f"{minimum} through {maximum}" if maximum is not None else f"{minimum} or greater"
-        print(f"tabos: enter integer {limit}")
-
-
-def prompt_text(label: str, current: str) -> str:
-    value = input(f"{label} [{current}]: ").strip()
-    return value or current
-
-
-def command_config(_args: argparse.Namespace) -> None:
-    config = load_project_config()
-    print(f"TabOS project configuration ({LOCAL_CONFIG.relative_to(ROOT)})")
-    print("Press Enter to keep current value. Ctrl+C aborts without saving.\n")
-    try:
-        config["TABOS_HOST_STARTUP_APP"] = prompt_choice(
-            "Host startup app", config["TABOS_HOST_STARTUP_APP"], ("none", "console-test")
-        )
-        config["TABOS_TAB5_STARTUP_APP"] = prompt_choice(
-            "Tab5 startup app", config["TABOS_TAB5_STARTUP_APP"], ("none", "console-test", "elf-hello")
-        )
-        config["TABOS_HOST_ROOTFS"] = prompt_text(
-            "Host root filesystem directory", config["TABOS_HOST_ROOTFS"]
-        )
-        config["TABOS_FONT_FILE"] = prompt_text("Bitmap font file", config["TABOS_FONT_FILE"])
-        config["TABOS_FONT_GLYPH_WIDTH"] = prompt_integer(
-            "Font glyph width (pixels)", config["TABOS_FONT_GLYPH_WIDTH"], 1
-        )
-        config["TABOS_FONT_GLYPH_HEIGHT"] = prompt_integer(
-            "Font glyph height (pixels)", config["TABOS_FONT_GLYPH_HEIGHT"], 1
-        )
-        config["TABOS_FONT_GLYPH_COUNT"] = prompt_integer(
-            "Font glyph count", config["TABOS_FONT_GLYPH_COUNT"], 1, 256
-        )
-        config["TABOS_FONT_CELL_WIDTH"] = prompt_integer(
-            "Font cell width (pixels)", config["TABOS_FONT_CELL_WIDTH"], 1
-        )
-        config["TABOS_FONT_CELL_HEIGHT"] = prompt_integer(
-            "Font cell height (pixels)", config["TABOS_FONT_CELL_HEIGHT"], 1
-        )
-        config["TABOS_TERMINAL_SCALE"] = prompt_integer(
-            "Terminal scale", config["TABOS_TERMINAL_SCALE"], 1, 8
-        )
-        config["TABOS_TERMINAL_SCROLLBACK_LINES"] = prompt_integer(
-            "Terminal scrollback lines", config["TABOS_TERMINAL_SCROLLBACK_LINES"], 1
-        )
-        config["TABOS_CURSOR_BLINK_INTERVAL_MS"] = prompt_integer(
-            "Cursor blink half-period (ms)", config["TABOS_CURSOR_BLINK_INTERVAL_MS"], 1
-        )
-    except (EOFError, KeyboardInterrupt):
-        print("\ntabos: configuration aborted", file=sys.stderr)
-        raise SystemExit(2)
-
-    validate_project_config(config)
-    LOCAL_DIR.mkdir(parents=True, exist_ok=True)
-    temporary = LOCAL_CONFIG.with_suffix(".config.tmp")
-    contents = "# Generated by ./tools/tabos config\n" + "".join(
-        f"{name}={config[name]}\n" for name in CONFIG_DEFAULTS
-    )
-    temporary.write_text(contents, encoding="utf-8")
-    os.replace(temporary, LOCAL_CONFIG)
-    print(f"tabos: saved {LOCAL_CONFIG.relative_to(ROOT)}")
-
-
-def project_cmake_arguments(target: str) -> list[str]:
-    config = load_project_config()
-    startup_app = config["TABOS_TAB5_STARTUP_APP" if target == "tab5" else "TABOS_HOST_STARTUP_APP"]
-    font_path = Path(config["TABOS_FONT_FILE"])
-    if not font_path.is_absolute():
-        font_path = ROOT / font_path
-    host_rootfs = Path(config["TABOS_HOST_ROOTFS"])
-    if not host_rootfs.is_absolute():
-        host_rootfs = ROOT / host_rootfs
-    return [
-        f"-DTABOS_HOST_ROOTFS={host_rootfs}",
-        f"-DTABOS_FONT_FILE={font_path}",
-        f"-DTABOS_FONT_GLYPH_WIDTH={config['TABOS_FONT_GLYPH_WIDTH']}",
-        f"-DTABOS_FONT_GLYPH_HEIGHT={config['TABOS_FONT_GLYPH_HEIGHT']}",
-        f"-DTABOS_FONT_GLYPH_COUNT={config['TABOS_FONT_GLYPH_COUNT']}",
-        f"-DTABOS_FONT_CELL_WIDTH={config['TABOS_FONT_CELL_WIDTH']}",
-        f"-DTABOS_FONT_CELL_HEIGHT={config['TABOS_FONT_CELL_HEIGHT']}",
-        f"-DTABOS_TERMINAL_SCALE={config['TABOS_TERMINAL_SCALE']}",
-        f"-DTABOS_TERMINAL_SCROLLBACK_LINES={config['TABOS_TERMINAL_SCROLLBACK_LINES']}",
-        f"-DTABOS_CURSOR_BLINK_INTERVAL_MS={config['TABOS_CURSOR_BLINK_INTERVAL_MS']}",
-        f"-DTABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP={'ON' if startup_app == 'console-test' else 'OFF'}",
-        f"-DTABOS_ENABLE_ELF_LOADER_EXPERIMENT={'ON' if startup_app == 'elf-hello' else 'OFF'}",
-    ]
-
-
-def local_idf_installed() -> bool:
-    return (LOCAL_IDF / "export.sh").is_file() and (LOCAL_IDF / "install.sh").is_file()
-
-
-def active_idf_is_supported() -> bool:
-    idf_path = os.environ.get("IDF_PATH")
-    if not idf_path or shutil.which("idf.py") is None:
-        return False
-    version_file = Path(idf_path) / "version.txt"
-    try:
-        return version_file.read_text(encoding="utf-8").strip() == ESP_IDF_VERSION
-    except OSError:
-        return False
-
-
-def local_idf_environment() -> dict[str, str]:
-    if not local_idf_installed():
-        fail("local ESP-IDF is not installed; run './tools/tabos setup'")
-
-    environment = os.environ.copy()
-    environment["IDF_TOOLS_PATH"] = str(LOCAL_IDF_TOOLS)
-    command = [
-        "bash",
-        "-c",
-        'source "$1" >/dev/null && env -0',
-        "tabos-idf-environment",
-        str(LOCAL_IDF / "export.sh"),
-    ]
-    result = subprocess.run(command, cwd=ROOT, env=environment, check=True, capture_output=True)
-    return {
-        key.decode(): value.decode()
-        for entry in result.stdout.split(b"\0")
-        if entry
-        for key, value in [entry.split(b"=", 1)]
+def command_target(args: argparse.Namespace) -> None:
+    handlers = {
+        "build": command_build,
+        "test": command_test,
+        "run": command_run,
+        "flash": command_flash,
     }
+    handlers[args.action](args)
 
 
-def idf_environment() -> dict[str, str]:
-    if active_idf_is_supported():
-        return os.environ.copy()
-    print(f"tabos: activating local ESP-IDF {ESP_IDF_VERSION}", flush=True)
-    return local_idf_environment()
-
-
-def setup_host_tools() -> None:
-    host = platform.system()
-    if host == "Darwin":
-        brew = require_tool("brew", "install Homebrew from https://brew.sh")
-        packages = []
-        if not cmake_is_supported():
-            packages.append("cmake")
-        if shutil.which("ninja") is None:
-            packages.append("ninja")
-        if not sdl3_is_available():
-            packages.append("sdl3")
-        if shutil.which("git") is None:
-            packages.append("git")
-        if packages:
-            commands = [[brew, "install", *packages]]
-            confirm_commands("missing macOS host tools will be installed:", commands)
-            for command in commands:
-                run(command)
-        else:
-            print("tabos: macOS host tools already installed")
-        return
-    if host == "Linux":
-        apt_get = require_tool("apt-get", "use a Debian/Ubuntu host or install prerequisites manually")
-        packages = []
-        if any(shutil.which(tool) is None for tool in ("cc", "c++", "make")):
-            packages.append("build-essential")
-        if not cmake_is_supported():
-            packages.append("cmake")
-        if shutil.which("ninja") is None:
-            packages.append("ninja-build")
-        if not sdl3_is_available():
-            packages.append("libsdl3-dev")
-        if shutil.which("python3") is None:
-            packages.append("python3")
-        if shutil.which("git") is None:
-            packages.append("git")
-        if not packages:
-            print("tabos: Linux host tools already installed")
-            return
-        prefix = [] if os.geteuid() == 0 else [require_tool("sudo", "run setup as root or install sudo")]
-        commands = [
-            [*prefix, apt_get, "update"],
-            [*prefix, apt_get, "install", "-y", *packages],
-        ]
-        confirm_commands("missing Linux host tools will be installed:", commands)
-        for command in commands:
-            run(command)
-        return
-    fail(f"setup does not support host operating system '{host}'")
-
-
-def command_setup(_args: argparse.Namespace) -> None:
-    setup_host_tools()
-    git = require_tool("git", "install Git")
-    LOCAL_DIR.mkdir(parents=True, exist_ok=True)
-
-    git_dir = LOCAL_IDF / ".git"
-    if not LOCAL_IDF.exists():
-        idf_commands = [[
-            git, "clone", "--branch", ESP_IDF_VERSION, "--single-branch", "--depth", "1",
-            "--recursive", "--shallow-submodules",
-            "https://github.com/espressif/esp-idf.git", str(LOCAL_IDF),
-        ]]
-    elif git_dir.is_dir():
-        idf_commands = [
-            [git, "-C", str(LOCAL_IDF), "fetch", "--depth", "1", "origin", f"refs/tags/{ESP_IDF_VERSION}"],
-            [git, "-C", str(LOCAL_IDF), "checkout", "--detach", "FETCH_HEAD"],
-            [git, "-C", str(LOCAL_IDF), "submodule", "update", "--init", "--recursive", "--depth", "1"],
-        ]
+def normalize_target_arguments(args: argparse.Namespace) -> None:
+    values = args.target_arguments
+    if len(values) == 1:
+        args.configuration = "debug"
+        args.action = values[0]
+    elif len(values) == 2:
+        args.configuration, args.action = values
     else:
-        fail(f"{LOCAL_IDF} exists but is not an ESP-IDF Git checkout")
+        fail("target command expects [debug|release] <action>")
 
-    environment = os.environ.copy()
-    environment["IDF_TOOLS_PATH"] = str(LOCAL_IDF_TOOLS)
-    install_command = [str(LOCAL_IDF / "install.sh"), "esp32p4"]
-    confirm_commands(
-        f"ESP-IDF {ESP_IDF_VERSION} and ESP32-P4 tools will be downloaded or updated under .local:",
-        [*idf_commands, install_command],
-    )
-    for command in idf_commands:
-        run(command)
-    run(install_command, env=environment)
-    print("tabos: local ESP-IDF ready")
-    print("tabos: activate current shell with: eval \"$(./tools/tabos activate-idf)\"")
-
-
-def command_activate_idf(_args: argparse.Namespace) -> None:
-    if not local_idf_installed():
-        fail("local ESP-IDF is not installed; run './tools/tabos setup'")
-    print(f"export IDF_TOOLS_PATH={shlex.quote(str(LOCAL_IDF_TOOLS))}")
-    print(f". {shlex.quote(str(LOCAL_IDF / 'export.sh'))}")
-
-
-def validate_host(target: str) -> None:
-    host = platform.system()
-    expected = "Darwin" if target == "macos" else "Linux"
-    if host != expected:
-        fail(f"target '{target}' requires a {expected} host; current host is {host}")
-
-
-def host_build(target: str, configuration: str) -> None:
-    validate_host(target)
-    cmake = require_tool("cmake", "install CMake 3.22 or newer")
-    require_tool("ninja", "install Ninja")
-    preset = f"{target}-{configuration}"
-    run([cmake, "--preset", preset, *project_cmake_arguments(target)])
-    run([cmake, "--build", "--preset", preset])
-
-
-def tab5_command(configuration: str, action: str) -> None:
-    environment = idf_environment()
-    idf = shutil.which("idf.py", path=environment.get("PATH"))
-    if idf is None:
-        fail("idf.py missing after ESP-IDF activation; run './tools/tabos setup'")
-    build_dir = ROOT / "build" / f"tab5-{configuration}"
-    command = [
-        idf,
-        "-C",
-        str(ROOT / "targets" / "tab5"),
-        "-B",
-        str(build_dir),
-        "-DIDF_TARGET=esp32p4",
-        f"-DCMAKE_BUILD_TYPE={CONFIGURATIONS[configuration]}",
-        *project_cmake_arguments("tab5"),
-        action,
-    ]
-    run(command, env=environment)
-
-
-def command_build(args: argparse.Namespace) -> None:
-    if args.target in HOST_TARGETS:
-        host_build(args.target, args.configuration)
-    else:
-        tab5_command(args.configuration, "build")
-
-
-def command_test(args: argparse.Namespace) -> None:
-    if args.target not in HOST_TARGETS:
-        fail("tests currently run only on macos and linux host targets")
-    host_build(args.target, args.configuration)
-    ctest = require_tool("ctest", "install CMake 3.22 or newer")
-    run([ctest, "--preset", f"{args.target}-{args.configuration}"])
-
-
-def command_run(args: argparse.Namespace) -> None:
-    if args.target not in HOST_TARGETS:
-        fail("run supports host targets; use 'flash tab5' for hardware")
-    host_build(args.target, args.configuration)
-    executable = ROOT / "build" / f"{args.target}-{args.configuration}" / "tabos_host"
-    run([str(executable)])
-
-
-def command_flash(args: argparse.Namespace) -> None:
-    tab5_command(args.configuration, "flash")
-
-
-def add_target_arguments(parser: argparse.ArgumentParser, *, include_tab5: bool) -> None:
-    targets = ["macos", "linux"]
-    if include_tab5:
-        targets.append("tab5")
-    parser.add_argument("target", choices=targets)
-    parser.add_argument("configuration", nargs="?", choices=CONFIGURATIONS, default="debug")
+    if args.configuration not in CONFIGURATIONS:
+        fail("configuration must be debug or release")
+    actions = {"build", "flash"} if args.target == "tab5" else {"build", "test", "run"}
+    if args.action not in actions:
+        fail(f"target '{args.target}' action must be one of: {', '.join(sorted(actions))}")
 
 
 def parse_args() -> argparse.Namespace:
     system_name = identity_value("TABOS_SYSTEM_NAME")
-    parser = argparse.ArgumentParser(description=f"Build, test, run, flash, and set up {system_name} targets")
+    parser = argparse.ArgumentParser(
+        description=f"Build, test, run, flash, and set up {system_name} targets"
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    build_parser = subparsers.add_parser("build", help="build a target")
-    add_target_arguments(build_parser, include_tab5=True)
-    build_parser.set_defaults(handler=command_build)
-
-    test_parser = subparsers.add_parser("test", help="build and test a host target")
-    add_target_arguments(test_parser, include_tab5=False)
-    test_parser.set_defaults(handler=command_test)
-
-    run_parser = subparsers.add_parser("run", help="build and run a host target")
-    add_target_arguments(run_parser, include_tab5=False)
-    run_parser.set_defaults(handler=command_run)
-
-    flash_parser = subparsers.add_parser("flash", help="build and flash Tab5")
-    flash_parser.add_argument("target", choices=["tab5"])
-    flash_parser.add_argument("configuration", nargs="?", choices=CONFIGURATIONS, default="debug")
-    flash_parser.set_defaults(handler=command_flash)
+    for target in ("macos", "linux", "tab5"):
+        target_parser = subparsers.add_parser(target, help=f"operate on {target} target")
+        actions = ("build", "flash") if target == "tab5" else ("build", "test", "run")
+        target_parser.add_argument(
+            "target_arguments",
+            nargs="+",
+            metavar="[debug|release] action",
+            help=f"optional configuration followed by one of: {', '.join(actions)}",
+        )
+        target_parser.set_defaults(
+            target=target,
+            handler=command_target,
+            argument_normalizer=normalize_target_arguments,
+        )
 
     setup_parser = subparsers.add_parser(
         "setup", help=f"install host tools and ESP-IDF {ESP_IDF_VERSION}"
@@ -510,7 +81,11 @@ def parse_args() -> argparse.Namespace:
     )
     config_parser.set_defaults(handler=command_config)
 
-    return parser.parse_args()
+    args = parser.parse_args()
+    normalizer = getattr(args, "argument_normalizer", None)
+    if normalizer is not None:
+        normalizer(args)
+    return args
 
 
 def main() -> int:
