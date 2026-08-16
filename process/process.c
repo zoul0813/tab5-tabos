@@ -1,4 +1,5 @@
 #include <tabos/internal/application.h>
+#include <tabos/internal/console.h>
 #include <tabos/internal/elf_application.h>
 
 #include <tabos/platform/platform.h>
@@ -25,6 +26,18 @@ static kernel_process_t *foreground_process;
 static bool last_exit_valid;
 static int last_exit_status;
 
+static const char *termination_name(tabos_process_termination_t cause)
+{
+    switch (cause) {
+    case TABOS_PROCESS_TERMINATION_EXIT_REQUEST: return "exit request";
+    case TABOS_PROCESS_TERMINATION_RETURN: return "return";
+    case TABOS_PROCESS_TERMINATION_FAULT: return "execution fault";
+    case TABOS_PROCESS_TERMINATION_FORCED: return "forced termination";
+    case TABOS_PROCESS_TERMINATION_NONE: return "unknown cause";
+    }
+    return "unknown cause";
+}
+
 static void panic_root_process(kernel_process_t *process)
 {
     char message[96];
@@ -33,13 +46,12 @@ static void panic_root_process(kernel_process_t *process)
     last_exit_status = process->context.exit_status;
     last_exit_valid = true;
     (void)snprintf(message, sizeof(message),
-        "KERNEL PANIC: process 0 (%s) exited with status %d",
-        process->context.descriptor->name, process->context.exit_status);
+        "KERNEL PANIC: process 0 (%s): %s; status %d",
+        process->context.descriptor->name,
+        termination_name(process->context.termination_cause),
+        process->context.exit_status);
     platform_log(message);
-    if (process->context.console_owned) {
-        (void)tabos_console_write(&process->context.console, "\n[KERNEL PANIC] ");
-        (void)tabos_console_write_line(&process->context.console, message + 14);
-    }
+    (void)console_write_panic(message);
 }
 
 static kernel_process_t *find_process(tabos_process_id_t id)
@@ -319,9 +331,33 @@ const tabos_app_descriptor_t *tabos_app_active(void)
 void tabos_app_request_exit(tabos_app_context_t *context, int exit_status)
 {
     if (foreground_process != NULL && context == &foreground_process->context) {
+        if (context->termination_cause == TABOS_PROCESS_TERMINATION_NONE) {
+            context->termination_cause = TABOS_PROCESS_TERMINATION_EXIT_REQUEST;
+        }
         context->exit_requested = true;
         context->exit_status = exit_status;
     }
+}
+
+void kernel_process_fail(tabos_app_context_t *context,
+                         tabos_process_termination_t cause,
+                         int exit_status)
+{
+    if (foreground_process == NULL || context != &foreground_process->context ||
+        cause == TABOS_PROCESS_TERMINATION_NONE) {
+        return;
+    }
+    context->termination_cause = cause;
+    context->exit_requested = true;
+    context->exit_status = exit_status;
+}
+
+bool kernel_process_force_terminate(tabos_process_id_t process_id, int exit_status)
+{
+    kernel_process_t *process = find_process(process_id);
+    if (process == NULL || process != foreground_process) return false;
+    kernel_process_fail(&process->context, TABOS_PROCESS_TERMINATION_FORCED, exit_status);
+    return true;
 }
 
 const tabos_console_session_t *tabos_app_console(const tabos_app_context_t *context)
@@ -369,6 +405,14 @@ bool tabos_process_system_panicked(void)
 {
     return foreground_process != NULL &&
         foreground_process->state == TABOS_PROCESS_PANICKED;
+}
+
+bool tabos_process_panic_info(tabos_process_termination_t *cause, int *exit_status)
+{
+    if (!tabos_process_system_panicked() || cause == NULL || exit_status == NULL) return false;
+    *cause = foreground_process->context.termination_cause;
+    *exit_status = foreground_process->context.exit_status;
+    return true;
 }
 
 void application_report_diagnostic_result(tabos_app_context_t *context, int status)

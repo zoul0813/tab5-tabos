@@ -211,7 +211,7 @@ static void elf_update(tabos_app_context_t *context)
 {
     loader_elf_application_t *application = application_from_context(context);
     if (application == NULL || application->execution == NULL) {
-        tabos_app_request_exit(context, 5);
+        kernel_process_fail(context, TABOS_PROCESS_TERMINATION_FAULT, 5);
         return;
     }
 
@@ -243,7 +243,7 @@ static void elf_update(tabos_app_context_t *context)
     if (result == PLATFORM_RISCV32_YIELDED) return;
     if (result == PLATFORM_RISCV32_FAULT) {
         (void)tabos_console_write_line(application->console, "ELF execution FAILED");
-        tabos_app_request_exit(context, 5);
+        kernel_process_fail(context, TABOS_PROCESS_TERMINATION_FAULT, 5);
         return;
     }
     char exit_message[56];
@@ -251,7 +251,7 @@ static void elf_update(tabos_app_context_t *context)
                    "ELF entry returned status %d", returned_status);
     platform_log(exit_message);
     if (!atomic_load_explicit(&application->exit_requested, memory_order_acquire)) {
-        tabos_app_request_exit(context, returned_status);
+        kernel_process_fail(context, TABOS_PROCESS_TERMINATION_RETURN, returned_status);
     }
 }
 

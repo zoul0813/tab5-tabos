@@ -6,6 +6,10 @@
 #include <tabos/internal/input.h>
 #include <tabos/internal/terminal.h>
 
+#include "platform_test.h"
+
+#include <string.h>
+
 static unsigned int entry_calls;
 static unsigned int update_calls;
 static unsigned int cleanup_calls;
@@ -16,6 +20,23 @@ static unsigned int child_stage;
 static bool nested_complete;
 static unsigned int file_root_stage;
 static bool file_child_cleanup_complete;
+static tabos_process_termination_t requested_panic_cause;
+
+static bool terminal_contains(const terminal_t *terminal, const char *text)
+{
+    const size_t length = strlen(text);
+    if (length == 0U) return true;
+    size_t matched = 0U;
+    const size_t cell_count = terminal->line_capacity * terminal->columns;
+    for (size_t index = 0U; index < cell_count; ++index) {
+        if (terminal->cells[index].character == text[matched]) {
+            if (++matched == length) return true;
+        } else {
+            matched = terminal->cells[index].character == text[0] ? 1U : 0U;
+        }
+    }
+    return false;
+}
 
 static bool nested_entry(tabos_app_context_t *context)
 {
@@ -151,6 +172,20 @@ static const tabos_app_descriptor_t failing_app = {
     .cleanup = test_cleanup,
 };
 
+static void panic_update(tabos_app_context_t *context)
+{
+    kernel_process_fail(context, requested_panic_cause, 41);
+}
+
+static const tabos_app_descriptor_t panic_app = {
+    .abi_version = TABOS_APPLICATION_ABI_VERSION,
+    .name = "panic-test",
+    .version = "1.0.0",
+    .capabilities = TABOS_APP_CAPABILITY_CONSOLE,
+    .entry = nested_entry,
+    .update = panic_update,
+};
+
 int main(void)
 {
     input_init();
@@ -162,7 +197,9 @@ int main(void)
     if (!terminal_init(&terminal, display_framebuffer(), 2U)) {
         return 1;
     }
-    console_init(&terminal);
+    if (!console_init(&terminal)) {
+        return 1;
+    }
     kernel_application_system_init();
 
     if (!application_registry_register(&root_app) ||
@@ -256,12 +293,17 @@ int main(void)
     }
 
     kernel_application_system_update();
+    tabos_process_termination_t panic_cause = TABOS_PROCESS_TERMINATION_NONE;
     if (tabos_app_is_running() || tabos_app_active() != &test_app || update_calls != 1U ||
         cleanup_calls != 1U || tabos_process_count() != 1U ||
         !tabos_process_system_panicked() ||
         !tabos_process_info(0U, &process_info) ||
         process_info.state != TABOS_PROCESS_PANICKED ||
         !tabos_app_last_exit_status(&exit_status) || exit_status != 7 ||
+        !tabos_process_panic_info(&panic_cause, &exit_status) ||
+        panic_cause != TABOS_PROCESS_TERMINATION_EXIT_REQUEST || exit_status != 7 ||
+        strstr(test_platform_last_log(), "exit request") == NULL ||
+        !terminal_contains(&terminal, "KERNEL PANIC") ||
         tabos_console_acquire(&denied)) {
         return 1;
     }
@@ -273,6 +315,32 @@ int main(void)
         return 1;
     }
     tabos_console_release(&denied);
+
+    const tabos_process_termination_t panic_causes[] = {
+        TABOS_PROCESS_TERMINATION_RETURN,
+        TABOS_PROCESS_TERMINATION_FAULT,
+        TABOS_PROCESS_TERMINATION_FORCED,
+    };
+    for (size_t index = 0U; index < sizeof(panic_causes) / sizeof(panic_causes[0]); ++index) {
+        kernel_application_system_init();
+        if (!application_registry_register(&panic_app) ||
+            tabos_app_launch("panic-test") != TABOS_APP_RESULT_OK) {
+            return 1;
+        }
+        requested_panic_cause = panic_causes[index];
+        test_platform_clear_log();
+        if (requested_panic_cause == TABOS_PROCESS_TERMINATION_FORCED) {
+            if (!kernel_process_force_terminate(0U, 41)) return 1;
+        }
+        kernel_application_system_update();
+        if (!tabos_process_panic_info(&panic_cause, &exit_status) ||
+            panic_cause != requested_panic_cause || exit_status != 41 ||
+            tabos_process_count() != 1U || strlen(test_platform_last_log()) == 0U) {
+            return 1;
+        }
+        kernel_application_system_shutdown();
+    }
+
     console_shutdown();
     terminal_shutdown(&terminal);
     display_shutdown();

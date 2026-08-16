@@ -52,6 +52,12 @@ Filesystem shell uses same process operation through ELF ABI call gate.
 this for shell startup. Each loaded ELF owns path, descriptor, executable mapping, and
 execution context until process cleanup.
 
+Process 0 is required and cannot exit. Exit request, executable return, execution fault,
+or forced termination moves it into kernel-panic state without unloading or restarting
+it. `tabos_process_panic_info()` reports retained cause and status. Panic message is sent
+to serial logging and directly to framebuffer console even if ordinary console ownership
+is unavailable.
+
 ## Console Test Application
 
 When `TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP=ON`, built-in `console-test` application is registered and selected as persistent PID 0. It receives console ownership from process manager instead of acquiring console itself. Ctrl+Q reports diagnostic completion but leaves PID 0 active.
@@ -83,6 +89,8 @@ Current implementation is deliberately small:
   discovery yet
 - Tab5 runs each native ELF entry in managed FreeRTOS application task so persistent
   applications do not block runtime/service loop
+- shared console state uses platform mutexes: SDL mutex on host and a FreeRTOS mutex with
+  priority inheritance on Tab5
 
 Descriptor and public application API avoid assumptions about executable container.
 Loader reads stripped ELF through TabOS filesystem API and maps its entry into this

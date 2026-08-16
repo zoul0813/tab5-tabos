@@ -1,10 +1,16 @@
 #include <tabos/platform/platform.h>
 
 #include <stddef.h>
+#include <stdio.h>
 #include <stdlib.h>
+
+struct platform_mutex {
+    unsigned int unused;
+};
 
 static platform_pixel_t pixels[TABOS_DISPLAY_WIDTH * TABOS_DISPLAY_HEIGHT];
 static uint64_t monotonic_ms;
+static char last_log[256];
 
 bool platform_display_init(platform_framebuffer_t *framebuffer)
 {
@@ -60,7 +66,17 @@ bool platform_get_diagnostics(platform_diagnostics_t *diagnostics)
 
 void platform_log(const char *message)
 {
-    (void)message;
+    (void)snprintf(last_log, sizeof(last_log), "%s", message != NULL ? message : "");
+}
+
+const char *test_platform_last_log(void)
+{
+    return last_log;
+}
+
+void test_platform_clear_log(void)
+{
+    last_log[0] = '\0';
 }
 
 uint64_t platform_time_ms(void)
@@ -143,4 +159,24 @@ void test_platform_advance_time_ms(uint64_t elapsed_ms)
 
 void platform_input_wait(void)
 {
+}
+
+platform_mutex_t *platform_mutex_create(void)
+{
+    return calloc(1U, sizeof(platform_mutex_t));
+}
+
+void platform_mutex_destroy(platform_mutex_t *mutex)
+{
+    free(mutex);
+}
+
+void platform_mutex_lock(platform_mutex_t *mutex)
+{
+    (void)mutex;
+}
+
+void platform_mutex_unlock(platform_mutex_t *mutex)
+{
+    (void)mutex;
 }

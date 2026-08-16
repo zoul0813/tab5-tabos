@@ -32,7 +32,7 @@ int main(int argc, char **argv)
     }
 
     if (!kernel_runtime_start()) {
-        fprintf(stderr, "%s display initialization failed\n", TABOS_SYSTEM_NAME);
+        fprintf(stderr, "%s runtime startup failed\n", TABOS_SYSTEM_NAME);
         kernel_runtime_shutdown();
         platform_shutdown();
         return 1;

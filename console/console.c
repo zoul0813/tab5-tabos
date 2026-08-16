@@ -8,12 +8,10 @@
 
 #include <tabos/platform/platform.h>
 
-#include <stdatomic.h>
-
 static terminal_t *active_terminal;
 static uint32_t foreground_token;
 static uint32_t next_token = 1U;
-static atomic_flag console_lock = ATOMIC_FLAG_INIT;
+static platform_mutex_t *console_mutex;
 static tabos_timer_t cursor_timer;
 static bool cursor_phase_visible = true;
 
@@ -31,14 +29,12 @@ static bool restart_cursor_blink(void)
 
 static void lock_console(void)
 {
-    while (atomic_flag_test_and_set_explicit(&console_lock, memory_order_acquire)) {
-        platform_input_wait();
-    }
+    platform_mutex_lock(console_mutex);
 }
 
 static void unlock_console(void)
 {
-    atomic_flag_clear_explicit(&console_lock, memory_order_release);
+    platform_mutex_unlock(console_mutex);
 }
 
 static bool owns_console(const tabos_console_session_t *session)
@@ -46,8 +42,11 @@ static bool owns_console(const tabos_console_session_t *session)
     return session != NULL && session->token != 0U && session->token == foreground_token;
 }
 
-void console_init(terminal_t *terminal)
+bool console_init(terminal_t *terminal)
 {
+    if (terminal == NULL || console_mutex != NULL) return false;
+    console_mutex = platform_mutex_create();
+    if (console_mutex == NULL) return false;
     lock_console();
     active_terminal = terminal;
     foreground_token = 0U;
@@ -55,6 +54,7 @@ void console_init(terminal_t *terminal)
     tabos_timer_cancel(&cursor_timer);
     cursor_phase_visible = true;
     unlock_console();
+    return true;
 }
 
 void console_rebind(terminal_t *terminal)
@@ -67,13 +67,30 @@ void console_rebind(terminal_t *terminal)
     unlock_console();
 }
 
+bool console_write_panic(const char *text)
+{
+    if (text == NULL || console_mutex == NULL) return false;
+    lock_console();
+    if (active_terminal == NULL) {
+        unlock_console();
+        return false;
+    }
+    terminal_write_line(active_terminal, text);
+    const bool presented = display_present();
+    unlock_console();
+    return presented;
+}
+
 void console_shutdown(void)
 {
+    if (console_mutex == NULL) return;
     lock_console();
     active_terminal = NULL;
     foreground_token = 0U;
     tabos_timer_cancel(&cursor_timer);
     unlock_console();
+    platform_mutex_destroy(console_mutex);
+    console_mutex = NULL;
 }
 
 bool tabos_console_acquire(tabos_console_session_t *session)

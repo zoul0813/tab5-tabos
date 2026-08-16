@@ -27,6 +27,14 @@ typedef enum {
     TABOS_PROCESS_PANICKED,
 } tabos_process_state_t;
 
+typedef enum {
+    TABOS_PROCESS_TERMINATION_NONE = 0,
+    TABOS_PROCESS_TERMINATION_EXIT_REQUEST,
+    TABOS_PROCESS_TERMINATION_RETURN,
+    TABOS_PROCESS_TERMINATION_FAULT,
+    TABOS_PROCESS_TERMINATION_FORCED,
+} tabos_process_termination_t;
+
 typedef struct {
     tabos_process_id_t id;
     tabos_process_id_t parent_id;
@@ -80,6 +88,7 @@ tabos_process_id_t tabos_app_process_id(const tabos_app_context_t *context);
 size_t tabos_process_count(void);
 bool tabos_process_info(tabos_process_id_t id, tabos_process_info_t *info);
 bool tabos_process_system_panicked(void);
+bool tabos_process_panic_info(tabos_process_termination_t *cause, int *exit_status);
 
 /* Read most recently completed application's status. */
 bool tabos_app_last_exit_status(int *exit_status);

@@ -22,7 +22,9 @@ int main(void)
         return 1;
     }
     terminal_clear(&terminal);
-    console_init(&terminal);
+    if (!console_init(&terminal)) {
+        return 1;
+    }
 
     tabos_console_session_t foreground = {0};
     tabos_console_session_t background = {0};

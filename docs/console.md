@@ -19,6 +19,11 @@ if (tabos_console_acquire(&console)) {
 
 Only one session can own the foreground console. Calls made with missing, background, released, or stale sessions fail. A rejected input read does not remove an event from the queue. This is cooperative ownership, not a security boundary; future process management will assign and revoke foreground sessions.
 
+Console and terminal state is protected across runtime and native application tasks by a
+platform mutex. Host uses SDL synchronization; Tab5 uses a FreeRTOS mutex with priority
+inheritance. Kernel panic output can bypass normal session ownership while retaining the
+same synchronization.
+
 ## Output and Cursor Controls
 
 Terminal stores character, foreground color, and background color in a cell/history model. Framebuffer is rendered view, not only copy of terminal state. `tabos_console_write()` updates cells and presents changed framebuffer immediately. Normal writes and cursor changes redraw dirty cells only; clear, resize, and viewport movement perform full redraw. Supported controls are:

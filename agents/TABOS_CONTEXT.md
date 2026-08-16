@@ -151,6 +151,11 @@ faults, or is otherwise terminated, kernel must enter panic state rather than un
 restart, or normally unwind process 0. Panic must report process-0 failure and available
 cause/exit status to both serial/log sink and framebuffer console/terminal.
 
+Current implementation retains explicit return, exit-request, execution-fault, and
+forced-termination causes. Panic output bypasses ordinary console-session ownership.
+Shared console/terminal state uses an SDL mutex on host and a priority-inheriting FreeRTOS
+mutex on Tab5; portable code does not expose either native mutex type.
+
 Experimental loader now accepts bounded little-endian RV32 `ET_EXEC` ELF with loadable
 segments, executable entry, and no dynamic segment or relocations. It can read a bounded
 ELF file through TabOS filesystem API; checked-in hello bytes remain loader/test fixture

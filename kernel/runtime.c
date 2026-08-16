@@ -195,7 +195,11 @@ bool kernel_runtime_start(void)
         return false;
     }
 
-    console_init(&terminal);
+    if (!console_init(&terminal)) {
+        terminal_shutdown(&terminal);
+        display_shutdown();
+        return false;
+    }
     kernel_application_system_init();
     if (!diagnostic_apps_register()) {
         kernel_application_system_shutdown();

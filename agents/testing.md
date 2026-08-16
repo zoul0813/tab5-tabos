@@ -143,6 +143,11 @@ resume nonexistent parent, and failure cause/exit status appears through both ca
 serial/log output and framebuffer console/terminal output. Panic rendering must work even
 when process-0 console session is stale or unavailable.
 
+Deterministic lifecycle coverage exercises exit request, executable return, execution
+fault, and forced termination. Console tests build against the platform mutex contract;
+hardware validation remains responsible for detecting task starvation, lock inversion,
+and watchdog regressions under the FreeRTOS implementation.
+
 Host RV32 tests must force multiple instruction-slice yields before child completion and
 verify retained PC, registers, memory, and parent state. Tab5 tests must keep native child
 active while independently proving keyboard polling, timer/cursor updates, display work,

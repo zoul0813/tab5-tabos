@@ -64,7 +64,7 @@ void app_main(void)
     }
 
     if (!kernel_runtime_start()) {
-        ESP_LOGE(TAG, "%s display initialization failed", TABOS_SYSTEM_NAME);
+        ESP_LOGE(TAG, "%s runtime startup failed", TABOS_SYSTEM_NAME);
         kernel_runtime_shutdown();
         platform_shutdown();
         return;

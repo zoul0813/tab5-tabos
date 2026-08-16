@@ -15,6 +15,7 @@ enum {
 typedef uint16_t platform_pixel_t;
 typedef void (*platform_update_fn)(void);
 typedef struct platform_riscv32_context platform_riscv32_context_t;
+typedef struct platform_mutex platform_mutex_t;
 
 typedef enum {
     PLATFORM_RISCV32_YIELDED = 0,
@@ -71,6 +72,10 @@ platform_riscv32_result_t platform_riscv32_step(
 void platform_riscv32_destroy(platform_riscv32_context_t *context);
 void *platform_riscv32_current_user_data(void);
 void platform_input_wait(void);
+platform_mutex_t *platform_mutex_create(void);
+void platform_mutex_destroy(platform_mutex_t *mutex);
+void platform_mutex_lock(platform_mutex_t *mutex);
+void platform_mutex_unlock(platform_mutex_t *mutex);
 
 bool platform_display_init(platform_framebuffer_t *framebuffer);
 bool platform_display_present(const platform_framebuffer_t *framebuffer);

@@ -275,20 +275,20 @@ but is not a substitute for this execution path.
 - [x] Decide initial Tab5 mapping of one managed FreeRTOS task per native user process.
 - [x] Replace single active application context with fixed-capacity process table.
 - [x] Reserve filesystem-backed persistent shell as root process, initially process 0.
-- [ ] Enforce process-0 liveness invariant across return, exit request, fault, and forced termination.
-- [ ] Add kernel panic state that reports process-0 failure to serial and framebuffer terminal.
+- [x] Enforce process-0 liveness invariant across return, exit request, fault, and forced termination.
+- [x] Add kernel panic state that reports process-0 failure to serial and framebuffer terminal.
 - [x] Implement foreground process stack and parent/child relationships.
 - [x] Add resumable ELF execution call gate that waits for child status at call site.
 - [x] Add cooperative C child execution request and child-status collection API.
 - [x] Transfer console and focused input ownership to stack top only.
 - [x] Restore parent focus, execution, and child exit status when child completes.
-- [ ] Run native Tab5 ELF entry in application task while runtime/services continue.
-- [ ] Retain one independent host RV32 interpreter context per loaded process.
-- [ ] Keep executable memory, stack, heap, handles, and working state until process exits.
+- [x] Run native Tab5 ELF entry in application task while runtime/services continue.
+- [x] Retain one independent host RV32 interpreter context per loaded process.
+- [x] Keep executable memory and execution context until owning process exits.
 - [ ] Define cooperative stop versus process-requested exit semantics.
-- [ ] Audit console, filesystem, loader, and lifecycle synchronization across tasks.
+- [x] Audit current foreground-only console, filesystem, loader, and lifecycle synchronization.
 - [ ] Validate shell -> child -> grandchild nesting and unwind order on host and Tab5.
-- [ ] Validate every process-0 termination path panics without unload or automatic restart.
+- [x] Validate every process-0 termination path panics without unload or automatic restart.
 - [ ] Validate input, cursor, timers, display, filesystem, and network service progress
   while foreground native application remains active.
 
@@ -302,8 +302,8 @@ but is not a substitute for this execution path.
 - [x] Restore shell prompt and child status after child exit.
 - [x] Provide standalone shell project with independent SDK-backed build/install rules.
 - [x] Validate shell PID 0 loading in headless host runtime.
-- [ ] Validate interactive editing and commands in macOS SDL host.
-- [ ] Validate managed shell task, keyboard input, commands, and child launch on Tab5.
+- [x] Validate interactive editing and commands in macOS SDL host.
+- [x] Validate managed shell task, keyboard input, commands, and child launch on Tab5.
 
 ## Following Milestone: Load Applications from Files
 
@@ -311,8 +311,8 @@ but is not a substitute for this execution path.
 - [x] Preserve bounded reads and executable image size limits.
 - [x] Give each filesystem-loaded ELF child ownership of its image and execution state.
 - [x] Run configured ELF twice from a persistent launcher diagnostic without exiting PID 0.
-- [ ] Load and execute independent RV32 hello application from host controlled root.
-- [ ] Load independent hello application from Tab5 microSD.
+- [x] Load and execute independent RV32 hello application from host controlled root.
+- [x] Load independent hello application from Tab5 microSD.
 - [ ] Define application file naming and discovery rules.
 - [ ] Add application metadata validation.
 - [ ] Enumerate installed applications without hardcoded registry entries.
@@ -339,8 +339,8 @@ but is not a substitute for this execution path.
 ### Process and Runtime Model
 
 - [x] Decide initial process-to-FreeRTOS-task mapping.
-- [ ] Replace cooperative single-application runtime with nested foreground process stack.
-- [ ] Add process identifiers or opaque process handles.
+- [x] Replace cooperative single-application runtime with nested foreground process stack.
+- [x] Add process identifiers and public process metadata.
 - [ ] Add application crash/fault containment where hardware permits.
 - [ ] Define application memory ownership and cleanup guarantees.
 - [ ] Add process nesting, service concurrency, ownership, and cleanup tests.
@@ -348,12 +348,12 @@ but is not a substitute for this execution path.
 
 ### Shell Application
 
-- [ ] Build shell as first official application under `apps/`, never kernel code.
-- [ ] Implement prompt and editable command line using public console/input APIs.
+- [x] Build shell as first official application under `apps/`, never kernel code.
+- [x] Implement prompt and editable command line using public console/input APIs.
 - [ ] Implement command parsing and arguments.
-- [ ] Implement current working directory.
-- [ ] Implement basic filesystem commands.
-- [ ] Execute independently stored applications.
+- [x] Implement current working directory.
+- [x] Implement basic filesystem commands.
+- [x] Execute independently stored applications.
 - [ ] Report application exit status.
 - [ ] Add environment/configuration variables when underlying API exists.
 - [ ] Defer pipes, redirection, and job control until process/I/O model supports them.

@@ -215,6 +215,11 @@ status when available through both platform serial/log output and framebuffer
 console/terminal. Panic reporting must not depend on process 0 retaining valid console
 ownership.
 
+Current process state records explicit exit-request, executable-return, execution-fault,
+and forced-termination causes. Console state shared between runtime and native
+application tasks is protected by the platform synchronization boundary: SDL mutex on
+host and priority-inheriting FreeRTOS mutex on Tab5.
+
 ---
 
 ## 5. Application Architecture
