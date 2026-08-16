@@ -235,8 +235,16 @@ tabos_app_result_t tabos_app_launch(const char *name)
 
 tabos_app_result_t tabos_app_launch_path(const char *path)
 {
+    const char *const argv[] = {path};
+    return tabos_app_launch_path_args(path, 1U, argv);
+}
+
+tabos_app_result_t tabos_app_launch_path_args(const char *path,
+                                              size_t argc,
+                                              const char *const *argv)
+{
     if (path == NULL || path[0] == '\0') return TABOS_APP_RESULT_INVALID;
-    loader_elf_application_t *application = loader_elf_application_create(path);
+    loader_elf_application_t *application = loader_elf_application_create(path, argc, argv);
     if (application == NULL) return TABOS_APP_RESULT_INVALID;
     return launch_root_descriptor(
         loader_elf_application_descriptor(application), application,
@@ -302,8 +310,17 @@ tabos_app_result_t kernel_process_launch_child(tabos_app_context_t *parent,
 
 tabos_app_result_t tabos_app_exec(tabos_app_context_t *context, const char *path)
 {
+    const char *const argv[] = {path};
+    return tabos_app_exec_args(context, path, 1U, argv);
+}
+
+tabos_app_result_t tabos_app_exec_args(tabos_app_context_t *context,
+                                       const char *path,
+                                       size_t argc,
+                                       const char *const *argv)
+{
     if (context == NULL || path == NULL || path[0] == '\0') return TABOS_APP_RESULT_INVALID;
-    loader_elf_application_t *application = loader_elf_application_create(path);
+    loader_elf_application_t *application = loader_elf_application_create(path, argc, argv);
     if (application == NULL) return TABOS_APP_RESULT_INVALID;
     return launch_child_descriptor(
         context, loader_elf_application_descriptor(application), application,

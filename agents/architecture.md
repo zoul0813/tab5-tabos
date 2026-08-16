@@ -166,6 +166,10 @@ retained RV32 interpreter slices. Tab5 platform starts native ELF entry in manag
 application task and polls completion from runtime task. Shell uses pending child-exec
 protocol to remain blocked until process manager restores it with child status.
 
+ELF ABI version 2 entry and nested execution carry bounded `argc`/`argv`. Child loader
+state owns copied arguments for full process lifetime. Tokenization, quoting, and escaping
+are application policy implemented by shell, not kernel process behavior.
+
 First ELF implementation accepts minimal stripped RV32 `ET_EXEC` image with bounded
 `PT_LOAD` segments and no relocations/dynamic linking. Loader can consume a bounded file
 through TabOS filesystem API, copies its image into platform-provided executable memory,

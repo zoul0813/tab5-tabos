@@ -1,7 +1,7 @@
 # Hello ELF
 
 Hello ELF is a minimal independent TabOS application used to validate filesystem ELF
-loading and execution.
+loading, argument delivery, and execution. It prints its received argument vector.
 
 Activate the project toolchain, then build and install it into the host TF-card root:
 

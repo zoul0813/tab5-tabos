@@ -29,6 +29,8 @@ static const char *const TAG = TABOS_PLATFORM_LOG_TAG;
 struct platform_riscv32_context {
     tabos_elf_entry_fn entry;
     tabos_elf_api_t api;
+    size_t argc;
+    const char *const *argv;
     void *user_data;
     TaskHandle_t task;
     atomic_bool started;
@@ -45,7 +47,7 @@ static void elf_task_main(void *argument)
 {
     platform_riscv32_context_t *context = argument;
     vTaskSetThreadLocalStoragePointer(NULL, 0, context->user_data);
-    context->returned_status = context->entry(&context->api);
+    context->returned_status = context->entry(&context->api, (int)context->argc, context->argv);
     atomic_store_explicit(&context->finished, true, memory_order_release);
     vTaskDelete(NULL);
 }
@@ -138,12 +140,15 @@ platform_riscv32_context_t *platform_riscv32_create(
     size_t memory_size,
     uint32_t minimum_address,
     const tabos_elf_api_t *api,
+    size_t argc,
+    const char *const *argv,
     void *user_data)
 {
     (void)memory;
     (void)memory_size;
     (void)minimum_address;
-    if (entry == NULL || api == NULL) return NULL;
+    if (entry == NULL || api == NULL || argc > TABOS_ELF_ARG_MAX ||
+        (argc > 0U && argv == NULL)) return NULL;
     platform_riscv32_context_t *context = calloc(1U, sizeof(*context));
     if (context == NULL) return NULL;
     tabos_elf_entry_fn entry_function = NULL;
@@ -152,6 +157,8 @@ platform_riscv32_context_t *platform_riscv32_create(
     memcpy(&entry_function, &entry, sizeof(entry_function));
     context->entry = entry_function;
     context->api = *api;
+    context->argc = argc;
+    context->argv = argv;
     context->user_data = user_data;
     return context;
 }

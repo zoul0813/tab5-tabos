@@ -2,7 +2,7 @@
 
 TabOS validates and loads independently compiled, stripped RV32 ELF images from TabOS
 storage, then executes the same artifact on Tab5 or through bounded RV32 interpretation
-on host. Shell integration is not implemented yet.
+on host. Shell launches these images as nested foreground processes.
 
 ## Current ELF Contract
 
@@ -19,7 +19,7 @@ Accepted image must be:
 - at most 2 MiB ELF file size
 - at most 1 MiB loaded image
 
-Current hello fixture is 348-byte stripped ELF containing 125-byte load image, one load segment, and no relocations. Source lives in `apps/hello_elf/src/main.c`. Linker configuration lives in `sdk/linker/app-riscv32.ld`.
+Current hello fixture is 420-byte stripped ELF containing a 199-byte load image, one load segment, and no relocations. Source lives in `apps/hello_elf/src/main.c`. Linker configuration lives in `sdk/linker/app-riscv32.ld`.
 
 Application payloads currently target RV32IMA with integer ABI `ilp32`. This subset runs natively on ESP32-P4 and through pinned `mini-rv32ima` interpreter on macOS and Linux. Host execution uses reserved guest call gates to bridge experimental TabOS API table; it does not provide Linux system calls.
 
@@ -40,7 +40,8 @@ it to `.local/rootfs/T/bin/hello.bin`. Use the `build` target to skip installati
 Unstripped linker output remains at
 `build/apps/hello/hello.elf` for debugging.
 
-Applications use `<tabos/elf_api.h>`. Experimental API table provides console output and
+Applications use `<tabos/elf_api.h>`. Experimental ABI version 2 invokes entry with API
+table, `argc`, and `argv`. API table provides console output and
 input, terminal clearing, working-directory and directory-list operations, child
 execution, cooperative yielding, and clean exit request. ABI is not frozen.
 
@@ -69,7 +70,8 @@ Filesystem-backed launcher remains process 0 and starts `hello.bin` twice as chi
 processes. Successful display output includes two hello messages followed by:
 
 ```text
-Hello from independent TabOS ELF
+Hello TabOS!
+argv: T:/bin/hello.bin
 ELF child exited with status 0
 ELF launcher diagnostic passed
 ```
@@ -91,7 +93,6 @@ Current Tab5 backend loads bytes through a writable PSRAM mapping, synchronizes 
 
 Loader does not yet provide:
 
-- application arguments
 - relocation processing
 - imported symbol resolution
 - multiple code/data permission regions

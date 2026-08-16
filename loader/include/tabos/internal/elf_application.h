@@ -5,7 +5,9 @@
 
 typedef struct loader_elf_application loader_elf_application_t;
 
-loader_elf_application_t *loader_elf_application_create(const char *path);
+loader_elf_application_t *loader_elf_application_create(const char *path,
+                                                        size_t argc,
+                                                        const char *const *argv);
 const tabos_app_descriptor_t *loader_elf_application_descriptor(
     const loader_elf_application_t *application);
 void loader_elf_application_destroy(void *application);

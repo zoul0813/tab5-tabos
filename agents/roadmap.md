@@ -179,7 +179,7 @@
 - [x] Synchronize instruction/data caches before execution.
 - [x] Translate application string pointers back to readable data alias.
 - [x] Execute independent hello ELF on Tab5 hardware.
-- [x] Verify `Hello from independent TabOS ELF` on physical Tab5.
+- [x] Verify independently loaded hello ELF on physical Tab5.
 - [ ] Decide whether final executable remains ELF or becomes converted TabOS format.
 - [ ] Define final relocation and symbol-binding model.
 - [ ] Define final application ABI and versioning policy.
@@ -299,6 +299,7 @@ but is not a substitute for this execution path.
 - [x] Add ELF console text input, raw output, clear, filesystem, exec, and yield calls.
 - [x] Add initial `help`, `clear`, `pwd`, `cd`, and `ls` commands.
 - [x] Launch `T:/bin/<name>.bin` and explicit paths as foreground children.
+- [x] Parse quoted/escaped shell arguments and deliver child-owned `argc`/`argv`.
 - [x] Restore shell prompt and child status after child exit.
 - [x] Provide standalone shell project with independent SDK-backed build/install rules.
 - [x] Validate shell PID 0 loading in headless host runtime.
@@ -329,7 +330,7 @@ but is not a substitute for this execution path.
 - [ ] Provide compiler, linker, strip, and packaging workflow for external applications.
 - [ ] Optionally provide host-native application build mode for sanitizer-heavy source tests;
   keep RV32 execution as canonical binary/ABI validation.
-- [ ] Add argument passing and application-visible exit status.
+- [x] Add argument passing and application-visible exit status.
 - [ ] Decide libc/newlib wrapper strategy.
 - [ ] Add memory allocation API.
 - [ ] Add time and timer API suitable for applications.
@@ -350,7 +351,7 @@ but is not a substitute for this execution path.
 
 - [x] Build shell as first official application under `apps/`, never kernel code.
 - [x] Implement prompt and editable command line using public console/input APIs.
-- [ ] Implement command parsing and arguments.
+- [x] Implement command parsing and arguments.
 - [x] Implement current working directory.
 - [x] Implement basic filesystem commands.
 - [x] Execute independently stored applications.

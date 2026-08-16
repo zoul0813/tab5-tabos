@@ -72,8 +72,15 @@ const tabos_app_descriptor_t *tabos_app_find(const char *name);
 /* Launch one registered foreground application. */
 tabos_app_result_t tabos_app_launch(const char *name);
 tabos_app_result_t tabos_app_launch_path(const char *path);
+tabos_app_result_t tabos_app_launch_path_args(const char *path,
+                                              size_t argc,
+                                              const char *const *argv);
 /* Start file-backed child. Caller must return control after a successful request. */
 tabos_app_result_t tabos_app_exec(tabos_app_context_t *context, const char *path);
+tabos_app_result_t tabos_app_exec_args(tabos_app_context_t *context,
+                                       const char *path,
+                                       size_t argc,
+                                       const char *const *argv);
 bool tabos_app_take_child_status(tabos_app_context_t *context, int *status);
 bool tabos_app_is_running(void);
 const tabos_app_descriptor_t *tabos_app_active(void);

@@ -33,10 +33,19 @@ Initial commands are:
 - `<program>`: execute `T:/bin/<program>.bin`
 - `<path>`: execute explicit application path
 
+Shell splits application commands into at most 16 arguments. Spaces delimit arguments;
+single quotes, double quotes, and backslash escaping preserve spaces or quote characters:
+
+```text
+hello one "two words" escaped\ value
+```
+
+Quote and escape processing belongs exclusively to shell. Kernel receives only finalized
+argument strings and does not interpret command-line syntax.
+
 Shell waits for normalized console text/key events. Enter submits line; Backspace edits
 without crossing prompt. Executed application becomes foreground child, owns console and
 input, then returns status and focus to shell.
 
-Current shell ABI is experimental. Command arguments, quoting, environment variables,
-redirection, pipelines, background jobs, and executable search across multiple drives are
-not implemented.
+Current shell ABI is experimental. Environment variables, redirection, pipelines,
+background jobs, and executable search across multiple drives are not implemented.

@@ -1,10 +1,13 @@
 #include <tabos/elf_api.h>
 
+#include <shell/parser.h>
+
 #include <stdint.h>
 
 enum {
     SHELL_LINE_CAPACITY = 256,
     SHELL_IO_CAPACITY = 1024,
+    SHELL_ARGUMENT_CAPACITY = TABOS_ELF_ARG_MAX,
 };
 
 static uint32_t string_length(const char *text)
@@ -48,13 +51,6 @@ static void append_string(char *destination, uint32_t capacity, const char *sour
     destination[used] = '\0';
 }
 
-static const char *command_argument(const char *line)
-{
-    while (*line != '\0' && *line != ' ') line++;
-    while (*line == ' ') line++;
-    return line;
-}
-
 static void write_error(const tabos_elf_api_t *api, const char *operation, int status)
 {
     char number[16];
@@ -80,39 +76,47 @@ static void write_error(const tabos_elf_api_t *api, const char *operation, int s
 
 static void execute_command(const tabos_elf_api_t *api, char *line)
 {
-    while (*line == ' ') line++;
-    uint32_t length = string_length(line);
-    while (length > 0U && line[length - 1U] == ' ') line[--length] = '\0';
-    if (line[0] == '\0') return;
+    char *argv[SHELL_ARGUMENT_CAPACITY];
+    const int parsed = shell_parse_arguments(line, argv, SHELL_ARGUMENT_CAPACITY);
+    if (parsed == 0) return;
+    if (parsed < 0) {
+        api->console_write(parsed == SHELL_PARSE_UNTERMINATED_QUOTE
+            ? "Unterminated quote" : "Too many arguments");
+        return;
+    }
+    const uint32_t argc = (uint32_t)parsed;
+    const char *command = argv[0];
 
-    if (string_equal(line, "help")) {
+    if (string_equal(command, "help")) {
         api->console_write("Commands: help clear pwd cd ls <program>");
         return;
     }
-    if (string_equal(line, "clear")) {
+    if (string_equal(command, "clear")) {
         (void)api->console_clear();
         return;
     }
-    if (string_equal(line, "pwd")) {
+    if (string_equal(command, "pwd")) {
         char path[512];
         const int result = api->fs_getcwd(path, sizeof(path));
         if (result == 0) api->console_write(path);
         else write_error(api, "pwd", result);
         return;
     }
-    if (string_equal(line, "cd") || string_starts_with(line, "cd ")) {
-        const char *path = command_argument(line);
-        if (path[0] == '\0') {
+    if (string_equal(command, "cd")) {
+        if (argc != 2U) {
             api->console_write("Usage: cd <path>");
             return;
         }
-        const int result = api->fs_chdir(path);
+        const int result = api->fs_chdir(argv[1]);
         if (result != 0) write_error(api, "cd", result);
         return;
     }
-    if (string_equal(line, "ls") || string_starts_with(line, "ls ")) {
-        const char *path = command_argument(line);
-        if (path[0] == '\0') path = ".";
+    if (string_equal(command, "ls")) {
+        if (argc > 2U) {
+            api->console_write("Usage: ls [path]");
+            return;
+        }
+        const char *path = argc == 2U ? argv[1] : ".";
         char listing[SHELL_IO_CAPACITY];
         const int result = api->fs_list(path, listing, sizeof(listing));
         if (result == 0) api->console_write_raw(listing);
@@ -121,26 +125,30 @@ static void execute_command(const tabos_elf_api_t *api, char *line)
     }
 
     char path[512];
-    if (string_starts_with(line, "A:/") || string_starts_with(line, "T:/") ||
-        line[0] == '/') {
-        copy_string(path, sizeof(path), line);
+    const uint32_t command_length = string_length(command);
+    if (string_starts_with(command, "A:/") || string_starts_with(command, "T:/") ||
+        command[0] == '/') {
+        copy_string(path, sizeof(path), command);
     } else {
         copy_string(path, sizeof(path), "T:/bin/");
-        append_string(path, sizeof(path), line);
-        if (!string_starts_with(line + (length > 4U ? length - 4U : 0U), ".bin")) {
+        append_string(path, sizeof(path), command);
+        if (!string_starts_with(command + (command_length > 4U ? command_length - 4U : 0U),
+                                ".bin")) {
             append_string(path, sizeof(path), ".bin");
         }
     }
     int status = TABOS_ELF_EXEC_PENDING;
     while (status == TABOS_ELF_EXEC_PENDING) {
-        status = api->exec(path);
+        status = api->exec(path, argc, (const char *const *)argv);
         if (status == TABOS_ELF_EXEC_PENDING) api->yield();
     }
     if (status != 0) write_error(api, path, status);
 }
 
-int tabos_elf_entry(const tabos_elf_api_t *api)
+int tabos_elf_entry(const tabos_elf_api_t *api, int argc, const char *const *argv)
 {
+    (void)argc;
+    (void)argv;
     if (api == 0 || api->abi_version != TABOS_ELF_API_VERSION ||
         api->console_read == 0 || api->console_write_raw == 0 || api->exec == 0) {
         return 2;

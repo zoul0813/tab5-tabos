@@ -48,6 +48,12 @@ loaded and blocked while child owns console and input; `tabos_app_take_child_sta
 receives status from a later callback after cleanup and parent resume.
 Filesystem shell uses same process operation through ELF ABI call gate.
 
+Filesystem applications receive `argc` and `argv` at entry. Process/loader copies at
+most 16 arguments and 512 total argument bytes into child-owned storage before launch;
+the copy remains valid for process lifetime. `tabos_app_exec_args()` is token-based and
+does not parse quoting or escaping. Shell owns command-line syntax and passes finalized
+strings.
+
 `tabos_app_launch_path()` starts filesystem-backed ELF directly as process 0. Runtime uses
 this for shell startup. Each loaded ELF owns path, descriptor, executable mapping, and
 execution context until process cleanup.

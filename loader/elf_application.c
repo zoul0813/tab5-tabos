@@ -17,6 +17,9 @@ struct loader_elf_application {
     tabos_app_descriptor_t descriptor;
     char name[TABOS_FS_NAME_MAX + 1U];
     char path[TABOS_FS_PATH_MAX];
+    size_t argc;
+    char argument_data[TABOS_ELF_ARG_BYTES_MAX];
+    const char *argv[TABOS_ELF_ARG_MAX + 1U];
     tabos_app_context_t *context;
     const tabos_console_session_t *console;
     loader_elf_image_t image;
@@ -28,7 +31,31 @@ struct loader_elf_application {
     atomic_bool exec_status_ready;
     atomic_int exec_status;
     char exec_path[TABOS_FS_PATH_MAX];
+    size_t exec_argc;
+    char exec_argument_data[TABOS_ELF_ARG_BYTES_MAX];
+    const char *exec_argv[TABOS_ELF_ARG_MAX + 1U];
 };
+
+static bool copy_arguments(size_t argc,
+                           const char *const *argv,
+                           char *data,
+                           size_t data_size,
+                           const char **copied_argv)
+{
+    if (argc > TABOS_ELF_ARG_MAX || (argc > 0U && argv == NULL)) return false;
+    size_t used = 0U;
+    for (size_t index = 0U; index < argc; ++index) {
+        if (argv[index] == NULL) return false;
+        const char *argument = platform_executable_data_pointer(argv[index]);
+        const size_t length = strlen(argument) + 1U;
+        if (length > data_size - used) return false;
+        copied_argv[index] = data + used;
+        memcpy(data + used, argument, length);
+        used += length;
+    }
+    copied_argv[argc] = NULL;
+    return true;
+}
 
 static loader_elf_application_t *application_from_context(tabos_app_context_t *context)
 {
@@ -126,7 +153,7 @@ static int elf_fs_list(const char *path, char *buffer, uint32_t capacity)
     return result;
 }
 
-static int elf_exec(const char *path)
+static int elf_exec(const char *path, uint32_t argc, const char *const *argv)
 {
     loader_elf_application_t *application = platform_riscv32_current_user_data();
     if (application == NULL || path == NULL || path[0] == '\0') return -TABOS_EINVAL;
@@ -140,9 +167,17 @@ static int elf_exec(const char *path)
     if (atomic_load_explicit(&application->exec_in_flight, memory_order_acquire)) {
         return TABOS_ELF_EXEC_PENDING;
     }
-    const size_t length = strlen(path);
+    const char *readable_path = platform_executable_data_pointer(path);
+    const size_t length = strlen(readable_path);
     if (length >= sizeof(application->exec_path)) return -TABOS_ENAMETOOLONG;
-    memcpy(application->exec_path, path, length + 1U);
+    if (!copy_arguments((size_t)argc, argv,
+                        application->exec_argument_data,
+                        sizeof(application->exec_argument_data),
+                        application->exec_argv)) {
+        return -TABOS_EINVAL;
+    }
+    memcpy(application->exec_path, readable_path, length + 1U);
+    application->exec_argc = (size_t)argc;
     atomic_store_explicit(&application->exec_in_flight, true, memory_order_release);
     atomic_store_explicit(&application->exec_requested, true, memory_order_release);
     return TABOS_ELF_EXEC_PENDING;
@@ -199,7 +234,8 @@ static bool elf_entry(tabos_app_context_t *context)
     };
     application->execution = platform_riscv32_create(
         application->image.entry, application->image.memory, application->image.memory_size,
-        application->image.info.minimum_address, &api, application);
+        application->image.info.minimum_address, &api,
+        application->argc, application->argv, application);
     if (application->execution == NULL) {
         (void)tabos_console_write_line(application->console, "ELF execution FAILED");
         return false;
@@ -221,7 +257,8 @@ static void elf_update(tabos_app_context_t *context)
         atomic_store_explicit(&application->exec_status_ready, true, memory_order_release);
     }
     if (atomic_exchange_explicit(&application->exec_requested, false, memory_order_acq_rel)) {
-        const tabos_app_result_t launch_result = tabos_app_exec(context, application->exec_path);
+        const tabos_app_result_t launch_result = tabos_app_exec_args(
+            context, application->exec_path, application->exec_argc, application->exec_argv);
         if (launch_result != TABOS_APP_RESULT_OK) {
             atomic_store_explicit(&application->exec_status, -(100 + (int)launch_result),
                                   memory_order_release);
@@ -267,7 +304,9 @@ static void elf_cleanup(tabos_app_context_t *context, int exit_status)
     application->console = NULL;
 }
 
-loader_elf_application_t *loader_elf_application_create(const char *path)
+loader_elf_application_t *loader_elf_application_create(const char *path,
+                                                        size_t argc,
+                                                        const char *const *argv)
 {
     if (path == NULL || path[0] == '\0') return NULL;
     const size_t path_length = strlen(path);
@@ -275,6 +314,12 @@ loader_elf_application_t *loader_elf_application_create(const char *path)
 
     loader_elf_application_t *application = calloc(1U, sizeof(*application));
     if (application == NULL) return NULL;
+    if (!copy_arguments(argc, argv, application->argument_data,
+                        sizeof(application->argument_data), application->argv)) {
+        free(application);
+        return NULL;
+    }
+    application->argc = argc;
     memcpy(application->path, path, path_length + 1U);
 
     const char *name = strrchr(path, '/');

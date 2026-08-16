@@ -119,6 +119,11 @@ restores parent with child status after process-owned ELF resources are cleaned.
 filesystem, and ELF launcher diagnostics persist as temporary root processes. ELF
 launcher runs configured child twice, avoiding process-0 exit.
 
+Experimental ELF ABI version 2 passes `argc`/`argv` at entry and through nested `exec`.
+Loader owns bounded copies of up to 16 arguments and 512 total bytes for child lifetime.
+Shell alone parses spaces, single/double quotes, and backslash escapes; kernel never
+interprets command-line quoting syntax.
+
 Filesystem-backed shell implementation loads `T:/bin/shell.bin` as process 0. ELF API
 now includes console input/raw output/clear, working-directory and directory listing,
 child execution, cooperative yield, and exit request. Shell implements `help`, `clear`,
@@ -159,8 +164,8 @@ mutex on Tab5; portable code does not expose either native mutex type.
 Experimental loader now accepts bounded little-endian RV32 `ET_EXEC` ELF with loadable
 segments, executable entry, and no dynamic segment or relocations. It can read a bounded
 ELF file through TabOS filesystem API; checked-in hello bytes remain loader/test fixture
-only. Hello is independently compiled by GCC for RV32IMA/`ilp32`, stripped to 348 bytes,
-loads 125 bytes, and calls versioned API table containing console write and exit request.
+only. Hello is independently compiled by GCC for RV32IMA/`ilp32`, stripped to 420 bytes,
+loads 199 bytes, and calls versioned API table containing console, argument, and exit services.
 Host executes same artifact through RV32 interpretation and reserved API call gates;
 guest CPU and memory state persist across bounded runtime-update instruction slices, so
 no application-lifetime instruction ceiling exists. Tab5 executes it natively.

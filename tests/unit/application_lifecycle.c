@@ -1,4 +1,5 @@
 #include <tabos/application.h>
+#include <tabos/elf_api.h>
 
 #include <tabos/internal/application.h>
 #include <tabos/internal/console.h>
@@ -249,6 +250,23 @@ int main(void)
     kernel_application_system_init();
 
     if (tabos_app_launch_path("T:/missing-shell.bin") != TABOS_APP_RESULT_START_FAILED ||
+        tabos_process_count() != 0U) {
+        return 1;
+    }
+    const char *too_many_arguments[TABOS_ELF_ARG_MAX + 1U];
+    for (size_t index = 0U; index < TABOS_ELF_ARG_MAX + 1U; ++index) {
+        too_many_arguments[index] = "x";
+    }
+    char oversized_argument[TABOS_ELF_ARG_BYTES_MAX + 1U];
+    for (size_t index = 0U; index < sizeof(oversized_argument) - 1U; ++index) {
+        oversized_argument[index] = 'x';
+    }
+    oversized_argument[sizeof(oversized_argument) - 1U] = '\0';
+    const char *oversized_arguments[] = {oversized_argument};
+    if (tabos_app_launch_path_args("T:/missing-shell.bin", TABOS_ELF_ARG_MAX + 1U,
+                                   too_many_arguments) != TABOS_APP_RESULT_INVALID ||
+        tabos_app_launch_path_args("T:/missing-shell.bin", 1U,
+                                   oversized_arguments) != TABOS_APP_RESULT_INVALID ||
         tabos_process_count() != 0U) {
         return 1;
     }

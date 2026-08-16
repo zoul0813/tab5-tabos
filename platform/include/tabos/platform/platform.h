@@ -64,6 +64,8 @@ platform_riscv32_context_t *platform_riscv32_create(
     size_t memory_size,
     uint32_t minimum_address,
     const tabos_elf_api_t *api,
+    size_t argc,
+    const char *const *argv,
     void *user_data);
 platform_riscv32_result_t platform_riscv32_step(
     platform_riscv32_context_t *context,

@@ -1,7 +1,8 @@
 # TabOS Shell
 
 The shell is TabOS's persistent process 0 and command-line interface. It uses only the
-public experimental TabOS application ABI.
+public experimental TabOS application ABI. Its parser owns spaces, quoting, and escaping;
+kernel receives finalized argument strings.
 
 Activate the project toolchain, then build and install it into the host TF-card root:
 

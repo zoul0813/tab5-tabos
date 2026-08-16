@@ -107,9 +107,12 @@ platform_riscv32_context_t *platform_riscv32_create(
     size_t memory_size,
     uint32_t minimum_address,
     const tabos_elf_api_t *api,
+    size_t argc,
+    const char *const *argv,
     void *user_data)
 {
     if (entry == NULL || memory == NULL || memory_size == 0U || api == NULL ||
+        argc > TABOS_ELF_ARG_MAX || (argc > 0U && argv == NULL) ||
         memory_size > HOST_RV32_RAM_SIZE ||
         minimum_address > HOST_RV32_RAM_SIZE - memory_size) {
         return NULL;
@@ -145,11 +148,42 @@ platform_riscv32_context_t *platform_riscv32_create(
     write_u32(context->memory, api_address + 36U, HOST_RV32_YIELD);
     write_u32(context->memory, api_address + 40U, HOST_RV32_CONSOLE_WRITE_RAW);
 
+    uint32_t argument_data_address = api_address + 44U;
+    uint32_t argument_data_end = argument_data_address;
+    for (size_t index = 0U; index < argc; ++index) {
+        if (argv[index] == NULL) {
+            platform_riscv32_destroy(context);
+            return NULL;
+        }
+        const size_t length = strlen(argv[index]) + 1U;
+        const size_t used = (size_t)(argument_data_end - argument_data_address);
+        if (length > TABOS_ELF_ARG_BYTES_MAX - used ||
+            argument_data_end > HOST_RV32_RAM_SIZE - length) {
+            platform_riscv32_destroy(context);
+            return NULL;
+        }
+        memcpy(context->memory + argument_data_end, argv[index], length);
+        argument_data_end += (uint32_t)length;
+    }
+    const uint32_t argv_address = (argument_data_end + 3U) & ~UINT32_C(3);
+    if (argv_address > HOST_RV32_RAM_SIZE - ((uint32_t)argc + 1U) * 4U) {
+        platform_riscv32_destroy(context);
+        return NULL;
+    }
+    uint32_t next_argument = argument_data_address;
+    for (size_t index = 0U; index < argc; ++index) {
+        write_u32(context->memory, argv_address + (uint32_t)index * 4U, next_argument);
+        next_argument += (uint32_t)strlen(argv[index]) + 1U;
+    }
+    write_u32(context->memory, argv_address + (uint32_t)argc * 4U, 0U);
+
     context->api = *api;
     context->user_data = user_data;
     context->state.pc = minimum_address + (uint32_t)entry_offset;
     context->state.regs[2] = HOST_RV32_RAM_SIZE - 16U;
     context->state.regs[10] = api_address;
+    context->state.regs[11] = (uint32_t)argc;
+    context->state.regs[12] = argv_address;
     context->state.regs[1] = HOST_RV32_RETURN;
     return context;
 }
@@ -218,13 +252,36 @@ platform_riscv32_result_t platform_riscv32_step(
             context->state.pc = context->state.regs[1];
             continue;
         }
-        if (context->state.pc == HOST_RV32_FS_CHDIR || context->state.pc == HOST_RV32_EXEC) {
+        if (context->state.pc == HOST_RV32_FS_CHDIR) {
             const char *path = guest_string(context->memory, context->state.regs[10]);
-            int (*operation)(const char *) = context->state.pc == HOST_RV32_FS_CHDIR
-                ? context->api.fs_chdir : context->api.exec;
-            if (path == NULL || operation == NULL) return PLATFORM_RISCV32_FAULT;
+            if (path == NULL || context->api.fs_chdir == NULL) return PLATFORM_RISCV32_FAULT;
             current_user_data = context->user_data;
-            context->state.regs[10] = (uint32_t)operation(path);
+            context->state.regs[10] = (uint32_t)context->api.fs_chdir(path);
+            current_user_data = NULL;
+            context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_EXEC) {
+            const char *path = guest_string(context->memory, context->state.regs[10]);
+            const uint32_t argc = context->state.regs[11];
+            const uint32_t argv_address = context->state.regs[12];
+            if (path == NULL || argc > TABOS_ELF_ARG_MAX || context->api.exec == NULL ||
+                argv_address > HOST_RV32_RAM_SIZE - (argc + 1U) * 4U) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            const char *arguments[TABOS_ELF_ARG_MAX + 1U];
+            for (uint32_t index = 0U; index < argc; ++index) {
+                const uint32_t offset = argv_address + index * 4U;
+                const uint32_t address = (uint32_t)context->memory[offset] |
+                    (uint32_t)context->memory[offset + 1U] << 8U |
+                    (uint32_t)context->memory[offset + 2U] << 16U |
+                    (uint32_t)context->memory[offset + 3U] << 24U;
+                arguments[index] = guest_string(context->memory, address);
+                if (arguments[index] == NULL) return PLATFORM_RISCV32_FAULT;
+            }
+            arguments[argc] = NULL;
+            current_user_data = context->user_data;
+            context->state.regs[10] = (uint32_t)context->api.exec(path, argc, arguments);
             current_user_data = NULL;
             context->state.pc = context->state.regs[1];
             continue;
