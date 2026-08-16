@@ -82,5 +82,6 @@ uint64_t platform_time_ms(void)
 
 void platform_input_wait(void)
 {
-    vTaskDelay(pdMS_TO_TICKS(1));
+    /* One millisecond rounds to zero at the configured 100 Hz tick rate. */
+    vTaskDelay(1);
 }

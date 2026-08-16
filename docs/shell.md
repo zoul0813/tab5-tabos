@@ -8,11 +8,12 @@ Build shell with project ESP-IDF toolchain activated:
 
 ```sh
 eval "$(./tools/tabos activate-idf)"
-make -C apps/shell install
+make -C apps/shell
 ```
 
-Build output is `build/apps/shell/shell.bin`; `install` copies it to
-`.local/rootfs/T/bin/shell.bin`. The unstripped debugging image remains at
+Build output is `build/apps/shell/shell.bin`; the default target copies it to
+`.local/rootfs/T/bin/shell.bin`. Use the `build` target to skip installation. The
+unstripped debugging image remains at
 `build/apps/shell/shell.elf`. Copy `shell.bin` and other applications to the TF-card
 `bin/` directory for Tab5.
 

@@ -24,6 +24,7 @@ struct loader_elf_application {
     atomic_bool exit_requested;
     atomic_int requested_exit_status;
     atomic_bool exec_requested;
+    atomic_bool exec_in_flight;
     atomic_bool exec_status_ready;
     atomic_int exec_status;
     char exec_path[TABOS_FS_PATH_MAX];
@@ -74,13 +75,8 @@ static int elf_console_read(char *buffer, uint32_t capacity)
             buffer[copied] = '\0';
             return (int)copied;
         }
-        if (event.type != TABOS_INPUT_KEY_DOWN) continue;
-        char character = '\0';
-        if (event.key == TABOS_KEY_ENTER) character = '\n';
-        else if (event.key == TABOS_KEY_BACKSPACE) character = '\b';
-        else if (event.key == TABOS_KEY_TAB) character = '\t';
-        if (character != '\0') {
-            buffer[0] = character;
+        if (event.type == TABOS_INPUT_KEY_DOWN && event.key == TABOS_KEY_BACKSPACE) {
+            buffer[0] = '\b';
             buffer[1] = '\0';
             return 1;
         }
@@ -136,14 +132,19 @@ static int elf_exec(const char *path)
     if (application == NULL || path == NULL || path[0] == '\0') return -TABOS_EINVAL;
     if (atomic_exchange_explicit(&application->exec_status_ready, false,
                                  memory_order_acq_rel)) {
-        return atomic_load_explicit(&application->exec_status, memory_order_acquire);
+        const int status = atomic_load_explicit(&application->exec_status,
+                                                memory_order_acquire);
+        atomic_store_explicit(&application->exec_in_flight, false, memory_order_release);
+        return status;
     }
-    if (!atomic_load_explicit(&application->exec_requested, memory_order_acquire)) {
-        const size_t length = strlen(path);
-        if (length >= sizeof(application->exec_path)) return -TABOS_ENAMETOOLONG;
-        memcpy(application->exec_path, path, length + 1U);
-        atomic_store_explicit(&application->exec_requested, true, memory_order_release);
+    if (atomic_load_explicit(&application->exec_in_flight, memory_order_acquire)) {
+        return TABOS_ELF_EXEC_PENDING;
     }
+    const size_t length = strlen(path);
+    if (length >= sizeof(application->exec_path)) return -TABOS_ENAMETOOLONG;
+    memcpy(application->exec_path, path, length + 1U);
+    atomic_store_explicit(&application->exec_in_flight, true, memory_order_release);
+    atomic_store_explicit(&application->exec_requested, true, memory_order_release);
     return TABOS_ELF_EXEC_PENDING;
 }
 

@@ -23,9 +23,11 @@ TABOS_CFLAGS += -ffreestanding -fPIC -fno-stack-protector -fno-asynchronous-unwi
 TABOS_LDFLAGS := -nostdlib -Wl,-T,$(SDK_ROOT)/linker/app-riscv32.ld
 TABOS_LDFLAGS += -Wl,--build-id=none -Wl,--gc-sections -Wl,-N
 
-.PHONY: all clean install size
+.PHONY: all build clean install size
 
-all: $(OUTPUT)
+all: install
+
+build: $(OUTPUT)
 
 $(UNSTRIPPED): $(SOURCES) $(SDK_ROOT)/linker/app-riscv32.ld
 	@mkdir -p $(dir $@)

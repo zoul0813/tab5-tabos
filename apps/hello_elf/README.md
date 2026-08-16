@@ -7,9 +7,10 @@ Activate the project toolchain, then build and install it into the host TF-card 
 
 ```sh
 eval "$(./tools/tabos activate-idf)"
-make -C apps/hello_elf install
+make -C apps/hello_elf
 ```
 
-The stripped runnable image is written to `build/apps/hello/hello.bin` and installed as
-`.local/rootfs/T/bin/hello.bin`. The unstripped ELF remains at
+The default build writes the stripped runnable image to `build/apps/hello/hello.bin` and
+installs it as `.local/rootfs/T/bin/hello.bin`. Use `make -C apps/hello_elf build` to
+build without installing. The unstripped ELF remains at
 `build/apps/hello/hello.elf` for debugging.

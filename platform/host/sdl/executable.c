@@ -248,7 +248,7 @@ platform_riscv32_result_t platform_riscv32_step(
             context->api.yield();
             current_user_data = NULL;
             context->state.pc = context->state.regs[1];
-            continue;
+            return PLATFORM_RISCV32_YIELDED;
         }
         (void)MiniRV32IMAStep(&context->state, context->memory, 0U, 0U, 1);
         if (context->state.mcause != 0U) return PLATFORM_RISCV32_FAULT;

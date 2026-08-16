@@ -33,11 +33,11 @@ Build the standalone application inside the activated ESP-IDF v5.4.4 environment
 
 ```sh
 make -C apps/hello_elf
-make -C apps/hello_elf install
 ```
 
-The stripped runnable output is `build/apps/hello/hello.bin`; `install` copies it to
-`.local/rootfs/T/bin/hello.bin`. Unstripped linker output remains at
+The stripped runnable output is `build/apps/hello/hello.bin`; the default target copies
+it to `.local/rootfs/T/bin/hello.bin`. Use the `build` target to skip installation.
+Unstripped linker output remains at
 `build/apps/hello/hello.elf` for debugging.
 
 Applications use `<tabos/elf_api.h>`. Experimental API table provides console output and

@@ -6,6 +6,8 @@
 
 #include <tabos/config/console.h>
 
+#include <tabos/platform/platform.h>
+
 #include <stdatomic.h>
 
 static terminal_t *active_terminal;
@@ -30,6 +32,7 @@ static bool restart_cursor_blink(void)
 static void lock_console(void)
 {
     while (atomic_flag_test_and_set_explicit(&console_lock, memory_order_acquire)) {
+        platform_input_wait();
     }
 }
 
