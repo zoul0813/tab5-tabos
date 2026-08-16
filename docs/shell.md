@@ -8,12 +8,13 @@ Build shell with project ESP-IDF toolchain activated:
 
 ```sh
 eval "$(./tools/tabos activate-idf)"
-./sdk/tools/build-shell-elf.sh
+make -C apps/shell install
 ```
 
-Default output is `.local/rootfs/T/bin/shell.bin`. Unstripped debugging image remains at
-`build/elf-spike/shell-unstripped.elf`. Copy `shell.bin` and other applications to TF
-card `bin/` directory for Tab5.
+Build output is `build/apps/shell/shell.bin`; `install` copies it to
+`.local/rootfs/T/bin/shell.bin`. The unstripped debugging image remains at
+`build/apps/shell/shell.elf`. Copy `shell.bin` and other applications to the TF-card
+`bin/` directory for Tab5.
 
 Select `shell` as host and Tab5 startup application with:
 

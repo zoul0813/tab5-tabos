@@ -72,8 +72,11 @@ Platform backends are split by service instead of collected in one large transla
 
 Portable `input/input.c` owns queue and HID text translation. Optional event logging lives in `input/input_diagnostic.c`, keeping diagnostic compile gating outside queue logic. `graphics/font.c` owns fixed-width drawing while `config/Font.cmake` describes replaceable raw bitmap data such as `graphics/blueterm.f12`. Build-generated assembly embeds configured asset directly without generating a C bitmap table.
 
-`apps/shell/` contains independently built RV32 shell source. `sdk/tools/build-shell-elf.sh`
-produces runnable shell binary separately from firmware build.
+Each independently loaded application under `apps/` is a standalone project with its
+own build definition, `src/`, `include/`, `README.md`, and `LICENSE`. Application
+Makefiles use shared TabOS SDK rules from `sdk/make/application.mk`; runnable binaries
+are built separately from firmware. Built-in firmware diagnostics remain grouped under
+`apps/diag/` because they are kernel test fixtures rather than distributable programs.
 
 ## Dependency Direction
 

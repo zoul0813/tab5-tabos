@@ -300,7 +300,7 @@ but is not a substitute for this execution path.
 - [x] Add initial `help`, `clear`, `pwd`, `cd`, and `ls` commands.
 - [x] Launch `T:/bin/<name>.bin` and explicit paths as foreground children.
 - [x] Restore shell prompt and child status after child exit.
-- [x] Provide independent shell build/install script.
+- [x] Provide standalone shell project with independent SDK-backed build/install rules.
 - [x] Validate shell PID 0 loading in headless host runtime.
 - [ ] Validate interactive editing and commands in macOS SDL host.
 - [ ] Validate managed shell task, keyboard input, commands, and child launch on Tab5.

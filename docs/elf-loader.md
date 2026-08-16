@@ -19,7 +19,7 @@ Accepted image must be:
 - at most 2 MiB ELF file size
 - at most 1 MiB loaded image
 
-Current hello fixture is 348-byte stripped ELF containing 125-byte load image, one load segment, and no relocations. Source lives in `apps/hello_elf/hello.c`. Linker configuration lives in `sdk/linker/app-riscv32.ld`.
+Current hello fixture is 348-byte stripped ELF containing 125-byte load image, one load segment, and no relocations. Source lives in `apps/hello_elf/src/main.c`. Linker configuration lives in `sdk/linker/app-riscv32.ld`.
 
 Application payloads currently target RV32IMA with integer ABI `ilp32`. This subset runs natively on ESP32-P4 and through pinned `mini-rv32ima` interpreter on macOS and Linux. Host execution uses reserved guest call gates to bridge experimental TabOS API table; it does not provide Linux system calls.
 
@@ -29,16 +29,16 @@ Guest registers and memory persist into next update. This is scheduling quantum,
 application lifetime limit: long-running and interactive programs continue until they
 return, request exit, fault, or are stopped by lifecycle manager.
 
-Build standalone fixture inside activated ESP-IDF v5.4.4 environment. Default output is
-`build/elf-spike/hello-stripped.elf`; an optional argument selects another output path:
+Build the standalone application inside the activated ESP-IDF v5.4.4 environment:
 
 ```sh
-./sdk/tools/build-hello-elf.sh
-./sdk/tools/build-hello-elf.sh .local/rootfs/T/bin/hello.bin
+make -C apps/hello_elf
+make -C apps/hello_elf install
 ```
 
-Unstripped linker output remains under `build/elf-spike/hello-unstripped.elf` for
-debugging. Only stripped runnable output is written to selected destination.
+The stripped runnable output is `build/apps/hello/hello.bin`; `install` copies it to
+`.local/rootfs/T/bin/hello.bin`. Unstripped linker output remains at
+`build/apps/hello/hello.elf` for debugging.
 
 Applications use `<tabos/elf_api.h>`. Experimental API table provides console output and
 input, terminal clearing, working-directory and directory-list operations, child
