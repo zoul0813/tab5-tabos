@@ -55,6 +55,7 @@ static const uint32_t HOST_RV32_FS_RENAME = UINT32_C(0xffff0050);
 static const uint32_t HOST_RV32_FD_GET_FLAGS = UINT32_C(0xffff0054);
 static const uint32_t HOST_RV32_FD_SET_FLAGS = UINT32_C(0xffff0058);
 static const uint32_t HOST_RV32_HEAP_SBRK = UINT32_C(0xffff005c);
+static const uint32_t HOST_RV32_FS_RMDIR = UINT32_C(0xffff0060);
 
 struct platform_riscv32_context {
     uint8_t *memory;
@@ -149,7 +150,7 @@ platform_riscv32_context_t *platform_riscv32_create(
 
     const uint32_t image_end = minimum_address + (uint32_t)memory_size;
     const uint32_t api_address = (image_end + 15U) & ~15U;
-    if (api_address > HOST_RV32_RAM_SIZE - 96U) {
+    if (api_address > HOST_RV32_RAM_SIZE - 100U) {
         platform_riscv32_destroy(context);
         return NULL;
     }
@@ -177,8 +178,9 @@ platform_riscv32_context_t *platform_riscv32_create(
     write_u32(context->memory, api_address + 84U, HOST_RV32_FD_GET_FLAGS);
     write_u32(context->memory, api_address + 88U, HOST_RV32_FD_SET_FLAGS);
     write_u32(context->memory, api_address + 92U, HOST_RV32_HEAP_SBRK);
+    write_u32(context->memory, api_address + 96U, HOST_RV32_FS_RMDIR);
 
-    uint32_t argument_data_address = api_address + 96U;
+    uint32_t argument_data_address = api_address + 100U;
     uint32_t argument_data_end = argument_data_address;
     for (size_t index = 0U; index < argc; ++index) {
         if (argv[index] == NULL) {
@@ -420,6 +422,15 @@ platform_riscv32_result_t platform_riscv32_step(
             if (path == NULL || context->api.fs_unlink == NULL) return PLATFORM_RISCV32_FAULT;
             current_user_data = context->user_data;
             context->state.regs[10] = (uint32_t)context->api.fs_unlink(path);
+            current_user_data = NULL;
+            context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_FS_RMDIR) {
+            const char *path = guest_string(context->memory, context->state.regs[10]);
+            if (path == NULL || context->api.fs_rmdir == NULL) return PLATFORM_RISCV32_FAULT;
+            current_user_data = context->user_data;
+            context->state.regs[10] = (uint32_t)context->api.fs_rmdir(path);
             current_user_data = NULL;
             context->state.pc = context->state.regs[1];
             continue;

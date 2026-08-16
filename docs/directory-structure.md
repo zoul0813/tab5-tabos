@@ -13,7 +13,9 @@ tabos/
 │   │   ├── console/     Console/input diagnostic
 │   │   ├── elf_loader/  Embedded-ELF loader/execution diagnostic
 │   │   └── filesystem/  Filesystem/storage diagnostic
-│   └── hello_elf/       Independently built ELF example application
+│   ├── hello_elf/       Independently built ELF example application
+│   ├── shell/           Independently built command shell application
+│   └── tester/          Modular end-to-end SDK and ABI test application
 ├── audio/               Portable audio subsystem
 ├── cmake/               Shared host-build CMake modules
 ├── config/              Common identity, display, font, input, console, and loader build settings

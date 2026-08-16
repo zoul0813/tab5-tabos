@@ -130,9 +130,24 @@ int _mkdir(const char *path, int mode)
     return fail_result(tabos_runtime_api->fs_mkdir(path, (uint32_t)mode));
 }
 
+int mkdir(const char *path, mode_t mode)
+{
+    return _mkdir(path, (int)mode);
+}
+
 int _unlink(const char *path)
 {
     return fail_result(tabos_runtime_api->fs_unlink(path));
+}
+
+int _rmdir(const char *path)
+{
+    return fail_result(tabos_runtime_api->fs_rmdir(path));
+}
+
+int rmdir(const char *path)
+{
+    return _rmdir(path);
 }
 
 int _rename(const char *old_path, const char *new_path)
@@ -145,6 +160,11 @@ int _chdir(const char *path)
     return fail_result(tabos_runtime_api->fs_chdir(path));
 }
 
+int chdir(const char *path)
+{
+    return _chdir(path);
+}
+
 char *_getcwd(char *buffer, size_t size)
 {
     const int result = tabos_runtime_api->fs_getcwd(buffer, (uint32_t)size);
@@ -153,6 +173,11 @@ char *_getcwd(char *buffer, size_t size)
         return NULL;
     }
     return buffer;
+}
+
+char *getcwd(char *buffer, size_t size)
+{
+    return _getcwd(buffer, size);
 }
 
 void *_sbrk(ptrdiff_t increment)

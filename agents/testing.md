@@ -95,6 +95,7 @@ This should make normal development substantially faster.
 - Host targets use SDL3 and build through `./tools/tabos`.
 - `./tools/tabos config` stores TabOS-owned host and Tab5 settings in `.local/tabos.config`; wrapper commands pass them explicitly to every configuration.
 - Tab5 firmware requires ESP-IDF v5.4.4. `./tools/tabos setup` installs host prerequisites and a project-local copy under `.local/`; Tab5 wrapper commands activate it automatically when needed.
+- Tab5 wrapper commands may use an already-active ESP-IDF only when `IDF_PATH` is set and `idf.py --version` reports the exact required version. This permits the pinned ESP-IDF CI container while preventing accidental builds with another active SDK version.
 - Project-local ESP-IDF tools live under `.local/espressif-tools`, keeping them separate from global ESP-IDF installations.
 - Hardware flashing uses local `esptool` through `./tools/flash.sh [debug|release]`; debug is the default.
 - Hardware serial monitoring uses `./tools/tabos tab5 [debug|release] monitor`; debug is the default and `ESPPORT` selects a device when needed.
@@ -156,6 +157,12 @@ native application must not execute on runtime/service task.
 
 Argument tests cover guest `argc`/`argv` memory construction plus shell parsing of plain,
 single-quoted, double-quoted, escaped, empty, unterminated, and excessive arguments.
+
+`apps/tester` is the maintained end-to-end SDK validation application. Keep individual
+concerns in separate test modules and run the same independently built RV32 artifact on
+host and Tab5. New public application APIs should add tester coverage where hardware or
+full-runtime behavior cannot be proven by ordinary host unit tests. Tests must clean up
+persistent files and directories and return nonzero when any assertion fails.
 
 ---
 

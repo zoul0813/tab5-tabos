@@ -44,6 +44,7 @@ typedef struct {
     int (*fd_get_flags)(int descriptor);
     int (*fd_set_flags)(int descriptor, int flags);
     void *(*heap_sbrk)(int32_t increment);
+    int (*fs_rmdir)(const char *path);
 } tabos_elf_api_t;
 
 typedef int (*tabos_elf_entry_fn)(const tabos_elf_api_t *api,

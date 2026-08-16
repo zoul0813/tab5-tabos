@@ -32,6 +32,7 @@
 - [x] Implement C runtime startup and newlib syscall stubs.
 - [x] Convert independently loaded sample applications to standard `main`.
 - [ ] Validate libc, filesystem, heap, CP437, nonblocking input, and cleanup on host and Tab5.
+- [x] Add modular `apps/tester` application for ongoing public SDK and ABI validation.
 - [ ] Add RVC/compressed-instruction support to host execution, then select compressed
   application multilib for shared artifacts.
 

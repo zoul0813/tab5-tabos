@@ -317,6 +317,14 @@ static int elf_fs_unlink_path(const char *path)
     return tabos_fs_unlink(resolved) == 0 ? 0 : -*tabos_errno_location();
 }
 
+static int elf_fs_rmdir_path(const char *path)
+{
+    loader_elf_application_t *application = platform_riscv32_current_user_data();
+    char resolved[TABOS_FS_PATH_MAX];
+    if (!elf_resolve_path(application, path, resolved)) return -TABOS_EINVAL;
+    return tabos_fs_rmdir(resolved) == 0 ? 0 : -*tabos_errno_location();
+}
+
 static int elf_fs_rename_path(const char *old_path, const char *new_path)
 {
     loader_elf_application_t *application = platform_riscv32_current_user_data();
@@ -476,6 +484,7 @@ static bool elf_entry(tabos_app_context_t *context)
         .fd_get_flags = elf_fd_get_flags,
         .fd_set_flags = elf_fd_set_flags,
         .heap_sbrk = elf_heap_sbrk,
+        .fs_rmdir = elf_fs_rmdir_path,
     };
     application->execution = platform_riscv32_create(
         application->image.entry, application->image.memory, application->image.memory_size,
