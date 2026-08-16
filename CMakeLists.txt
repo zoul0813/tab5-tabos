@@ -127,7 +127,10 @@ target_compile_definitions(tabos_platform_host PRIVATE TABOS_TARGET_HOST=1)
 if(TABOS_TARGET STREQUAL "macos")
     target_compile_definitions(tabos_platform_host PRIVATE TABOS_HOST_MACOS=1)
 else()
-    target_compile_definitions(tabos_platform_host PRIVATE TABOS_HOST_LINUX=1)
+    target_compile_definitions(tabos_platform_host PRIVATE
+        TABOS_HOST_LINUX=1
+        _POSIX_C_SOURCE=200809L
+    )
 endif()
 
 tabos_enable_warnings(tabos_platform_host)

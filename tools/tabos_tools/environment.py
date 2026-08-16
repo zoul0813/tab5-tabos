@@ -43,13 +43,21 @@ def local_idf_installed() -> bool:
 
 def active_idf_is_supported() -> bool:
     idf_path = os.environ.get("IDF_PATH")
-    if not idf_path or shutil.which("idf.py") is None:
+    idf = shutil.which("idf.py")
+    if not idf_path or idf is None:
         return False
-    version_file = Path(idf_path) / "version.txt"
     try:
-        return version_file.read_text(encoding="utf-8").strip() == ESP_IDF_VERSION
+        result = subprocess.run(
+            [idf, "--version"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
     except OSError:
         return False
+    match = re.search(r"\bESP-IDF\s+v?(\d+\.\d+\.\d+)\b", result.stdout)
+    required_version = ESP_IDF_VERSION.removeprefix("v")
+    return result.returncode == 0 and match is not None and match.group(1) == required_version
 
 
 def local_idf_environment() -> dict[str, str]:
