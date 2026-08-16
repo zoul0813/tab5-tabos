@@ -62,12 +62,14 @@ platform_riscv32_context_t *platform_riscv32_create(
     const void *memory,
     size_t memory_size,
     uint32_t minimum_address,
-    const tabos_elf_api_t *api);
+    const tabos_elf_api_t *api,
+    void *user_data);
 platform_riscv32_result_t platform_riscv32_step(
     platform_riscv32_context_t *context,
     unsigned int instruction_budget,
     int *returned_status);
 void platform_riscv32_destroy(platform_riscv32_context_t *context);
+void *platform_riscv32_current_user_data(void);
 void platform_input_wait(void);
 
 bool platform_display_init(platform_framebuffer_t *framebuffer);

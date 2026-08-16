@@ -158,21 +158,25 @@ void kernel_application_system_shutdown(void)
     application_registry_reset();
 }
 
-tabos_app_result_t tabos_app_launch(const char *name)
+static tabos_app_result_t launch_root_descriptor(
+    const tabos_app_descriptor_t *descriptor,
+    void *application_data,
+    void (*application_data_destroy)(void *data))
 {
-    if (name == NULL || name[0] == '\0') {
+    if (descriptor == NULL) {
+        if (application_data_destroy != NULL) application_data_destroy(application_data);
         return TABOS_APP_RESULT_INVALID;
     }
     if (foreground_process != NULL) {
+        if (application_data_destroy != NULL) application_data_destroy(application_data);
         return TABOS_APP_RESULT_BUSY;
-    }
-    const tabos_app_descriptor_t *descriptor = tabos_app_find(name);
-    if (descriptor == NULL) {
-        return TABOS_APP_RESULT_NOT_FOUND;
     }
 
     kernel_process_t *process = free_process_slot();
-    if (process == NULL) return TABOS_APP_RESULT_START_FAILED;
+    if (process == NULL) {
+        if (application_data_destroy != NULL) application_data_destroy(application_data);
+        return TABOS_APP_RESULT_START_FAILED;
+    }
     *process = (kernel_process_t){
         .occupied = true,
         .id = 0U,
@@ -181,11 +185,14 @@ tabos_app_result_t tabos_app_launch(const char *name)
         .context = {
             .descriptor = descriptor,
             .process_id = 0U,
+            .application_data = application_data,
         },
+        .application_data_destroy = application_data_destroy,
     };
     next_process_id = 1U;
     tabos_app_context_t *context = &process->context;
     if (!acquire_process_console(process)) {
+        if (application_data_destroy != NULL) application_data_destroy(application_data);
         *process = (kernel_process_t){0};
         return TABOS_APP_RESULT_START_FAILED;
     }
@@ -203,6 +210,25 @@ tabos_app_result_t tabos_app_launch(const char *name)
     }
     if (context->exit_requested) panic_root_process(process);
     return TABOS_APP_RESULT_OK;
+}
+
+tabos_app_result_t tabos_app_launch(const char *name)
+{
+    if (name == NULL || name[0] == '\0') return TABOS_APP_RESULT_INVALID;
+    if (foreground_process != NULL) return TABOS_APP_RESULT_BUSY;
+    const tabos_app_descriptor_t *descriptor = tabos_app_find(name);
+    if (descriptor == NULL) return TABOS_APP_RESULT_NOT_FOUND;
+    return launch_root_descriptor(descriptor, NULL, NULL);
+}
+
+tabos_app_result_t tabos_app_launch_path(const char *path)
+{
+    if (path == NULL || path[0] == '\0') return TABOS_APP_RESULT_INVALID;
+    loader_elf_application_t *application = loader_elf_application_create(path);
+    if (application == NULL) return TABOS_APP_RESULT_INVALID;
+    return launch_root_descriptor(
+        loader_elf_application_descriptor(application), application,
+        loader_elf_application_destroy);
 }
 
 static tabos_app_result_t launch_child_descriptor(

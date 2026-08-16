@@ -21,6 +21,7 @@ CONFIG_DEFAULTS = {
     "TABOS_TERMINAL_SCROLLBACK_LINES": "256",
     "TABOS_CURSOR_BLINK_INTERVAL_MS": "500",
     "TABOS_ELF_STARTUP_PATH": "T:/bin/hello.bin",
+    "TABOS_SHELL_PATH": "T:/bin/shell.bin",
     "TABOS_HOST_STARTUP_APP": "none",
     "TABOS_TAB5_STARTUP_APP": "none",
 }
@@ -36,6 +37,8 @@ def validate_project_config(config: dict[str, str]) -> None:
         fail("TABOS_HOST_ROOTFS must not be empty")
     if not config["TABOS_ELF_STARTUP_PATH"]:
         fail("TABOS_ELF_STARTUP_PATH must not be empty")
+    if not config["TABOS_SHELL_PATH"]:
+        fail("TABOS_SHELL_PATH must not be empty")
     for name in (
         "TABOS_FONT_GLYPH_WIDTH",
         "TABOS_FONT_GLYPH_HEIGHT",
@@ -68,11 +71,11 @@ def validate_project_config(config: dict[str, str]) -> None:
         if not re.fullmatch(r"[1-9][0-9]*", config[name]):
             fail(f"{name} must be a positive integer")
     if config["TABOS_HOST_STARTUP_APP"] not in {
-        "none", "console-test", "filesystem-test", "elf-hello"
+        "none", "console-test", "filesystem-test", "elf-hello", "shell"
     }:
         fail("TABOS_HOST_STARTUP_APP must be none, console-test, filesystem-test, or elf-hello")
     if config["TABOS_TAB5_STARTUP_APP"] not in {
-        "none", "console-test", "filesystem-test", "elf-hello"
+        "none", "console-test", "filesystem-test", "elf-hello", "shell"
     }:
         fail("TABOS_TAB5_STARTUP_APP must be none, console-test, filesystem-test, or elf-hello")
 
@@ -125,14 +128,17 @@ def command_config(_args: argparse.Namespace) -> None:
     try:
         config["TABOS_HOST_STARTUP_APP"] = prompt_choice(
             "Host startup app", config["TABOS_HOST_STARTUP_APP"],
-            ("none", "console-test", "filesystem-test", "elf-hello")
+            ("none", "console-test", "filesystem-test", "elf-hello", "shell")
         )
         config["TABOS_TAB5_STARTUP_APP"] = prompt_choice(
             "Tab5 startup app", config["TABOS_TAB5_STARTUP_APP"],
-            ("none", "console-test", "filesystem-test", "elf-hello")
+            ("none", "console-test", "filesystem-test", "elf-hello", "shell")
         )
         config["TABOS_ELF_STARTUP_PATH"] = prompt_text(
             "Filesystem-backed ELF startup path", config["TABOS_ELF_STARTUP_PATH"]
+        )
+        config["TABOS_SHELL_PATH"] = prompt_text(
+            "Filesystem-backed shell path", config["TABOS_SHELL_PATH"]
         )
         config["TABOS_HOST_ROOTFS"] = prompt_text(
             "Host root filesystem directory", config["TABOS_HOST_ROOTFS"]
@@ -198,7 +204,9 @@ def project_cmake_arguments(target: str) -> list[str]:
         f"-DTABOS_TERMINAL_SCROLLBACK_LINES={config['TABOS_TERMINAL_SCROLLBACK_LINES']}",
         f"-DTABOS_CURSOR_BLINK_INTERVAL_MS={config['TABOS_CURSOR_BLINK_INTERVAL_MS']}",
         f"-DTABOS_ELF_STARTUP_PATH={config['TABOS_ELF_STARTUP_PATH']}",
+        f"-DTABOS_SHELL_PATH={config['TABOS_SHELL_PATH']}",
         f"-DTABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP={'ON' if startup_app == 'console-test' else 'OFF'}",
         f"-DTABOS_ENABLE_FILESYSTEM_DIAGNOSTIC_APP={'ON' if startup_app == 'filesystem-test' else 'OFF'}",
         f"-DTABOS_ENABLE_ELF_LOADER_EXPERIMENT={'ON' if startup_app == 'elf-hello' else 'OFF'}",
+        f"-DTABOS_ENABLE_SHELL_STARTUP={'ON' if startup_app == 'shell' else 'OFF'}",
     ]

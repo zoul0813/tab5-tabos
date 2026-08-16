@@ -98,13 +98,15 @@ platform_riscv32_context_t *platform_riscv32_create(
     const void *memory,
     size_t memory_size,
     uint32_t minimum_address,
-    const tabos_elf_api_t *api)
+    const tabos_elf_api_t *api,
+    void *user_data)
 {
     (void)entry;
     (void)memory;
     (void)memory_size;
     (void)minimum_address;
     (void)api;
+    (void)user_data;
     return NULL;
 }
 
@@ -122,6 +124,11 @@ platform_riscv32_result_t platform_riscv32_step(
 void platform_riscv32_destroy(platform_riscv32_context_t *context)
 {
     (void)context;
+}
+
+void *platform_riscv32_current_user_data(void)
+{
+    return NULL;
 }
 
 void test_platform_set_time_ms(uint64_t time_ms)

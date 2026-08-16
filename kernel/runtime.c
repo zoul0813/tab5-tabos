@@ -15,6 +15,7 @@
 #include <tabos/platform/platform.h>
 
 #include <tabos/config/identity.h>
+#include <tabos/config/loader.h>
 #include <tabos/config/display.h>
 #include <tabos/config/console.h>
 
@@ -204,8 +205,14 @@ bool kernel_runtime_start(void)
         return false;
     }
     runtime_started = true;
+#if TABOS_ENABLE_SHELL_STARTUP
+    const tabos_app_result_t startup_result = tabos_app_launch_path(TABOS_SHELL_PATH);
+#else
     const char *startup_app = diagnostic_startup_app();
-    if (startup_app != NULL && tabos_app_launch(startup_app) != TABOS_APP_RESULT_OK) {
+    const tabos_app_result_t startup_result = startup_app != NULL
+        ? tabos_app_launch(startup_app) : TABOS_APP_RESULT_OK;
+#endif
+    if (startup_result != TABOS_APP_RESULT_OK) {
         kernel_application_system_shutdown();
         console_shutdown();
         terminal_shutdown(&terminal);

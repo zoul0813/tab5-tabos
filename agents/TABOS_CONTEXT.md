@@ -117,8 +117,15 @@ metadata with persistent nested foreground stack. Public cooperative C
 callback. Process manager blocks and retains parent, transfers console/input, then
 restores parent with child status after process-owned ELF resources are cleaned. Console,
 filesystem, and ELF launcher diagnostics persist as temporary root processes. ELF
-launcher runs configured child twice, avoiding process-0 exit. Managed Tab5 application
-tasks and ELF-facing exec call gate remain next work.
+launcher runs configured child twice, avoiding process-0 exit.
+
+Filesystem-backed shell implementation loads `T:/bin/shell.bin` as process 0. ELF API
+now includes console input/raw output/clear, working-directory and directory listing,
+child execution, cooperative yield, and exit request. Shell implements `help`, `clear`,
+`pwd`, `cd`, `ls`, named `T:/bin/<name>.bin` execution, and explicit path execution.
+Host retains interpreter state; Tab5 native ELF entry runs in managed FreeRTOS application
+task so runtime services remain scheduled. Tab5 task and interactive hardware behavior
+still require device validation.
 
 ### Decision: persistent nested foreground processes
 

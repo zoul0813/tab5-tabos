@@ -274,11 +274,11 @@ but is not a substitute for this execution path.
 - [x] Decide initial persistent nested foreground process model.
 - [x] Decide initial Tab5 mapping of one managed FreeRTOS task per native user process.
 - [x] Replace single active application context with fixed-capacity process table.
-- [ ] Reserve persistent shell as root process, initially process 0.
+- [x] Reserve filesystem-backed persistent shell as root process, initially process 0.
 - [ ] Enforce process-0 liveness invariant across return, exit request, fault, and forced termination.
 - [ ] Add kernel panic state that reports process-0 failure to serial and framebuffer terminal.
 - [x] Implement foreground process stack and parent/child relationships.
-- [ ] Add resumable synchronous ELF execution call gate that blocks parent at call site.
+- [x] Add resumable ELF execution call gate that waits for child status at call site.
 - [x] Add cooperative C child execution request and child-status collection API.
 - [x] Transfer console and focused input ownership to stack top only.
 - [x] Restore parent focus, execution, and child exit status when child completes.
@@ -291,6 +291,19 @@ but is not a substitute for this execution path.
 - [ ] Validate every process-0 termination path panics without unload or automatic restart.
 - [ ] Validate input, cursor, timers, display, filesystem, and network service progress
   while foreground native application remains active.
+
+## Current Milestone: Filesystem-Backed Shell
+
+- [x] Load external `T:/bin/shell.bin` as process 0.
+- [x] Add managed Tab5 ELF task implementation so persistent entry does not run on runtime task.
+- [x] Add ELF console text input, raw output, clear, filesystem, exec, and yield calls.
+- [x] Add initial `help`, `clear`, `pwd`, `cd`, and `ls` commands.
+- [x] Launch `T:/bin/<name>.bin` and explicit paths as foreground children.
+- [x] Restore shell prompt and child status after child exit.
+- [x] Provide independent shell build/install script.
+- [x] Validate shell PID 0 loading in headless host runtime.
+- [ ] Validate interactive editing and commands in macOS SDL host.
+- [ ] Validate managed shell task, keyboard input, commands, and child launch on Tab5.
 
 ## Following Milestone: Load Applications from Files
 

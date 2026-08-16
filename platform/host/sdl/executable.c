@@ -33,12 +33,23 @@ enum {
 static const uint32_t HOST_RV32_CONSOLE_WRITE = UINT32_C(0xffff0000);
 static const uint32_t HOST_RV32_REQUEST_EXIT = UINT32_C(0xffff0004);
 static const uint32_t HOST_RV32_RETURN = UINT32_C(0xffff0008);
+static const uint32_t HOST_RV32_CONSOLE_READ = UINT32_C(0xffff000c);
+static const uint32_t HOST_RV32_CONSOLE_CLEAR = UINT32_C(0xffff0010);
+static const uint32_t HOST_RV32_FS_GETCWD = UINT32_C(0xffff0014);
+static const uint32_t HOST_RV32_FS_CHDIR = UINT32_C(0xffff0018);
+static const uint32_t HOST_RV32_FS_LIST = UINT32_C(0xffff001c);
+static const uint32_t HOST_RV32_EXEC = UINT32_C(0xffff0020);
+static const uint32_t HOST_RV32_YIELD = UINT32_C(0xffff0024);
+static const uint32_t HOST_RV32_CONSOLE_WRITE_RAW = UINT32_C(0xffff0028);
 
 struct platform_riscv32_context {
     uint8_t *memory;
     struct MiniRV32IMAState state;
     tabos_elf_api_t api;
+    void *user_data;
 };
+
+static void *current_user_data;
 
 static void write_u32(uint8_t *memory, uint32_t address, uint32_t value)
 {
@@ -55,6 +66,12 @@ static const char *guest_string(const uint8_t *memory, uint32_t address)
         return NULL;
     }
     return (const char *)memory + address;
+}
+
+static void *guest_buffer(uint8_t *memory, uint32_t address, uint32_t capacity)
+{
+    return address <= HOST_RV32_RAM_SIZE && capacity <= HOST_RV32_RAM_SIZE - address
+        ? memory + address : NULL;
 }
 
 void *platform_executable_alloc(size_t size)
@@ -89,7 +106,8 @@ platform_riscv32_context_t *platform_riscv32_create(
     const void *memory,
     size_t memory_size,
     uint32_t minimum_address,
-    const tabos_elf_api_t *api)
+    const tabos_elf_api_t *api,
+    void *user_data)
 {
     if (entry == NULL || memory == NULL || memory_size == 0U || api == NULL ||
         memory_size > HOST_RV32_RAM_SIZE ||
@@ -111,15 +129,24 @@ platform_riscv32_context_t *platform_riscv32_create(
 
     const uint32_t image_end = minimum_address + (uint32_t)memory_size;
     const uint32_t api_address = (image_end + 15U) & ~15U;
-    if (api_address > HOST_RV32_RAM_SIZE - 16U) {
+    if (api_address > HOST_RV32_RAM_SIZE - 44U) {
         platform_riscv32_destroy(context);
         return NULL;
     }
     write_u32(context->memory, api_address, api->abi_version);
     write_u32(context->memory, api_address + 4U, HOST_RV32_CONSOLE_WRITE);
     write_u32(context->memory, api_address + 8U, HOST_RV32_REQUEST_EXIT);
+    write_u32(context->memory, api_address + 12U, HOST_RV32_CONSOLE_READ);
+    write_u32(context->memory, api_address + 16U, HOST_RV32_CONSOLE_CLEAR);
+    write_u32(context->memory, api_address + 20U, HOST_RV32_FS_GETCWD);
+    write_u32(context->memory, api_address + 24U, HOST_RV32_FS_CHDIR);
+    write_u32(context->memory, api_address + 28U, HOST_RV32_FS_LIST);
+    write_u32(context->memory, api_address + 32U, HOST_RV32_EXEC);
+    write_u32(context->memory, api_address + 36U, HOST_RV32_YIELD);
+    write_u32(context->memory, api_address + 40U, HOST_RV32_CONSOLE_WRITE_RAW);
 
     context->api = *api;
+    context->user_data = user_data;
     context->state.pc = minimum_address + (uint32_t)entry_offset;
     context->state.regs[2] = HOST_RV32_RAM_SIZE - 16U;
     context->state.regs[10] = api_address;
@@ -145,13 +172,81 @@ platform_riscv32_result_t platform_riscv32_step(
             if (text == NULL || context->api.console_write == NULL) {
                 return PLATFORM_RISCV32_FAULT;
             }
+            current_user_data = context->user_data;
             context->api.console_write(text);
+            current_user_data = NULL;
+            context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_CONSOLE_WRITE_RAW) {
+            const char *text = guest_string(context->memory, context->state.regs[10]);
+            if (text == NULL || context->api.console_write_raw == NULL) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data = context->user_data;
+            context->api.console_write_raw(text);
+            current_user_data = NULL;
             context->state.pc = context->state.regs[1];
             continue;
         }
         if (context->state.pc == HOST_RV32_REQUEST_EXIT) {
             if (context->api.request_exit == NULL) return PLATFORM_RISCV32_FAULT;
+            current_user_data = context->user_data;
             context->api.request_exit((int)context->state.regs[10]);
+            current_user_data = NULL;
+            context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_CONSOLE_READ ||
+            context->state.pc == HOST_RV32_FS_GETCWD) {
+            const uint32_t capacity = context->state.regs[11];
+            char *buffer = guest_buffer(context->memory, context->state.regs[10], capacity);
+            int (*operation)(char *, uint32_t) = context->state.pc == HOST_RV32_CONSOLE_READ
+                ? context->api.console_read : context->api.fs_getcwd;
+            if (buffer == NULL || operation == NULL) return PLATFORM_RISCV32_FAULT;
+            current_user_data = context->user_data;
+            context->state.regs[10] = (uint32_t)operation(buffer, capacity);
+            current_user_data = NULL;
+            context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_CONSOLE_CLEAR) {
+            if (context->api.console_clear == NULL) return PLATFORM_RISCV32_FAULT;
+            current_user_data = context->user_data;
+            context->state.regs[10] = (uint32_t)context->api.console_clear();
+            current_user_data = NULL;
+            context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_FS_CHDIR || context->state.pc == HOST_RV32_EXEC) {
+            const char *path = guest_string(context->memory, context->state.regs[10]);
+            int (*operation)(const char *) = context->state.pc == HOST_RV32_FS_CHDIR
+                ? context->api.fs_chdir : context->api.exec;
+            if (path == NULL || operation == NULL) return PLATFORM_RISCV32_FAULT;
+            current_user_data = context->user_data;
+            context->state.regs[10] = (uint32_t)operation(path);
+            current_user_data = NULL;
+            context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_FS_LIST) {
+            const char *path = guest_string(context->memory, context->state.regs[10]);
+            const uint32_t capacity = context->state.regs[12];
+            char *buffer = guest_buffer(context->memory, context->state.regs[11], capacity);
+            if (path == NULL || buffer == NULL || context->api.fs_list == NULL) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data = context->user_data;
+            context->state.regs[10] = (uint32_t)context->api.fs_list(path, buffer, capacity);
+            current_user_data = NULL;
+            context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_YIELD) {
+            if (context->api.yield == NULL) return PLATFORM_RISCV32_FAULT;
+            current_user_data = context->user_data;
+            context->api.yield();
+            current_user_data = NULL;
             context->state.pc = context->state.regs[1];
             continue;
         }
@@ -159,6 +254,11 @@ platform_riscv32_result_t platform_riscv32_step(
         if (context->state.mcause != 0U) return PLATFORM_RISCV32_FAULT;
     }
     return PLATFORM_RISCV32_YIELDED;
+}
+
+void *platform_riscv32_current_user_data(void)
+{
+    return current_user_data;
 }
 
 void platform_riscv32_destroy(platform_riscv32_context_t *context)

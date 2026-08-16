@@ -211,6 +211,11 @@ int main(void)
     kernel_application_system_shutdown();
     kernel_application_system_init();
 
+    if (tabos_app_launch_path("T:/missing-shell.bin") != TABOS_APP_RESULT_START_FAILED ||
+        tabos_process_count() != 0U) {
+        return 1;
+    }
+
     tabos_app_descriptor_t invalid = test_app;
     invalid.abi_version = TABOS_APPLICATION_ABI_VERSION + 1U;
     if (application_registry_register(&invalid) ||

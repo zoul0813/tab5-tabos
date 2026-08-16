@@ -40,7 +40,9 @@ Build standalone fixture inside activated ESP-IDF v5.4.4 environment. Default ou
 Unstripped linker output remains under `build/elf-spike/hello-unstripped.elf` for
 debugging. Only stripped runnable output is written to selected destination.
 
-Application uses `<tabos/elf_api.h>`. API version 1 contains ABI version, console-write function, and clean-exit request function. This small table is experimental and not frozen as final TabOS ABI.
+Applications use `<tabos/elf_api.h>`. Experimental API table provides console output and
+input, terminal clearing, working-directory and directory-list operations, child
+execution, cooperative yielding, and clean exit request. ABI is not frozen.
 
 ## Tab5 Hardware Test
 
@@ -90,7 +92,6 @@ Current Tab5 backend loads bytes through a writable PSRAM mapping, synchronizes 
 Loader does not yet provide:
 
 - application arguments
-- ELF-facing `exec` call gate
 - relocation processing
 - imported symbol resolution
 - multiple code/data permission regions

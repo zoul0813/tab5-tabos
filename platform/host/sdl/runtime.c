@@ -95,7 +95,8 @@ bool platform_init(bool headless)
 {
     is_headless = headless;
     quit_requested = false;
-    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
+    const SDL_InitFlags flags = headless ? 0U : SDL_INIT_VIDEO | SDL_INIT_EVENTS;
+    if (!SDL_Init(flags)) {
         SDL_Log("SDL initialization failed: %s", SDL_GetError());
         return false;
     }

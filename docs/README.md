@@ -13,6 +13,7 @@ This directory contains user and contributor documentation for TabOS.
 - [ELF Loader Experiment](elf-loader.md): stripped RV32 ELF contract, build pipeline, and Tab5 validation.
 - [Time and Timers](time.md): monotonic clock and reusable polling timers.
 - [Filesystem and Storage](filesystem.md): POSIX-style file API, host root, and Tab5 microSD behavior.
+- [Shell](shell.md): build, install, start, and use filesystem-backed PID 0 shell.
 
 ## Documentation Policy
 

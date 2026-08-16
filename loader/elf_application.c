@@ -7,6 +7,7 @@
 #include <tabos/platform/platform.h>
 
 #include <stdio.h>
+#include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -20,10 +21,13 @@ struct loader_elf_application {
     const tabos_console_session_t *console;
     loader_elf_image_t image;
     platform_riscv32_context_t *execution;
-    bool exit_requested;
+    atomic_bool exit_requested;
+    atomic_int requested_exit_status;
+    atomic_bool exec_requested;
+    atomic_bool exec_status_ready;
+    atomic_int exec_status;
+    char exec_path[TABOS_FS_PATH_MAX];
 };
-
-static loader_elf_application_t *active_application;
 
 static loader_elf_application_t *application_from_context(tabos_app_context_t *context)
 {
@@ -32,16 +36,120 @@ static loader_elf_application_t *application_from_context(tabos_app_context_t *c
 
 static void elf_console_write(const char *text)
 {
-    if (active_application == NULL || active_application->console == NULL || text == NULL) return;
+    loader_elf_application_t *application = platform_riscv32_current_user_data();
+    if (application == NULL || application->console == NULL || text == NULL) return;
     const char *readable_text = platform_executable_data_pointer(text);
-    (void)tabos_console_write_line(active_application->console, readable_text);
+    (void)tabos_console_write_line(application->console, readable_text);
+}
+
+static void elf_console_write_raw(const char *text)
+{
+    loader_elf_application_t *application = platform_riscv32_current_user_data();
+    if (application == NULL || application->console == NULL || text == NULL) return;
+    const char *readable_text = platform_executable_data_pointer(text);
+    (void)tabos_console_write(application->console, readable_text);
 }
 
 static void elf_request_exit(int exit_status)
 {
-    if (active_application == NULL || active_application->context == NULL) return;
-    active_application->exit_requested = true;
-    tabos_app_request_exit(active_application->context, exit_status);
+    loader_elf_application_t *application = platform_riscv32_current_user_data();
+    if (application == NULL || application->context == NULL) return;
+    atomic_store_explicit(&application->requested_exit_status, exit_status, memory_order_release);
+    atomic_store_explicit(&application->exit_requested, true, memory_order_release);
+}
+
+static int elf_console_read(char *buffer, uint32_t capacity)
+{
+    loader_elf_application_t *application = platform_riscv32_current_user_data();
+    if (application == NULL || application->console == NULL || buffer == NULL || capacity < 2U) {
+        return -1;
+    }
+    tabos_input_event_t event;
+    while (tabos_console_poll(application->console, &event)) {
+        if (event.type == TABOS_INPUT_TEXT) {
+            const size_t length = strlen(event.text);
+            const size_t copied = length < (size_t)capacity - 1U
+                ? length : (size_t)capacity - 1U;
+            memcpy(buffer, event.text, copied);
+            buffer[copied] = '\0';
+            return (int)copied;
+        }
+        if (event.type != TABOS_INPUT_KEY_DOWN) continue;
+        char character = '\0';
+        if (event.key == TABOS_KEY_ENTER) character = '\n';
+        else if (event.key == TABOS_KEY_BACKSPACE) character = '\b';
+        else if (event.key == TABOS_KEY_TAB) character = '\t';
+        if (character != '\0') {
+            buffer[0] = character;
+            buffer[1] = '\0';
+            return 1;
+        }
+    }
+    buffer[0] = '\0';
+    return 0;
+}
+
+static int elf_console_clear(void)
+{
+    loader_elf_application_t *application = platform_riscv32_current_user_data();
+    return application != NULL && application->console != NULL &&
+        tabos_console_clear(application->console) ? 0 : -1;
+}
+
+static int elf_fs_getcwd(char *buffer, uint32_t capacity)
+{
+    return tabos_fs_getcwd(buffer, capacity) != NULL ? 0 : -*tabos_errno_location();
+}
+
+static int elf_fs_chdir(const char *path)
+{
+    return tabos_fs_chdir(path) == 0 ? 0 : -*tabos_errno_location();
+}
+
+static int elf_fs_list(const char *path, char *buffer, uint32_t capacity)
+{
+    if (path == NULL || buffer == NULL || capacity == 0U) return -TABOS_EINVAL;
+    const tabos_dir_t directory = tabos_fs_opendir(path);
+    if (directory < 0) return -*tabos_errno_location();
+    size_t used = 0U;
+    tabos_dirent_t entry;
+    int result = 0;
+    while ((result = tabos_fs_readdir(directory, &entry)) > 0) {
+        const size_t length = strlen(entry.name);
+        if (length + 1U >= (size_t)capacity - used) {
+            result = -TABOS_ENOSPC;
+            break;
+        }
+        memcpy(buffer + used, entry.name, length);
+        used += length;
+        buffer[used++] = '\n';
+    }
+    if (result < 0) result = -*tabos_errno_location();
+    if (tabos_fs_closedir(directory) != 0 && result == 0) result = -*tabos_errno_location();
+    buffer[used] = '\0';
+    return result;
+}
+
+static int elf_exec(const char *path)
+{
+    loader_elf_application_t *application = platform_riscv32_current_user_data();
+    if (application == NULL || path == NULL || path[0] == '\0') return -TABOS_EINVAL;
+    if (atomic_exchange_explicit(&application->exec_status_ready, false,
+                                 memory_order_acq_rel)) {
+        return atomic_load_explicit(&application->exec_status, memory_order_acquire);
+    }
+    if (!atomic_load_explicit(&application->exec_requested, memory_order_acquire)) {
+        const size_t length = strlen(path);
+        if (length >= sizeof(application->exec_path)) return -TABOS_ENAMETOOLONG;
+        memcpy(application->exec_path, path, length + 1U);
+        atomic_store_explicit(&application->exec_requested, true, memory_order_release);
+    }
+    return TABOS_ELF_EXEC_PENDING;
+}
+
+static void elf_yield(void)
+{
+    platform_input_wait();
 }
 
 static bool elf_entry(tabos_app_context_t *context)
@@ -79,10 +187,18 @@ static bool elf_entry(tabos_app_context_t *context)
         .abi_version = TABOS_ELF_API_VERSION,
         .console_write = elf_console_write,
         .request_exit = elf_request_exit,
+        .console_read = elf_console_read,
+        .console_clear = elf_console_clear,
+        .fs_getcwd = elf_fs_getcwd,
+        .fs_chdir = elf_fs_chdir,
+        .fs_list = elf_fs_list,
+        .exec = elf_exec,
+        .yield = elf_yield,
+        .console_write_raw = elf_console_write_raw,
     };
     application->execution = platform_riscv32_create(
         application->image.entry, application->image.memory, application->image.memory_size,
-        application->image.info.minimum_address, &api);
+        application->image.info.minimum_address, &api, application);
     if (application->execution == NULL) {
         (void)tabos_console_write_line(application->console, "ELF execution FAILED");
         return false;
@@ -98,11 +214,31 @@ static void elf_update(tabos_app_context_t *context)
         return;
     }
 
+    int child_status = 0;
+    if (tabos_app_take_child_status(context, &child_status)) {
+        atomic_store_explicit(&application->exec_status, child_status, memory_order_release);
+        atomic_store_explicit(&application->exec_status_ready, true, memory_order_release);
+    }
+    if (atomic_exchange_explicit(&application->exec_requested, false, memory_order_acq_rel)) {
+        const tabos_app_result_t launch_result = tabos_app_exec(context, application->exec_path);
+        if (launch_result != TABOS_APP_RESULT_OK) {
+            atomic_store_explicit(&application->exec_status, -(100 + (int)launch_result),
+                                  memory_order_release);
+            atomic_store_explicit(&application->exec_status_ready, true, memory_order_release);
+        } else {
+            return;
+        }
+    }
+    if (atomic_exchange_explicit(&application->exit_requested, false, memory_order_acq_rel)) {
+        tabos_app_request_exit(
+            context, atomic_load_explicit(&application->requested_exit_status,
+                                          memory_order_acquire));
+        return;
+    }
+
     int returned_status = 0;
-    active_application = application;
     const platform_riscv32_result_t result = platform_riscv32_step(
         application->execution, ELF_INSTRUCTIONS_PER_UPDATE, &returned_status);
-    active_application = NULL;
     if (result == PLATFORM_RISCV32_YIELDED) return;
     if (result == PLATFORM_RISCV32_FAULT) {
         (void)tabos_console_write_line(application->console, "ELF execution FAILED");
@@ -113,7 +249,9 @@ static void elf_update(tabos_app_context_t *context)
     (void)snprintf(exit_message, sizeof(exit_message),
                    "ELF entry returned status %d", returned_status);
     platform_log(exit_message);
-    if (!application->exit_requested) tabos_app_request_exit(context, returned_status);
+    if (!atomic_load_explicit(&application->exit_requested, memory_order_acquire)) {
+        tabos_app_request_exit(context, returned_status);
+    }
 }
 
 static void elf_cleanup(tabos_app_context_t *context, int exit_status)
@@ -121,7 +259,6 @@ static void elf_cleanup(tabos_app_context_t *context, int exit_status)
     (void)exit_status;
     loader_elf_application_t *application = application_from_context(context);
     if (application == NULL) return;
-    if (active_application == application) active_application = NULL;
     platform_riscv32_destroy(application->execution);
     application->execution = NULL;
     loader_elf_unload(&application->image);

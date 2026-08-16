@@ -35,7 +35,7 @@ static platform_riscv32_result_t execute_raw(
     };
     int returned_status = -1;
     platform_riscv32_context_t *context = platform_riscv32_create(
-        instructions, instructions, size, 0U, &api);
+        instructions, instructions, size, 0U, &api, NULL);
     if (context == NULL) return PLATFORM_RISCV32_FAULT;
     const platform_riscv32_result_t result =
         platform_riscv32_step(context, budget, &returned_status);
@@ -55,7 +55,7 @@ int main(void)
     };
     int returned_status = -1;
     platform_riscv32_context_t *context = platform_riscv32_create(
-        image.entry, image.memory, image.memory_size, image.info.minimum_address, &api);
+        image.entry, image.memory, image.memory_size, image.info.minimum_address, &api, NULL);
     platform_riscv32_result_t result = PLATFORM_RISCV32_FAULT;
     if (context != NULL) {
         result = platform_riscv32_step(context, 10000U, &returned_status);
@@ -82,7 +82,7 @@ int main(void)
         UINT32_C(0x00008067), /* ret */
     };
     platform_riscv32_context_t *resumable = platform_riscv32_create(
-        resumable_program, resumable_program, sizeof(resumable_program), 0U, &api);
+        resumable_program, resumable_program, sizeof(resumable_program), 0U, &api, NULL);
     int resumable_status = -1;
     const bool resumed = resumable != NULL &&
         platform_riscv32_step(resumable, 2U, &resumable_status) ==

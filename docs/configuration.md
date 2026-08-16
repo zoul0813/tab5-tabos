@@ -13,8 +13,8 @@ cache contents.
 
 Current settings cover:
 
-- host startup application: `none`, `console-test`, `filesystem-test`, or `elf-hello`
-- Tab5 startup application: `none`, `console-test`, `filesystem-test`, or `elf-hello`
+- host startup application: `none`, `console-test`, `filesystem-test`, `elf-hello`, or `shell`
+- Tab5 startup application: `none`, `console-test`, `filesystem-test`, `elf-hello`, or `shell`
 - raw bitmap font file
 - font glyph width, height, and glyph count (1 through 256)
 - terminal font cell width and height
@@ -23,6 +23,7 @@ Current settings cover:
 - cursor blink interval
 - controlled host drive-container directory
 - filesystem-backed ELF startup path, defaulting to `T:/bin/hello.bin`
+- filesystem-backed PID 0 shell path, defaulting to `T:/bin/shell.bin`
 
 The host executes `elf-hello` from configured TabOS drive through bounded RV32
 interpretation using same application artifact as Tab5.

@@ -155,10 +155,16 @@ parent/state metadata, and nested foreground stack. Launching built-in or filesy
 child blocks and retains parent, transfers console focus, then restores parent and child
 status during unwind. Public cooperative C API exposes child request through
 `tabos_app_exec()` plus later child-status collection; caller returns from current
-callback after successful request. Filesystem ELF image, execution context, path, and descriptor belong to child
-process and are released only during child cleanup. Persistent `elf-hello` diagnostic
-runs configured ELF twice as children without exiting process 0. ELF ABI call-gate
-integration and managed Tab5 application tasks remain next work.
+callback after successful request. Filesystem ELF image, execution context, path, and
+descriptor belong to child process and are released only during child cleanup. Persistent
+`elf-hello` diagnostic runs configured ELF twice as children without exiting process 0.
+
+Filesystem-backed shell now loads `T:/bin/shell.bin` directly as process 0. Experimental
+ELF API provides console input/output, terminal clear, current-directory and directory
+listing operations, child execution, yield, and exit request. Host advances shell through
+retained RV32 interpreter slices. Tab5 platform starts native ELF entry in managed FreeRTOS
+application task and polls completion from runtime task. Shell uses pending child-exec
+protocol to remain blocked until process manager restores it with child status.
 
 First ELF implementation accepts minimal stripped RV32 `ET_EXEC` image with bounded
 `PT_LOAD` segments and no relocations/dynamic linking. Loader can consume a bounded file

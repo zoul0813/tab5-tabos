@@ -46,7 +46,11 @@ lifecycle state. Built-in applications can call `tabos_app_exec(context, path)` 
 a filesystem-backed ELF child, then must return from current callback. Parent remains
 loaded and blocked while child owns console and input; `tabos_app_take_child_status()`
 receives status from a later callback after cleanup and parent resume.
-Future shell will use same process operation through an ELF ABI call gate.
+Filesystem shell uses same process operation through ELF ABI call gate.
+
+`tabos_app_launch_path()` starts filesystem-backed ELF directly as process 0. Runtime uses
+this for shell startup. Each loaded ELF owns path, descriptor, executable mapping, and
+execution context until process cleanup.
 
 ## Console Test Application
 
@@ -72,12 +76,15 @@ Current implementation is deliberately small:
 - registry capacity is 16 built-in descriptors
 - fixed-capacity process table supports nested foreground processes; blocked parents retain state and resume after child exit
 - C application API supports cooperative filesystem-backed child requests and status
-  collection; resumable synchronous ELF-facing execution call gate remains pending
+  collection; ELF API exposes blocking-style child execution through cooperative pending
+  status while process manager blocks parent
 - PID 0 exit enters kernel-panic state and retains its process record; memory isolation remains unavailable
 - experimental filesystem-backed ELF loader exists, but no relocations, arguments, or
   discovery yet
+- Tab5 runs each native ELF entry in managed FreeRTOS application task so persistent
+  applications do not block runtime/service loop
 
 Descriptor and public application API avoid assumptions about executable container.
-Current loader diagnostic reads stripped ELF through TabOS filesystem API and maps its
-entry into this lifecycle without making ELF details part of normal application source
-API. See [ELF Loader Experiment](elf-loader.md).
+Loader reads stripped ELF through TabOS filesystem API and maps its entry into this
+lifecycle without making ELF details part of normal application source API. See
+[ELF Loader Experiment](elf-loader.md).
