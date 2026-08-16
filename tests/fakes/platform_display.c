@@ -94,6 +94,11 @@ void *platform_executable_prepare(void *memory, size_t size)
     return memory != NULL && size > 0U ? memory : NULL;
 }
 
+bool platform_executable_finalize(void *memory, size_t size)
+{
+    return memory != NULL && size > 0U;
+}
+
 const void *platform_executable_data_pointer(const void *memory)
 {
     return memory;

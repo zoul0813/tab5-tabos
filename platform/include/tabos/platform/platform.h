@@ -55,6 +55,7 @@ void platform_log(const char *message);
 uint64_t platform_time_ms(void);
 void *platform_executable_alloc(size_t size);
 void *platform_executable_prepare(void *memory, size_t size);
+bool platform_executable_finalize(void *memory, size_t size);
 const void *platform_executable_data_pointer(const void *memory);
 void platform_executable_free(void *memory);
 bool platform_can_execute_riscv32(void);

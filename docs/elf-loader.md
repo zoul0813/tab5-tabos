@@ -15,7 +15,8 @@ Accepted image must be:
 - one or more valid `PT_LOAD` segments
 - entry point inside executable load segment
 - no dynamic segment
-- no `SHT_REL` or `SHT_RELA` relocations
+- static `SHT_RELA` relocation records retained for loaded sections
+- no dynamic segment or `SHT_REL` relocations
 - at most 2 MiB ELF file size
 - at most 1 MiB loaded image
 
@@ -42,9 +43,10 @@ Build the standalone application inside the activated ESP-IDF v5.4.4 environment
 make -C apps/hello_elf
 ```
 
-The stripped runnable output is `build/apps/hello/hello.bin`; the default target copies
+The runnable output is `build/apps/hello/hello.bin`; the default target copies
 it to `.local/rootfs/T/bin/hello.bin`. Use the `build` target to skip installation.
-Unstripped linker output remains at
+The runnable image has debug sections removed but retains its static symbol and relocation
+tables. Unstripped linker output remains at
 `build/apps/hello/hello.elf` for debugging.
 
 Applications normally implement `int main(int argc, char **argv)` and include standard C
@@ -102,8 +104,10 @@ Current Tab5 backend allocates the complete ELF image in writable PSRAM, synchro
 then maps the same physical pages into the ESP32-P4 executable PSRAM linear region. The
 MMU request uses `EXEC | READ`; ESP-IDF explicitly rejects adding `WRITE`. On ESP32-P4 the
 selected linear region is connected to both instruction and data buses, so the executable
-alias is expected to support the application writes needed by globals, BSS, and newlib
-state. This behavior requires physical Tab5 validation.
+alias supports instruction fetches while application data pointers are statically rebased
+to that alias. The loader applies `R_RISCV_32`, `HI20`, `LO12_I`, and `LO12_S`
+relocations before its final data/instruction cache synchronization. PC-relative control
+flow and address relocations require no load-bias adjustment.
 
 The writable alias remains available to the loader and kernel for data-pointer
 translation. Application images therefore use PSRAM rather than being capped by internal
@@ -119,7 +123,7 @@ executable heap capabilities and MMU restrictions:
 
 Loader does not yet provide:
 
-- relocation processing
+- dynamic relocation and imported-symbol processing
 - imported symbol resolution
 - multiple code/data permission regions
 - process isolation or crash containment

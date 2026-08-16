@@ -186,18 +186,19 @@
 
 - [x] Build independently compiled minimal RV32 ELF fixture with GCC.
 - [x] Parse bounded little-endian RV32 `ET_EXEC` images.
-- [x] Validate program headers, segment bounds, entry point, image size, and unsupported relocations.
+- [x] Validate program headers, segment bounds, entry point, image size, and relocations.
 - [x] Copy loadable segments and zero required memory.
 - [x] Pass versioned TabOS API table to application entry point.
 - [x] Expose experimental console write and exit request API calls.
 - [x] Add host parser, copy, malformed-image, limit, and cleanup tests.
 - [x] Allocate writable PSRAM and create executable MMU alias on ESP32-P4.
 - [x] Synchronize instruction/data caches before execution.
+- [x] Retain and apply static RISC-V relocations for native PSRAM load bias.
 - [x] Translate application string pointers back to readable data alias.
 - [x] Execute independent hello ELF on Tab5 hardware.
 - [x] Verify independently loaded hello ELF on physical Tab5.
 - [ ] Decide whether final executable remains ELF or becomes converted TabOS format.
-- [ ] Define final relocation and symbol-binding model.
+- [x] Define initial static relocation model; defer dynamic/imported symbol binding.
 - [ ] Define final application ABI and versioning policy.
 - [ ] Define failure containment and application memory ownership.
 

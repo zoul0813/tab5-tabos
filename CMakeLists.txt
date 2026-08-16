@@ -121,7 +121,7 @@ target_include_directories(tabos_platform_host
         "${TABOS_GENERATED_INCLUDE_DIR}"
         "${mini_rv32ima_SOURCE_DIR}/mini-rv32ima"
 )
-target_link_libraries(tabos_platform_host PRIVATE SDL3::SDL3)
+target_link_libraries(tabos_platform_host PRIVATE tabos_core SDL3::SDL3)
 target_compile_definitions(tabos_platform_host PRIVATE TABOS_TARGET_HOST=1)
 
 if(TABOS_TARGET STREQUAL "macos")

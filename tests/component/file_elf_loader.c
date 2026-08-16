@@ -28,8 +28,8 @@ int main(void)
     loader_elf_image_t image;
     const loader_elf_result_t result = loader_elf_load_file(path, &image);
     const bool valid = result == LOADER_ELF_OK && image.memory != NULL &&
-        image.entry == image.memory && image.memory_size == 125U &&
-        memcmp(image.memory, loader_hello_elf + 84U, 125U) == 0;
+        image.entry == image.memory && image.memory_size == 207U &&
+        memcmp(image.memory, loader_hello_elf + 84U, 207U) == 0;
     loader_elf_unload(&image);
 
     const bool missing_rejected =

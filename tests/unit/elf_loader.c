@@ -32,21 +32,21 @@ int main(void)
     loader_elf_info_t info;
     if (loader_elf_inspect(loader_hello_elf, loader_hello_elf_size, &info) != LOADER_ELF_OK ||
         info.entry_address != 0U || info.minimum_address != 0U ||
-        info.maximum_address != 125U || info.image_size != 125U ||
+        info.maximum_address != 207U || info.image_size != 207U ||
         info.load_segment_count != 1U ||
         loader_elf_inspect(loader_hello_elf, 51U, &info) != LOADER_ELF_TRUNCATED ||
         !expect_mutation(16U, 3U, LOADER_ELF_UNSUPPORTED_FORMAT) ||
-        !expect_mutation(68U, 126U, LOADER_ELF_INVALID_SEGMENT) ||
+        !expect_mutation(68U, 208U, LOADER_ELF_INVALID_SEGMENT) ||
         !expect_mutation(24U, 256U, LOADER_ELF_INVALID_ENTRY) ||
         !expect_mutation(72U, (1024U * 1024U) + 1U, LOADER_ELF_IMAGE_TOO_LARGE) ||
-        !expect_mutation(272U, 9U, LOADER_ELF_UNSUPPORTED_RELOCATION)) {
+        !expect_mutation(604U, 9U, LOADER_ELF_UNSUPPORTED_RELOCATION)) {
         return 1;
     }
 
     loader_elf_image_t image;
     if (loader_elf_load(loader_hello_elf, loader_hello_elf_size, &image) != LOADER_ELF_OK ||
-        image.memory == NULL || image.entry != image.memory || image.memory_size != 125U ||
-        memcmp(image.memory, loader_hello_elf + 84U, 125U) != 0) {
+        image.memory == NULL || image.entry != image.memory || image.memory_size != 207U ||
+        memcmp(image.memory, loader_hello_elf + 84U, 207U) != 0) {
         return 1;
     }
     loader_elf_unload(&image);

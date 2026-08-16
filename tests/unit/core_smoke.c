@@ -29,9 +29,17 @@ int main(void)
         return 1;
     }
 
+#if TABOS_ENABLE_SHELL_STARTUP
+    if (kernel_runtime_start()) {
+        return 1;
+    }
+    kernel_runtime_shutdown();
+    return 0;
+#else
     if (!kernel_runtime_start()) {
         return 1;
     }
+#endif
 
 #if TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP
     const tabos_app_descriptor_t *active = tabos_app_active();

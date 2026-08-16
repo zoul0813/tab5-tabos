@@ -2,6 +2,26 @@
 
 TabOS has portable application descriptors, built-in application registry, and single foreground application lifecycle. This foundation runs identically in host and Tab5 builds. Applications use public TabOS APIs and do not call SDL3, ESP-IDF, or FreeRTOS directly.
 
+## Building Applications
+
+Activate project ESP-IDF environment, then build and install every independently loaded
+application with:
+
+```sh
+./apps/build.sh
+```
+
+Script builds `hello_elf`, `shell`, and `tester`, then installs runnable ELF images under
+`.local/rootfs/T/bin/`. Maintain application list in `apps/build.sh` as applications are
+added. Arguments pass to each application Makefile; for example, this builds without
+installing:
+
+```sh
+./apps/build.sh build
+```
+
+Individual application commands such as `make -C apps/shell` remain available.
+
 ## Descriptor
 
 Built-in applications export `tabos_app_descriptor_t` from `<tabos/application.h>`:
@@ -98,14 +118,15 @@ Current implementation is deliberately small:
   collection; ELF API exposes blocking-style child execution through cooperative pending
   status while process manager blocks parent
 - PID 0 exit enters kernel-panic state and retains its process record; memory isolation remains unavailable
-- filesystem-backed ELF loader supports argument vectors and a first C17/newlib runtime,
-  but no relocations, discovery, or executable metadata yet
+- filesystem-backed ELF loader supports argument vectors, static load relocation, and a
+  first C17/newlib runtime, but no dynamic linking, discovery, or executable metadata yet
 - Tab5 runs each native ELF entry in managed FreeRTOS application task so persistent
   applications do not block runtime/service loop
 - shared console state uses platform mutexes: SDL mutex on host and a FreeRTOS mutex with
   priority inheritance on Tab5
 
 Descriptor and public application API avoid assumptions about executable container.
-Loader reads stripped ELF through TabOS filesystem API and maps its entry into this
+Loader reads ELF with debug sections removed and static relocations retained through
+TabOS filesystem API and maps its entry into this
 lifecycle without making ELF details part of normal application source API. See
 [ELF Loader Experiment](elf-loader.md).

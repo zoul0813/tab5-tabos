@@ -170,12 +170,16 @@ ELF ABI version 3 entry and nested execution carry bounded `argc`/`argv`. Child 
 state owns copied arguments for full process lifetime. Tokenization, quoting, and escaping
 are application policy implemented by shell, not kernel process behavior.
 
-First ELF implementation accepts minimal stripped RV32 `ET_EXEC` image with bounded
-`PT_LOAD` segments and no relocations/dynamic linking. Loader can consume a bounded file
+First ELF implementation accepts static RV32 `ET_EXEC` image with bounded
+`PT_LOAD` segments and retained `SHT_RELA` records, but no dynamic linking. Loader can consume a bounded file
 through TabOS filesystem API, copies its image into platform-provided executable memory,
 and invokes entry with versioned API table. Checked-in hello bytes remain only a focused
 loader/test fixture. Tab5 loads the image through a writable PSRAM allocation and maps the
 same physical pages into the ESP32-P4 PSRAM linear region with an `EXEC | READ` request.
+Loader rebases absolute data and instruction-address relocations to this executable alias
+before final cache synchronization. Application builds use non-PIC code, disable linker
+relaxation and small-data addressing, emit static relocations, then remove debug sections
+without stripping relocation or symbol tables.
 ESP-IDF rejects an explicit `EXEC | WRITE` request, but the selected P4 linear region is
 connected to both instruction and data buses. Hardware validation must prove writes to
 globals, BSS, and newlib state through that alias. Host executes the same RV32 artifact

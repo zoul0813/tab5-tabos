@@ -16,8 +16,27 @@ enum {
     ELF_PROGRAM_LOAD = 1,
     ELF_PROGRAM_DYNAMIC = 2,
     ELF_PROGRAM_EXECUTE = 1,
+    ELF_SECTION_SYMBOL_TABLE = 2,
     ELF_SECTION_RELA = 4,
     ELF_SECTION_REL = 9,
+    ELF_RELOCATION_NONE = 0,
+    ELF_RELOCATION_32 = 1,
+    ELF_RELOCATION_BRANCH = 16,
+    ELF_RELOCATION_JAL = 17,
+    ELF_RELOCATION_CALL = 18,
+    ELF_RELOCATION_CALL_PLT = 19,
+    ELF_RELOCATION_PCREL_HI20 = 23,
+    ELF_RELOCATION_PCREL_LO12_I = 24,
+    ELF_RELOCATION_PCREL_LO12_S = 25,
+    ELF_RELOCATION_HI20 = 26,
+    ELF_RELOCATION_LO12_I = 27,
+    ELF_RELOCATION_LO12_S = 28,
+    ELF_RELOCATION_RELAX = 51,
+    ELF_RELA_ENTRY_SIZE = 12,
+    ELF_SYMBOL_ENTRY_SIZE = 16,
+    ELF_SECTION_ALLOCATED = 2,
+    ELF_SYMBOL_UNDEFINED = 0,
+    ELF_SYMBOL_ABSOLUTE = 0xfff1,
     ELF_MAX_IMAGE_SIZE = 1024 * 1024,
     ELF_MAX_FILE_SIZE = 2 * 1024 * 1024,
 };
@@ -31,6 +50,19 @@ static uint32_t read_u32(const uint8_t *value)
 {
     return (uint32_t)value[0] | ((uint32_t)value[1] << 8U) |
         ((uint32_t)value[2] << 16U) | ((uint32_t)value[3] << 24U);
+}
+
+static int32_t read_i32(const uint8_t *value)
+{
+    return (int32_t)read_u32(value);
+}
+
+static void write_u32(uint8_t *value, uint32_t number)
+{
+    value[0] = (uint8_t)number;
+    value[1] = (uint8_t)(number >> 8U);
+    value[2] = (uint8_t)(number >> 16U);
+    value[3] = (uint8_t)(number >> 24U);
 }
 
 static bool range_valid(size_t offset, size_t length, size_t total)
@@ -57,12 +89,137 @@ static loader_elf_result_t inspect_sections(const uint8_t *data, size_t size)
     for (uint16_t index = 0U; index < section_count; ++index) {
         const uint8_t *section = data + section_offset + ((size_t)index * section_entry_size);
         const uint32_t type = read_u32(section + 4U);
+        const uint32_t file_offset = read_u32(section + 16U);
         const uint32_t section_size = read_u32(section + 20U);
-        if ((type == ELF_SECTION_REL || type == ELF_SECTION_RELA) && section_size > 0U) {
+        const uint32_t entry_size = read_u32(section + 36U);
+        if (type == ELF_SECTION_REL && section_size > 0U) {
             return LOADER_ELF_UNSUPPORTED_RELOCATION;
         }
+        if (type == ELF_SECTION_RELA &&
+            (entry_size != ELF_RELA_ENTRY_SIZE || section_size % entry_size != 0U ||
+             !range_valid(file_offset, section_size, size))) return LOADER_ELF_TRUNCATED;
     }
     return LOADER_ELF_OK;
+}
+
+static loader_elf_result_t apply_relocations(const uint8_t *data, size_t size,
+                                             const loader_elf_info_t *info,
+                                             uint8_t *writable_memory,
+                                             const void *executable_memory)
+{
+    const uint32_t section_offset = read_u32(data + 32U);
+    const uint16_t section_entry_size = read_u16(data + 46U);
+    const uint16_t section_count = read_u16(data + 48U);
+    const void *translated = platform_executable_data_pointer(executable_memory);
+    const uint32_t load_bias = translated == executable_memory ? 0U
+        : (uint32_t)(uintptr_t)executable_memory - info->minimum_address;
+    if (load_bias == 0U) return LOADER_ELF_OK;
+    bool found_relocations = false;
+
+    for (uint16_t section_index = 0U; section_index < section_count; ++section_index) {
+        const uint8_t *section = data + section_offset +
+            (size_t)section_index * section_entry_size;
+        if (read_u32(section + 4U) != ELF_SECTION_RELA) continue;
+        const uint32_t relocation_offset = read_u32(section + 16U);
+        const uint32_t relocation_size = read_u32(section + 20U);
+        const uint32_t symbol_section_index = read_u32(section + 24U);
+        const uint32_t target_section_index = read_u32(section + 28U);
+        if (target_section_index >= section_count) return LOADER_ELF_UNSUPPORTED_RELOCATION;
+        const uint8_t *target_section = data + section_offset +
+            (size_t)target_section_index * section_entry_size;
+        if ((read_u32(target_section + 8U) & ELF_SECTION_ALLOCATED) == 0U) continue;
+        found_relocations = true;
+        if (symbol_section_index >= section_count) return LOADER_ELF_UNSUPPORTED_RELOCATION;
+        const uint8_t *symbol_section = data + section_offset +
+            (size_t)symbol_section_index * section_entry_size;
+        if (read_u32(symbol_section + 4U) != ELF_SECTION_SYMBOL_TABLE ||
+            read_u32(symbol_section + 36U) != ELF_SYMBOL_ENTRY_SIZE) {
+            return LOADER_ELF_UNSUPPORTED_RELOCATION;
+        }
+        const uint32_t symbol_offset = read_u32(symbol_section + 16U);
+        const uint32_t symbol_size = read_u32(symbol_section + 20U);
+        if (symbol_size == 0U || symbol_size % ELF_SYMBOL_ENTRY_SIZE != 0U ||
+            !range_valid(symbol_offset, symbol_size, size)) return LOADER_ELF_TRUNCATED;
+
+        for (uint32_t used = 0U; used < relocation_size; used += ELF_RELA_ENTRY_SIZE) {
+            const uint8_t *relocation = data + relocation_offset + used;
+            const uint32_t target_address = read_u32(relocation);
+            const uint32_t relocation_info = read_u32(relocation + 4U);
+            const uint32_t type = relocation_info & 0xffU;
+            const uint32_t symbol_index = relocation_info >> 8U;
+            const int32_t addend = read_i32(relocation + 8U);
+            if (type == ELF_RELOCATION_NONE || type == ELF_RELOCATION_BRANCH ||
+                type == ELF_RELOCATION_JAL || type == ELF_RELOCATION_CALL ||
+                type == ELF_RELOCATION_CALL_PLT || type == ELF_RELOCATION_PCREL_HI20 ||
+                type == ELF_RELOCATION_PCREL_LO12_I ||
+                type == ELF_RELOCATION_PCREL_LO12_S || type == ELF_RELOCATION_RELAX) {
+                continue;
+            }
+            if (type != ELF_RELOCATION_32 && type != ELF_RELOCATION_HI20 &&
+                type != ELF_RELOCATION_LO12_I && type != ELF_RELOCATION_LO12_S) {
+                return LOADER_ELF_UNSUPPORTED_RELOCATION;
+            }
+            if (target_address < info->minimum_address ||
+                target_address > info->maximum_address - sizeof(uint32_t)) {
+                return LOADER_ELF_UNSUPPORTED_RELOCATION;
+            }
+            if (symbol_index >= symbol_size / ELF_SYMBOL_ENTRY_SIZE) {
+                return LOADER_ELF_UNSUPPORTED_RELOCATION;
+            }
+            const uint8_t *symbol = data + symbol_offset +
+                (size_t)symbol_index * ELF_SYMBOL_ENTRY_SIZE;
+            const uint32_t symbol_value = read_u32(symbol + 4U);
+            const uint16_t symbol_section_index_value = read_u16(symbol + 14U);
+            if (symbol_section_index_value == ELF_SYMBOL_UNDEFINED &&
+                type != ELF_RELOCATION_NONE) {
+                return LOADER_ELF_UNSUPPORTED_RELOCATION;
+            }
+            if (symbol_section_index_value >= section_count &&
+                symbol_section_index_value != ELF_SYMBOL_ABSOLUTE) {
+                return LOADER_ELF_UNSUPPORTED_RELOCATION;
+            }
+            uint8_t *target = writable_memory + (target_address - info->minimum_address);
+            const uint32_t symbol_bias = symbol_section_index_value == ELF_SYMBOL_ABSOLUTE
+                ? 0U : load_bias;
+            const uint32_t value = symbol_bias + symbol_value + (uint32_t)addend;
+            uint32_t instruction = read_u32(target);
+
+            switch (type) {
+            case ELF_RELOCATION_32:
+                write_u32(target, value);
+                break;
+            case ELF_RELOCATION_HI20:
+                instruction = (instruction & UINT32_C(0x00000fff)) |
+                    ((value + UINT32_C(0x800)) & UINT32_C(0xfffff000));
+                write_u32(target, instruction);
+                break;
+            case ELF_RELOCATION_LO12_I:
+                instruction = (instruction & UINT32_C(0x000fffff)) |
+                    ((value & UINT32_C(0x00000fff)) << 20U);
+                write_u32(target, instruction);
+                break;
+            case ELF_RELOCATION_LO12_S:
+                instruction &= ~UINT32_C(0xfe000f80);
+                instruction |= (value & UINT32_C(0x00000fe0)) << 20U;
+                instruction |= (value & UINT32_C(0x0000001f)) << 7U;
+                write_u32(target, instruction);
+                break;
+            case ELF_RELOCATION_NONE:
+            case ELF_RELOCATION_BRANCH:
+            case ELF_RELOCATION_JAL:
+            case ELF_RELOCATION_CALL:
+            case ELF_RELOCATION_CALL_PLT:
+            case ELF_RELOCATION_PCREL_HI20:
+            case ELF_RELOCATION_PCREL_LO12_I:
+            case ELF_RELOCATION_PCREL_LO12_S:
+            case ELF_RELOCATION_RELAX:
+                break;
+            default:
+                return LOADER_ELF_UNSUPPORTED_RELOCATION;
+            }
+        }
+    }
+    return found_relocations ? LOADER_ELF_OK : LOADER_ELF_UNSUPPORTED_RELOCATION;
 }
 
 loader_elf_result_t loader_elf_inspect(const uint8_t *data, size_t size, loader_elf_info_t *info)
@@ -187,6 +344,15 @@ loader_elf_result_t loader_elf_load(const uint8_t *data, size_t size, loader_elf
     if (executable_memory == NULL) {
         platform_executable_free(memory);
         return LOADER_ELF_PREPARE_FAILED;
+    }
+
+    const loader_elf_result_t relocation_result = apply_relocations(
+        data, size, &info, memory, executable_memory);
+    if (relocation_result != LOADER_ELF_OK ||
+        !platform_executable_finalize(executable_memory, info.image_size)) {
+        platform_executable_free(memory);
+        return relocation_result != LOADER_ELF_OK
+            ? relocation_result : LOADER_ELF_PREPARE_FAILED;
     }
 
     *image = (loader_elf_image_t){

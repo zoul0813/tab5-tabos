@@ -98,11 +98,11 @@ add_test(NAME unit.application_lifecycle COMMAND tabos_application_lifecycle)
 
 add_executable(tabos_elf_loader
     unit/elf_loader.c
-    "${TABOS_ROOT}/loader/fixtures/hello_elf.c"
+    "${CMAKE_CURRENT_LIST_DIR}/fixtures/elf/hello_elf.c"
     ${TABOS_TEST_PLATFORM_FAKES}
 )
 target_include_directories(tabos_elf_loader PRIVATE
-    "${TABOS_ROOT}/loader/fixtures"
+    "${CMAKE_CURRENT_LIST_DIR}/fixtures/elf"
     "${TABOS_ROOT}/loader/include"
     "${TABOS_ROOT}/platform/include"
 )
@@ -114,14 +114,14 @@ add_test(NAME unit.elf_loader COMMAND tabos_elf_loader)
 
 add_executable(tabos_file_elf_loader
     component/file_elf_loader.c
-    "${TABOS_ROOT}/loader/fixtures/hello_elf.c"
+    "${CMAKE_CURRENT_LIST_DIR}/fixtures/elf/hello_elf.c"
     fakes/platform_display.c
     fakes/storage_backend.c
     "${TABOS_ROOT}/platform/posix/storage.c"
 )
 target_include_directories(tabos_file_elf_loader PRIVATE
     "${TABOS_ROOT}/fs/include"
-    "${TABOS_ROOT}/loader/fixtures"
+    "${CMAKE_CURRENT_LIST_DIR}/fixtures/elf"
     "${TABOS_ROOT}/loader/include"
     "${TABOS_ROOT}/platform/include"
     "${TABOS_ROOT}/sdk/include"
@@ -135,10 +135,10 @@ add_test(NAME component.file_elf_loader COMMAND tabos_file_elf_loader)
 
 add_executable(tabos_rv32_execution
     component/rv32_execution.c
-    "${TABOS_ROOT}/loader/fixtures/hello_elf.c"
+    "${CMAKE_CURRENT_LIST_DIR}/fixtures/elf/hello_elf.c"
 )
 target_include_directories(tabos_rv32_execution PRIVATE
-    "${TABOS_ROOT}/loader/fixtures"
+    "${CMAKE_CURRENT_LIST_DIR}/fixtures/elf"
     "${TABOS_ROOT}/loader/include"
     "${TABOS_ROOT}/platform/include"
 )

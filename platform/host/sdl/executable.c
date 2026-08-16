@@ -104,6 +104,13 @@ void *platform_executable_prepare(void *memory, size_t size)
     return memory;
 }
 
+bool platform_executable_finalize(void *memory, size_t size)
+{
+    if (memory == NULL || size == 0U) return false;
+    __builtin___clear_cache((char *)memory, (char *)memory + size);
+    return true;
+}
+
 const void *platform_executable_data_pointer(const void *memory)
 {
     return memory;

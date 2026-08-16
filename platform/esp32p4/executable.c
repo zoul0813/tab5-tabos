@@ -106,6 +106,25 @@ void *platform_executable_prepare(void *memory, size_t size)
     return executable;
 }
 
+bool platform_executable_finalize(void *memory, size_t size)
+{
+    executable_mapping_t *mapping = NULL;
+    for (size_t index = 0U; index < EXECUTABLE_MAPPING_CAPACITY; ++index) {
+        if (mappings[index].writable == memory || mappings[index].executable == memory) {
+            mapping = &mappings[index];
+            break;
+        }
+    }
+    if (mapping == NULL || size == 0U || size > mapping->mapped_size ||
+        esp_cache_msync(mapping->writable, size,
+            ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_UNALIGNED) != ESP_OK) {
+        return false;
+    }
+    __builtin___clear_cache((char *)mapping->executable,
+                            (char *)mapping->executable + size);
+    return true;
+}
+
 const void *platform_executable_data_pointer(const void *memory)
 {
     const uintptr_t address = (uintptr_t)memory;

@@ -8,7 +8,8 @@ This document describes the current TabOS repository layout. It is authoritative
 tabos/
 ├── .github/workflows/   GitHub Actions builds, tests, and artifacts
 ├── agents/              Context and implementation guidance for coding agents
-├── apps/                Application sources
+├── apps/                Application sources and all-application build helper
+│   ├── build.sh         Build/install every independently loaded application
 │   ├── diag/            Optional built-in diagnostics and diagnostic registry
 │   │   ├── console/     Console/input diagnostic
 │   │   ├── elf_loader/  Embedded-ELF loader/execution diagnostic
@@ -25,7 +26,7 @@ tabos/
 ├── graphics/            Portable framebuffer and graphics subsystem
 ├── input/               Portable input-event subsystem
 ├── kernel/              Portable runtime, application lifecycle, registry, and service core
-├── loader/              Experimental ELF validation, loading, fixtures, and lifecycle adapter
+├── loader/              Experimental ELF validation, loading, and lifecycle adapter
 ├── net/                 Portable networking subsystem
 ├── platform/            Environment-specific service implementations
 │   ├── esp32p4/         ESP32-P4, ESP-IDF, FreeRTOS, and Tab5 BSP implementation
@@ -79,7 +80,9 @@ Portable `input/input.c` owns queue and HID text translation. Optional event log
 Each independently loaded application under `apps/` is a standalone project with its
 own build definition, `src/`, `include/`, `README.md`, and `LICENSE`. Application
 Makefiles use shared TabOS SDK rules from `sdk/make/application.mk`; runnable binaries
-are built separately from firmware. Built-in firmware diagnostics remain grouped under
+are built separately from firmware. `apps/build.sh` invokes every maintained standalone
+application build and installs outputs into local simulated `T:/bin`; update its application
+list whenever another standalone project is added. Built-in firmware diagnostics remain grouped under
 `apps/diag/` because they are kernel test fixtures rather than distributable programs.
 
 ## Dependency Direction
