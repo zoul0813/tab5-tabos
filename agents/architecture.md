@@ -166,7 +166,7 @@ retained RV32 interpreter slices. Tab5 platform starts native ELF entry in manag
 application task and polls completion from runtime task. Shell uses pending child-exec
 protocol to remain blocked until process manager restores it with child status.
 
-ELF ABI version 2 entry and nested execution carry bounded `argc`/`argv`. Child loader
+ELF ABI version 3 entry and nested execution carry bounded `argc`/`argv`. Child loader
 state owns copied arguments for full process lifetime. Tokenization, quoting, and escaping
 are application policy implemented by shell, not kernel process behavior.
 
@@ -174,10 +174,13 @@ First ELF implementation accepts minimal stripped RV32 `ET_EXEC` image with boun
 `PT_LOAD` segments and no relocations/dynamic linking. Loader can consume a bounded file
 through TabOS filesystem API, copies its image into platform-provided executable memory,
 and invokes entry with versioned API table. Checked-in hello bytes remain only a focused
-loader/test fixture. ESP32-P4 hardware validation proved writable PSRAM loading plus a
-read/execute MMU alias of same physical pages. Host executes same RV32 artifact through
-resumable interpreter slices. This remains experimental, not final executable-format or
-process-isolation decision.
+loader/test fixture. Tab5 loads the image through a writable PSRAM allocation and maps the
+same physical pages into the ESP32-P4 PSRAM linear region with an `EXEC | READ` request.
+ESP-IDF rejects an explicit `EXEC | WRITE` request, but the selected P4 linear region is
+connected to both instruction and data buses. Hardware validation must prove writes to
+globals, BSS, and newlib state through that alias. Host executes the same RV32 artifact
+through resumable interpreter slices. This remains experimental, not final
+executable-format or process-isolation decision.
 
 [DECIDED] Initial process model uses persistent nested foreground processes. Shell is
 persistent root process, initially process 0. Executing child blocks but does not unload

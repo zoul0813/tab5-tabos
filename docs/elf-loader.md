@@ -92,14 +92,24 @@ ELF launcher diagnostic passed
 Serial output includes source path, loaded image size, and returned status zero.
 Launcher remains active after validation, so successful child exits do not panic process 0.
 
-If display reports `ELF load FAILED: NO EXECUTABLE MEMORY`, writable PSRAM allocation failed. `PREPARE FAILED` means cache synchronization, physical-address resolution, or executable MMU alias creation failed.
+If display reports `ELF load FAILED: NO EXECUTABLE MEMORY`, writable PSRAM allocation
+failed. `PREPARE FAILED` means cache synchronization, physical-address resolution, or the
+executable PSRAM alias failed.
 
 ## Memory Scope
 
-Current Tab5 backend loads bytes through writable PSRAM, synchronizes cache, then creates
-a read/write/execute MMU alias for the same physical pages. Write permission is required
-for C globals, BSS, and newlib runtime state. ESP-IDF documents executable heap
-capabilities, explicit MMU mappings, and cache synchronization:
+Current Tab5 backend allocates the complete ELF image in writable PSRAM, synchronizes it,
+then maps the same physical pages into the ESP32-P4 executable PSRAM linear region. The
+MMU request uses `EXEC | READ`; ESP-IDF explicitly rejects adding `WRITE`. On ESP32-P4 the
+selected linear region is connected to both instruction and data buses, so the executable
+alias is expected to support the application writes needed by globals, BSS, and newlib
+state. This behavior requires physical Tab5 validation.
+
+The writable alias remains available to the loader and kernel for data-pointer
+translation. Application images therefore use PSRAM rather than being capped by internal
+RAM. If hardware validation disproves writable application access through the executable
+alias, the loader will need separate relocated code and data mappings. ESP-IDF documents
+executable heap capabilities and MMU restrictions:
 
 - [ESP32-P4 heap capabilities](https://docs.espressif.com/projects/esp-idf/en/v5.5/esp32p4/api-reference/system/mem_alloc.html)
 - [ESP32-P4 MMU-supported memory](https://docs.espressif.com/projects/esp-idf/en/v5.3/esp32p4/api-reference/system/mm.html)

@@ -301,6 +301,9 @@ but is not a substitute for this execution path.
 - [x] Run native Tab5 ELF entry in application task while runtime/services continue.
 - [x] Retain one independent host RV32 interpreter context per loaded process.
 - [x] Keep executable memory and execution context until owning process exits.
+- [ ] Verify mixed code/data ELF writes through the ESP32-P4 executable PSRAM alias.
+- [ ] Split ELF code and writable data mappings later if hardware validation shows the
+  dual-alias arrangement cannot safely support writable application state.
 - [ ] Define cooperative stop versus process-requested exit semantics.
 - [x] Audit current foreground-only console, filesystem, loader, and lifecycle synchronization.
 - [ ] Validate shell -> child -> grandchild nesting and unwind order on host and Tab5.
