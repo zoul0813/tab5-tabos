@@ -1,9 +1,8 @@
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
-#include <tabos/elf_api.h>
-
-extern const tabos_elf_api_t *tabos_runtime_api;
+#include <sched.h>
+#include <tabos/process.h>
 
 #include <shell/parser.h>
 
@@ -12,7 +11,7 @@ extern const tabos_elf_api_t *tabos_runtime_api;
 enum {
     SHELL_LINE_CAPACITY = 256,
     SHELL_IO_CAPACITY = 1024,
-    SHELL_ARGUMENT_CAPACITY = TABOS_ELF_ARG_MAX,
+    SHELL_ARGUMENT_CAPACITY = TABOS_PROCESS_ARG_MAX,
 };
 
 static uint32_t string_length(const char *text)
@@ -56,7 +55,7 @@ static void append_string(char *destination, uint32_t capacity, const char *sour
     destination[used] = '\0';
 }
 
-static void write_error(const tabos_elf_api_t *api, const char *operation, int status)
+static void write_error(const char *operation, int status)
 {
     char number[16];
     char message[96];
@@ -79,7 +78,7 @@ static void write_error(const tabos_elf_api_t *api, const char *operation, int s
     printf("%s\n", message);
 }
 
-static void write_exit_status(const tabos_elf_api_t *api, int status)
+static void write_exit_status(int status)
 {
     char number[16];
     char message[40];
@@ -101,7 +100,7 @@ static void write_exit_status(const tabos_elf_api_t *api, int status)
     printf("%s\n", message);
 }
 
-static void execute_command(const tabos_elf_api_t *api, char *line)
+static void execute_command(char *line)
 {
     char *argv[SHELL_ARGUMENT_CAPACITY];
     const int parsed = shell_parse_arguments(line, argv, SHELL_ARGUMENT_CAPACITY);
@@ -119,13 +118,13 @@ static void execute_command(const tabos_elf_api_t *api, char *line)
         return;
     }
     if (string_equal(command, "clear")) {
-        (void)api->console_clear();
+        printf("\033[2J\033[H");
         return;
     }
     if (string_equal(command, "pwd")) {
         char path[512];
         if (getcwd(path, sizeof(path)) != NULL) printf("%s\n", path);
-        else write_error(api, "pwd", -errno);
+        else write_error("pwd", -errno);
         return;
     }
     if (string_equal(command, "cd")) {
@@ -133,21 +132,9 @@ static void execute_command(const tabos_elf_api_t *api, char *line)
             printf("Usage: cd <path>\n");
             return;
         }
-        if (chdir(argv[1]) != 0) write_error(api, "cd", -errno);
+        if (chdir(argv[1]) != 0) write_error("cd", -errno);
         return;
     }
-    // if (string_equal(command, "ls")) {
-    //     if (argc > 2U) {
-    //         api->console_write("Usage: ls [path]");
-    //         return;
-    //     }
-    //     const char *path = argc == 2U ? argv[1] : ".";
-    //     char listing[SHELL_IO_CAPACITY];
-    //     const int result = api->fs_list(path, listing, sizeof(listing));
-    //     if (result == 0) api->console_write_raw(listing);
-    //     else write_error(api, "ls", result);
-    //     return;
-    // }
 
     char path[512];
     const uint32_t command_length = string_length(command);
@@ -162,15 +149,13 @@ static void execute_command(const tabos_elf_api_t *api, char *line)
             append_string(path, sizeof(path), ".bin");
         }
     }
-    int status = TABOS_ELF_EXEC_PENDING;
-    while (status == TABOS_ELF_EXEC_PENDING) {
-        status = api->exec(path, argc, (const char *const *)argv);
-        if (status == TABOS_ELF_EXEC_PENDING) api->yield();
-    }
-    if (status != 0) write_exit_status(api, status);
+    const int pid = tabos_spawn(path, (int)argc, (const char *const *)argv);
+    int status = pid < 0 ? pid : 0;
+    if (pid >= 0 && waitpid(pid, &status, 0) < 0) status = -errno;
+    if (status != 0) write_exit_status(status);
 }
 
-static void prompt(const tabos_elf_api_t *api)
+static void prompt(void)
 {
     char path[512];
     if (getcwd(path, sizeof(path)) != NULL) {
@@ -182,13 +167,8 @@ static void prompt(const tabos_elf_api_t *api)
 
 int main(int argc, char **argv)
 {
-    const tabos_elf_api_t *api = tabos_runtime_api;
     (void)argc;
     (void)argv;
-    if (api == 0 || api->abi_version != TABOS_ELF_API_VERSION ||
-        api->console_read == 0 || api->console_write_raw == 0 || api->exec == 0) {
-        return 2;
-    }
 
     char line[SHELL_LINE_CAPACITY];
     uint32_t used = 0U;
@@ -198,12 +178,12 @@ int main(int argc, char **argv)
     setvbuf(stdout, NULL, _IONBF, 0);
 
     printf("TabOS shell\n");
-    prompt(api);
+    prompt();
     for (;;) {
         char input[16];
-        const int count = api->console_read(input, sizeof(input));
+        const int count = (int)read(STDIN_FILENO, input, sizeof(input));
         if (count <= 0) {
-            api->yield();
+            if (count < 0 && errno != EAGAIN) break;
             continue;
         }
         for (int index = 0; index < count; ++index) {
@@ -211,10 +191,10 @@ int main(int argc, char **argv)
             if (character == '\n') {
                 line[used] = '\0';
                 putchar('\n');
-                execute_command(api, line);
+                execute_command(line);
                 used = 0U;
                 line[0] = '\0';
-                prompt(api);
+                prompt();
             } else if (character == '\b') {
                 if (used > 0U) {
                     used--;

@@ -11,7 +11,8 @@
 #include <sys/stat.h>
 #include <sys/statvfs.h>
 
-static const char drive_letters[] = {'A', 'T'};
+/* Host mirrors the currently supported Tab5 volume as the default drive. */
+static const char drive_letters[] = {'T', 'A'};
 
 size_t storage_backend_drive_count(void)
 {

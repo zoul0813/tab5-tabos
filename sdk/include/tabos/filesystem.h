@@ -54,6 +54,8 @@ enum {
     TABOS_ENAMETOOLONG = 36,
     TABOS_ENOTEMPTY = 39,
     TABOS_ENOTSUP = 95,
+    TABOS_EBUSY = 16,
+    TABOS_ECHILD = 10,
 };
 
 typedef int32_t tabos_fd_t;

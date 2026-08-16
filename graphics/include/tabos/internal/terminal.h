@@ -33,6 +33,11 @@ typedef struct {
     bool cursor_visible;
     bool cursor_phase_visible;
     bool full_redraw;
+    uint8_t ansi_state;
+    unsigned int ansi_value;
+    bool ansi_have_value;
+    size_t saved_column;
+    uint64_t saved_line;
 } terminal_t;
 
 bool terminal_init(terminal_t *terminal, platform_framebuffer_t *framebuffer, unsigned int scale);

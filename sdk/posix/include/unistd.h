@@ -6,6 +6,10 @@
 typedef tabos_ssize_t ssize_t;
 typedef tabos_off_t off_t;
 
+#define STDIN_FILENO 0
+#define STDOUT_FILENO 1
+#define STDERR_FILENO 2
+
 #define SEEK_SET TABOS_SEEK_SET
 #define SEEK_CUR TABOS_SEEK_CUR
 #define SEEK_END TABOS_SEEK_END

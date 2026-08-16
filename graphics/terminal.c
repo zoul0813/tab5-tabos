@@ -164,6 +164,62 @@ static void tab(terminal_t *terminal)
     }
 }
 
+static platform_pixel_t ansi_color(unsigned int value)
+{
+    static const platform_pixel_t colors[] = {
+        0x0000, 0xf800, 0x07e0, 0xffe0, 0x001f, 0xf81f, 0x07ff, 0xffff,
+    };
+    return colors[value < 8U ? value : 7U];
+}
+
+static void ansi_sgr(terminal_t *terminal, unsigned int value)
+{
+    if (value == 0U) {
+        terminal->foreground = 0xffff;
+        terminal->background = 0x0000;
+    } else if (value >= 30U && value <= 37U) {
+        terminal->foreground = ansi_color(value - 30U);
+    } else if (value >= 40U && value <= 47U) {
+        terminal->background = ansi_color(value - 40U);
+    }
+}
+
+static void ansi_command(terminal_t *terminal, char command)
+{
+    const unsigned int value = terminal->ansi_have_value ? terminal->ansi_value : 0U;
+    if (command == 'H' || command == 'f') {
+        terminal->current_line = terminal->first_line + (value > 0U ? value - 1U : 0U);
+        terminal->column = 0U;
+    } else if (command == 'A') {
+        terminal->current_line -= value < terminal->current_line ? value : terminal->current_line;
+    } else if (command == 'B') {
+        terminal->current_line += value;
+    } else if (command == 'C') {
+        terminal->column += value;
+        if (terminal->column >= terminal->columns) terminal->column = terminal->columns - 1U;
+    } else if (command == 'D') {
+        terminal->column -= value < terminal->column ? value : terminal->column;
+    } else if (command == 'G') {
+        terminal->column = value > 0U ? value - 1U : 0U;
+        if (terminal->column >= terminal->columns) terminal->column = terminal->columns - 1U;
+    } else if (command == 'J' && value == 2U) {
+        terminal_clear(terminal);
+    } else if (command == 'K') {
+        terminal_cell_t *cells = line_cells(terminal, terminal->current_line);
+        for (size_t column = terminal->column; column < terminal->columns; ++column) cells[column] = (terminal_cell_t){0};
+        terminal->line_lengths[line_slot(terminal, terminal->current_line)] = terminal->column;
+        terminal->full_redraw = true;
+    } else if (command == 'm') {
+        ansi_sgr(terminal, value);
+    } else if (command == 's') {
+        terminal->saved_column = terminal->column;
+        terminal->saved_line = terminal->current_line;
+    } else if (command == 'u') {
+        terminal->column = terminal->saved_column;
+        terminal->current_line = terminal->saved_line;
+    }
+}
+
 static void clear_framebuffer(terminal_t *terminal)
 {
     for (size_t y = 0U; y < terminal->framebuffer->height; ++y) {
@@ -399,6 +455,20 @@ void terminal_write(terminal_t *terminal, const char *text)
     mark_cursor(terminal);
     terminal->cursor_phase_visible = true;
     while (*text != '\0') {
+        if (terminal->ansi_state == 1U) {
+            if (*text == '[') { terminal->ansi_state = 2U; terminal->ansi_value = 0U; terminal->ansi_have_value = false; }
+            else if (*text == '7') { terminal->saved_column = terminal->column; terminal->saved_line = terminal->current_line; terminal->ansi_state = 0U; }
+            else if (*text == '8') { terminal->column = terminal->saved_column; terminal->current_line = terminal->saved_line; terminal->ansi_state = 0U; }
+            else terminal->ansi_state = 0U;
+            ++text;
+            continue;
+        }
+        if (terminal->ansi_state == 2U) {
+            if (*text >= '0' && *text <= '9') { terminal->ansi_value = terminal->ansi_value * 10U + (unsigned int)(*text - '0'); terminal->ansi_have_value = true; ++text; continue; }
+            if (*text == ';') { ++text; continue; }
+            ansi_command(terminal, *text); terminal->ansi_state = 0U; ++text; continue;
+        }
+        if ((unsigned char)*text == 0x1bU) { terminal->ansi_state = 1U; ++text; continue; }
         if (*text == '\n') {
             append_line(terminal, true);
         } else if (*text == '\r') {

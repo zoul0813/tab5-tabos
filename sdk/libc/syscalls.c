@@ -93,6 +93,16 @@ ssize_t _read(int descriptor, void *buffer, size_t count)
     }
 }
 
+int sched_yield(void)
+{
+    if (tabos_runtime_api == NULL || tabos_runtime_api->yield == NULL) {
+        errno = ENOSYS;
+        return -1;
+    }
+    tabos_runtime_api->yield();
+    return 0;
+}
+
 ssize_t _write(int descriptor, const void *buffer, size_t count)
 {
     return (ssize_t)fail_result(
