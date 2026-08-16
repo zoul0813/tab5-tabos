@@ -278,7 +278,8 @@ but is not a substitute for this execution path.
 - [ ] Enforce process-0 liveness invariant across return, exit request, fault, and forced termination.
 - [ ] Add kernel panic state that reports process-0 failure to serial and framebuffer terminal.
 - [x] Implement foreground process stack and parent/child relationships.
-- [ ] Add synchronous child execution API that blocks parent without unloading it.
+- [ ] Add resumable synchronous ELF execution call gate that blocks parent at call site.
+- [x] Add cooperative C child execution request and child-status collection API.
 - [x] Transfer console and focused input ownership to stack top only.
 - [x] Restore parent focus, execution, and child exit status when child completes.
 - [ ] Run native Tab5 ELF entry in application task while runtime/services continue.
@@ -295,6 +296,8 @@ but is not a substitute for this execution path.
 
 - [x] Make loader consume filesystem handles rather than embedded byte arrays.
 - [x] Preserve bounded reads and executable image size limits.
+- [x] Give each filesystem-loaded ELF child ownership of its image and execution state.
+- [x] Run configured ELF twice from a persistent launcher diagnostic without exiting PID 0.
 - [ ] Load and execute independent RV32 hello application from host controlled root.
 - [ ] Load independent hello application from Tab5 microSD.
 - [ ] Define application file naming and discovery rules.

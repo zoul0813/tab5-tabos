@@ -41,7 +41,12 @@ Registry rejects invalid ABI versions, unsupported capabilities, duplicate names
 6. Call cleanup callback with exit status.
 7. Release console ownership and return to idle runtime.
 
-`tabos_app_active()`, `tabos_app_is_running()`, and `tabos_app_last_exit_status()` expose lifecycle state. Future launcher or shell can inspect registry with `tabos_app_count()`, `tabos_app_at()`, and `tabos_app_find()`, then call `tabos_app_launch()`.
+`tabos_app_active()`, `tabos_app_is_running()`, and `tabos_app_last_exit_status()` expose
+lifecycle state. Built-in applications can call `tabos_app_exec(context, path)` to request
+a filesystem-backed ELF child, then must return from current callback. Parent remains
+loaded and blocked while child owns console and input; `tabos_app_take_child_status()`
+receives status from a later callback after cleanup and parent resume.
+Future shell will use same process operation through an ELF ABI call gate.
 
 ## Console Test Application
 
@@ -50,6 +55,11 @@ When `TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP=ON`, built-in `console-test` applicati
 When `TABOS_ENABLE_FILESYSTEM_DIAGNOSTIC_APP=ON`, built-in `filesystem-test`
 application validates real mounted storage through public TabOS filesystem API,
 prints each result, cleans its dedicated test directory after success, and exits.
+
+When `TABOS_ENABLE_ELF_LOADER_EXPERIMENT=ON`, persistent `elf-hello` launcher runs
+configured filesystem ELF twice as child processes. It verifies loading, process-owned
+execution state, console transfer, exit status, cleanup, and parent restoration without
+exiting process 0.
 
 ## Current Limits
 
@@ -61,10 +71,11 @@ Current implementation is deliberately small:
 - console is only defined capability
 - registry capacity is 16 built-in descriptors
 - fixed-capacity process table supports nested foreground processes; blocked parents retain state and resume after child exit
-- child launch is currently an internal built-in-test primitive; public synchronous execution API and RV32 call gate remain pending
+- C application API supports cooperative filesystem-backed child requests and status
+  collection; resumable synchronous ELF-facing execution call gate remains pending
 - PID 0 exit enters kernel-panic state and retains its process record; memory isolation remains unavailable
-- experimental filesystem-backed ELF loader exists, but no relocations, arguments,
-  discovery, or general external application memory management yet
+- experimental filesystem-backed ELF loader exists, but no relocations, arguments, or
+  discovery yet
 
 Descriptor and public application API avoid assumptions about executable container.
 Current loader diagnostic reads stripped ELF through TabOS filesystem API and maps its

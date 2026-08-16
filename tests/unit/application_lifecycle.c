@@ -14,6 +14,8 @@ static tabos_process_id_t entry_process_id;
 static unsigned int root_stage;
 static unsigned int child_stage;
 static bool nested_complete;
+static unsigned int file_root_stage;
+static bool file_child_cleanup_complete;
 
 static bool nested_entry(tabos_app_context_t *context)
 {
@@ -29,7 +31,7 @@ static void root_update(tabos_app_context_t *context)
         return;
     }
     int status = 0;
-    if (kernel_process_take_child_status(context, &status) && status == 22) {
+    if (tabos_app_take_child_status(context, &status) && status == 22) {
         nested_complete = true;
     }
 }
@@ -43,7 +45,7 @@ static void child_update(tabos_app_context_t *context)
         return;
     }
     int status = 0;
-    if (kernel_process_take_child_status(context, &status) && status == 33) {
+    if (tabos_app_take_child_status(context, &status) && status == 33) {
         tabos_app_request_exit(context, 22);
     }
 }
@@ -78,6 +80,29 @@ static const tabos_app_descriptor_t grandchild_app = {
     .capabilities = TABOS_APP_CAPABILITY_CONSOLE,
     .entry = nested_entry,
     .update = grandchild_update,
+};
+
+static void file_root_update(tabos_app_context_t *context)
+{
+    if (file_root_stage++ == 0U) {
+        if (tabos_app_exec(context, "T:/missing.bin") != TABOS_APP_RESULT_START_FAILED) {
+            tabos_app_request_exit(context, 92);
+        }
+        return;
+    }
+    int status = 0;
+    if (tabos_app_take_child_status(context, &status) && status == -1) {
+        file_child_cleanup_complete = true;
+    }
+}
+
+static const tabos_app_descriptor_t file_root_app = {
+    .abi_version = TABOS_APPLICATION_ABI_VERSION,
+    .name = "file-root",
+    .version = "1.0.0",
+    .capabilities = TABOS_APP_CAPABILITY_CONSOLE,
+    .entry = nested_entry,
+    .update = file_root_update,
 };
 
 static bool test_entry(tabos_app_context_t *context)
@@ -165,6 +190,20 @@ int main(void)
     kernel_application_system_update();
     kernel_application_system_update();
     if (!nested_complete || tabos_process_count() != 1U ||
+        !tabos_process_info(0U, &process_info) ||
+        process_info.state != TABOS_PROCESS_RUNNING || tabos_process_system_panicked()) {
+        return 1;
+    }
+    kernel_application_system_shutdown();
+    kernel_application_system_init();
+
+    if (!application_registry_register(&file_root_app) ||
+        tabos_app_launch("file-root") != TABOS_APP_RESULT_OK) {
+        return 1;
+    }
+    kernel_application_system_update();
+    kernel_application_system_update();
+    if (!file_child_cleanup_complete || tabos_process_count() != 1U ||
         !tabos_process_info(0U, &process_info) ||
         process_info.state != TABOS_PROCESS_RUNNING || tabos_process_system_panicked()) {
         return 1;

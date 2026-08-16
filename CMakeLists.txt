@@ -106,7 +106,6 @@ target_include_directories(tabos_core
         "${TABOS_ROOT}/input/include"
         "${TABOS_ROOT}/kernel/include"
         "${TABOS_ROOT}/loader/include"
-        "${TABOS_ROOT}/loader/fixtures"
         "${TABOS_ROOT}/platform/include"
         "${TABOS_GENERATED_INCLUDE_DIR}"
 )

@@ -150,7 +150,15 @@ TabOS API
 
 Programs should not require the complete TabOS firmware to be rebuilt and reflashed.
 
-Current process foundation provides a fixed-capacity process table, stable process IDs, parent/state metadata, and nested foreground stack. Launching built-in child blocks and retains parent, transfers console focus, permits further nesting, then restores parent and child status during reverse-order unwind. This internal request/resume mechanism deliberately does not expose asynchronous public API as substitute for future synchronous `exec`. Selected console and filesystem diagnostics remain persistent temporary PID 0 programs. Selecting independent `hello_elf` as PID 0 intentionally exercises root-exit panic. RV32 call-gate integration and managed Tab5 application tasks remain next work.
+Current process foundation provides fixed-capacity process table, stable process IDs,
+parent/state metadata, and nested foreground stack. Launching built-in or filesystem ELF
+child blocks and retains parent, transfers console focus, then restores parent and child
+status during unwind. Public cooperative C API exposes child request through
+`tabos_app_exec()` plus later child-status collection; caller returns from current
+callback after successful request. Filesystem ELF image, execution context, path, and descriptor belong to child
+process and are released only during child cleanup. Persistent `elf-hello` diagnostic
+runs configured ELF twice as children without exiting process 0. ELF ABI call-gate
+integration and managed Tab5 application tasks remain next work.
 
 First ELF implementation accepts minimal stripped RV32 `ET_EXEC` image with bounded
 `PT_LOAD` segments and no relocations/dynamic linking. Loader can consume a bounded file

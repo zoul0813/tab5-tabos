@@ -63,15 +63,17 @@ Build and flash can also be requested together through the wrapper:
 ./tools/tabos tab5 debug flash
 ```
 
-Successful display output includes:
+Filesystem-backed launcher remains process 0 and starts `hello.bin` twice as child
+processes. Successful display output includes two hello messages followed by:
 
 ```text
 Hello from independent TabOS ELF
+ELF child exited with status 0
+ELF launcher diagnostic passed
 ```
 
 Serial output includes source path, loaded image size, and returned status zero.
-Because diagnostic starts as process 0, its successful exit then intentionally exercises
-current process-0 panic behavior. Future shell will run file-backed programs as children.
+Launcher remains active after validation, so successful child exits do not panic process 0.
 
 If display reports `ELF load FAILED: NO EXECUTABLE MEMORY`, writable PSRAM allocation failed. `PREPARE FAILED` means cache synchronization, physical-address resolution, or executable MMU alias creation failed.
 
@@ -88,6 +90,7 @@ Current Tab5 backend loads bytes through a writable PSRAM mapping, synchronizes 
 Loader does not yet provide:
 
 - application arguments
+- ELF-facing `exec` call gate
 - relocation processing
 - imported symbol resolution
 - multiple code/data permission regions

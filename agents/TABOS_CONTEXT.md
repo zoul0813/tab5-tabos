@@ -110,7 +110,15 @@ The kernel currently constructs one structured boot report and sends it to both 
 
 The public `<tabos/console.h>` API now supplies one cooperative foreground console session. Only current session can write, clear, inspect cursor, navigate scrollback, or read normalized input; rejected reads do not consume events. Terminal controls support newline, carriage return, four-column tabs, destructive backspace, wrapping, clearing, and scrolling. Terminal state is a colored cell ring retaining visible rows plus `TABOS_TERMINAL_SCROLLBACK_LINES` (default 256) history rows. Viewport is separate from live cursor; Page Up/Down/Home/End navigate, cursor hides above live output, and new output returns to end. Tab5 Keyboard lacks these four physical HID keys, so diagnostic mapping uses Ctrl+Up/Down for Page Up/Down and Ctrl+Left/Right for Home/End; plain arrows remain unclaimed. Runtime scale changes reflow retained hard/soft lines and redraw cells. Cursor blinks at configurable half-period through reusable polling timer service; input/output restores visible phase. Terminal dirty-cell rendering avoids full glyph redraw for ordinary writes and blink changes. Writes still present framebuffer immediately on every target. Optional `TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP` builds a target-neutral echo/test application under `apps/`; it defaults off and is explicitly not shell.
 
-Portable application foundation defines descriptor and cooperative lifecycle API in `<tabos/application.h>`. Fixed-capacity process table currently launches one foreground PID 0 and exposes PID, parent, and state metadata. Console and filesystem diagnostics persist as temporary root processes after reporting completion. Ctrl+Q reports console-diagnostic completion without exiting. Independent `hello_elf` exit as PID 0 triggers kernel-panic state and retains root process record. Nested children and managed Tab5 application tasks remain next work.
+Portable application foundation defines descriptor and cooperative lifecycle API in
+`<tabos/application.h>`. Fixed-capacity process table exposes PID, parent, and state
+metadata with persistent nested foreground stack. Public cooperative C
+`tabos_app_exec()` requests filesystem ELF child; caller then returns from current
+callback. Process manager blocks and retains parent, transfers console/input, then
+restores parent with child status after process-owned ELF resources are cleaned. Console,
+filesystem, and ELF launcher diagnostics persist as temporary root processes. ELF
+launcher runs configured child twice, avoiding process-0 exit. Managed Tab5 application
+tasks and ELF-facing exec call gate remain next work.
 
 ### Decision: persistent nested foreground processes
 

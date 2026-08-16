@@ -1,4 +1,5 @@
 #include <tabos/internal/application.h>
+#include <tabos/internal/elf_application.h>
 
 #include <tabos/platform/platform.h>
 
@@ -13,6 +14,7 @@ typedef struct {
     tabos_process_id_t parent_id;
     tabos_process_state_t state;
     tabos_app_context_t context;
+    void (*application_data_destroy)(void *data);
 } kernel_process_t;
 
 static kernel_process_t processes[KERNEL_PROCESS_CAPACITY];
@@ -70,6 +72,9 @@ static void destroy_process(kernel_process_t *process)
     }
     if (context->console_owned) {
         tabos_console_release(&context->console);
+    }
+    if (process->application_data_destroy != NULL) {
+        process->application_data_destroy(context->application_data);
     }
 
     *process = (kernel_process_t){0};
@@ -200,16 +205,24 @@ tabos_app_result_t tabos_app_launch(const char *name)
     return TABOS_APP_RESULT_OK;
 }
 
-tabos_app_result_t kernel_process_launch_child(tabos_app_context_t *parent,
-                                               const char *name)
+static tabos_app_result_t launch_child_descriptor(
+    tabos_app_context_t *parent,
+    const tabos_app_descriptor_t *descriptor,
+    void *application_data,
+    void (*application_data_destroy)(void *data))
 {
-    if (parent == NULL || name == NULL || name[0] == '\0') return TABOS_APP_RESULT_INVALID;
+    if (parent == NULL || descriptor == NULL) {
+        if (application_data_destroy != NULL) application_data_destroy(application_data);
+        return TABOS_APP_RESULT_INVALID;
+    }
     if (foreground_process == NULL || parent != &foreground_process->context ||
-        foreground_process->state != TABOS_PROCESS_RUNNING) return TABOS_APP_RESULT_BUSY;
-    const tabos_app_descriptor_t *descriptor = tabos_app_find(name);
-    if (descriptor == NULL) return TABOS_APP_RESULT_NOT_FOUND;
+        foreground_process->state != TABOS_PROCESS_RUNNING) {
+        if (application_data_destroy != NULL) application_data_destroy(application_data);
+        return TABOS_APP_RESULT_BUSY;
+    }
     kernel_process_t *child = free_process_slot();
     if (child == NULL || foreground_depth >= KERNEL_PROCESS_CAPACITY) {
+        if (application_data_destroy != NULL) application_data_destroy(application_data);
         return TABOS_APP_RESULT_START_FAILED;
     }
 
@@ -223,7 +236,9 @@ tabos_app_result_t kernel_process_launch_child(tabos_app_context_t *parent,
         .context = {
             .descriptor = descriptor,
             .process_id = child_id,
+            .application_data = application_data,
         },
+        .application_data_destroy = application_data_destroy,
     };
     release_process_console(parent_process);
     parent_process->state = TABOS_PROCESS_BLOCKED;
@@ -238,7 +253,26 @@ tabos_app_result_t kernel_process_launch_child(tabos_app_context_t *parent,
     return TABOS_APP_RESULT_OK;
 }
 
-bool kernel_process_take_child_status(tabos_app_context_t *parent, int *status)
+tabos_app_result_t kernel_process_launch_child(tabos_app_context_t *parent,
+                                               const char *name)
+{
+    if (parent == NULL || name == NULL || name[0] == '\0') return TABOS_APP_RESULT_INVALID;
+    const tabos_app_descriptor_t *descriptor = tabos_app_find(name);
+    if (descriptor == NULL) return TABOS_APP_RESULT_NOT_FOUND;
+    return launch_child_descriptor(parent, descriptor, NULL, NULL);
+}
+
+tabos_app_result_t tabos_app_exec(tabos_app_context_t *context, const char *path)
+{
+    if (context == NULL || path == NULL || path[0] == '\0') return TABOS_APP_RESULT_INVALID;
+    loader_elf_application_t *application = loader_elf_application_create(path);
+    if (application == NULL) return TABOS_APP_RESULT_INVALID;
+    return launch_child_descriptor(
+        context, loader_elf_application_descriptor(application), application,
+        loader_elf_application_destroy);
+}
+
+bool tabos_app_take_child_status(tabos_app_context_t *parent, int *status)
 {
     if (parent == NULL || status == NULL || !parent->child_status_valid) return false;
     *status = parent->child_status;
