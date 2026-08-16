@@ -372,17 +372,26 @@ static void *elf_heap_sbrk(int32_t increment)
 static int elf_fs_list(const char *path, char *buffer, uint32_t capacity)
 {
     if (path == NULL || buffer == NULL || capacity == 0U) return -TABOS_EINVAL;
-    const tabos_dir_t directory = tabos_fs_opendir(path);
+    loader_elf_application_t *application = platform_riscv32_current_user_data();
+    if (application == NULL) return -TABOS_EINVAL;
+    char resolved[TABOS_FS_PATH_MAX];
+    if (!filesystem_normalize_path(path, application->working_directory,
+                                   resolved, sizeof(resolved))) {
+        return -TABOS_ENAMETOOLONG;
+    }
+    const tabos_dir_t directory = tabos_fs_opendir(resolved);
     if (directory < 0) return -*tabos_errno_location();
     size_t used = 0U;
     tabos_dirent_t entry;
     int result = 0;
     while ((result = tabos_fs_readdir(directory, &entry)) > 0) {
         const size_t length = strlen(entry.name);
-        if (length + 1U >= (size_t)capacity - used) {
+        if (length + 3U >= (size_t)capacity - used) {
             result = -TABOS_ENOSPC;
             break;
         }
+        buffer[used++] = (entry.mode & TABOS_S_IFDIR) != 0U ? 'D' : 'F';
+        buffer[used++] = ':';
         memcpy(buffer + used, entry.name, length);
         used += length;
         buffer[used++] = '\n';

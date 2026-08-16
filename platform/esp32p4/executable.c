@@ -9,6 +9,7 @@
 #include <sdkconfig.h>
 
 #include <freertos/FreeRTOS.h>
+#include <freertos/idf_additions.h>
 #include <freertos/task.h>
 
 #include <stdatomic.h>
@@ -194,8 +195,13 @@ platform_riscv32_result_t platform_riscv32_step(
         return PLATFORM_RISCV32_FAULT;
     }
     if (!atomic_load_explicit(&context->started, memory_order_acquire)) {
-        if (xTaskCreate(elf_task_main, "tabos-app", ELF_TASK_STACK_BYTES / sizeof(StackType_t),
-                        context, ELF_TASK_PRIORITY, &context->task) != pdPASS) {
+        if (xTaskCreateWithCaps(elf_task_main, "tabos-app",
+                                ELF_TASK_STACK_BYTES / sizeof(StackType_t), context,
+                                ELF_TASK_PRIORITY, &context->task,
+                                MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) != pdPASS) {
+            ESP_LOGE(TAG, "Could not create ELF task; free internal=%u, PSRAM=%u",
+                     (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+                     (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
             return PLATFORM_RISCV32_FAULT;
         }
         atomic_store_explicit(&context->started, true, memory_order_release);

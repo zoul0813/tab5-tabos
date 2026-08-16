@@ -53,6 +53,12 @@ if [ -n "$msc_mount" ]; then
         fi
         found_binary=true
         relative_path=${binary#"$project_root/build/apps/"}
+        case "$relative_path" in
+            coreutils/*/*)
+                relative_path=${relative_path#coreutils/}
+                relative_path=${relative_path#*/}
+                ;;
+        esac
         relative_path=${relative_path#*/}
         target="$destination/$relative_path"
         mkdir -p "$(dirname "$target")"

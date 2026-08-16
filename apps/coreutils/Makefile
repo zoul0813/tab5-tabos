@@ -1,0 +1,40 @@
+# Small independently loaded command-line utilities.
+
+PROGRAMS := ls mkdir rmdir cp rm mv
+
+ifeq ($(strip $(PROGRAM)),)
+
+.PHONY: all build install clean $(PROGRAMS)
+
+all: $(PROGRAMS)
+build: $(PROGRAMS:%=build-%)
+install: $(PROGRAMS)
+
+$(PROGRAMS):
+	$(MAKE) --no-print-directory PROGRAM=$@ -f Makefile program
+
+$(PROGRAMS:%=build-%): build-%:
+	$(MAKE) --no-print-directory PROGRAM=$* -f Makefile build
+
+clean:
+	@for program in $(PROGRAMS); do \
+		$(MAKE) --no-print-directory PROGRAM=$$program -f Makefile clean; \
+	done
+
+else
+
+APP_NAME := $(PROGRAM)
+APP_DIR := $(CURDIR)
+PROJECT_ROOT := $(abspath $(CURDIR)/../..)
+BUILD_DIR := $(PROJECT_ROOT)/build/apps/coreutils/$(PROGRAM)
+OUTPUT := $(BUILD_DIR)/$(PROGRAM).bin
+UNSTRIPPED := $(BUILD_DIR)/$(PROGRAM).elf
+INSTALL_PATH := $(PROJECT_ROOT)/.local/rootfs/T/bin/$(PROGRAM).bin
+SOURCES := $(CURDIR)/src/$(PROGRAM)/main.c
+
+include ../../sdk/make/application.mk
+
+.PHONY: program
+program: install
+
+endif

@@ -15,6 +15,8 @@ tabos/
 │   │   ├── elf_loader/  Embedded-ELF loader/execution diagnostic
 │   │   └── filesystem/  Filesystem/storage diagnostic
 │   ├── hello_elf/       Independently built ELF example application
+│   ├── coreutils/       Independently built small command-line utilities
+│   │   └── src/<name>/   Separate utility source and executable target
 │   ├── shell/           Independently built command shell application
 │   └── tester/          Modular end-to-end SDK and ABI test application
 ├── audio/               Portable audio subsystem

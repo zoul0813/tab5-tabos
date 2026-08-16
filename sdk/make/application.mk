@@ -19,7 +19,7 @@ CC := $(RISCV_PREFIX)gcc
 STRIP := $(RISCV_PREFIX)strip
 SIZE := $(RISCV_PREFIX)size
 
-TABOS_CPPFLAGS := -I$(SDK_ROOT)/include -I$(APP_DIR)/include
+TABOS_CPPFLAGS := -I$(SDK_ROOT)/include -I$(APP_DIR)/include -DTABOS_APPLICATION=1
 TABOS_CFLAGS := -march=rv32i_zicsr_zifencei -mabi=ilp32 -Os
 TABOS_CFLAGS += -std=c17 -fno-pic -mno-relax -msmall-data-limit=0
 TABOS_CFLAGS += -ffunction-sections -fdata-sections
@@ -27,7 +27,8 @@ TABOS_CFLAGS += -fno-stack-protector -fno-asynchronous-unwind-tables
 TABOS_LDFLAGS := -nostartfiles -Wl,-T,$(SDK_ROOT)/linker/app-riscv32.ld
 TABOS_LDFLAGS += -Wl,--build-id=none -Wl,--gc-sections -Wl,-N -Wl,--emit-relocs
 TABOS_RUNTIME_SOURCES := $(SDK_ROOT)/crt/crt0.c $(SDK_ROOT)/libc/syscalls.c \
-                         $(SDK_ROOT)/lib/process.c
+                         $(SDK_ROOT)/lib/process.c \
+                         $(SDK_ROOT)/lib/posix_filesystem.c
 
 .PHONY: all build clean install size
 

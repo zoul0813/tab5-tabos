@@ -1,11 +1,14 @@
 #include <tabos/posix_compat.h>
+#include <tabos/elf_api.h>
 
+#include <errno.h>
 #include <stdarg.h>
 #include <string.h>
 
 enum { TABOS_POSIX_MAX_DIRECTORIES = 8 };
 
 static tabos_posix_dir_t directory_pool[TABOS_POSIX_MAX_DIRECTORIES];
+const tabos_elf_api_t *tabos_runtime_api __attribute__((weak));
 
 int tabos_posix_open(const char *path, int flags, ...)
 {
@@ -82,39 +85,81 @@ tabos_posix_dir_t *tabos_posix_opendir(const char *path)
 {
     for (size_t index = 0U; index < TABOS_POSIX_MAX_DIRECTORIES; ++index) {
         if (directory_pool[index].allocated) continue;
-        const tabos_dir_t handle = tabos_fs_opendir(path);
-        if (handle < 0) return NULL;
         directory_pool[index] = (tabos_posix_dir_t){
-            .handle = handle,
             .allocated = true,
+#ifdef TABOS_APPLICATION
+            .runtime_backed = true,
+#endif
         };
+        tabos_dir_t handle =
+#ifdef TABOS_APPLICATION
+            -1;
+        if (tabos_runtime_api != NULL && tabos_runtime_api->fs_list != NULL) {
+            const int result = tabos_runtime_api->fs_list(
+                path, directory_pool[index].listing, sizeof(directory_pool[index].listing));
+            if (result < 0) {
+                directory_pool[index].allocated = false;
+                errno = -result;
+                return NULL;
+            }
+            handle = 0;
+        }
+#else
+            handle = tabos_fs_opendir(path);
+#endif
+        if (handle < 0) return NULL;
+        directory_pool[index].handle = handle;
         return &directory_pool[index];
     }
-    *tabos_errno_location() = TABOS_EMFILE;
+    errno = TABOS_EMFILE;
     return NULL;
 }
 
 void *tabos_posix_readdir(tabos_posix_dir_t *directory)
 {
     if (directory == NULL || !directory->allocated) {
-        *tabos_errno_location() = TABOS_EBADF;
+        errno = TABOS_EBADF;
         return NULL;
     }
-    const int result = tabos_fs_readdir(directory->handle, &directory->native_entry);
+ #ifdef TABOS_APPLICATION
+    if (directory->runtime_backed) {
+        const size_t start = directory->listing_offset;
+        if (directory->listing[start] == '\0') return NULL;
+        const char type = directory->listing[start];
+        const size_t name_start = start + 2U;
+        size_t end = name_start;
+        while (directory->listing[end] != '\0' && directory->listing[end] != '\n') ++end;
+        const size_t length = end - name_start;
+        if (length > TABOS_FS_NAME_MAX) { errno = TABOS_ENAMETOOLONG; return NULL; }
+        memcpy(directory->entry.d_name, directory->listing + name_start, length);
+        directory->entry.d_name[length] = '\0';
+        directory->entry.d_type = type == 'D' ? 2U : 1U;
+        directory->listing_offset = directory->listing[end] == '\n' ? end + 1U : end;
+        return &directory->entry;
+    }
+#else
+    tabos_dirent_t entry;
+    const int result = tabos_fs_readdir(directory->handle, &entry);
     if (result <= 0) return NULL;
-    directory->entry.d_type = (directory->native_entry.mode & TABOS_S_IFDIR) != 0U ? 2U : 1U;
-    memcpy(directory->entry.d_name, directory->native_entry.name,
-           strlen(directory->native_entry.name) + 1U);
+    directory->entry.d_type = (entry.mode & TABOS_S_IFDIR) != 0U ? 2U : 1U;
+    memcpy(directory->entry.d_name, entry.name, strlen(entry.name) + 1U);
     return &directory->entry;
+#endif
 }
 
 int tabos_posix_closedir(tabos_posix_dir_t *directory)
 {
     if (directory == NULL || !directory->allocated) {
-        *tabos_errno_location() = TABOS_EBADF;
+        errno = TABOS_EBADF;
         return -1;
     }
+#ifdef TABOS_APPLICATION
+    directory->allocated = false;
+    directory->runtime_backed = false;
+    return 0;
+#else
     const int result = tabos_fs_closedir(directory->handle);
     directory->allocated = false;
     return result;
+#endif
 }

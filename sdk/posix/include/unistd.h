@@ -15,6 +15,7 @@ typedef tabos_off_t off_t;
 #define write tabos_posix_write
 #define lseek tabos_posix_lseek
 #define unlink tabos_posix_unlink
+#define rename tabos_posix_rename
 #define rmdir tabos_posix_rmdir
 #define chdir tabos_posix_chdir
 #define getcwd tabos_posix_getcwd

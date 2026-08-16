@@ -33,6 +33,11 @@ example, `sys/ls.bin` is copied to `bin/sys/ls.bin`.
 
 Individual application commands such as `make -C apps/shell` remain available.
 
+Core utilities are grouped under `apps/coreutils/`, but each utility remains a separate
+program. Build one with `make -C apps/coreutils ls` or `make -C apps/coreutils mkdir`.
+Sources live in `apps/coreutils/src/<name>/main.c`; each output installs directly under
+`T:/bin/`.
+
 ## Descriptor
 
 Built-in applications export `tabos_app_descriptor_t` from `<tabos/application.h>`:

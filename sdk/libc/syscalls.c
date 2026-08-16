@@ -1,4 +1,5 @@
 #include <tabos/elf_api.h>
+#include <tabos/filesystem.h>
 
 #include <errno.h>
 #include <fcntl.h>
@@ -8,6 +9,32 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+
+const char *strerror(int error)
+{
+    switch (error) {
+        case EPERM: return "Operation not permitted";
+        case ENOENT: return "No such file or directory";
+        case EIO: return "I/O error";
+        case EBADF: return "Bad file descriptor";
+        case EAGAIN: return "Resource temporarily unavailable";
+        case ENOMEM: return "Out of memory";
+        case EACCES: return "Permission denied";
+        case EEXIST: return "File exists";
+        case ENODEV: return "No such device";
+        case ENOTDIR: return "Not a directory";
+        case EISDIR: return "Is a directory";
+        case EINVAL: return "Invalid argument";
+        case ENFILE: return "Too many open files";
+        case EMFILE: return "Too many open files";
+        case ENOSPC: return "No space left on device";
+        case EROFS: return "Read-only filesystem";
+        case ENAMETOOLONG: return "File name too long";
+        case TABOS_ENOTEMPTY: return "Directory not empty";
+        case ENOTSUP: return "Operation not supported";
+        default: return "Unknown error";
+    }
+}
 
 extern const tabos_elf_api_t *tabos_runtime_api;
 

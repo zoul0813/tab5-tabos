@@ -12,6 +12,10 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#ifndef DT_DIR
+#define DT_DIR 4
+#endif
+
 enum { PLATFORM_STORAGE_MAX_DRIVES = 26 };
 
 typedef struct {
@@ -347,11 +351,7 @@ int platform_storage_readdir(platform_dir_t directory, tabos_dirent_t *entry,
     const size_t name_length = strlen(native_entry->d_name);
     if (name_length > TABOS_FS_NAME_MAX) return TABOS_ENAMETOOLONG;
     memcpy(entry->name, native_entry->d_name, name_length + 1U);
-#ifdef DT_DIR
     entry->mode = native_entry->d_type == DT_DIR ? TABOS_S_IFDIR : TABOS_S_IFREG;
-#else
-    entry->mode = TABOS_S_IFREG;
-#endif
     *end = false;
     return 0;
 }
