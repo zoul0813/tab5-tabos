@@ -123,6 +123,9 @@ Experimental ELF ABI version 2 passes `argc`/`argv` at entry and through nested 
 Loader owns bounded copies of up to 16 arguments and 512 total bytes for child lifetime.
 Shell alone parses spaces, single/double quotes, and backslash escapes; kernel never
 interprets command-line quoting syntax.
+Loaded C applications use `<tabos/process.h>` synchronous `tabos_exec()` wrapper for
+nested foreground execution. Wrapper drives pending ELF call protocol and returns child
+status only after cleanup and parent restoration; it does not parse command strings.
 
 Filesystem-backed shell implementation loads `T:/bin/shell.bin` as process 0. ELF API
 now includes console input/raw output/clear, working-directory and directory listing,

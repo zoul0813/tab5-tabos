@@ -4,21 +4,32 @@ TabOS has portable application descriptors, built-in application registry, and s
 
 ## Building Applications
 
-Activate project ESP-IDF environment, then build and install every independently loaded
-application with:
+Build and install every independently loaded application with:
 
 ```sh
 ./apps/build.sh
 ```
 
-Script builds `hello_elf`, `shell`, and `tester`, then installs runnable ELF images under
-`.local/rootfs/T/bin/`. Maintain application list in `apps/build.sh` as applications are
-added. Arguments pass to each application Makefile; for example, this builds without
-installing:
+Script discovers every `apps/*/Makefile`, builds each application, and installs runnable
+ELF images under `.local/rootfs/T/bin/`. It activates project-local ESP-IDF toolchain
+automatically when compiler is not already available. Arguments pass to each application
+Makefile; for example, this builds without installing:
 
 ```sh
 ./apps/build.sh build
 ```
+
+To build and copy the applications to the Tab5 MSC volume, then safely eject
+it after copying:
+
+```sh
+./apps/build.sh build --msc
+```
+
+The default mount point is `/Volumes/TAB5`. Use `--msc-mount=/path` or set
+`TABOS_MSC_MOUNT` to override it. Binaries are copied to the volume's `bin/`
+directory. Subdirectories in an application's build output are preserved; for
+example, `sys/ls.bin` is copied to `bin/sys/ls.bin`.
 
 Individual application commands such as `make -C apps/shell` remain available.
 
@@ -80,6 +91,11 @@ versioned TabOS ABI. Standard streams are console-backed: stdin is unbuffered, s
 line-buffered, and stderr is unbuffered. Each process owns descriptors, errno, current
 working directory, and a bounded heap; children inherit a copy of the parent's working
 directory.
+
+`<tabos/process.h>` provides synchronous `tabos_exec(path, argc, argv)`. Parent remains
+loaded but blocked while child owns foreground console/input. Function returns child's
+exit status after cleanup and parent restoration. Arguments are already-tokenized strings;
+API performs no shell quoting or parsing.
 
 `tabos_app_launch_path()` starts filesystem-backed ELF directly as process 0. Runtime uses
 this for shell startup. Each loaded ELF owns path, descriptor, executable mapping, and

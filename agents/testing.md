@@ -163,6 +163,9 @@ concerns in separate test modules and run the same independently built RV32 arti
 host and Tab5. New public application APIs should add tester coverage where hardware or
 full-runtime behavior cannot be proven by ordinary host unit tests. Tests must clean up
 persistent files and directories and return nonzero when any assertion fails.
+Process module must remain self-contained: tester parent launches tester child, child
+launches tester grandchild, known statuses unwind in reverse, and parent repeats chain to
+prove cleanup and reload. Run tester from shell so this also exercises persistent PID 0.
 
 ---
 

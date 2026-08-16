@@ -76,6 +76,28 @@ static void write_error(const tabos_elf_api_t *api, const char *operation, int s
     api->console_write(message);
 }
 
+static void write_exit_status(const tabos_elf_api_t *api, int status)
+{
+    char number[16];
+    char message[40];
+    uint32_t used = 0U;
+    unsigned int value = (unsigned int)(status < 0 ? -status : status);
+    do {
+        number[used++] = (char)('0' + (value % 10U));
+        value /= 10U;
+    } while (value != 0U && used < sizeof(number) - 1U);
+    if (status < 0 && used < sizeof(number) - 1U) number[used++] = '-';
+    for (uint32_t left = 0U, right = used - 1U; left < right; left++, right--) {
+        const char temporary = number[left];
+        number[left] = number[right];
+        number[right] = temporary;
+    }
+    number[used] = '\0';
+    copy_string(message, sizeof(message), "Exit status: ");
+    append_string(message, sizeof(message), number);
+    api->console_write(message);
+}
+
 static void execute_command(const tabos_elf_api_t *api, char *line)
 {
     char *argv[SHELL_ARGUMENT_CAPACITY];
@@ -144,7 +166,7 @@ static void execute_command(const tabos_elf_api_t *api, char *line)
         status = api->exec(path, argc, (const char *const *)argv);
         if (status == TABOS_ELF_EXEC_PENDING) api->yield();
     }
-    if (status != 0) write_error(api, path, status);
+    write_exit_status(api, status);
 }
 
 int main(int argc, char **argv)

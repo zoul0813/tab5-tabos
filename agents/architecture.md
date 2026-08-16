@@ -169,6 +169,10 @@ protocol to remain blocked until process manager restores it with child status.
 ELF ABI version 3 entry and nested execution carry bounded `argc`/`argv`. Child loader
 state owns copied arguments for full process lifetime. Tokenization, quoting, and escaping
 are application policy implemented by shell, not kernel process behavior.
+SDK `<tabos/process.h>` wraps pending ELF call-gate protocol as synchronous
+`tabos_exec(path, argc, argv)`: parent stays loaded and blocked until child cleanup returns
+status. Maintained tester self-launches through child and grandchild levels, validates
+reverse status delivery, then repeats chain to exercise cleanup and reload.
 
 First ELF implementation accepts static RV32 `ET_EXEC` image with bounded
 `PT_LOAD` segments and retained `SHT_RELA` records, but no dynamic linking. Loader can consume a bounded file

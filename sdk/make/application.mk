@@ -26,7 +26,8 @@ TABOS_CFLAGS += -ffunction-sections -fdata-sections
 TABOS_CFLAGS += -fno-stack-protector -fno-asynchronous-unwind-tables
 TABOS_LDFLAGS := -nostartfiles -Wl,-T,$(SDK_ROOT)/linker/app-riscv32.ld
 TABOS_LDFLAGS += -Wl,--build-id=none -Wl,--gc-sections -Wl,-N -Wl,--emit-relocs
-TABOS_RUNTIME_SOURCES := $(SDK_ROOT)/crt/crt0.c $(SDK_ROOT)/libc/syscalls.c
+TABOS_RUNTIME_SOURCES := $(SDK_ROOT)/crt/crt0.c $(SDK_ROOT)/libc/syscalls.c \
+                         $(SDK_ROOT)/lib/process.c
 
 .PHONY: all build clean install size
 

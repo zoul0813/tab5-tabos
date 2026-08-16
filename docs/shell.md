@@ -45,7 +45,8 @@ argument strings and does not interpret command-line syntax.
 
 Shell waits for normalized console text/key events. Enter submits line; Backspace edits
 without crossing prompt. Executed application becomes foreground child, owns console and
-input, then returns status and focus to shell.
+input, then returns status and focus to shell. Shell prints `Exit status: N` after every
+external application completes.
 
 Current shell ABI is experimental. Environment variables, redirection, pipelines,
 background jobs, and executable search across multiple drives are not implemented.

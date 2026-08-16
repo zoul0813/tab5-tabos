@@ -25,5 +25,6 @@ void tester_test_stdio(tester_context_t *context);
 void tester_test_heap(tester_context_t *context);
 void tester_test_filesystem(tester_context_t *context);
 void tester_test_input(tester_context_t *context);
+void tester_test_process(tester_context_t *context);
 
 #endif

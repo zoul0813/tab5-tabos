@@ -31,7 +31,7 @@
 - [x] Implement process-owned descriptors, cwd, errno, and heap arena.
 - [x] Implement C runtime startup and newlib syscall stubs.
 - [x] Convert independently loaded sample applications to standard `main`.
-- [ ] Validate libc, filesystem, heap, CP437, nonblocking input, and cleanup on host and Tab5.
+- [x] Validate libc, filesystem, heap, CP437, nonblocking input, and cleanup on host and Tab5.
 - [x] Add modular `apps/tester` application for ongoing public SDK and ABI validation.
 - [ ] Add RVC/compressed-instruction support to host execution, then select compressed
   application multilib for shared artifacts.
@@ -302,7 +302,7 @@ but is not a substitute for this execution path.
 - [x] Run native Tab5 ELF entry in application task while runtime/services continue.
 - [x] Retain one independent host RV32 interpreter context per loaded process.
 - [x] Keep executable memory and execution context until owning process exits.
-- [ ] Verify mixed code/data ELF writes through the ESP32-P4 executable PSRAM alias.
+- [x] Verify mixed code/data ELF writes through the ESP32-P4 executable PSRAM alias.
 - [ ] Split ELF code and writable data mappings later if hardware validation shows the
   dual-alias arrangement cannot safely support writable application state.
 - [ ] Define cooperative stop versus process-requested exit semantics.
@@ -375,7 +375,7 @@ but is not a substitute for this execution path.
 - [x] Implement current working directory.
 - [x] Implement basic filesystem commands.
 - [x] Execute independently stored applications.
-- [ ] Report application exit status.
+- [x] Report application exit status.
 - [ ] Add environment/configuration variables when underlying API exists.
 - [ ] Defer pipes, redirection, and job control until process/I/O model supports them.
 - [ ] Reach cross-platform `$ hello` / `Hello from TabOS` milestone on macOS, Linux, and Tab5.

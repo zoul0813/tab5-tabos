@@ -6,6 +6,7 @@
 #include <tabos/elf_api.h>
 #include <tabos/filesystem.h>
 #include <tabos/input.h>
+#include <tabos/process.h>
 #include <tabos/terminal.h>
 #include <tabos/time.h>
 

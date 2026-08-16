@@ -30,6 +30,10 @@ For Tab5, copy `build/apps/tester/tester.bin` to `T:/bin/tester.bin`. A successf
 ends with `[PASS] TabOS SDK tester` and status zero. The filesystem test creates
 `T:/tabos-tester/` and removes it before completion.
 
+Process test launches tester as its own child; child launches another tester as
+grandchild. Known leaf and child exit statuses verify reverse-order status delivery.
+Parent repeats entire chain to verify cleanup and reloading without another app binary.
+
 Add future API coverage as another focused source module and register it in
 `apps/tester/src/main.c`. Tests should remain deterministic, clean up persistent state,
 and behave identically on host and Tab5.
