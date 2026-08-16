@@ -263,35 +263,37 @@ rather than ESP-IDF headers.
 
 Applications communicate with the OS through a stable TabOS ABI.
 
-The concrete mechanism is not yet frozen.
-
-Possible implementations include:
-
-```text
-Application
-    ↓
-linked API stub
-    ↓
-TabOS API table
-```
-
-or:
+[DECIDED] The initial transport is a versioned API table reached through SDK
+stubs. The ELF entry point is private `crt0`; normal C17 applications implement
+`int main(int argc, char **argv)`. `crt0` retains the API pointer, initializes
+the runtime, invokes `main`, and exits with its return status.
 
 ```text
-Application
-    ↓
-syscall/trap
-    ↓
-kernel dispatcher
+main(argc, argv)
+    ↑
+newlib + TabOS syscall stubs
+    ↑
+versioned TabOS API table
+    ↑
+kernel services
 ```
 
-or:
+[DECIDED] The first process C runtime provides POSIX-style descriptors and file
+calls. Descriptors 0/1/2 are console stdin/stdout/stderr; 3+ are process-owned
+files/devices. Working directory and errno are process-local, children inherit
+the parent's working directory, and exit closes all descriptors. Blocking
+stdin is default, with `fcntl(..., O_NONBLOCK)` supported immediately and
+empty nonblocking reads returning `EAGAIN`.
 
-```text
-Application ELF imports
-    ↓
-TabOS dynamic symbol resolver
-```
+[DECIDED] Each process has a 16 KiB stack and a lazily used, contiguous heap
+arena capped at 256 KiB by default. `_sbrk` advances within that arena. ELF
+describes static load/BSS requirements only; later executable metadata may
+override resource limits.
+
+[DECIDED] Runtime text is single-byte CP437. Standard streams and files carry
+bytes without UTF-8 decoding or newline translation. stdin is unbuffered,
+stdout line-buffered, stderr unbuffered, and regular files use normal libc
+buffering. The SDK does not provide `gets()`; use `fgets()`.
 
 Regardless of implementation, the public ABI should remain independent of internal TabOS subsystem organization.
 

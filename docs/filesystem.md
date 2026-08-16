@@ -13,10 +13,11 @@ the TabOS SDK:
 #include <unistd.h>
 ```
 
-The SDK headers map those source-level names to a TabOS-owned, prefixed ABI. This
-avoids exposing host, ESP-IDF, or C-library file descriptors and structures as the
-stable application ABI. `<tabos/filesystem.h>` provides the explicit namespaced
-API for system code that does not want the compatibility headers.
+Independently loaded applications use the toolchain's normal newlib headers. SDK syscall
+stubs map those functions to a TabOS-owned versioned ABI, so host and ESP-IDF descriptors
+never become application ABI. Kernel and built-in diagnostic code can use
+`<tabos/filesystem.h>` directly; `sdk/posix/include/` provides source compatibility for
+native TabOS components that do not link the loaded-application C runtime.
 
 ## Supported Operations
 
@@ -28,6 +29,11 @@ The initial subset supports:
 - current-working-directory operations
 - opening and iterating directories
 - fixed TabOS error numbers through `errno`
+- blocking console stdin plus `fcntl(..., O_NONBLOCK)` and `EAGAIN`
+
+Files and standard streams carry bytes without newline translation. TabOS system text is
+single-byte CP437; ASCII bytes retain their usual values and bytes 0x80-0xFF select CP437
+glyphs. Files may contain arbitrary binary data.
 
 Storage uses drive letters. Canonical absolute paths use `A:/path` form. `/path` is
 absolute on current drive and `path` is relative to current working directory. A bare
@@ -66,9 +72,8 @@ card-removal handling is not implemented. Tab5 FAT enables
 heap-backed long filename support through 255 characters, matching
 `TABOS_FS_NAME_MAX`; the default ESP-IDF 8.3-only mode is not used.
 
-Tab5 reserves an 8 KiB startup-task stack for current built-in applications. This
-accommodates nested filesystem and FatFs VFS calls until applications receive
-their own runtime tasks and stack budgets.
+Each native loaded application runs with a 16 KiB task stack. Its default heap limit is
+256 KiB, allocated and advanced on demand rather than inferred from ELF static segments.
 
 ### Boot USB Storage Mode
 

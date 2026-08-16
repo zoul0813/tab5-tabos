@@ -4,6 +4,7 @@
 #include <tabos/filesystem.h>
 #include <tabos/internal/application.h>
 #include <tabos/internal/elf_loader.h>
+#include <tabos/internal/filesystem.h>
 #include <tabos/platform/platform.h>
 
 #include <stdio.h>
@@ -11,7 +12,17 @@
 #include <stdlib.h>
 #include <string.h>
 
-enum { ELF_INSTRUCTIONS_PER_UPDATE = 10000 };
+enum {
+    ELF_INSTRUCTIONS_PER_UPDATE = 10000,
+    ELF_DESCRIPTOR_CAPACITY = 16,
+    ELF_HEAP_MAX = 256 * 1024,
+};
+
+typedef struct {
+    tabos_fd_t kernel_descriptor;
+    int flags;
+    bool open;
+} elf_descriptor_t;
 
 struct loader_elf_application {
     tabos_app_descriptor_t descriptor;
@@ -34,6 +45,10 @@ struct loader_elf_application {
     size_t exec_argc;
     char exec_argument_data[TABOS_ELF_ARG_BYTES_MAX];
     const char *exec_argv[TABOS_ELF_ARG_MAX + 1U];
+    elf_descriptor_t descriptors[ELF_DESCRIPTOR_CAPACITY];
+    char working_directory[TABOS_FS_PATH_MAX];
+    uint8_t *heap;
+    size_t heap_used;
 };
 
 static bool copy_arguments(size_t argc,
@@ -121,12 +136,229 @@ static int elf_console_clear(void)
 
 static int elf_fs_getcwd(char *buffer, uint32_t capacity)
 {
-    return tabos_fs_getcwd(buffer, capacity) != NULL ? 0 : -*tabos_errno_location();
+    loader_elf_application_t *application = platform_riscv32_current_user_data();
+    if (application == NULL || buffer == NULL || capacity == 0U) return -TABOS_EINVAL;
+    const size_t needed = strlen(application->working_directory) + 1U;
+    if (needed > capacity) return -TABOS_ENAMETOOLONG;
+    memcpy(buffer, application->working_directory, needed);
+    return 0;
 }
 
 static int elf_fs_chdir(const char *path)
 {
-    return tabos_fs_chdir(path) == 0 ? 0 : -*tabos_errno_location();
+    loader_elf_application_t *application = platform_riscv32_current_user_data();
+    if (application == NULL || path == NULL) return -TABOS_EINVAL;
+    char resolved[TABOS_FS_PATH_MAX];
+    const char *readable = platform_executable_data_pointer(path);
+    if (!filesystem_normalize_path(readable, application->working_directory,
+                                   resolved, sizeof(resolved))) return -TABOS_EINVAL;
+    tabos_stat_t status;
+    if (tabos_fs_stat(resolved, &status) != 0) return -*tabos_errno_location();
+    if ((status.mode & TABOS_S_IFDIR) == 0U) return -TABOS_ENOTDIR;
+    memcpy(application->working_directory, resolved, strlen(resolved) + 1U);
+    return 0;
+}
+
+static bool elf_resolve_path(loader_elf_application_t *application, const char *path,
+                             char resolved[TABOS_FS_PATH_MAX])
+{
+    return application != NULL && path != NULL &&
+        filesystem_normalize_path(platform_executable_data_pointer(path),
+                                  application->working_directory,
+                                  resolved, TABOS_FS_PATH_MAX);
+}
+
+static int elf_fd_open(const char *path, int flags, uint32_t mode)
+{
+    loader_elf_application_t *application = platform_riscv32_current_user_data();
+    char resolved[TABOS_FS_PATH_MAX];
+    if (!elf_resolve_path(application, path, resolved)) return -TABOS_EINVAL;
+    size_t index = 3U;
+    while (index < ELF_DESCRIPTOR_CAPACITY && application->descriptors[index].open) ++index;
+    if (index == ELF_DESCRIPTOR_CAPACITY) return -TABOS_EMFILE;
+    const tabos_fd_t kernel_descriptor = tabos_fs_open(resolved, flags & ~TABOS_O_NONBLOCK, mode);
+    if (kernel_descriptor < 0) return -*tabos_errno_location();
+    application->descriptors[index] = (elf_descriptor_t){
+        .kernel_descriptor = kernel_descriptor, .flags = flags, .open = true,
+    };
+    return (int)index;
+}
+
+static int elf_fd_close(int descriptor)
+{
+    loader_elf_application_t *application = platform_riscv32_current_user_data();
+    if (application == NULL || descriptor < 3 || descriptor >= ELF_DESCRIPTOR_CAPACITY ||
+        !application->descriptors[descriptor].open) return -TABOS_EBADF;
+    const int result = tabos_fs_close(application->descriptors[descriptor].kernel_descriptor);
+    if (result != 0) return -*tabos_errno_location();
+    application->descriptors[descriptor] = (elf_descriptor_t){0};
+    return 0;
+}
+
+static int elf_fd_read(int descriptor, void *buffer, uint32_t count)
+{
+    loader_elf_application_t *application = platform_riscv32_current_user_data();
+    if (application == NULL || (buffer == NULL && count != 0U)) return -TABOS_EINVAL;
+    if (descriptor == 0) {
+        if (count == 0U) return 0;
+        tabos_input_event_t event;
+        while (tabos_console_poll(application->console, &event)) {
+            if (event.type == TABOS_INPUT_TEXT) {
+                const size_t length = strlen(event.text);
+                const size_t copied = length < count ? length : count;
+                memcpy(buffer, event.text, copied);
+                return (int)copied;
+            }
+            if (event.type == TABOS_INPUT_KEY_DOWN && event.key == TABOS_KEY_BACKSPACE) {
+                ((char *)buffer)[0] = '\b';
+                return 1;
+            }
+        }
+        return -TABOS_EAGAIN;
+    }
+    if (descriptor < 3 || descriptor >= ELF_DESCRIPTOR_CAPACITY ||
+        !application->descriptors[descriptor].open) return -TABOS_EBADF;
+    const tabos_ssize_t result = tabos_fs_read(
+        application->descriptors[descriptor].kernel_descriptor, buffer, count);
+    return result >= 0 ? (int)result : -*tabos_errno_location();
+}
+
+static int elf_fd_write(int descriptor, const void *buffer, uint32_t count)
+{
+    loader_elf_application_t *application = platform_riscv32_current_user_data();
+    if (application == NULL || (buffer == NULL && count != 0U)) return -TABOS_EINVAL;
+    if (descriptor == 1 || descriptor == 2) {
+        const char *source = platform_executable_data_pointer(buffer);
+        char chunk[129];
+        uint32_t written = 0U;
+        while (written < count) {
+            const uint32_t length = count - written < sizeof(chunk) - 1U
+                ? count - written : (uint32_t)sizeof(chunk) - 1U;
+            memcpy(chunk, source + written, length);
+            chunk[length] = '\0';
+            if (!tabos_console_write(application->console, chunk)) return -TABOS_EIO;
+            written += length;
+        }
+        return (int)count;
+    }
+    if (descriptor < 3 || descriptor >= ELF_DESCRIPTOR_CAPACITY ||
+        !application->descriptors[descriptor].open) return -TABOS_EBADF;
+    const tabos_ssize_t result = tabos_fs_write(
+        application->descriptors[descriptor].kernel_descriptor,
+        platform_executable_data_pointer(buffer), count);
+    return result >= 0 ? (int)result : -*tabos_errno_location();
+}
+
+static int elf_fd_seek(int descriptor, int32_t offset, int whence, int32_t *position)
+{
+    loader_elf_application_t *application = platform_riscv32_current_user_data();
+    if (application == NULL || position == NULL || descriptor < 3 ||
+        descriptor >= ELF_DESCRIPTOR_CAPACITY || !application->descriptors[descriptor].open) {
+        return -TABOS_EBADF;
+    }
+    const tabos_off_t result = tabos_fs_seek(
+        application->descriptors[descriptor].kernel_descriptor, offset, whence);
+    if (result < 0) return -*tabos_errno_location();
+    if (result > INT32_MAX) return -TABOS_ENOTSUP;
+    *position = (int32_t)result;
+    return 0;
+}
+
+static void elf_copy_stat(tabos_elf_stat_t *destination, const tabos_stat_t *source)
+{
+    destination->mode = source->mode;
+    destination->size_low = (uint32_t)source->size;
+    destination->size_high = (uint32_t)(source->size >> 32U);
+    destination->modified_time_low = (int32_t)source->modified_time;
+    destination->modified_time_high = (int32_t)(source->modified_time >> 32U);
+}
+
+static int elf_fs_stat_path(const char *path, tabos_elf_stat_t *status)
+{
+    loader_elf_application_t *application = platform_riscv32_current_user_data();
+    char resolved[TABOS_FS_PATH_MAX];
+    tabos_stat_t native_status;
+    if (status == NULL || !elf_resolve_path(application, path, resolved)) return -TABOS_EINVAL;
+    if (tabos_fs_stat(resolved, &native_status) != 0) return -*tabos_errno_location();
+    elf_copy_stat(status, &native_status);
+    return 0;
+}
+
+static int elf_fd_stat(int descriptor, tabos_elf_stat_t *status)
+{
+    loader_elf_application_t *application = platform_riscv32_current_user_data();
+    if (status == NULL || application == NULL) return -TABOS_EINVAL;
+    if (descriptor >= 0 && descriptor <= 2) {
+        *status = (tabos_elf_stat_t){0};
+        return 0;
+    }
+    if (descriptor < 3 || descriptor >= ELF_DESCRIPTOR_CAPACITY ||
+        !application->descriptors[descriptor].open) return -TABOS_EBADF;
+    tabos_stat_t native_status;
+    if (tabos_fs_fstat(application->descriptors[descriptor].kernel_descriptor,
+                       &native_status) != 0) return -*tabos_errno_location();
+    elf_copy_stat(status, &native_status);
+    return 0;
+}
+
+static int elf_fs_mkdir_path(const char *path, uint32_t mode)
+{
+    loader_elf_application_t *application = platform_riscv32_current_user_data();
+    char resolved[TABOS_FS_PATH_MAX];
+    if (!elf_resolve_path(application, path, resolved)) return -TABOS_EINVAL;
+    return tabos_fs_mkdir(resolved, mode) == 0 ? 0 : -*tabos_errno_location();
+}
+
+static int elf_fs_unlink_path(const char *path)
+{
+    loader_elf_application_t *application = platform_riscv32_current_user_data();
+    char resolved[TABOS_FS_PATH_MAX];
+    if (!elf_resolve_path(application, path, resolved)) return -TABOS_EINVAL;
+    return tabos_fs_unlink(resolved) == 0 ? 0 : -*tabos_errno_location();
+}
+
+static int elf_fs_rename_path(const char *old_path, const char *new_path)
+{
+    loader_elf_application_t *application = platform_riscv32_current_user_data();
+    char old_resolved[TABOS_FS_PATH_MAX];
+    char new_resolved[TABOS_FS_PATH_MAX];
+    if (!elf_resolve_path(application, old_path, old_resolved) ||
+        !elf_resolve_path(application, new_path, new_resolved)) return -TABOS_EINVAL;
+    return tabos_fs_rename(old_resolved, new_resolved) == 0
+        ? 0 : -*tabos_errno_location();
+}
+
+static int elf_fd_get_flags(int descriptor)
+{
+    loader_elf_application_t *application = platform_riscv32_current_user_data();
+    if (application == NULL || descriptor < 0 || descriptor >= ELF_DESCRIPTOR_CAPACITY ||
+        !application->descriptors[descriptor].open) return -TABOS_EBADF;
+    return application->descriptors[descriptor].flags;
+}
+
+static int elf_fd_set_flags(int descriptor, int flags)
+{
+    loader_elf_application_t *application = platform_riscv32_current_user_data();
+    if (application == NULL || descriptor < 0 || descriptor >= ELF_DESCRIPTOR_CAPACITY ||
+        !application->descriptors[descriptor].open) return -TABOS_EBADF;
+    application->descriptors[descriptor].flags =
+        (application->descriptors[descriptor].flags & ~TABOS_O_NONBLOCK) |
+        (flags & TABOS_O_NONBLOCK);
+    return 0;
+}
+
+static void *elf_heap_sbrk(int32_t increment)
+{
+    loader_elf_application_t *application = platform_riscv32_current_user_data();
+    if (application == NULL || increment < 0 ||
+        (size_t)increment > ELF_HEAP_MAX - application->heap_used) return (void *)-1;
+    if (application->heap == NULL) {
+        application->heap = malloc(ELF_HEAP_MAX);
+        if (application->heap == NULL) return (void *)-1;
+    }
+    void *previous = application->heap + application->heap_used;
+    application->heap_used += (size_t)increment;
+    return previous;
 }
 
 static int elf_fs_list(const char *path, char *buffer, uint32_t capacity)
@@ -231,6 +463,19 @@ static bool elf_entry(tabos_app_context_t *context)
         .exec = elf_exec,
         .yield = elf_yield,
         .console_write_raw = elf_console_write_raw,
+        .fd_open = elf_fd_open,
+        .fd_close = elf_fd_close,
+        .fd_read = elf_fd_read,
+        .fd_write = elf_fd_write,
+        .fd_seek = elf_fd_seek,
+        .fs_stat = elf_fs_stat_path,
+        .fd_stat = elf_fd_stat,
+        .fs_mkdir = elf_fs_mkdir_path,
+        .fs_unlink = elf_fs_unlink_path,
+        .fs_rename = elf_fs_rename_path,
+        .fd_get_flags = elf_fd_get_flags,
+        .fd_set_flags = elf_fd_set_flags,
+        .heap_sbrk = elf_heap_sbrk,
     };
     application->execution = platform_riscv32_create(
         application->image.entry, application->image.memory, application->image.memory_size,
@@ -300,6 +545,15 @@ static void elf_cleanup(tabos_app_context_t *context, int exit_status)
     platform_riscv32_destroy(application->execution);
     application->execution = NULL;
     loader_elf_unload(&application->image);
+    for (size_t index = 3U; index < ELF_DESCRIPTOR_CAPACITY; ++index) {
+        if (application->descriptors[index].open) {
+            (void)tabos_fs_close(application->descriptors[index].kernel_descriptor);
+            application->descriptors[index] = (elf_descriptor_t){0};
+        }
+    }
+    free(application->heap);
+    application->heap = NULL;
+    application->heap_used = 0U;
     application->context = NULL;
     application->console = NULL;
 }
@@ -321,6 +575,13 @@ loader_elf_application_t *loader_elf_application_create(const char *path,
     }
     application->argc = argc;
     memcpy(application->path, path, path_length + 1U);
+    for (size_t index = 0U; index < 3U; ++index) {
+        application->descriptors[index] = (elf_descriptor_t){.flags = 0, .open = true};
+    }
+    if (tabos_fs_getcwd(application->working_directory,
+                        sizeof(application->working_directory)) == NULL) {
+        memcpy(application->working_directory, "A:/", 4U);
+    }
 
     const char *name = strrchr(path, '/');
     name = name != NULL ? name + 1 : path;
@@ -350,4 +611,19 @@ const tabos_app_descriptor_t *loader_elf_application_descriptor(
 void loader_elf_application_destroy(void *application)
 {
     free(application);
+}
+
+const char *loader_elf_application_working_directory(
+    const loader_elf_application_t *application)
+{
+    return application != NULL ? application->working_directory : NULL;
+}
+
+bool loader_elf_application_set_working_directory(loader_elf_application_t *application,
+                                                  const char *working_directory)
+{
+    if (application == NULL || working_directory == NULL ||
+        strlen(working_directory) >= sizeof(application->working_directory)) return false;
+    memcpy(application->working_directory, working_directory, strlen(working_directory) + 1U);
+    return true;
 }

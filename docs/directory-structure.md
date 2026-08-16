@@ -35,8 +35,10 @@ tabos/
 ├── process/             Portable process table, PID, lifecycle, and focus management
 ├── rootfs/              Future default TabOS filesystem contents
 ├── sdk/                 Public application-development surface
+│   ├── crt/             Loaded-application startup and `main()` bridge
 │   ├── include/         Public TabOS headers
 │   ├── lib/             Application-facing compatibility wrappers
+│   ├── libc/            Newlib syscall stubs backed by the TabOS ABI
 │   ├── posix/include/   POSIX source-compatibility headers
 │   ├── linker/          Future linker scripts and executable-format support
 │   └── tools/           Future SDK tools

@@ -322,6 +322,15 @@ tabos_app_result_t tabos_app_exec_args(tabos_app_context_t *context,
     if (context == NULL || path == NULL || path[0] == '\0') return TABOS_APP_RESULT_INVALID;
     loader_elf_application_t *application = loader_elf_application_create(path, argc, argv);
     if (application == NULL) return TABOS_APP_RESULT_INVALID;
+    if (foreground_process != NULL &&
+        foreground_process->application_data_destroy == loader_elf_application_destroy) {
+        const char *working_directory = loader_elf_application_working_directory(
+            foreground_process->context.application_data);
+        if (!loader_elf_application_set_working_directory(application, working_directory)) {
+            loader_elf_application_destroy(application);
+            return TABOS_APP_RESULT_INVALID;
+        }
+    }
     return launch_child_descriptor(
         context, loader_elf_application_descriptor(application), application,
         loader_elf_application_destroy);

@@ -85,6 +85,10 @@ static void dispatch_event(const SDL_Event *event)
             return;
         }
         synthesized_text[0] = '\0';
+        for (const unsigned char *byte = (const unsigned char *)event->text.text;
+             *byte != '\0'; ++byte) {
+            if (*byte >= 0x80U) return;
+        }
         tabos_input_event_t input_event = {.type = TABOS_INPUT_TEXT};
         (void)snprintf(input_event.text, sizeof(input_event.text), "%s", event->text.text);
         (void)input_submit(&input_event);

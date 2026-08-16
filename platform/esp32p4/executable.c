@@ -93,7 +93,8 @@ void *platform_executable_prepare(void *memory, size_t size)
     void *executable = NULL;
     const esp_err_t result = esp_mmu_map(
         physical_address, mapping->mapped_size, MMU_TARGET_PSRAM0,
-        MMU_MEM_CAP_EXEC | MMU_MEM_CAP_READ, ESP_MMU_MMAP_FLAG_PADDR_SHARED, &executable);
+        MMU_MEM_CAP_EXEC | MMU_MEM_CAP_READ | MMU_MEM_CAP_WRITE,
+        ESP_MMU_MMAP_FLAG_PADDR_SHARED, &executable);
     if (result != ESP_OK) {
         ESP_LOGE(TAG, "Could not map executable PSRAM: %s", esp_err_to_name(result));
         return NULL;

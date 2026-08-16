@@ -19,9 +19,16 @@ Accepted image must be:
 - at most 2 MiB ELF file size
 - at most 1 MiB loaded image
 
-Current hello fixture is 420-byte stripped ELF containing a 199-byte load image, one load segment, and no relocations. Source lives in `apps/hello_elf/src/main.c`. Linker configuration lives in `sdk/linker/app-riscv32.ld`.
+The hello application is a normal C17 program with `main(argc, argv)`. Source lives in
+`apps/hello_elf/src/main.c`; SDK startup, libc syscall stubs, and linker configuration
+live under `sdk/`. Runnable image size depends on the newlib functions used by the app.
 
-Application payloads currently target RV32IMA with integer ABI `ilp32`. This subset runs natively on ESP32-P4 and through pinned `mini-rv32ima` interpreter on macOS and Linux. Host execution uses reserved guest call gates to bridge experimental TabOS API table; it does not provide Linux system calls.
+Application payloads currently select the toolchain's non-compressed RV32I multilib with
+integer ABI `ilp32`. This keeps newlib-generated code executable both natively on
+ESP32-P4 and through the pinned `mini-rv32ima` interpreter on macOS and Linux. Compressed
+RVC output requires host-interpreter support before it can become the shared default.
+Host execution uses reserved guest call gates to bridge the TabOS API table; it does not
+provide Linux system calls.
 
 Host execution is resumable. Each application update executes at most 10,000 guest
 instructions, then yields to normal TabOS input, display, timer, and application work.
@@ -40,10 +47,16 @@ it to `.local/rootfs/T/bin/hello.bin`. Use the `build` target to skip installati
 Unstripped linker output remains at
 `build/apps/hello/hello.elf` for debugging.
 
-Applications use `<tabos/elf_api.h>`. Experimental ABI version 2 invokes entry with API
-table, `argc`, and `argv`. API table provides console output and
-input, terminal clearing, working-directory and directory-list operations, child
-execution, cooperative yielding, and clean exit request. ABI is not frozen.
+Applications normally implement `int main(int argc, char **argv)` and include standard C
+headers. SDK `crt0` owns the ELF entry, initializes newlib, calls `main`, flushes streams,
+and converts its return value into process exit. Experimental ABI version 3 remains
+behind SDK stubs. It provides console, file descriptor, filesystem, heap, child execution,
+yield, and clean-exit services. ABI is not frozen.
+
+Each process starts with console descriptors 0, 1, and 2 and allocates file/device
+descriptors from 3 upward. It owns an inherited working directory, errno state, 16 KiB
+stack, and a heap that grows on demand to 256 KiB by default. Process cleanup closes open
+descriptors and releases heap and executable memory.
 
 ## Tab5 Hardware Test
 
@@ -83,7 +96,10 @@ If display reports `ELF load FAILED: NO EXECUTABLE MEMORY`, writable PSRAM alloc
 
 ## Memory Scope
 
-Current Tab5 backend loads bytes through a writable PSRAM mapping, synchronizes cache, then creates a read/execute MMU alias for the same physical pages. API string pointers are translated back to readable data mapping. ESP-IDF documents executable heap capabilities, explicit MMU execute mappings, and instruction-cache synchronization:
+Current Tab5 backend loads bytes through writable PSRAM, synchronizes cache, then creates
+a read/write/execute MMU alias for the same physical pages. Write permission is required
+for C globals, BSS, and newlib runtime state. ESP-IDF documents executable heap
+capabilities, explicit MMU mappings, and cache synchronization:
 
 - [ESP32-P4 heap capabilities](https://docs.espressif.com/projects/esp-idf/en/v5.5/esp32p4/api-reference/system/mem_alloc.html)
 - [ESP32-P4 MMU-supported memory](https://docs.espressif.com/projects/esp-idf/en/v5.3/esp32p4/api-reference/system/mm.html)

@@ -277,16 +277,47 @@ Likely API families:
 - inter-task/inter-process communication
 - device/system information
 
-### Open: syscall mechanism
+### Decision: initial C runtime and syscall mechanism
 
-The concrete ABI has not been selected.
+[DECIDED] Independently loaded applications use a versioned TabOS API table.
+SDK stubs and the C runtime dispatch through that table; applications must not
+link directly to kernel or ESP-IDF internals. A trap mechanism may replace the
+transport later without changing the source-level application API.
 
-Candidates to investigate include:
+[DECIDED] The initial application language/runtime target is C17 with
+`int main(int argc, char **argv)`. A hidden `crt0` owns the ELF entry point,
+records the API table, calls `main`, and converts its return value to process
+exit. Use the ESP RISC-V newlib implementation initially. C++ support is
+deferred.
 
-- direct calls through a stable system API table
-- linked stubs that dispatch through an API table
-- a trap/syscall mechanism if the hardware/runtime makes this useful
-- dynamic symbol resolution from loaded ELF applications
+[DECIDED] Each process owns:
+
+- descriptors 0, 1, and 2 for console stdin, stdout, and stderr
+- descriptors 3 and above for files and devices
+- its current working directory, inherited by children
+- its errno state
+- a bounded heap arena, initially unused and grown by `sbrk`
+
+The default maximum application heap is 256 KiB and the current stack remains
+16 KiB. ELF segments determine static image memory, not dynamic heap demand.
+Future executable metadata may override heap and stack limits. All descriptors,
+heap memory, and other runtime resources are reclaimed deterministically at
+process exit.
+
+[DECIDED] The first libc filesystem surface includes open, read, write, close,
+lseek, stat, fstat, mkdir, unlink, and rename. Standard streams use unbuffered
+stdin, line-buffered stdout, and unbuffered stderr. Ordinary files retain normal
+libc buffering. Files are binary-transparent and perform no newline conversion.
+
+[DECIDED] Blocking stdin is the default. Descriptor state supports
+`O_NONBLOCK` from the first implementation through `fcntl`; an empty
+nonblocking read fails with `EAGAIN`.
+
+[DECIDED] TabOS system text is single-byte CP437, not UTF-8. ASCII retains its
+usual byte values and bytes 0x80-0xFF are CP437 glyphs. Files remain arbitrary
+byte streams. Host input that cannot be represented as CP437 must be rejected
+or substituted explicitly. Unsafe `gets()` is not supported; applications use
+bounded functions such as `fgets()`.
 
 The design should optimize for:
 
@@ -296,7 +327,8 @@ The design should optimize for:
 4. host emulation/simulation
 5. ability to evolve TabOS internals independently of applications
 
-Do not prematurely imitate POSIX if a smaller TabOS-native API is clearer.
+POSIX-style C APIs are provided where they improve source portability, while
+the underlying TabOS ABI remains small, versioned, and OS-owned.
 
 ## 7. Filesystem and Storage
 

@@ -1,5 +1,7 @@
 #include <tabos/elf_api.h>
 
+extern const tabos_elf_api_t *tabos_runtime_api;
+
 #include <shell/parser.h>
 
 #include <stdint.h>
@@ -145,8 +147,9 @@ static void execute_command(const tabos_elf_api_t *api, char *line)
     if (status != 0) write_error(api, path, status);
 }
 
-int tabos_elf_entry(const tabos_elf_api_t *api, int argc, const char *const *argv)
+int main(int argc, char **argv)
 {
+    const tabos_elf_api_t *api = tabos_runtime_api;
     (void)argc;
     (void)argv;
     if (api == 0 || api->abi_version != TABOS_ELF_API_VERSION ||

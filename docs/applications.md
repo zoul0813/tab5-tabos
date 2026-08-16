@@ -54,6 +54,13 @@ the copy remains valid for process lifetime. `tabos_app_exec_args()` is token-ba
 does not parse quoting or escaping. Shell owns command-line syntax and passes finalized
 strings.
 
+Independently loaded C17 applications expose `main(argc, argv)`, not a kernel descriptor
+or raw ELF entry. SDK `crt0` and newlib stubs translate standard C/POSIX calls to the
+versioned TabOS ABI. Standard streams are console-backed: stdin is unbuffered, stdout is
+line-buffered, and stderr is unbuffered. Each process owns descriptors, errno, current
+working directory, and a bounded heap; children inherit a copy of the parent's working
+directory.
+
 `tabos_app_launch_path()` starts filesystem-backed ELF directly as process 0. Runtime uses
 this for shell startup. Each loaded ELF owns path, descriptor, executable mapping, and
 execution context until process cleanup.
@@ -91,8 +98,8 @@ Current implementation is deliberately small:
   collection; ELF API exposes blocking-style child execution through cooperative pending
   status while process manager blocks parent
 - PID 0 exit enters kernel-panic state and retains its process record; memory isolation remains unavailable
-- experimental filesystem-backed ELF loader exists, but no relocations, arguments, or
-  discovery yet
+- filesystem-backed ELF loader supports argument vectors and a first C17/newlib runtime,
+  but no relocations, discovery, or executable metadata yet
 - Tab5 runs each native ELF entry in managed FreeRTOS application task so persistent
   applications do not block runtime/service loop
 - shared console state uses platform mutexes: SDL mutex on host and a FreeRTOS mutex with

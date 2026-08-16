@@ -11,6 +11,7 @@
 #define O_EXCL TABOS_O_EXCL
 #define O_TRUNC TABOS_O_TRUNC
 #define O_APPEND TABOS_O_APPEND
+#define O_NONBLOCK TABOS_O_NONBLOCK
 
 #define open tabos_posix_open
 

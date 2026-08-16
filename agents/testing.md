@@ -447,6 +447,15 @@ Console tests cover exclusive foreground acquisition, background and stale-sessi
 
 Application lifecycle tests cover descriptor validation, duplicate rejection, registry lookup, startup failure cleanup, PID metadata, process-table retention, PID 0→1→2 nesting, blocked-parent state, console focus transfer, reverse-order status unwind, root-exit panic transition, and shutdown cleanup. Runtime smoke test verifies configured `console-test` remains PID 0 after Ctrl+Q reports completion. Same portable lifecycle code compiles into host and Tab5; host executes deterministic tests while Tab5 cross-build verifies target compatibility.
 
+The C runtime test matrix must use the same independently built applications on
+host and Tab5. Cover `main(argc, argv)`, return-to-exit status, descriptors
+0/1/2, file descriptors 3+, open/read/write/close/lseek/stat/fstat/mkdir/unlink/
+rename, inherited but isolated working directories, process-local errno,
+line-buffered stdout, unbuffered stderr/stdin, binary-transparent I/O, heap
+growth and limit failure, and deterministic cleanup after success and failure.
+Test blocking stdin plus `O_NONBLOCK`/`EAGAIN`. Text fixtures use raw CP437 bytes;
+host Unicode input outside CP437 must be rejected or explicitly substituted.
+
 ELF loader tests use real stripped RV32 fixture and cover format metadata, segment bounds, executable entry, relocation rejection, image-size limit, memory copy, unload, and malformed inputs under host sanitizers. Host executes same RV32 bytes through resumable interpreter and must cover multiple instruction slices, API-table calls, argument vectors, console output, return status, illegal instructions, and invalid guest memory access. Tab5 hardware validation covers executable PSRAM mapping, cache synchronization, native API-table calls, arguments, console output, return status, and cleanup. Expected success text begins with `Hello TabOS!`.
 
 Manual console validation must include prompt-boundary Backspace, held Backspace, held printable keys, Enter, and Tab followed by visible text. Host backend synthesizes missing Enter/Tab/repeat text while retaining SDL text input for normal layout and IME behavior; matching SDL text events are suppressed to prevent duplicates.

@@ -19,6 +19,7 @@ enum {
     TABOS_O_EXCL = 0x0020,
     TABOS_O_TRUNC = 0x0040,
     TABOS_O_APPEND = 0x0080,
+    TABOS_O_NONBLOCK = 0x0100,
 };
 
 enum {

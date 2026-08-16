@@ -1,11 +1,12 @@
 #include <tabos/platform/platform.h>
 
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 enum {
-    HOST_RV32_RAM_SIZE = 1024 * 1024,
+    HOST_RV32_RAM_SIZE = 2 * 1024 * 1024,
 };
 
 #define MINI_RV32_RAM_SIZE HOST_RV32_RAM_SIZE
@@ -41,12 +42,28 @@ static const uint32_t HOST_RV32_FS_LIST = UINT32_C(0xffff001c);
 static const uint32_t HOST_RV32_EXEC = UINT32_C(0xffff0020);
 static const uint32_t HOST_RV32_YIELD = UINT32_C(0xffff0024);
 static const uint32_t HOST_RV32_CONSOLE_WRITE_RAW = UINT32_C(0xffff0028);
+static const uint32_t HOST_RV32_FD_OPEN = UINT32_C(0xffff002c);
+static const uint32_t HOST_RV32_FD_CLOSE = UINT32_C(0xffff0030);
+static const uint32_t HOST_RV32_FD_READ = UINT32_C(0xffff0034);
+static const uint32_t HOST_RV32_FD_WRITE = UINT32_C(0xffff0038);
+static const uint32_t HOST_RV32_FD_SEEK = UINT32_C(0xffff003c);
+static const uint32_t HOST_RV32_FS_STAT = UINT32_C(0xffff0040);
+static const uint32_t HOST_RV32_FD_STAT = UINT32_C(0xffff0044);
+static const uint32_t HOST_RV32_FS_MKDIR = UINT32_C(0xffff0048);
+static const uint32_t HOST_RV32_FS_UNLINK = UINT32_C(0xffff004c);
+static const uint32_t HOST_RV32_FS_RENAME = UINT32_C(0xffff0050);
+static const uint32_t HOST_RV32_FD_GET_FLAGS = UINT32_C(0xffff0054);
+static const uint32_t HOST_RV32_FD_SET_FLAGS = UINT32_C(0xffff0058);
+static const uint32_t HOST_RV32_HEAP_SBRK = UINT32_C(0xffff005c);
 
 struct platform_riscv32_context {
     uint8_t *memory;
     struct MiniRV32IMAState state;
     tabos_elf_api_t api;
     void *user_data;
+    uint32_t heap_base;
+    uint32_t heap_break;
+    uint32_t heap_end;
 };
 
 static void *current_user_data;
@@ -132,7 +149,7 @@ platform_riscv32_context_t *platform_riscv32_create(
 
     const uint32_t image_end = minimum_address + (uint32_t)memory_size;
     const uint32_t api_address = (image_end + 15U) & ~15U;
-    if (api_address > HOST_RV32_RAM_SIZE - 44U) {
+    if (api_address > HOST_RV32_RAM_SIZE - 96U) {
         platform_riscv32_destroy(context);
         return NULL;
     }
@@ -147,8 +164,21 @@ platform_riscv32_context_t *platform_riscv32_create(
     write_u32(context->memory, api_address + 32U, HOST_RV32_EXEC);
     write_u32(context->memory, api_address + 36U, HOST_RV32_YIELD);
     write_u32(context->memory, api_address + 40U, HOST_RV32_CONSOLE_WRITE_RAW);
+    write_u32(context->memory, api_address + 44U, HOST_RV32_FD_OPEN);
+    write_u32(context->memory, api_address + 48U, HOST_RV32_FD_CLOSE);
+    write_u32(context->memory, api_address + 52U, HOST_RV32_FD_READ);
+    write_u32(context->memory, api_address + 56U, HOST_RV32_FD_WRITE);
+    write_u32(context->memory, api_address + 60U, HOST_RV32_FD_SEEK);
+    write_u32(context->memory, api_address + 64U, HOST_RV32_FS_STAT);
+    write_u32(context->memory, api_address + 68U, HOST_RV32_FD_STAT);
+    write_u32(context->memory, api_address + 72U, HOST_RV32_FS_MKDIR);
+    write_u32(context->memory, api_address + 76U, HOST_RV32_FS_UNLINK);
+    write_u32(context->memory, api_address + 80U, HOST_RV32_FS_RENAME);
+    write_u32(context->memory, api_address + 84U, HOST_RV32_FD_GET_FLAGS);
+    write_u32(context->memory, api_address + 88U, HOST_RV32_FD_SET_FLAGS);
+    write_u32(context->memory, api_address + 92U, HOST_RV32_HEAP_SBRK);
 
-    uint32_t argument_data_address = api_address + 44U;
+    uint32_t argument_data_address = api_address + 96U;
     uint32_t argument_data_end = argument_data_address;
     for (size_t index = 0U; index < argc; ++index) {
         if (argv[index] == NULL) {
@@ -176,6 +206,13 @@ platform_riscv32_context_t *platform_riscv32_create(
         next_argument += (uint32_t)strlen(argv[index]) + 1U;
     }
     write_u32(context->memory, argv_address + (uint32_t)argc * 4U, 0U);
+    context->heap_base = (argv_address + ((uint32_t)argc + 1U) * 4U + 15U) & ~15U;
+    context->heap_break = context->heap_base;
+    context->heap_end = context->heap_base + 256U * 1024U;
+    if (context->heap_end > HOST_RV32_RAM_SIZE - 16U * 1024U) {
+        platform_riscv32_destroy(context);
+        return NULL;
+    }
 
     context->api = *api;
     context->user_data = user_data;
@@ -299,6 +336,127 @@ platform_riscv32_result_t platform_riscv32_step(
             context->state.pc = context->state.regs[1];
             continue;
         }
+        if (context->state.pc == HOST_RV32_FD_OPEN) {
+            const char *path = guest_string(context->memory, context->state.regs[10]);
+            if (path == NULL || context->api.fd_open == NULL) return PLATFORM_RISCV32_FAULT;
+            current_user_data = context->user_data;
+            context->state.regs[10] = (uint32_t)context->api.fd_open(
+                path, (int)context->state.regs[11], context->state.regs[12]);
+            current_user_data = NULL;
+            context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_FD_CLOSE ||
+            context->state.pc == HOST_RV32_FD_GET_FLAGS) {
+            int (*operation)(int) = context->state.pc == HOST_RV32_FD_CLOSE
+                ? context->api.fd_close : context->api.fd_get_flags;
+            if (operation == NULL) return PLATFORM_RISCV32_FAULT;
+            current_user_data = context->user_data;
+            context->state.regs[10] = (uint32_t)operation((int)context->state.regs[10]);
+            current_user_data = NULL;
+            context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_FD_READ ||
+            context->state.pc == HOST_RV32_FD_WRITE) {
+            const uint32_t count_bytes = context->state.regs[12];
+            void *buffer = guest_buffer(context->memory, context->state.regs[11], count_bytes);
+            if (buffer == NULL) return PLATFORM_RISCV32_FAULT;
+            current_user_data = context->user_data;
+            context->state.regs[10] = (uint32_t)(context->state.pc == HOST_RV32_FD_READ
+                ? context->api.fd_read((int)context->state.regs[10], buffer, count_bytes)
+                : context->api.fd_write((int)context->state.regs[10], buffer, count_bytes));
+            current_user_data = NULL;
+            context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_FD_SEEK) {
+            int32_t *position = guest_buffer(context->memory, context->state.regs[13], 4U);
+            if (position == NULL || context->api.fd_seek == NULL) return PLATFORM_RISCV32_FAULT;
+            current_user_data = context->user_data;
+            context->state.regs[10] = (uint32_t)context->api.fd_seek(
+                (int)context->state.regs[10], (int32_t)context->state.regs[11],
+                (int)context->state.regs[12], position);
+            current_user_data = NULL;
+            context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_FS_STAT) {
+            const char *path = guest_string(context->memory, context->state.regs[10]);
+            tabos_elf_stat_t *status = guest_buffer(context->memory, context->state.regs[11],
+                                                    sizeof(*status));
+            if (path == NULL || status == NULL || context->api.fs_stat == NULL) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data = context->user_data;
+            context->state.regs[10] = (uint32_t)context->api.fs_stat(path, status);
+            current_user_data = NULL;
+            context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_FD_STAT) {
+            tabos_elf_stat_t *status = guest_buffer(context->memory, context->state.regs[11],
+                                                    sizeof(*status));
+            if (status == NULL || context->api.fd_stat == NULL) return PLATFORM_RISCV32_FAULT;
+            current_user_data = context->user_data;
+            context->state.regs[10] = (uint32_t)context->api.fd_stat(
+                (int)context->state.regs[10], status);
+            current_user_data = NULL;
+            context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_FS_MKDIR) {
+            const char *path = guest_string(context->memory, context->state.regs[10]);
+            if (path == NULL || context->api.fs_mkdir == NULL) return PLATFORM_RISCV32_FAULT;
+            current_user_data = context->user_data;
+            context->state.regs[10] = (uint32_t)context->api.fs_mkdir(
+                path, context->state.regs[11]);
+            current_user_data = NULL;
+            context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_FS_UNLINK) {
+            const char *path = guest_string(context->memory, context->state.regs[10]);
+            if (path == NULL || context->api.fs_unlink == NULL) return PLATFORM_RISCV32_FAULT;
+            current_user_data = context->user_data;
+            context->state.regs[10] = (uint32_t)context->api.fs_unlink(path);
+            current_user_data = NULL;
+            context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_FS_RENAME) {
+            const char *old_path = guest_string(context->memory, context->state.regs[10]);
+            const char *new_path = guest_string(context->memory, context->state.regs[11]);
+            if (old_path == NULL || new_path == NULL || context->api.fs_rename == NULL) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data = context->user_data;
+            context->state.regs[10] = (uint32_t)context->api.fs_rename(old_path, new_path);
+            current_user_data = NULL;
+            context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_FD_SET_FLAGS) {
+            if (context->api.fd_set_flags == NULL) return PLATFORM_RISCV32_FAULT;
+            current_user_data = context->user_data;
+            context->state.regs[10] = (uint32_t)context->api.fd_set_flags(
+                (int)context->state.regs[10], (int)context->state.regs[11]);
+            current_user_data = NULL;
+            context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_HEAP_SBRK) {
+            const int32_t increment = (int32_t)context->state.regs[10];
+            const uint32_t previous = context->heap_break;
+            if (increment < 0 || (uint32_t)increment > context->heap_end - context->heap_break) {
+                context->state.regs[10] = UINT32_MAX;
+            } else {
+                context->heap_break += (uint32_t)increment;
+                context->state.regs[10] = previous;
+            }
+            context->state.pc = context->state.regs[1];
+            continue;
+        }
         if (context->state.pc == HOST_RV32_YIELD) {
             if (context->api.yield == NULL) return PLATFORM_RISCV32_FAULT;
             current_user_data = context->user_data;
@@ -307,8 +465,16 @@ platform_riscv32_result_t platform_riscv32_step(
             context->state.pc = context->state.regs[1];
             return PLATFORM_RISCV32_YIELDED;
         }
+        const uint32_t instruction_pc = context->state.pc;
         (void)MiniRV32IMAStep(&context->state, context->memory, 0U, 0U, 1);
-        if (context->state.mcause != 0U) return PLATFORM_RISCV32_FAULT;
+        if (context->state.mcause != 0U) {
+            char message[96];
+            (void)snprintf(message, sizeof(message),
+                           "RV32 fault at PC 0x%08x, cause 0x%08x",
+                           instruction_pc, context->state.mcause);
+            platform_log(message);
+            return PLATFORM_RISCV32_FAULT;
+        }
     }
     return PLATFORM_RISCV32_YIELDED;
 }

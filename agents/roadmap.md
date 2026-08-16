@@ -20,6 +20,21 @@
 
 ## Current Work
 
+### C17 Application Runtime
+
+- [x] Decide `main(argc, argv)` entry contract and hidden `crt0` lifecycle.
+- [x] Decide versioned API-table transport and initial newlib integration.
+- [x] Decide process-local descriptor, cwd, errno, and cleanup semantics.
+- [x] Decide 16 KiB stack and default 256 KiB bounded growing heap.
+- [x] Decide CP437 byte-text, binary file, and stdio buffering semantics.
+- [x] Decide blocking stdin plus immediate `O_NONBLOCK`/`EAGAIN` support.
+- [x] Implement process-owned descriptors, cwd, errno, and heap arena.
+- [x] Implement C runtime startup and newlib syscall stubs.
+- [x] Convert independently loaded sample applications to standard `main`.
+- [ ] Validate libc, filesystem, heap, CP437, nonblocking input, and cleanup on host and Tab5.
+- [ ] Add RVC/compressed-instruction support to host execution, then select compressed
+  application multilib for shared artifacts.
+
 - [x] Replace generated C glyph tables with directly embedded raw bitmap font data.
 - [x] Support compile-time fixed-width font width, height, cell size, and 1-256 glyphs.
 - [x] Render glyph zero when requested byte is outside configured glyph count.

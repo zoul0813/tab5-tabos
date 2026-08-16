@@ -1,7 +1,8 @@
 # Hello ELF
 
-Hello ELF is a minimal independent TabOS application used to validate filesystem ELF
-loading, argument delivery, and execution. It prints its received argument vector.
+Hello ELF is a minimal independent C17 TabOS application used to validate filesystem ELF
+loading, `main(argc, argv)`, newlib output, argument delivery, and clean return. It prints
+its received argument vector with `puts()` and `printf()`.
 
 Activate the project toolchain, then build and install it into the host TF-card root:
 
