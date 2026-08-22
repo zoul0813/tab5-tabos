@@ -61,6 +61,14 @@ typedef struct {
     int (*fs_rmdir)(const char *path);
     uint64_t (*monotonic_ms)(void);
     int (*system_info)(tabos_elf_system_info_t *info);
+    int (*graphics_open)(uint32_t *width, uint32_t *height);
+    int (*graphics_clear)(uint32_t color);
+    int (*graphics_fill_rect)(int32_t x, int32_t y, uint32_t width, uint32_t height,
+                              uint32_t color);
+    int (*graphics_blit)(int32_t x, int32_t y, uint32_t width, uint32_t height,
+                         const uint16_t *pixels);
+    int (*graphics_present)(void);
+    int (*graphics_close)(void);
 } tabos_elf_api_t;
 
 typedef int (*tabos_elf_entry_fn)(const tabos_elf_api_t *api,

@@ -29,6 +29,10 @@ Public applications use C17/newlib allocation and stdio, the documented filesyst
 subset, foreground process launch/wait, monotonic time/cooperative sleep, and portable
 system information. TabOS does not claim complete POSIX compatibility.
 
+The initial public graphics contract provides fullscreen RGB565 drawing through
+OS-owned clear, clipped primitive, bitmap blit, and present operations. Applications
+do not own display hardware, and returning from graphics restores the terminal.
+
 ## 2. Hardware Baseline
 
 ### Decision / current hardware assumptions

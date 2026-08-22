@@ -126,7 +126,7 @@ bool platform_executable_finalize(void *memory, size_t size)
     return true;
 }
 
-const void *platform_executable_data_pointer(const void *memory)
+const void *platform_executable_data_pointer(const void *memory, size_t size)
 {
     const uintptr_t address = (uintptr_t)memory;
     for (size_t index = 0U; index < EXECUTABLE_MAPPING_CAPACITY; ++index) {
@@ -134,7 +134,25 @@ const void *platform_executable_data_pointer(const void *memory)
         const uintptr_t executable = (uintptr_t)mapping->executable;
         if (mapping->executable != NULL && address >= executable &&
             address - executable < mapping->mapped_size) {
-            return (const uint8_t *)mapping->writable + (address - executable);
+            const size_t offset = address - executable;
+            const size_t synchronized = size < mapping->mapped_size - offset
+                ? size : mapping->mapped_size - offset;
+            void *writable = (uint8_t *)mapping->writable + offset;
+            if (synchronized > 0U) {
+                const uintptr_t cache_line_size = CONFIG_CACHE_L2_CACHE_LINE_SIZE;
+                const uintptr_t invalidate_start =
+                    (uintptr_t)writable & ~(cache_line_size - 1U);
+                const uintptr_t invalidate_end =
+                    ((uintptr_t)writable + synchronized + cache_line_size - 1U) &
+                    ~(cache_line_size - 1U);
+                if (esp_cache_msync((void *)memory, synchronized,
+                        ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_UNALIGNED) != ESP_OK ||
+                    esp_cache_msync((void *)invalidate_start, invalidate_end - invalidate_start,
+                        ESP_CACHE_MSYNC_FLAG_DIR_M2C) != ESP_OK) {
+                    return NULL;
+                }
+            }
+            return writable;
         }
     }
     return memory;

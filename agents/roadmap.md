@@ -383,9 +383,12 @@ but is not a substitute for this execution path.
 
 ### Graphics and Windowing
 
-- [ ] Define public graphics/surface API.
+- [x] Define initial public fullscreen RGB565 graphics API.
+- [x] Add clipped fill, pixel, line, rectangle, bitmap blit, and explicit present operations.
+- [x] Restore the terminal framebuffer when a graphics application closes or exits.
+- [x] Add a portable interactive graphics demo and tester coverage.
 - [ ] Decide framebuffer placement and buffering strategy from measurements.
-- [ ] Add drawing primitives and clipping tests.
+- [ ] Add deterministic pixel-level clipping and framebuffer regression tests.
 - [ ] Add damage tracking and compositor service.
 - [ ] Implement window manager as client of public graphics/input services.
 - [ ] Support fullscreen application optimization without granting hardware ownership.

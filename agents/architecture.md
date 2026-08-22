@@ -48,6 +48,11 @@ and SDK runtime sources. ABI v1 uses newlib for C17 allocation and stdio, provid
 documented filesystem subset, monotonic time/cooperative sleep, foreground process
 launch/wait, and portable system information. TabOS does not promise full POSIX compatibility.
 
+Fullscreen graphics use an OS-owned RGB565 framebuffer through public SDK calls.
+Applications never receive display-driver ownership. They may clear, draw clipped
+primitives, blit RGB565 pixels, and explicitly present a frame. Closing or exiting
+the graphics application restores the retained terminal display.
+
 ESP-IDF and FreeRTOS are implementation foundations, not the application programming model.
 
 ---

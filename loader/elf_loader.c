@@ -110,7 +110,7 @@ static loader_elf_result_t apply_relocations(const uint8_t *data, size_t size,
     const uint32_t section_offset = read_u32(data + 32U);
     const uint16_t section_entry_size = read_u16(data + 46U);
     const uint16_t section_count = read_u16(data + 48U);
-    const void *translated = platform_executable_data_pointer(executable_memory);
+    const void *translated = platform_executable_data_pointer(executable_memory, 1U);
     const uint32_t load_bias = translated == executable_memory ? 0U
         : (uint32_t)(uintptr_t)executable_memory - info->minimum_address;
     if (load_bias == 0U) return LOADER_ELF_OK;

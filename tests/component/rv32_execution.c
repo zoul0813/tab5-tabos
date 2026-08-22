@@ -5,6 +5,7 @@
 #include "hello_elf.h"
 
 #include <stdbool.h>
+#include <stdio.h>
 #include <string.h>
 
 static bool wrote_expected_message;
@@ -79,6 +80,9 @@ int main(void)
     if (result != PLATFORM_RISCV32_RETURNED || !wrote_expected_message ||
         !wrote_first_argument || !wrote_quoted_argument || !requested_exit ||
         requested_status != 0 || returned_status != 0) {
+        fprintf(stderr, "result=%d message=%d arg1=%d arg2=%d exit=%d status=%d returned=%d\n",
+                result, wrote_expected_message, wrote_first_argument, wrote_quoted_argument,
+                requested_exit, requested_status, returned_status);
         return 1;
     }
 

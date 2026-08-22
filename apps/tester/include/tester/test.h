@@ -27,5 +27,6 @@ void tester_test_filesystem(tester_context_t *context);
 void tester_test_input(tester_context_t *context);
 void tester_test_process(tester_context_t *context);
 void tester_test_runtime(tester_context_t *context);
+void tester_test_graphics(tester_context_t *context);
 
 #endif

@@ -45,6 +45,7 @@ bool terminal_resize(terminal_t *terminal, platform_framebuffer_t *framebuffer,
                          unsigned int scale);
 void terminal_shutdown(terminal_t *terminal);
 void terminal_clear(terminal_t *terminal);
+void terminal_redraw(terminal_t *terminal);
 void terminal_set_colors(terminal_t *terminal, platform_pixel_t foreground,
                              platform_pixel_t background);
 void terminal_write(terminal_t *terminal, const char *text);

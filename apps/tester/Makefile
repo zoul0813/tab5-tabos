@@ -8,6 +8,7 @@ SOURCES := $(CURDIR)/src/main.c \
            $(CURDIR)/src/tests/filesystem.c \
            $(CURDIR)/src/tests/input.c \
            $(CURDIR)/src/tests/process.c \
-           $(CURDIR)/src/tests/runtime.c
+           $(CURDIR)/src/tests/runtime.c \
+           $(CURDIR)/src/tests/graphics.c
 
 include ../../sdk/make/application.mk

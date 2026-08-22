@@ -99,8 +99,9 @@ bool platform_executable_finalize(void *memory, size_t size)
     return memory != NULL && size > 0U;
 }
 
-const void *platform_executable_data_pointer(const void *memory)
+const void *platform_executable_data_pointer(const void *memory, size_t size)
 {
+    (void)size;
     return memory;
 }
 

@@ -295,11 +295,7 @@ bool tabos_console_poll(const tabos_console_session_t *session, tabos_input_even
         return false;
     }
     const bool received = tabos_input_poll(event);
-    if (received) {
-        if (restart_cursor_blink()) {
-            (void)display_present();
-        }
-    }
+    if (received) (void)restart_cursor_blink();
     unlock_console();
     return received;
 }
@@ -316,9 +312,7 @@ bool tabos_console_wait(const tabos_console_session_t *session, tabos_input_even
             return false;
         }
         if (tabos_input_poll(event)) {
-            if (restart_cursor_blink()) {
-                (void)display_present();
-            }
+            (void)restart_cursor_blink();
             unlock_console();
             return true;
         }
@@ -334,6 +328,16 @@ void console_update(void)
         tabos_timer_poll(&cursor_timer)) {
         cursor_phase_visible = !cursor_phase_visible;
         terminal_set_cursor_phase(active_terminal, cursor_phase_visible);
+        (void)display_present();
+    }
+    unlock_console();
+}
+
+void console_redraw(void)
+{
+    lock_console();
+    if (active_terminal != NULL) {
+        terminal_redraw(active_terminal);
         (void)display_present();
     }
     unlock_console();

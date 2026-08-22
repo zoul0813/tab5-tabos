@@ -449,6 +449,13 @@ void terminal_set_colors(terminal_t *terminal, platform_pixel_t foreground,
     }
 }
 
+void terminal_redraw(terminal_t *terminal)
+{
+    if (terminal == NULL) return;
+    terminal->full_redraw = true;
+    render(terminal);
+}
+
 void terminal_write(terminal_t *terminal, const char *text)
 {
     if (terminal == NULL || terminal->cells == NULL || text == NULL) {

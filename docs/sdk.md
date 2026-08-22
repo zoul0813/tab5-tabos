@@ -16,6 +16,11 @@ iteration, and nonblocking flags. TabOS does not claim full POSIX compatibility.
 `<tabos/runtime_time.h>` provides monotonic milliseconds and cooperative sleep.
 `<tabos/system.h>` provides portable target, device, display, processor, and memory data.
 
+## Fullscreen Graphics
+
+`<tabos/graphics.h>` provides foreground fullscreen RGB565 clear, clipped rectangle,
+bitmap blit, and explicit presentation operations. See `docs/graphics-api.md`.
+
 ## Building
 
 Each application includes `sdk/make/application.mk`. `make` produces a stripped,

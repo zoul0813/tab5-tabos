@@ -58,6 +58,12 @@ static const uint32_t HOST_RV32_HEAP_SBRK = UINT32_C(0xffff005c);
 static const uint32_t HOST_RV32_FS_RMDIR = UINT32_C(0xffff0060);
 static const uint32_t HOST_RV32_MONOTONIC_MS = UINT32_C(0xffff0064);
 static const uint32_t HOST_RV32_SYSTEM_INFO = UINT32_C(0xffff0068);
+static const uint32_t HOST_RV32_GRAPHICS_OPEN = UINT32_C(0xffff006c);
+static const uint32_t HOST_RV32_GRAPHICS_CLEAR = UINT32_C(0xffff0070);
+static const uint32_t HOST_RV32_GRAPHICS_FILL_RECT = UINT32_C(0xffff0074);
+static const uint32_t HOST_RV32_GRAPHICS_BLIT = UINT32_C(0xffff0078);
+static const uint32_t HOST_RV32_GRAPHICS_PRESENT = UINT32_C(0xffff007c);
+static const uint32_t HOST_RV32_GRAPHICS_CLOSE = UINT32_C(0xffff0080);
 
 struct platform_riscv32_context {
     uint8_t *memory;
@@ -113,8 +119,9 @@ bool platform_executable_finalize(void *memory, size_t size)
     return true;
 }
 
-const void *platform_executable_data_pointer(const void *memory)
+const void *platform_executable_data_pointer(const void *memory, size_t size)
 {
+    (void)size;
     return memory;
 }
 
@@ -159,7 +166,7 @@ platform_riscv32_context_t *platform_riscv32_create(
 
     const uint32_t image_end = minimum_address + (uint32_t)memory_size;
     const uint32_t api_address = (image_end + 15U) & ~15U;
-    if (api_address > HOST_RV32_RAM_SIZE - 108U) {
+    if (api_address > HOST_RV32_RAM_SIZE - 132U) {
         platform_riscv32_destroy(context);
         return NULL;
     }
@@ -190,8 +197,14 @@ platform_riscv32_context_t *platform_riscv32_create(
     write_u32(context->memory, api_address + 96U, HOST_RV32_FS_RMDIR);
     write_u32(context->memory, api_address + 100U, HOST_RV32_MONOTONIC_MS);
     write_u32(context->memory, api_address + 104U, HOST_RV32_SYSTEM_INFO);
+    write_u32(context->memory, api_address + 108U, HOST_RV32_GRAPHICS_OPEN);
+    write_u32(context->memory, api_address + 112U, HOST_RV32_GRAPHICS_CLEAR);
+    write_u32(context->memory, api_address + 116U, HOST_RV32_GRAPHICS_FILL_RECT);
+    write_u32(context->memory, api_address + 120U, HOST_RV32_GRAPHICS_BLIT);
+    write_u32(context->memory, api_address + 124U, HOST_RV32_GRAPHICS_PRESENT);
+    write_u32(context->memory, api_address + 128U, HOST_RV32_GRAPHICS_CLOSE);
 
-    uint32_t argument_data_address = api_address + 108U;
+    uint32_t argument_data_address = api_address + 132U;
     uint32_t argument_data_end = argument_data_address;
     for (size_t index = 0U; index < argc; ++index) {
         if (argv[index] == NULL) {
@@ -494,6 +507,59 @@ platform_riscv32_result_t platform_riscv32_step(
                 return PLATFORM_RISCV32_FAULT;
             }
             context->state.regs[10] = (uint32_t)context->api.system_info(info);
+            context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_GRAPHICS_OPEN) {
+            uint32_t *width = guest_buffer(context->memory, context->state.regs[10], sizeof(*width));
+            uint32_t *height = guest_buffer(context->memory, context->state.regs[11], sizeof(*height));
+            if (width == NULL || height == NULL || context->api.graphics_open == NULL) return PLATFORM_RISCV32_FAULT;
+            current_user_data = context->user_data;
+            context->state.regs[10] = (uint32_t)context->api.graphics_open(width, height);
+            current_user_data = NULL;
+            context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_GRAPHICS_CLEAR ||
+            context->state.pc == HOST_RV32_GRAPHICS_PRESENT ||
+            context->state.pc == HOST_RV32_GRAPHICS_CLOSE) {
+            int result;
+            current_user_data = context->user_data;
+            if (context->state.pc == HOST_RV32_GRAPHICS_CLEAR && context->api.graphics_clear != NULL)
+                result = context->api.graphics_clear(context->state.regs[10]);
+            else if (context->state.pc == HOST_RV32_GRAPHICS_PRESENT && context->api.graphics_present != NULL)
+                result = context->api.graphics_present();
+            else if (context->state.pc == HOST_RV32_GRAPHICS_CLOSE && context->api.graphics_close != NULL)
+                result = context->api.graphics_close();
+            else { current_user_data = NULL; return PLATFORM_RISCV32_FAULT; }
+            current_user_data = NULL;
+            context->state.regs[10] = (uint32_t)result;
+            context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_GRAPHICS_FILL_RECT) {
+            if (context->api.graphics_fill_rect == NULL) return PLATFORM_RISCV32_FAULT;
+            current_user_data = context->user_data;
+            context->state.regs[10] = (uint32_t)context->api.graphics_fill_rect(
+                (int32_t)context->state.regs[10], (int32_t)context->state.regs[11],
+                context->state.regs[12], context->state.regs[13], context->state.regs[14]);
+            current_user_data = NULL;
+            context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_GRAPHICS_BLIT) {
+            const uint32_t width = context->state.regs[12], height = context->state.regs[13];
+            if (width != 0U && height > UINT32_MAX / width) return PLATFORM_RISCV32_FAULT;
+            const uint32_t pixel_count = width * height;
+            if (pixel_count > UINT32_MAX / sizeof(uint16_t)) return PLATFORM_RISCV32_FAULT;
+            const uint16_t *pixels = guest_buffer(context->memory, context->state.regs[14],
+                                                  pixel_count * sizeof(uint16_t));
+            if (pixels == NULL || context->api.graphics_blit == NULL) return PLATFORM_RISCV32_FAULT;
+            current_user_data = context->user_data;
+            context->state.regs[10] = (uint32_t)context->api.graphics_blit(
+                (int32_t)context->state.regs[10], (int32_t)context->state.regs[11],
+                width, height, pixels);
+            current_user_data = NULL;
             context->state.pc = context->state.regs[1];
             continue;
         }

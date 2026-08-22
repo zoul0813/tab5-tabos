@@ -5,6 +5,8 @@
 #include <tabos/internal/application.h>
 #include <tabos/internal/elf_loader.h>
 #include <tabos/internal/filesystem.h>
+#include <tabos/internal/display.h>
+#include <tabos/internal/console.h>
 #include <tabos/platform/platform.h>
 #include <tabos/config/display.h>
 
@@ -41,6 +43,7 @@ struct loader_elf_application {
     atomic_bool exec_requested;
     atomic_bool exec_in_flight;
     atomic_bool exec_status_ready;
+    bool graphics_active;
     atomic_int exec_status;
     char exec_path[TABOS_FS_PATH_MAX];
     size_t exec_argc;
@@ -59,10 +62,13 @@ static bool copy_arguments(size_t argc,
                            const char **copied_argv)
 {
     if (argc > TABOS_ELF_ARG_MAX || (argc > 0U && argv == NULL)) return false;
+    argv = platform_executable_data_pointer(argv, (argc + 1U) * sizeof(*argv));
+    if (argv == NULL) return false;
     size_t used = 0U;
     for (size_t index = 0U; index < argc; ++index) {
         if (argv[index] == NULL) return false;
-        const char *argument = platform_executable_data_pointer(argv[index]);
+        const char *argument = platform_executable_data_pointer(argv[index], data_size - used);
+        if (argument == NULL) return false;
         const size_t length = strlen(argument) + 1U;
         if (length > data_size - used) return false;
         copied_argv[index] = data + used;
@@ -82,7 +88,8 @@ static void elf_console_write(const char *text)
 {
     loader_elf_application_t *application = platform_riscv32_current_user_data();
     if (application == NULL || application->console == NULL || text == NULL) return;
-    const char *readable_text = platform_executable_data_pointer(text);
+    const char *readable_text = platform_executable_data_pointer(text, TABOS_ELF_ARG_BYTES_MAX);
+    if (readable_text == NULL) return;
     (void)tabos_console_write_line(application->console, readable_text);
 }
 
@@ -90,7 +97,8 @@ static void elf_console_write_raw(const char *text)
 {
     loader_elf_application_t *application = platform_riscv32_current_user_data();
     if (application == NULL || application->console == NULL || text == NULL) return;
-    const char *readable_text = platform_executable_data_pointer(text);
+    const char *readable_text = platform_executable_data_pointer(text, TABOS_ELF_ARG_BYTES_MAX);
+    if (readable_text == NULL) return;
     (void)tabos_console_write(application->console, readable_text);
 }
 
@@ -150,7 +158,8 @@ static int elf_fs_chdir(const char *path)
     loader_elf_application_t *application = platform_riscv32_current_user_data();
     if (application == NULL || path == NULL) return -TABOS_EINVAL;
     char resolved[TABOS_FS_PATH_MAX];
-    const char *readable = platform_executable_data_pointer(path);
+    const char *readable = platform_executable_data_pointer(path, TABOS_FS_PATH_MAX);
+    if (readable == NULL) return -TABOS_EIO;
     if (!filesystem_normalize_path(readable, application->working_directory,
                                    resolved, sizeof(resolved))) return -TABOS_EINVAL;
     tabos_stat_t status;
@@ -163,10 +172,10 @@ static int elf_fs_chdir(const char *path)
 static bool elf_resolve_path(loader_elf_application_t *application, const char *path,
                              char resolved[TABOS_FS_PATH_MAX])
 {
-    return application != NULL && path != NULL &&
-        filesystem_normalize_path(platform_executable_data_pointer(path),
-                                  application->working_directory,
-                                  resolved, TABOS_FS_PATH_MAX);
+    if (application == NULL || path == NULL) return false;
+    const char *readable = platform_executable_data_pointer(path, TABOS_FS_PATH_MAX);
+    return readable != NULL && filesystem_normalize_path(
+        readable, application->working_directory, resolved, TABOS_FS_PATH_MAX);
 }
 
 static int elf_fd_open(const char *path, int flags, uint32_t mode)
@@ -229,7 +238,8 @@ static int elf_fd_write(int descriptor, const void *buffer, uint32_t count)
     loader_elf_application_t *application = platform_riscv32_current_user_data();
     if (application == NULL || (buffer == NULL && count != 0U)) return -TABOS_EINVAL;
     if (descriptor == 1 || descriptor == 2) {
-        const char *source = platform_executable_data_pointer(buffer);
+        const char *source = platform_executable_data_pointer(buffer, count);
+        if (source == NULL) return -TABOS_EIO;
         char chunk[129];
         uint32_t written = 0U;
         while (written < count) {
@@ -244,9 +254,10 @@ static int elf_fd_write(int descriptor, const void *buffer, uint32_t count)
     }
     if (descriptor < 3 || descriptor >= ELF_DESCRIPTOR_CAPACITY ||
         !application->descriptors[descriptor].open) return -TABOS_EBADF;
+    const void *source = platform_executable_data_pointer(buffer, count);
+    if (source == NULL) return -TABOS_EIO;
     const tabos_ssize_t result = tabos_fs_write(
-        application->descriptors[descriptor].kernel_descriptor,
-        platform_executable_data_pointer(buffer), count);
+        application->descriptors[descriptor].kernel_descriptor, source, count);
     return result >= 0 ? (int)result : -*tabos_errno_location();
 }
 
@@ -430,6 +441,83 @@ static int elf_system_info(tabos_elf_system_info_t *info)
     return 0;
 }
 
+static int elf_graphics_open(uint32_t *width, uint32_t *height)
+{
+    loader_elf_application_t *application = platform_riscv32_current_user_data();
+    platform_framebuffer_t *framebuffer = display_framebuffer();
+    if (application == NULL || framebuffer == NULL || width == NULL || height == NULL) return -TABOS_EINVAL;
+    application->graphics_active = true;
+    *width = (uint32_t)framebuffer->width;
+    *height = (uint32_t)framebuffer->height;
+    return 0;
+}
+
+static int elf_graphics_clear(uint32_t color)
+{
+    loader_elf_application_t *application = platform_riscv32_current_user_data();
+    platform_framebuffer_t *framebuffer = display_framebuffer();
+    if (application == NULL || !application->graphics_active || framebuffer == NULL) return -TABOS_EINVAL;
+    for (size_t y = 0U; y < framebuffer->height; ++y)
+        for (size_t x = 0U; x < framebuffer->width; ++x)
+            framebuffer->pixels[y * framebuffer->stride_pixels + x] = (platform_pixel_t)color;
+    return 0;
+}
+
+static int elf_graphics_fill_rect(int32_t x, int32_t y, uint32_t width, uint32_t height,
+                                  uint32_t color)
+{
+    loader_elf_application_t *application = platform_riscv32_current_user_data();
+    platform_framebuffer_t *framebuffer = display_framebuffer();
+    if (application == NULL || !application->graphics_active || framebuffer == NULL) return -TABOS_EINVAL;
+    const int64_t right = (int64_t)x + width, bottom = (int64_t)y + height;
+    const int32_t left = x < 0 ? 0 : x, top = y < 0 ? 0 : y;
+    const int32_t clipped_right = right > (int64_t)framebuffer->width ? (int32_t)framebuffer->width : (int32_t)right;
+    const int32_t clipped_bottom = bottom > (int64_t)framebuffer->height ? (int32_t)framebuffer->height : (int32_t)bottom;
+    for (int32_t row = top; row < clipped_bottom; ++row)
+        for (int32_t column = left; column < clipped_right; ++column)
+            framebuffer->pixels[(size_t)row * framebuffer->stride_pixels + (size_t)column] = (platform_pixel_t)color;
+    return 0;
+}
+
+static int elf_graphics_blit(int32_t x, int32_t y, uint32_t width, uint32_t height,
+                             const uint16_t *pixels)
+{
+    loader_elf_application_t *application = platform_riscv32_current_user_data();
+    platform_framebuffer_t *framebuffer = display_framebuffer();
+    const size_t pixel_bytes = width <= SIZE_MAX / height &&
+        (size_t)width * height <= SIZE_MAX / sizeof(*pixels)
+        ? (size_t)width * height * sizeof(*pixels) : 0U;
+    const uint16_t *source = platform_executable_data_pointer(pixels, pixel_bytes);
+    if (application == NULL || !application->graphics_active || framebuffer == NULL || source == NULL ||
+        width == 0U || height == 0U || width > SIZE_MAX / height) return -TABOS_EINVAL;
+    for (uint32_t row = 0U; row < height; ++row) {
+        const int64_t destination_y = (int64_t)y + row;
+        if (destination_y < 0 || destination_y >= (int64_t)framebuffer->height) continue;
+        for (uint32_t column = 0U; column < width; ++column) {
+            const int64_t destination_x = (int64_t)x + column;
+            if (destination_x < 0 || destination_x >= (int64_t)framebuffer->width) continue;
+            framebuffer->pixels[(size_t)destination_y * framebuffer->stride_pixels + (size_t)destination_x] =
+                source[(size_t)row * width + column];
+        }
+    }
+    return 0;
+}
+
+static int elf_graphics_present(void)
+{
+    loader_elf_application_t *application = platform_riscv32_current_user_data();
+    return application != NULL && application->graphics_active && display_present() ? 0 : -TABOS_EIO;
+}
+
+static int elf_graphics_close(void)
+{
+    loader_elf_application_t *application = platform_riscv32_current_user_data();
+    if (application == NULL || !application->graphics_active) return -TABOS_EINVAL;
+    application->graphics_active = false;
+    console_redraw();
+    return 0;
+}
+
 static int elf_exec(const char *path, uint32_t argc, const char *const *argv)
 {
     loader_elf_application_t *application = platform_riscv32_current_user_data();
@@ -444,7 +532,8 @@ static int elf_exec(const char *path, uint32_t argc, const char *const *argv)
     if (atomic_load_explicit(&application->exec_in_flight, memory_order_acquire)) {
         return TABOS_ELF_EXEC_PENDING;
     }
-    const char *readable_path = platform_executable_data_pointer(path);
+    const char *readable_path = platform_executable_data_pointer(path, TABOS_FS_PATH_MAX);
+    if (readable_path == NULL) return -TABOS_EIO;
     const size_t length = strlen(readable_path);
     if (length >= sizeof(application->exec_path)) return -TABOS_ENAMETOOLONG;
     if (!copy_arguments((size_t)argc, argv,
@@ -524,6 +613,12 @@ static bool elf_entry(tabos_app_context_t *context)
         .fs_rmdir = elf_fs_rmdir_path,
         .monotonic_ms = elf_monotonic_ms,
         .system_info = elf_system_info,
+        .graphics_open = elf_graphics_open,
+        .graphics_clear = elf_graphics_clear,
+        .graphics_fill_rect = elf_graphics_fill_rect,
+        .graphics_blit = elf_graphics_blit,
+        .graphics_present = elf_graphics_present,
+        .graphics_close = elf_graphics_close,
     };
     application->execution = platform_riscv32_create(
         application->image.entry, application->image.memory, application->image.memory_size,
@@ -658,7 +753,9 @@ const tabos_app_descriptor_t *loader_elf_application_descriptor(
 
 void loader_elf_application_destroy(void *application)
 {
-    free(application);
+    loader_elf_application_t *elf_application = application;
+    if (elf_application != NULL && elf_application->graphics_active) console_redraw();
+    free(elf_application);
 }
 
 const char *loader_elf_application_working_directory(
