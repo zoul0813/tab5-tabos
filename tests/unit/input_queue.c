@@ -1,4 +1,7 @@
 #include <tabos/internal/input.h>
+#include <tabos/config/input.h>
+
+#include "platform_test.h"
 
 #include <string.h>
 
@@ -46,5 +49,30 @@ int main(void)
             return 1;
         }
     }
+    if (tabos_input_poll(&received)) return 1;
+
+    input_init();
+    const tabos_input_event_t held = {
+        .type = TABOS_INPUT_KEY_DOWN,
+        .key = TABOS_KEY_W,
+    };
+    if (!input_submit(&held) || !tabos_input_poll(&received)) return 1;
+    test_platform_advance_time_ms(TABOS_KEY_REPEAT_DELAY_MS - 1U);
+    input_update();
+    if (tabos_input_poll(&received)) return 1;
+    test_platform_advance_time_ms(1U);
+    input_update();
+    if (!tabos_input_poll(&received) || received.type != TABOS_INPUT_KEY_DOWN ||
+        received.key != TABOS_KEY_W || !received.repeat ||
+        !tabos_input_poll(&received) || received.type != TABOS_INPUT_TEXT ||
+        strcmp(received.text, "w") != 0 || !received.repeat) return 1;
+
+    const tabos_input_event_t released = {
+        .type = TABOS_INPUT_KEY_UP,
+        .key = TABOS_KEY_W,
+    };
+    if (!input_submit(&released) || !tabos_input_poll(&received)) return 1;
+    test_platform_advance_time_ms(TABOS_KEY_REPEAT_INTERVAL_MS);
+    input_update();
     return tabos_input_poll(&received) ? 1 : 0;
 }

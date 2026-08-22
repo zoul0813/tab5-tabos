@@ -19,4 +19,7 @@ are available. `tabos_graphics_blit()` copies an RGB565 bitmap. Closing or
 terminating a graphics application restores the terminal. Windowing, compositing,
 transparency, touch, and direct framebuffer access are not part of this API.
 
+Opening fullscreen graphics automatically hides and pauses the terminal cursor. Closing
+the graphics context—or exiting without closing it—restores the terminal and cursor.
+
 Run `graphics-demo`; use W/A/S/D to move and Q to exit.

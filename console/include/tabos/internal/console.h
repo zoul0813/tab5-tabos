@@ -9,5 +9,6 @@ bool console_write_panic(const char *text);
 void console_shutdown(void);
 void console_update(void);
 void console_redraw(void);
+void console_set_graphics_active(bool active);
 
 #endif

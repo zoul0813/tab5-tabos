@@ -447,6 +447,7 @@ static int elf_graphics_open(uint32_t *width, uint32_t *height)
     platform_framebuffer_t *framebuffer = display_framebuffer();
     if (application == NULL || framebuffer == NULL || width == NULL || height == NULL) return -TABOS_EINVAL;
     application->graphics_active = true;
+    console_set_graphics_active(true);
     *width = (uint32_t)framebuffer->width;
     *height = (uint32_t)framebuffer->height;
     return 0;
@@ -514,7 +515,7 @@ static int elf_graphics_close(void)
     loader_elf_application_t *application = platform_riscv32_current_user_data();
     if (application == NULL || !application->graphics_active) return -TABOS_EINVAL;
     application->graphics_active = false;
-    console_redraw();
+    console_set_graphics_active(false);
     return 0;
 }
 
@@ -754,7 +755,9 @@ const tabos_app_descriptor_t *loader_elf_application_descriptor(
 void loader_elf_application_destroy(void *application)
 {
     loader_elf_application_t *elf_application = application;
-    if (elf_application != NULL && elf_application->graphics_active) console_redraw();
+    if (elf_application != NULL && elf_application->graphics_active) {
+        console_set_graphics_active(false);
+    }
     free(elf_application);
 }
 

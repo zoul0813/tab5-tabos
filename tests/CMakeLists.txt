@@ -33,6 +33,7 @@ target_include_directories(tabos_input_queue PRIVATE
     "${TABOS_ROOT}/platform/include"
     "${TABOS_ROOT}/sdk/include"
     "${CMAKE_CURRENT_LIST_DIR}/fakes"
+    "${TABOS_GENERATED_INCLUDE_DIR}"
 )
 target_link_libraries(tabos_input_queue PRIVATE tabos_core)
 tabos_enable_warnings(tabos_input_queue)

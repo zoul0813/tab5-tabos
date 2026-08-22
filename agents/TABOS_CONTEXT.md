@@ -31,7 +31,9 @@ system information. TabOS does not claim complete POSIX compatibility.
 
 The initial public graphics contract provides fullscreen RGB565 drawing through
 OS-owned clear, clipped primitive, bitmap blit, and present operations. Applications
-do not own display hardware, and returning from graphics restores the terminal.
+do not own display hardware. Fullscreen ownership pauses the terminal cursor; returning
+from graphics restores the terminal and cursor. TabOS normalizes held-key repeat timing
+above platform keyboard backends so host and Tab5 applications receive repeat events.
 
 ## 2. Hardware Baseline
 

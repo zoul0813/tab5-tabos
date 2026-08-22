@@ -14,16 +14,20 @@ static uint32_t next_token = 1U;
 static platform_mutex_t *console_mutex;
 static tabos_timer_t cursor_timer;
 static bool cursor_phase_visible = true;
+static bool graphics_active;
 
 static bool restart_cursor_blink(void)
 {
     const bool changed = !cursor_phase_visible;
     cursor_phase_visible = true;
-    if (active_terminal != NULL) {
+    graphics_active = false;
+    if (!graphics_active && active_terminal != NULL) {
         terminal_set_cursor_phase(active_terminal, true);
     }
-    tabos_timer_start(&cursor_timer, TABOS_CURSOR_BLINK_INTERVAL_MS,
-                      TABOS_CURSOR_BLINK_INTERVAL_MS);
+    if (!graphics_active) {
+        tabos_timer_start(&cursor_timer, TABOS_CURSOR_BLINK_INTERVAL_MS,
+                          TABOS_CURSOR_BLINK_INTERVAL_MS);
+    }
     return changed;
 }
 
@@ -324,7 +328,7 @@ bool tabos_console_wait(const tabos_console_session_t *session, tabos_input_even
 void console_update(void)
 {
     lock_console();
-    if (active_terminal != NULL && foreground_token != 0U &&
+    if (!graphics_active && active_terminal != NULL && foreground_token != 0U &&
         tabos_timer_poll(&cursor_timer)) {
         cursor_phase_visible = !cursor_phase_visible;
         terminal_set_cursor_phase(active_terminal, cursor_phase_visible);
@@ -337,6 +341,26 @@ void console_redraw(void)
 {
     lock_console();
     if (active_terminal != NULL) {
+        terminal_redraw(active_terminal);
+        (void)display_present();
+    }
+    unlock_console();
+}
+
+void console_set_graphics_active(bool active)
+{
+    lock_console();
+    if (graphics_active == active || active_terminal == NULL) {
+        unlock_console();
+        return;
+    }
+    graphics_active = active;
+    if (active) {
+        tabos_timer_cancel(&cursor_timer);
+        terminal_set_cursor_visible(active_terminal, false);
+    } else if (foreground_token != 0U) {
+        terminal_set_cursor_visible(active_terminal, true);
+        (void)restart_cursor_blink();
         terminal_redraw(active_terminal);
         (void)display_present();
     }

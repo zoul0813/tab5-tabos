@@ -1,5 +1,6 @@
 #include <tabos/internal/input.h>
 
+#include <tabos/config/input.h>
 #include <tabos/platform/platform.h>
 
 #include <stdatomic.h>
@@ -11,6 +12,9 @@ static tabos_input_event_t event_queue[INPUT_QUEUE_CAPACITY];
 static size_t queue_head;
 static size_t queue_count;
 static atomic_flag queue_lock = ATOMIC_FLAG_INIT;
+static tabos_key_t held_key;
+static uint8_t held_modifiers;
+static uint64_t next_repeat_ms;
 
 static void lock_queue(void)
 {
@@ -28,6 +32,9 @@ void input_init(void)
     lock_queue();
     queue_head = 0U;
     queue_count = 0U;
+    held_key = TABOS_KEY_UNKNOWN;
+    held_modifiers = 0U;
+    next_repeat_ms = 0U;
     unlock_queue();
 }
 
@@ -41,6 +48,17 @@ bool input_submit(const tabos_input_event_t *event)
     if (event == NULL) {
         return false;
     }
+    /* Platform repeat timing differs. TabOS generates one portable repeat stream. */
+    if (event->repeat) return true;
+    if (event->type == TABOS_INPUT_KEY_DOWN) {
+        held_key = event->key;
+        held_modifiers = event->modifiers;
+        next_repeat_ms = platform_time_ms() + TABOS_KEY_REPEAT_DELAY_MS;
+    } else if (event->type == TABOS_INPUT_KEY_UP && event->key == held_key) {
+        held_key = TABOS_KEY_UNKNOWN;
+        held_modifiers = 0U;
+        next_repeat_ms = 0U;
+    }
     lock_queue();
     if (queue_count == INPUT_QUEUE_CAPACITY) {
         queue_head = (queue_head + 1U) % INPUT_QUEUE_CAPACITY;
@@ -52,6 +70,49 @@ bool input_submit(const tabos_input_event_t *event)
     unlock_queue();
     input_diagnostic_log(event);
     return true;
+}
+
+void input_update(void)
+{
+    const uint64_t now = platform_time_ms();
+    if (held_key == TABOS_KEY_UNKNOWN || now < next_repeat_ms) return;
+
+    tabos_input_event_t key_event = {
+        .type = TABOS_INPUT_KEY_DOWN,
+        .key = held_key,
+        .modifiers = held_modifiers,
+        .repeat = true,
+    };
+    lock_queue();
+    if (queue_count == INPUT_QUEUE_CAPACITY) {
+        queue_head = (queue_head + 1U) % INPUT_QUEUE_CAPACITY;
+        --queue_count;
+    }
+    size_t tail = (queue_head + queue_count) % INPUT_QUEUE_CAPACITY;
+    event_queue[tail] = key_event;
+    ++queue_count;
+    unlock_queue();
+    input_diagnostic_log(&key_event);
+
+    tabos_input_event_t text_event = {
+        .type = TABOS_INPUT_TEXT,
+        .modifiers = held_modifiers,
+        .repeat = true,
+    };
+    if (input_text_from_hid((uint8_t)held_key, held_modifiers,
+                            text_event.text, sizeof(text_event.text)) > 0U) {
+        lock_queue();
+        if (queue_count == INPUT_QUEUE_CAPACITY) {
+            queue_head = (queue_head + 1U) % INPUT_QUEUE_CAPACITY;
+            --queue_count;
+        }
+        tail = (queue_head + queue_count) % INPUT_QUEUE_CAPACITY;
+        event_queue[tail] = text_event;
+        ++queue_count;
+        unlock_queue();
+        input_diagnostic_log(&text_event);
+    }
+    next_repeat_ms = now + TABOS_KEY_REPEAT_INTERVAL_MS;
 }
 
 static bool pop_event(tabos_input_event_t *event)

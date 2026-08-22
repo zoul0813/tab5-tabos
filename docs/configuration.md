@@ -21,6 +21,7 @@ Current settings cover:
 - terminal scale
 - terminal scrollback capacity
 - cursor blink interval
+- held-key repeat delay and interval
 - controlled host drive-container directory
 - filesystem-backed ELF startup path, defaulting to `T:/bin/hello`
 - filesystem-backed PID 0 shell path, defaulting to `T:/bin/shell`

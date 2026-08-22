@@ -232,6 +232,7 @@ void kernel_runtime_update(void)
     if (!runtime_started) {
         return;
     }
+    input_update();
     console_update();
     kernel_application_system_update();
 }
