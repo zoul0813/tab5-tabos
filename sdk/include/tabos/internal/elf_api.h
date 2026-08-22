@@ -1,9 +1,9 @@
-#ifndef TABOS_ELF_API_H
-#define TABOS_ELF_API_H
+#ifndef TABOS_INTERNAL_ELF_API_H
+#define TABOS_INTERNAL_ELF_API_H
 
 #include <stdint.h>
 
-#define TABOS_ELF_API_VERSION 3U
+#define TABOS_ELF_API_VERSION 4U
 #define TABOS_ELF_EXEC_PENDING (-2147483647 - 1)
 
 enum {
@@ -18,6 +18,20 @@ typedef struct {
     int32_t modified_time_low;
     int32_t modified_time_high;
 } tabos_elf_stat_t;
+
+typedef struct {
+    char target[16];
+    char device[32];
+    char display[32];
+    uint32_t display_width;
+    uint32_t display_height;
+    uint32_t cpu_cores;
+    uint32_t cpu_frequency_mhz;
+    uint32_t memory_total_low;
+    uint32_t memory_total_high;
+    uint32_t external_memory_total_low;
+    uint32_t external_memory_total_high;
+} tabos_elf_system_info_t;
 
 typedef struct {
     uint32_t abi_version;
@@ -45,6 +59,8 @@ typedef struct {
     int (*fd_set_flags)(int descriptor, int flags);
     void *(*heap_sbrk)(int32_t increment);
     int (*fs_rmdir)(const char *path);
+    uint64_t (*monotonic_ms)(void);
+    int (*system_info)(tabos_elf_system_info_t *info);
 } tabos_elf_api_t;
 
 typedef int (*tabos_elf_entry_fn)(const tabos_elf_api_t *api,

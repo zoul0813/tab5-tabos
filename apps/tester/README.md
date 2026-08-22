@@ -11,8 +11,8 @@ eval "$(./tools/tabos activate-idf)"
 make -C apps/tester
 ```
 
-The runnable image is `build/apps/tester/tester.bin` and installs as
-`.local/rootfs/T/bin/tester.bin`. Copy it to `T:/bin/tester.bin` on Tab5, then run:
+The runnable image is `build/apps/tester/tester` and installs as
+`.local/rootfs/T/bin/tester`. Copy it to `T:/bin/tester` on Tab5, then run:
 
 ```text
 > tester one "two words"

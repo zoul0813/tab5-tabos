@@ -7,7 +7,7 @@
 void tester_test_process(tester_context_t *context)
 {
     const char *const arguments[] = {
-        "T:/bin/tester.bin",
+        "T:/bin/tester",
         "--process-child",
         NULL,
     };

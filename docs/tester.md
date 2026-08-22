@@ -2,7 +2,7 @@
 
 `apps/tester/` is the maintained end-to-end validation application for the public TabOS
 SDK, C runtime, and application ABI. Unlike host unit tests, it is compiled as a normal
-independent RV32 application and the same `tester.bin` runs through host emulation and on
+independent RV32 application and the same extensionless `tester` runs through host emulation and on
 Tab5 hardware.
 
 Tests are separate modules under `apps/tester/src/tests/`. The current modules cover:
@@ -26,7 +26,7 @@ Run from the shell:
 > tester one "two words"
 ```
 
-For Tab5, copy `build/apps/tester/tester.bin` to `T:/bin/tester.bin`. A successful run
+For Tab5, copy `build/apps/tester/tester` to `T:/bin/tester`. A successful run
 ends with `[PASS] TabOS SDK tester` and status zero. The filesystem test creates
 `T:/tabos-tester/` and removes it before completion.
 

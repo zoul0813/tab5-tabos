@@ -41,6 +41,13 @@ DOS-style semicolon-separated PATH entries. Absolute drive paths and relative
 paths containing `/` (including `./` and `../`) bypass PATH lookup. The shell
 does not append `.bin` to command names.
 
+### Application ABI v1 [DECIDED]
+
+Applications consume public SDK headers only; the ELF transport table is private to CRT
+and SDK runtime sources. ABI v1 uses newlib for C17 allocation and stdio, provides the
+documented filesystem subset, monotonic time/cooperative sleep, foreground process
+launch/wait, and portable system information. TabOS does not promise full POSIX compatibility.
+
 ESP-IDF and FreeRTOS are implementation foundations, not the application programming model.
 
 ---

@@ -3,10 +3,11 @@
 
 #include <tabos/application.h>
 #include <tabos/console.h>
-#include <tabos/elf_api.h>
 #include <tabos/filesystem.h>
 #include <tabos/input.h>
 #include <tabos/process.h>
+#include <tabos/runtime_time.h>
+#include <tabos/system.h>
 #include <tabos/terminal.h>
 #include <tabos/time.h>
 

@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <tabos/elf_api.h>
+#include <tabos/internal/elf_api.h>
 
 enum {
     TABOS_DISPLAY_WIDTH = 1280,

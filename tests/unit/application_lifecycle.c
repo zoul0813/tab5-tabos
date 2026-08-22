@@ -1,5 +1,5 @@
 #include <tabos/application.h>
-#include <tabos/elf_api.h>
+#include <tabos/internal/elf_api.h>
 
 #include <tabos/internal/application.h>
 #include <tabos/internal/console.h>

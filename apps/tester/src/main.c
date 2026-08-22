@@ -12,7 +12,7 @@ static int run_process_fixture(int argc, char **argv)
     if (strcmp(argv[1], "--process-child") != 0) return -1;
 
     const char *const arguments[] = {
-        "T:/bin/tester.bin",
+        "T:/bin/tester",
         "--process-leaf",
         NULL,
     };
@@ -32,6 +32,7 @@ int main(int argc, char **argv)
         {"Filesystem and working directory", tester_test_filesystem},
         {"Nonblocking input", tester_test_input},
         {"Nested process execution", tester_test_process},
+        {"Time and system information", tester_test_runtime},
     };
     tester_context_t context = {.argc = argc, .argv = argv};
 

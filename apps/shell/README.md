@@ -12,8 +12,8 @@ eval "$(./tools/tabos activate-idf)"
 make -C apps/shell
 ```
 
-The default build writes the stripped runnable image to `build/apps/shell/shell.bin` and
-installs it as `.local/rootfs/T/bin/shell.bin`. Use `make -C apps/shell build` to build
+The default build writes the stripped runnable image to `build/apps/shell/shell` and
+installs it as `.local/rootfs/T/bin/shell`. Use `make -C apps/shell build` to build
 without installing. The unstripped ELF remains at
 `build/apps/shell/shell.elf` for debugging.
 

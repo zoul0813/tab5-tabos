@@ -1,4 +1,4 @@
-#include <tabos/elf_api.h>
+#include <tabos/internal/elf_api.h>
 
 int tabos_elf_entry(const tabos_elf_api_t *api, int argc, const char *const *argv)
 {

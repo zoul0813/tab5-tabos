@@ -23,6 +23,12 @@ defaults to `T:/bin`, with user-configurable semicolon-separated PATH entries.
 Paths containing `/` are resolved relative to the current drive and working
 directory; explicit drive paths such as `T:/bin/tester` remain supported.
 
+The first supported external application contract is TabOS application ABI v1.
+The ELF API table is private transport used only by CRT and SDK runtime sources.
+Public applications use C17/newlib allocation and stdio, the documented filesystem
+subset, foreground process launch/wait, monotonic time/cooperative sleep, and portable
+system information. TabOS does not claim complete POSIX compatibility.
+
 ## 2. Hardware Baseline
 
 ### Decision / current hardware assumptions

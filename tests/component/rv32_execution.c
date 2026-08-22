@@ -1,4 +1,4 @@
-#include <tabos/elf_api.h>
+#include <tabos/internal/elf_api.h>
 #include <tabos/internal/elf_loader.h>
 #include <tabos/platform/platform.h>
 

@@ -227,6 +227,13 @@ add_test(
 )
 
 add_test(
+    NAME architecture.application_api_boundary
+    COMMAND "${CMAKE_COMMAND}"
+        "-DTABOS_SOURCE_DIR=${TABOS_ROOT}"
+        -P "${CMAKE_CURRENT_LIST_DIR}/check_application_api_boundary.cmake"
+)
+
+add_test(
     NAME architecture.symbol_naming
     COMMAND "${CMAKE_COMMAND}"
         "-DTABOS_SOURCE_DIR=${TABOS_ROOT}"

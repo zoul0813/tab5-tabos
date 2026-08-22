@@ -1,5 +1,7 @@
 # Application Lifecycle
 
+The supported external application SDK and libc surface are documented in `docs/sdk.md`.
+
 TabOS has portable application descriptors, built-in application registry, and single foreground application lifecycle. This foundation runs identically in host and Tab5 builds. Applications use public TabOS APIs and do not call SDL3, ESP-IDF, or FreeRTOS directly.
 
 ## Building Applications
@@ -29,7 +31,7 @@ it after copying:
 The default mount point is `/Volumes/TAB5`. Use `--msc-mount=/path` or set
 `TABOS_MSC_MOUNT` to override it. Binaries are copied to the volume's `bin/`
 directory. Subdirectories in an application's build output are preserved; for
-example, `sys/ls.bin` is copied to `bin/sys/ls.bin`.
+example, `sys/ls` is copied to `bin/sys/ls`.
 
 Individual application commands such as `make -C apps/shell` remain available.
 

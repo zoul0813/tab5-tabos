@@ -56,6 +56,8 @@ static const uint32_t HOST_RV32_FD_GET_FLAGS = UINT32_C(0xffff0054);
 static const uint32_t HOST_RV32_FD_SET_FLAGS = UINT32_C(0xffff0058);
 static const uint32_t HOST_RV32_HEAP_SBRK = UINT32_C(0xffff005c);
 static const uint32_t HOST_RV32_FS_RMDIR = UINT32_C(0xffff0060);
+static const uint32_t HOST_RV32_MONOTONIC_MS = UINT32_C(0xffff0064);
+static const uint32_t HOST_RV32_SYSTEM_INFO = UINT32_C(0xffff0068);
 
 struct platform_riscv32_context {
     uint8_t *memory;
@@ -157,7 +159,7 @@ platform_riscv32_context_t *platform_riscv32_create(
 
     const uint32_t image_end = minimum_address + (uint32_t)memory_size;
     const uint32_t api_address = (image_end + 15U) & ~15U;
-    if (api_address > HOST_RV32_RAM_SIZE - 100U) {
+    if (api_address > HOST_RV32_RAM_SIZE - 108U) {
         platform_riscv32_destroy(context);
         return NULL;
     }
@@ -186,8 +188,10 @@ platform_riscv32_context_t *platform_riscv32_create(
     write_u32(context->memory, api_address + 88U, HOST_RV32_FD_SET_FLAGS);
     write_u32(context->memory, api_address + 92U, HOST_RV32_HEAP_SBRK);
     write_u32(context->memory, api_address + 96U, HOST_RV32_FS_RMDIR);
+    write_u32(context->memory, api_address + 100U, HOST_RV32_MONOTONIC_MS);
+    write_u32(context->memory, api_address + 104U, HOST_RV32_SYSTEM_INFO);
 
-    uint32_t argument_data_address = api_address + 100U;
+    uint32_t argument_data_address = api_address + 108U;
     uint32_t argument_data_end = argument_data_address;
     for (size_t index = 0U; index < argc; ++index) {
         if (argv[index] == NULL) {
@@ -472,6 +476,24 @@ platform_riscv32_result_t platform_riscv32_step(
                 context->heap_break += (uint32_t)increment;
                 context->state.regs[10] = previous;
             }
+            context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_MONOTONIC_MS) {
+            if (context->api.monotonic_ms == NULL) return PLATFORM_RISCV32_FAULT;
+            const uint64_t value = context->api.monotonic_ms();
+            context->state.regs[10] = (uint32_t)value;
+            context->state.regs[11] = (uint32_t)(value >> 32U);
+            context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_SYSTEM_INFO) {
+            tabos_elf_system_info_t *info = guest_buffer(
+                context->memory, context->state.regs[10], sizeof(*info));
+            if (info == NULL || context->api.system_info == NULL) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            context->state.regs[10] = (uint32_t)context->api.system_info(info);
             context->state.pc = context->state.regs[1];
             continue;
         }

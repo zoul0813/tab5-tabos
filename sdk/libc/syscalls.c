@@ -1,4 +1,4 @@
-#include <tabos/elf_api.h>
+#include <tabos/internal/elf_api.h>
 #include <tabos/filesystem.h>
 
 #include <errno.h>

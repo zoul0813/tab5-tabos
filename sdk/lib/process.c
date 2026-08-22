@@ -1,6 +1,6 @@
 #include <tabos/process.h>
 
-#include <tabos/elf_api.h>
+#include <tabos/internal/elf_api.h>
 #include <tabos/posix_compat.h>
 #include <errno.h>
 #include <sched.h>

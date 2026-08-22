@@ -1,11 +1,12 @@
 #include <tabos/internal/elf_application.h>
 
-#include <tabos/elf_api.h>
+#include <tabos/internal/elf_api.h>
 #include <tabos/filesystem.h>
 #include <tabos/internal/application.h>
 #include <tabos/internal/elf_loader.h>
 #include <tabos/internal/filesystem.h>
 #include <tabos/platform/platform.h>
+#include <tabos/config/display.h>
 
 #include <stdio.h>
 #include <stdatomic.h>
@@ -402,6 +403,33 @@ static int elf_fs_list(const char *path, char *buffer, uint32_t capacity)
     return result;
 }
 
+static uint64_t elf_monotonic_ms(void)
+{
+    return platform_time_ms();
+}
+
+static int elf_system_info(tabos_elf_system_info_t *info)
+{
+    if (info == NULL) return -TABOS_EINVAL;
+    platform_diagnostics_t diagnostics;
+    if (!platform_get_diagnostics(&diagnostics)) return -TABOS_EIO;
+    memset(info, 0, sizeof(*info));
+    (void)snprintf(info->target, sizeof(info->target), "%s", platform_name());
+    (void)snprintf(info->device, sizeof(info->device), "%s",
+                   diagnostics.device_name != NULL ? diagnostics.device_name : "Unknown");
+    (void)snprintf(info->display, sizeof(info->display), "%s", platform_display_name());
+    info->display_width = TABOS_DISPLAY_WIDTH;
+    info->display_height = TABOS_DISPLAY_HEIGHT;
+    info->cpu_cores = diagnostics.cpu_cores;
+    info->cpu_frequency_mhz = diagnostics.cpu_frequency_mhz;
+    info->memory_total_low = (uint32_t)diagnostics.memory_total_bytes;
+    info->memory_total_high = (uint32_t)(diagnostics.memory_total_bytes >> 32U);
+    info->external_memory_total_low = (uint32_t)diagnostics.external_memory_total_bytes;
+    info->external_memory_total_high =
+        (uint32_t)(diagnostics.external_memory_total_bytes >> 32U);
+    return 0;
+}
+
 static int elf_exec(const char *path, uint32_t argc, const char *const *argv)
 {
     loader_elf_application_t *application = platform_riscv32_current_user_data();
@@ -494,6 +522,8 @@ static bool elf_entry(tabos_app_context_t *context)
         .fd_set_flags = elf_fd_set_flags,
         .heap_sbrk = elf_heap_sbrk,
         .fs_rmdir = elf_fs_rmdir_path,
+        .monotonic_ms = elf_monotonic_ms,
+        .system_info = elf_system_info,
     };
     application->execution = platform_riscv32_create(
         application->image.entry, application->image.memory, application->image.memory_size,

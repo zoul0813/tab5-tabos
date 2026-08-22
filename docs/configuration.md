@@ -22,8 +22,8 @@ Current settings cover:
 - terminal scrollback capacity
 - cursor blink interval
 - controlled host drive-container directory
-- filesystem-backed ELF startup path, defaulting to `T:/bin/hello.bin`
-- filesystem-backed PID 0 shell path, defaulting to `T:/bin/shell.bin`
+- filesystem-backed ELF startup path, defaulting to `T:/bin/hello`
+- filesystem-backed PID 0 shell path, defaulting to `T:/bin/shell`
 
 The host executes `elf-hello` from configured TabOS drive through bounded RV32
 interpretation using same application artifact as Tab5.

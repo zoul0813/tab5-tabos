@@ -346,17 +346,17 @@ but is not a substitute for this execution path.
 
 ### SDK and Stable Application ABI
 
-- [ ] Freeze first supported application ABI version after filesystem-backed loader validation.
-- [ ] Publish public application headers independent from ESP-IDF and FreeRTOS.
-- [ ] Provide compiler, linker, strip, and packaging workflow for external applications.
+- [x] Freeze first supported application ABI version after filesystem-backed loader validation.
+- [x] Publish public application headers independent from ESP-IDF and FreeRTOS.
+- [x] Provide compiler, linker, strip, and packaging workflow for external applications.
 - [ ] Optionally provide host-native application build mode for sanitizer-heavy source tests;
   keep RV32 execution as canonical binary/ABI validation.
 - [x] Add argument passing and application-visible exit status.
-- [ ] Decide libc/newlib wrapper strategy.
-- [ ] Add memory allocation API.
-- [ ] Add time and timer API suitable for applications.
-- [ ] Add system/device information API.
-- [ ] Document how users build and package applications under `docs/`.
+- [x] Decide libc/newlib wrapper strategy.
+- [x] Provide malloc/free through newlib and the process-owned growing heap.
+- [x] Add monotonic time and cooperative sleep API suitable for applications.
+- [x] Add portable system/device information API.
+- [x] Document how users build and package applications under `docs/`.
 
 ### Process and Runtime Model
 
