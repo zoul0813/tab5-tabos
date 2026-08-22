@@ -1,6 +1,6 @@
 # Small independently loaded command-line utilities.
 
-PROGRAMS := ls mkdir rmdir cp rm mv
+PROGRAMS := ls mkdir rmdir cp rm mv hexdump
 
 ifeq ($(strip $(PROGRAM)),)
 

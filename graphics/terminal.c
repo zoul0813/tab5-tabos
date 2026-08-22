@@ -206,8 +206,10 @@ static void ansi_command(terminal_t *terminal, char command)
         terminal_clear(terminal);
     } else if (command == 'K') {
         terminal_cell_t *cells = line_cells(terminal, terminal->current_line);
-        for (size_t column = terminal->column; column < terminal->columns; ++column) cells[column] = (terminal_cell_t){0};
-        terminal->line_lengths[line_slot(terminal, terminal->current_line)] = terminal->column;
+        const size_t start = value == 2U ? 0U : terminal->column;
+        const size_t end = value == 2U ? terminal->columns : terminal->columns;
+        for (size_t column = start; column < end; ++column) cells[column] = (terminal_cell_t){0};
+        terminal->line_lengths[line_slot(terminal, terminal->current_line)] = start;
         terminal->full_redraw = true;
     } else if (command == 'm') {
         ansi_sgr(terminal, value);

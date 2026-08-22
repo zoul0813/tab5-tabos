@@ -1,0 +1,10 @@
+if(NOT DEFINED TABOS_SOURCE_DIR)
+    message(FATAL_ERROR "TABOS_SOURCE_DIR is required")
+endif()
+
+file(READ "${TABOS_SOURCE_DIR}/apps/shell/src/main.c" shell_source)
+foreach(pattern IN ITEMS "api->" "tabos_runtime_api" "tabos_elf_api_t" "TABOS_ELF_API_VERSION")
+    if(shell_source MATCHES "${pattern}")
+        message(FATAL_ERROR "Shell directly references ELF runtime API: ${pattern}")
+    endif()
+endforeach()

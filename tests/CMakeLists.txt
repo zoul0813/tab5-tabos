@@ -56,6 +56,18 @@ tabos_enable_sanitizers(tabos_console_service)
 
 add_test(NAME unit.console_service COMMAND tabos_console_service)
 
+add_executable(tabos_terminal_ansi unit/terminal_ansi.c ${TABOS_TEST_PLATFORM_FAKES})
+target_include_directories(tabos_terminal_ansi PRIVATE
+    "${TABOS_ROOT}/graphics/include"
+    "${TABOS_ROOT}/platform/include"
+    "${TABOS_GENERATED_INCLUDE_DIR}"
+)
+target_link_libraries(tabos_terminal_ansi PRIVATE tabos_core)
+tabos_enable_warnings(tabos_terminal_ansi)
+tabos_enable_sanitizers(tabos_terminal_ansi)
+
+add_test(NAME unit.terminal_ansi COMMAND tabos_terminal_ansi)
+
 add_executable(tabos_timer unit/timer.c ${TABOS_TEST_PLATFORM_FAKES})
 target_include_directories(tabos_timer PRIVATE
     "${TABOS_ROOT}/platform/include"
@@ -205,6 +217,13 @@ add_test(
     COMMAND "${CMAKE_COMMAND}"
         "-DTABOS_SOURCE_DIR=${TABOS_ROOT}"
         -P "${CMAKE_CURRENT_LIST_DIR}/check_boundaries.cmake"
+)
+
+add_test(
+    NAME architecture.shell_api_boundary
+    COMMAND "${CMAKE_COMMAND}"
+        "-DTABOS_SOURCE_DIR=${TABOS_ROOT}"
+        -P "${CMAKE_CURRENT_LIST_DIR}/check_shell_boundary.cmake"
 )
 
 add_test(

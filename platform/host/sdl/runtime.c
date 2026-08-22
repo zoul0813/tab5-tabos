@@ -131,8 +131,10 @@ int platform_run(platform_update_fn update)
         return 0;
     }
     while (!quit_requested) {
-        host_input_update(true);
+        /* Poll input without letting event arrival control emulation speed. */
+        host_input_update(false);
         if (update != NULL) update();
+        SDL_Delay(1);
     }
     return 0;
 }
