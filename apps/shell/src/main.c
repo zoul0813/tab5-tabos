@@ -2,17 +2,22 @@
 #include <errno.h>
 #include <unistd.h>
 #include <sched.h>
+#include <sys/stat.h>
+#include <string.h>
 #include <tabos/process.h>
 
 #include <shell/parser.h>
 
 #include <stdint.h>
+#include <stdbool.h>
 
 enum {
     SHELL_LINE_CAPACITY = 256,
     SHELL_IO_CAPACITY = 1024,
     SHELL_ARGUMENT_CAPACITY = TABOS_PROCESS_ARG_MAX,
 };
+
+static char shell_path[256] = "T:/bin";
 
 static uint32_t string_length(const char *text)
 {
@@ -114,7 +119,20 @@ static void execute_command(char *line)
     const char *command = argv[0];
 
     if (string_equal(command, "help")) {
-        printf("Commands: help clear pwd cd ls <program>\n");
+        printf("Commands: help clear pwd cd set echo <program>\n");
+        return;
+    }
+    if (string_equal(command, "set")) {
+        if (argc == 2U && string_starts_with(argv[1], "PATH=")) {
+            copy_string(shell_path, sizeof(shell_path), argv[1] + 5U);
+        } else {
+            printf("Usage: set PATH=<directories>\n");
+        }
+        return;
+    }
+    if (string_equal(command, "echo") && argc == 2U &&
+        (string_equal(argv[1], "%PATH%") || string_equal(argv[1], "$PATH"))) {
+        printf("%s\n", shell_path);
         return;
     }
     if (string_equal(command, "clear")) {
@@ -137,17 +155,25 @@ static void execute_command(char *line)
     }
 
     char path[512];
-    const uint32_t command_length = string_length(command);
-    if (string_starts_with(command, "A:/") || string_starts_with(command, "T:/") ||
-        command[0] == '/') {
+    if (strchr(command, '/') != NULL) {
         copy_string(path, sizeof(path), command);
     } else {
-        copy_string(path, sizeof(path), "T:/bin/");
-        append_string(path, sizeof(path), command);
-        if (!string_starts_with(command + (command_length > 4U ? command_length - 4U : 0U),
-                                ".bin")) {
-            append_string(path, sizeof(path), ".bin");
+        bool found = false;
+        const char *start = shell_path;
+        while (*start != '\0' && !found) {
+            const char *end = strchr(start, ';');
+            const size_t length = end == NULL ? string_length(start) : (size_t)(end - start);
+            if (length + 1U + string_length(command) + 1U < sizeof(path)) {
+                memcpy(path, start, length);
+                path[length] = '/';
+                copy_string(path + length + 1U, sizeof(path) - length - 1U, command);
+                struct stat status;
+                found = stat(path, &status) == 0 && S_ISREG(status.st_mode);
+            }
+            if (end == NULL) break;
+            start = end + 1U;
         }
+        if (!found) copy_string(path, sizeof(path), command);
     }
     const int pid = tabos_spawn(path, (int)argc, (const char *const *)argv);
     int status = pid < 0 ? pid : 0;
@@ -204,8 +230,7 @@ int main(int argc, char **argv)
             } else if ((unsigned char)character >= 32U && used + 1U < sizeof(line)) {
                 line[used++] = character;
                 line[used] = '\0';
-                char echoed[2] = {character, '\0'};
-                printf(echoed);
+                putchar((unsigned char)character);
             }
         }
     }

@@ -335,6 +335,7 @@ but is not a substitute for this execution path.
 - [x] Load and execute independent RV32 hello application from host controlled root.
 - [x] Load independent hello application from Tab5 microSD.
 - [ ] Define application file naming and discovery rules.
+- [x] Define extensionless application names, default `T:/bin` PATH, and relative-path command syntax.
 - [ ] Add application metadata validation.
 - [ ] Enumerate installed applications without hardcoded registry entries.
 - [ ] Add minimal launcher diagnostic that lists and starts applications.

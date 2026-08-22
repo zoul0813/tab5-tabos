@@ -33,6 +33,14 @@ The core architectural idea is:
 
 TabOS owns the user-facing operating-system model.
 
+### Application command discovery [DECIDED]
+
+Applications are installed as extensionless executable files under `T:/bin/`.
+The shell default command search path is `T:/bin`; users may redefine it with
+DOS-style semicolon-separated PATH entries. Absolute drive paths and relative
+paths containing `/` (including `./` and `../`) bypass PATH lookup. The shell
+does not append `.bin` to command names.
+
 ESP-IDF and FreeRTOS are implementation foundations, not the application programming model.
 
 ---

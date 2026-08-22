@@ -18,7 +18,7 @@ int main(int argc, char **argv)
 
     struct dirent *entry;
     while ((entry = readdir(directory)) != NULL) {
-        printf(entry->d_name);
+        printf("%s", entry->d_name);
         if (entry->d_type == DT_DIR) {
             printf("/");
         }

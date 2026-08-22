@@ -47,10 +47,13 @@ if [ -n "$msc_mount" ]; then
     destination="$msc_mount/bin"
     mkdir -p "$destination"
     found_binary=false
-    for binary in "$project_root"/build/apps/*/*.bin "$project_root"/build/apps/*/*/*.bin; do
+    for binary in "$project_root"/build/apps/*/* "$project_root"/build/apps/*/*/*; do
         if [ ! -f "$binary" ]; then
             continue
         fi
+        case "$binary" in
+            *.elf) continue ;;
+        esac
         found_binary=true
         relative_path=${binary#"$project_root/build/apps/"}
         case "$relative_path" in

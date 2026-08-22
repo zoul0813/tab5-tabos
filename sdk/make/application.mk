@@ -10,9 +10,9 @@ APP_DIR ?= $(CURDIR)
 SDK_ROOT ?= $(abspath $(APP_DIR)/../../sdk)
 PROJECT_ROOT ?= $(abspath $(SDK_ROOT)/..)
 BUILD_DIR ?= $(PROJECT_ROOT)/build/apps/$(APP_NAME)
-OUTPUT ?= $(BUILD_DIR)/$(APP_NAME).bin
+OUTPUT ?= $(BUILD_DIR)/$(APP_NAME)
 UNSTRIPPED ?= $(BUILD_DIR)/$(APP_NAME).elf
-INSTALL_PATH ?= $(PROJECT_ROOT)/.local/rootfs/T/bin/$(APP_NAME).bin
+INSTALL_PATH ?= $(PROJECT_ROOT)/.local/rootfs/T/bin/$(APP_NAME)
 
 RISCV_PREFIX ?= riscv32-esp-elf-
 CC := $(RISCV_PREFIX)gcc

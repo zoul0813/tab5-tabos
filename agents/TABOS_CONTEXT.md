@@ -18,6 +18,11 @@ The goal is not to reproduce Zeal OS literally. The useful model to carry forwar
 
 The system should hide most ESP32/ESP-IDF-specific machinery from normal TabOS applications.
 
+Application discovery uses extensionless executable names. Shell command lookup
+defaults to `T:/bin`, with user-configurable semicolon-separated PATH entries.
+Paths containing `/` are resolved relative to the current drive and working
+directory; explicit drive paths such as `T:/bin/tester` remain supported.
+
 ## 2. Hardware Baseline
 
 ### Decision / current hardware assumptions

@@ -11,6 +11,8 @@ int main(void)
         strcmp(text, "A") != 0 ||
         input_text_from_hid(TABOS_KEY_1, TABOS_MODIFIER_SHIFT, text, sizeof(text)) != 1U ||
         strcmp(text, "!") != 0 ||
+        input_text_from_hid(TABOS_KEY_5, TABOS_MODIFIER_SHIFT, text, sizeof(text)) != 1U ||
+        strcmp(text, "%") != 0 ||
         input_text_from_hid(TABOS_KEY_A, TABOS_MODIFIER_CONTROL, text, sizeof(text)) != 0U) {
         return 1;
     }

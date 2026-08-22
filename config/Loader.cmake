@@ -4,9 +4,9 @@ option(
     OFF
 )
 
-set(TABOS_ELF_STARTUP_PATH "T:/bin/hello.bin" CACHE STRING
+set(TABOS_ELF_STARTUP_PATH "T:/bin/hello" CACHE STRING
     "TabOS path loaded by the filesystem-backed ELF diagnostic")
-set(TABOS_SHELL_PATH "T:/bin/shell.bin" CACHE STRING
+set(TABOS_SHELL_PATH "T:/bin/shell" CACHE STRING
     "TabOS filesystem path for the PID 0 shell")
 
 option(TABOS_ENABLE_SHELL_STARTUP "Start filesystem-backed shell as process 0" OFF)

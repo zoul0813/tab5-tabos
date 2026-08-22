@@ -20,8 +20,8 @@ CONFIG_DEFAULTS = {
     "TABOS_TERMINAL_SCALE": "2",
     "TABOS_TERMINAL_SCROLLBACK_LINES": "256",
     "TABOS_CURSOR_BLINK_INTERVAL_MS": "500",
-    "TABOS_ELF_STARTUP_PATH": "T:/bin/hello.bin",
-    "TABOS_SHELL_PATH": "T:/bin/shell.bin",
+    "TABOS_ELF_STARTUP_PATH": "T:/bin/hello",
+    "TABOS_SHELL_PATH": "T:/bin/shell",
     "TABOS_HOST_STARTUP_APP": "none",
     "TABOS_TAB5_STARTUP_APP": "none",
 }
