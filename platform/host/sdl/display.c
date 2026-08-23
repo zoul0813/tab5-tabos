@@ -5,6 +5,7 @@
 #include <tabos/config/identity.h>
 #include <tabos/config/display.h>
 
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -13,6 +14,7 @@ static SDL_Renderer *renderer;
 static SDL_Texture *texture;
 static platform_pixel_t *framebuffer_pixels;
 static Uint64 graphics_present_deadline_ns;
+static bool renderer_vsync;
 
 bool host_capture_screenshot(void)
 {
@@ -59,7 +61,7 @@ const char *platform_display_name(void)
 
 uint32_t platform_graphics_capabilities(void)
 {
-    return 0U;
+    return TABOS_GRAPHICS_CAP_HARDWARE_ACCELERATED;
 }
 
 bool platform_graphics_begin(void)
@@ -75,7 +77,7 @@ void platform_graphics_end(void)
 
 bool platform_graphics_present(platform_framebuffer_t *framebuffer)
 {
-    if (!host_is_headless()) {
+    if (!host_is_headless() && !renderer_vsync) {
         const Uint64 period_ns = UINT64_C(1000000000) / TABOS_HOST_REFRESH_RATE_HZ;
         graphics_present_deadline_ns += period_ns;
         const Uint64 now = SDL_GetTicksNS();
@@ -91,15 +93,63 @@ bool platform_graphics_present(platform_framebuffer_t *framebuffer)
 bool platform_graphics_fill(platform_framebuffer_t *framebuffer, int32_t x, int32_t y,
                             uint32_t width, uint32_t height, platform_pixel_t color)
 {
-    (void)framebuffer; (void)x; (void)y; (void)width; (void)height; (void)color;
-    return false;
+    if (framebuffer == NULL || framebuffer->pixels == NULL || width == 0U || height == 0U ||
+        framebuffer->width > INT_MAX || framebuffer->height > INT_MAX ||
+        framebuffer->stride_pixels > INT_MAX / sizeof(*framebuffer->pixels)) return false;
+    SDL_Surface *surface = SDL_CreateSurfaceFrom(
+        (int)framebuffer->width, (int)framebuffer->height, SDL_PIXELFORMAT_RGB565,
+        framebuffer->pixels, (int)(framebuffer->stride_pixels * sizeof(*framebuffer->pixels)));
+    if (surface == NULL) return false;
+    const SDL_Rect rectangle = {.x = x, .y = y, .w = (int)width, .h = (int)height};
+    const bool filled = SDL_FillSurfaceRect(surface, &rectangle, color);
+    SDL_DestroySurface(surface);
+    return filled;
 }
 
 bool platform_graphics_blit(platform_framebuffer_t *framebuffer,
                             const tabos_graphics_blit_options_t *options)
 {
-    (void)framebuffer; (void)options;
-    return false;
+    if (framebuffer == NULL || framebuffer->pixels == NULL || options == NULL ||
+        options->pixels == NULL || options->bitmap_width == 0U ||
+        options->bitmap_height == 0U || options->source.x < 0 || options->source.y < 0 ||
+        options->source.width == 0U || options->source.height == 0U ||
+        options->destination.width == 0U || options->destination.height == 0U ||
+        options->rotation != TABOS_GRAPHICS_ROTATE_0 || options->mirror_x ||
+        options->mirror_y || options->opacity != 255U || options->color_key_enabled ||
+        (uint64_t)(uint32_t)options->source.x + options->source.width > options->bitmap_width ||
+        (uint64_t)(uint32_t)options->source.y + options->source.height > options->bitmap_height ||
+        framebuffer->width > INT_MAX || framebuffer->height > INT_MAX ||
+        framebuffer->stride_pixels > INT_MAX / sizeof(*framebuffer->pixels) ||
+        options->bitmap_width > INT_MAX || options->bitmap_height > INT_MAX ||
+        options->bitmap_width > INT_MAX / sizeof(*options->pixels) ||
+        options->source.width > INT_MAX || options->source.height > INT_MAX ||
+        options->destination.width > INT_MAX || options->destination.height > INT_MAX) return false;
+
+    SDL_Surface *source = SDL_CreateSurfaceFrom(
+        (int)options->bitmap_width, (int)options->bitmap_height, SDL_PIXELFORMAT_RGB565,
+        (void *)options->pixels, (int)(options->bitmap_width * sizeof(*options->pixels)));
+    SDL_Surface *destination = SDL_CreateSurfaceFrom(
+        (int)framebuffer->width, (int)framebuffer->height, SDL_PIXELFORMAT_RGB565,
+        framebuffer->pixels, (int)(framebuffer->stride_pixels * sizeof(*framebuffer->pixels)));
+    if (source == NULL || destination == NULL) {
+        SDL_DestroySurface(source);
+        SDL_DestroySurface(destination);
+        return false;
+    }
+    const SDL_Rect source_rectangle = {
+        .x = options->source.x, .y = options->source.y,
+        .w = (int)options->source.width, .h = (int)options->source.height,
+    };
+    const SDL_Rect destination_rectangle = {
+        .x = options->destination.x, .y = options->destination.y,
+        .w = (int)options->destination.width, .h = (int)options->destination.height,
+    };
+    const bool blitted = SDL_BlitSurfaceScaled(source, &source_rectangle, destination,
+                                                &destination_rectangle,
+                                                SDL_SCALEMODE_NEAREST);
+    SDL_DestroySurface(source);
+    SDL_DestroySurface(destination);
+    return blitted;
 }
 
 bool platform_raster_fill_span(platform_pixel_t *destination, size_t count,
@@ -135,6 +185,11 @@ bool platform_display_init(platform_framebuffer_t *framebuffer)
             SDL_Log("SDL renderer creation failed: %s", SDL_GetError());
             platform_display_shutdown();
             return false;
+        }
+        renderer_vsync = SDL_SetRenderVSync(renderer, 1);
+        if (!renderer_vsync) {
+            SDL_Log("Renderer VSYNC unavailable; using %u Hz timer pacing: %s",
+                    TABOS_HOST_REFRESH_RATE_HZ, SDL_GetError());
         }
         texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGB565,
             SDL_TEXTUREACCESS_STREAMING, TABOS_DISPLAY_WIDTH, TABOS_DISPLAY_HEIGHT);
@@ -187,6 +242,7 @@ void platform_display_shutdown(void)
         SDL_DestroyRenderer(renderer);
         renderer = NULL;
     }
+    renderer_vsync = false;
     free(framebuffer_pixels);
     framebuffer_pixels = NULL;
 }

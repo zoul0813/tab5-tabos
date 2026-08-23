@@ -15,7 +15,7 @@ static void report_phase(const char *name, unsigned int frames, uint64_t elapsed
 
 int main(void)
 {
-    tabos_graphics_t graphics;
+    tabos_graphics_t graphics = {0};
     if (tabos_graphics_open(&graphics) != 0) return 1;
     const uint32_t capabilities = tabos_graphics_capabilities(&graphics);
     const unsigned int phase_frames = 60U;

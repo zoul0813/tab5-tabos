@@ -18,7 +18,10 @@
 #include <string.h>
 
 enum {
-    ELF_INSTRUCTIONS_PER_UPDATE = 10000,
+    /* The P4 backend runs ELF code natively and ignores this interpreter budget.
+       Keep host slices large enough for framebuffer workloads without starving its
+       event loop for an unbounded period. */
+    ELF_INSTRUCTIONS_PER_UPDATE = 2000000,
     ELF_DESCRIPTOR_CAPACITY = 16,
     ELF_HEAP_MAX = 256 * 1024,
     ELF_GRAPHICS_COMMAND_CAPACITY = 64,
@@ -79,6 +82,9 @@ struct loader_elf_application {
     uint8_t *heap;
     size_t heap_used;
     uint32_t tty_mode;
+    char input_pending[4];
+    uint8_t input_pending_offset;
+    uint8_t input_pending_length;
 };
 
 static bool elf_handle_tty_navigation(loader_elf_application_t *application,
@@ -261,12 +267,62 @@ static int elf_fd_close(int descriptor)
     return 0;
 }
 
+static int elf_copy_pending_input(loader_elf_application_t *application,
+                                  void *buffer, uint32_t count)
+{
+    const uint32_t available = (uint32_t)application->input_pending_length -
+        application->input_pending_offset;
+    const uint32_t copied = available < count ? available : count;
+    if (copied == 0U) return 0;
+    memcpy(buffer, application->input_pending + application->input_pending_offset, copied);
+    application->input_pending_offset = (uint8_t)(application->input_pending_offset + copied);
+    if (application->input_pending_offset == application->input_pending_length) {
+        application->input_pending_offset = 0U;
+        application->input_pending_length = 0U;
+    }
+    return (int)copied;
+}
+
+static bool elf_queue_arrow_input(loader_elf_application_t *application,
+                                  const tabos_input_event_t *event)
+{
+    if (event->type != TABOS_INPUT_KEY_DOWN) return false;
+    char final = '\0';
+    switch (event->key) {
+        case TABOS_KEY_UP: final = 'A'; break;
+        case TABOS_KEY_DOWN: final = 'B'; break;
+        case TABOS_KEY_RIGHT: final = 'C'; break;
+        case TABOS_KEY_LEFT: final = 'D'; break;
+        default: return false;
+    }
+    application->input_pending[0] = '\x1b';
+    application->input_pending[1] = '[';
+    application->input_pending[2] = final;
+    application->input_pending_offset = 0U;
+    application->input_pending_length = 3U;
+    return true;
+}
+
+static int elf_input_poll(tabos_input_event_t *event)
+{
+    loader_elf_application_t *application = platform_riscv32_current_user_data();
+    if (application == NULL || application->console == NULL || event == NULL) {
+        return -TABOS_EINVAL;
+    }
+    while (tabos_console_poll(application->console, event)) {
+        if (!elf_handle_tty_navigation(application, event)) return 1;
+    }
+    return 0;
+}
+
 static int elf_fd_read(int descriptor, void *buffer, uint32_t count)
 {
     loader_elf_application_t *application = platform_riscv32_current_user_data();
     if (application == NULL || (buffer == NULL && count != 0U)) return -TABOS_EINVAL;
     if (descriptor == 0) {
         if (count == 0U) return 0;
+        const int pending = elf_copy_pending_input(application, buffer, count);
+        if (pending != 0) return pending;
         tabos_input_event_t event;
         while (tabos_console_poll(application->console, &event)) {
             if (elf_handle_tty_navigation(application, &event)) continue;
@@ -279,6 +335,9 @@ static int elf_fd_read(int descriptor, void *buffer, uint32_t count)
             if (event.type == TABOS_INPUT_KEY_DOWN && event.key == TABOS_KEY_BACKSPACE) {
                 ((char *)buffer)[0] = '\b';
                 return 1;
+            }
+            if (elf_queue_arrow_input(application, &event)) {
+                return elf_copy_pending_input(application, buffer, count);
             }
         }
         return -TABOS_EAGAIN;
@@ -783,6 +842,7 @@ static bool elf_entry(tabos_app_context_t *context)
         .graphics_blit_ex = elf_graphics_blit_ex,
         .tty_get_mode = elf_tty_get_mode,
         .tty_set_mode = elf_tty_set_mode,
+        .input_poll = elf_input_poll,
     };
     application->execution = platform_riscv32_create(
         application->image.entry, application->image.memory, application->image.memory_size,

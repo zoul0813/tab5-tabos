@@ -397,6 +397,7 @@ but is not a substitute for this execution path.
 - [x] Add VSYNC-paced native double buffering for tear-free Tab5 graphics.
 - [x] Add deterministic pixel-level clipping and framebuffer regression tests.
 - [x] Add a portable graphics benchmark application.
+- [x] Add application-owned integer-scaled logical canvases with automatic presentation.
 - [ ] Validate PPA orientation, transforms, and fallback on physical Tab5 variants.
 - [ ] Record host and Tab5 benchmark results.
 - [ ] Decide framebuffer placement and buffering strategy from measurements.

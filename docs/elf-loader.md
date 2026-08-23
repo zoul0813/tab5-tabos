@@ -51,7 +51,7 @@ tables. Unstripped linker output remains at
 
 Applications normally implement `int main(int argc, char **argv)` and include standard C
 headers. SDK `crt0` owns the ELF entry, initializes newlib, calls `main`, flushes streams,
-and converts its return value into process exit. Internal ABI version 5 remains
+and converts its return value into process exit. Internal ABI version 6 remains
 behind SDK stubs. It provides console, file descriptor, filesystem, heap, child execution,
 yield, TTY-mode, and clean-exit services. Applications use the public SDK interfaces,
 not this internal call table.

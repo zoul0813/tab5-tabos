@@ -839,6 +839,18 @@ scrollback navigation cannot alter or present the graphics framebuffer. TTY navi
 keys must reach the graphics application regardless of its inherited TTY mode. Closing
 or faulting the application must redraw and present the retained terminal exactly once.
 
+Scaled-canvas tests must cover zero-initialized native opening, dimensions supplied before
+the single open call, rejection when only one dimension is supplied, fullscreen and 4:3
+dimensions, integer fit/centering,
+black default and runtime-changing letterbox colors, allocation and cleanup, direct pixel
+access, clipped primitives, transformed/color-keyed/alpha blits, one full-canvas upscale
+per present, and matching logical output on host and Tab5.
+
+Foreground application stdin represents arrow-key presses and normalized repeats as ANSI
+CSI `A`, `B`, `C`, and `D` sequences. Reads smaller than a sequence must preserve and
+return its remaining bytes on later calls. Graphics-mode arrow keys must reach the active
+application rather than trigger inherited terminal scrollback policy.
+
 ---
 
 ## 22. Input Tests

@@ -18,13 +18,28 @@ if (tabos_input_wait(&event)) {
 }
 ```
 
-Events are `TABOS_INPUT_KEY_DOWN`, `TABOS_INPUT_KEY_UP`, or `TABOS_INPUT_TEXT`. Key events carry a portable physical key, modifier mask, and repeat flag. Text events carry up to nine UTF-8 bytes plus a null terminator.
+Events are `TABOS_INPUT_KEY_DOWN`, `TABOS_INPUT_KEY_UP`, or `TABOS_INPUT_TEXT`.
+Key events carry a portable physical key, modifier mask, and repeat flag. The public
+header defines codes such as `TABOS_KEY_UP`, `TABOS_KEY_ENTER`, `TABOS_KEY_CTRL`,
+`TABOS_KEY_SHIFT`, `TABOS_KEY_ALT`, and `TABOS_KEY_GUI`. Test modifiers accompanying
+any event with `TABOS_MODIFIER_CONTROL`, `TABOS_MODIFIER_SHIFT`,
+`TABOS_MODIFIER_ALT`, and `TABOS_MODIFIER_GUI`. Text events carry up to nine CP437
+bytes plus a null terminator.
+
+Raw input and standard input consume the same foreground event stream. An application
+should choose one interface rather than mix them. Terminal applications may use
+`read(STDIN_FILENO, ...)`; arrow keys are encoded as ANSI CSI `A`, `B`, `C`, and `D`
+sequences. Games and other interactive applications should use this raw event API to
+observe key-up, key-down, held-key repeats, and modifiers directly.
 
 The queue holds 64 events and is protected for host-thread and FreeRTOS-task access. If producers outrun consumers, the oldest event is discarded so current input remains responsive.
 
 ## Host Backend
 
-SDL3 physical keyboard events become TabOS key-down/key-up events. SDL3 text input becomes TabOS UTF-8 text events. This preserves host keyboard layout and input-method behavior instead of rebuilding host text translation inside TabOS. SDL does not consistently provide text events for Enter, Tab, or operating-system key repeat, so host backend synthesizes those missing normalized text events and suppresses matching SDL duplicates.
+SDL3 physical keyboard events become TabOS key-down/key-up events. Representable SDL3
+text input becomes CP437 text events. SDL does not consistently provide text events for
+Enter, Tab, or operating-system key repeat, so the host backend synthesizes missing
+normalized text events and suppresses matching SDL duplicates.
 
 Cmd+Shift+F12 on macOS (Super+Shift+F12 on Linux) saves the current logical
 1280x720 framebuffer as a timestamped PNG under `screenshots/`. The host backend
@@ -70,6 +85,9 @@ idf.py -C targets/tab5 -B build/tab5-debug \
 
 ## Current Limits
 
-No application consumes keyboard events yet, so typing does not alter the boot display. The future shell application will consume this public API. The current driver uses low-overhead polling; GPIO50 interrupt support can replace polling later without changing application code.
+Only the foreground application can consume input. The shell uses terminal standard
+input, while graphics applications may use raw events. The current Tab5 driver uses
+low-overhead polling; GPIO50 interrupt support can replace polling later without changing
+application code.
 
 USB keyboards connected to Tab5 are not supported yet. A future ESP-IDF USB-host HID backend can submit events to the same portable queue and coexist with the I²C keyboard without changing applications.

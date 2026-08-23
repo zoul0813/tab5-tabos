@@ -53,6 +53,15 @@ Applications never receive display-driver ownership. They may clear, draw clippe
 primitives, blit RGB565 pixels, and explicitly present a frame. Closing or exiting
 the graphics application restores the retained terminal display.
 
+[DECIDED] Applications may select an SDK-owned lower-resolution RGB565 canvas by setting
+both dimensions in a zero-initialized graphics context before the single open call. Leaving
+both dimensions zero selects native mode. TabOS chooses the largest uniform integer scale
+that fits, centers the output, and uses a
+runtime-changeable black-by-default RGB565 color for letterbox/pillarbox borders. Existing
+graphics operations render into application memory and present clears borders then performs
+one nearest-neighbor blit through the normal kernel graphics API. This adds no ELF call-table
+entry, never exposes physical framebuffer memory, and never stretches pixels nonuniformly.
+
 [DECIDED] Fullscreen graphics ownership automatically suspends TTY shortcut interception
 and all terminal rendering/presentation. Terminal cell/history state may continue changing
 but cannot touch the graphics framebuffer. Raw input reaches the graphics application;
@@ -582,7 +591,13 @@ Keyboard latency and reliability have priority because TabOS is intended to supp
 
 Touch input is intentionally deferred until the future GUI/windowing and application-input work. Initial terminal and shell milestones require keyboard support, not touch. Current ST712x I2C access in the display backend is hardware-revision detection only and must not be mistaken for a general touch subsystem.
 
-Keyboard input now uses a public platform-neutral event queue with key-down, key-up, modifier, repeat, and UTF-8 text semantics. SDL3 and the Tab5 I2C keyboard are backend producers. Future USB HID support on Tab5 must feed the same queue and may coexist with the built-in I2C keyboard; applications must not depend on input-device-specific protocols.
+Keyboard input now uses a public platform-neutral event queue with key-down, key-up,
+modifier, repeat, and CP437 text semantics. Filesystem ELF applications access raw events
+through `<tabos/input.h>` over the private ABI, while terminal stdin retains ANSI arrow
+sequences. Both interfaces consume the same foreground queue and must not be mixed by one
+application. SDL3 and the Tab5 I2C keyboard are backend producers. Future USB HID support
+on Tab5 must feed the same queue and may coexist with the built-in I2C keyboard;
+applications must not depend on input-device-specific protocols.
 
 ### Tab5 boot-time USB storage mode
 

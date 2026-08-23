@@ -13,6 +13,15 @@ typedef uint16_t tabos_color_t;
 typedef struct {
     uint32_t width;
     uint32_t height;
+    uint32_t physical_width;
+    uint32_t physical_height;
+    tabos_color_t *pixels;
+    uint32_t scale;
+    uint32_t output_x;
+    uint32_t output_y;
+    uint32_t output_width;
+    uint32_t output_height;
+    tabos_color_t letterbox_color;
     bool open;
 } tabos_graphics_t;
 
@@ -51,9 +60,13 @@ enum {
     TABOS_GRAPHICS_CAP_BLEND = 1U << 2,
     TABOS_GRAPHICS_CAP_COLOR_KEY = 1U << 3,
     TABOS_GRAPHICS_CAP_HARDWARE_ACCELERATED = 1U << 4,
+    TABOS_GRAPHICS_CAP_SCALED_CANVAS = 1U << 5,
 };
 
 int tabos_graphics_open(tabos_graphics_t *graphics);
+tabos_color_t *tabos_graphics_pixels(tabos_graphics_t *graphics);
+int tabos_graphics_set_letterbox_color(tabos_graphics_t *graphics,
+                                       tabos_color_t color);
 int tabos_graphics_clear(tabos_graphics_t *graphics, tabos_color_t color);
 int tabos_graphics_fill_rect(tabos_graphics_t *graphics, int32_t x, int32_t y,
                              uint32_t width, uint32_t height, tabos_color_t color);

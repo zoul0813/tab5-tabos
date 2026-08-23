@@ -43,6 +43,14 @@ static tabos_key_t input_key(SDL_Scancode scancode)
         (scancode >= SDL_SCANCODE_INSERT && scancode <= SDL_SCANCODE_UP)) {
         return (tabos_key_t)scancode;
     }
+    if (scancode == SDL_SCANCODE_LCTRL || scancode == SDL_SCANCODE_RCTRL)
+        return TABOS_KEY_CTRL;
+    if (scancode == SDL_SCANCODE_LSHIFT || scancode == SDL_SCANCODE_RSHIFT)
+        return TABOS_KEY_SHIFT;
+    if (scancode == SDL_SCANCODE_LALT || scancode == SDL_SCANCODE_RALT)
+        return TABOS_KEY_ALT;
+    if (scancode == SDL_SCANCODE_LGUI || scancode == SDL_SCANCODE_RGUI)
+        return TABOS_KEY_GUI;
     return TABOS_KEY_UNKNOWN;
 }
 

@@ -2,9 +2,11 @@
 
 #include <tabos/graphics.h>
 
+#include <stddef.h>
+
 void tester_test_graphics(tester_context_t *context)
 {
-    tabos_graphics_t graphics;
+    tabos_graphics_t graphics = {0};
     const int opened = tabos_graphics_open(&graphics);
     tester_expect(context, opened == 0, "graphics context opens");
     if (opened != 0) return;
@@ -41,4 +43,44 @@ void tester_test_graphics(tester_context_t *context)
     tester_expect(context, tabos_graphics_present(&graphics) == 0, "frame presents");
     tester_expect(context, tabos_graphics_close(&graphics) == 0,
                   "graphics closes and restores terminal");
+
+    graphics = (tabos_graphics_t){.width = 320U, .height = 240U};
+    const int letterbox_opened = tabos_graphics_open(&graphics);
+    tester_expect(context, letterbox_opened == 0, "4:3 scaled graphics context opens");
+    if (letterbox_opened != 0) return;
+    tester_expect(context,
+                  graphics.scale == 3U && graphics.output_x == 160U &&
+                  graphics.output_y == 0U && graphics.output_width == 960U &&
+                  graphics.output_height == 720U && graphics.letterbox_color == 0U,
+                  "4:3 canvas is centered with black letterbox");
+    tester_expect(context,
+                  tabos_graphics_set_letterbox_color(
+                      &graphics, TABOS_RGB565(128, 0, 0)) == 0 &&
+                  tabos_graphics_present(&graphics) == 0,
+                  "letterbox color changes at runtime");
+    tester_expect(context, tabos_graphics_close(&graphics) == 0,
+                  "letterboxed graphics closes");
+
+    graphics = (tabos_graphics_t){.width = 320U, .height = 180U};
+    const int scaled_opened = tabos_graphics_open(&graphics);
+    tester_expect(context, scaled_opened == 0, "scaled graphics context opens");
+    if (scaled_opened != 0) return;
+    tester_expect(context,
+                  graphics.width == 320U && graphics.height == 180U &&
+                  graphics.physical_width == 1280U && graphics.physical_height == 720U &&
+                  graphics.scale == 4U && tabos_graphics_pixels(&graphics) != NULL,
+                  "scaled graphics dimensions and framebuffer available");
+    tester_expect(context,
+                  (tabos_graphics_capabilities(&graphics) &
+                   TABOS_GRAPHICS_CAP_SCALED_CANVAS) != 0U,
+                  "scaled canvas capability available");
+    tester_expect(context,
+                  tabos_graphics_clear(&graphics, TABOS_RGB565(0, 0, 0)) == 0 &&
+                  tabos_graphics_fill_rect(&graphics, 1, 1, 4U, 4U,
+                                           TABOS_RGB565(255, 0, 0)) == 0 &&
+                  tabos_graphics_blit_ex(&graphics, &transformed) == 0 &&
+                  tabos_graphics_present(&graphics) == 0,
+                  "scaled canvas draws and presents");
+    tester_expect(context, tabos_graphics_close(&graphics) == 0,
+                  "scaled graphics closes and restores terminal");
 }

@@ -2,10 +2,11 @@
 #define TABOS_INTERNAL_ELF_API_H
 
 #include <tabos/graphics.h>
+#include <tabos/input.h>
 
 #include <stdint.h>
 
-#define TABOS_ELF_API_VERSION 5U
+#define TABOS_ELF_API_VERSION 6U
 #define TABOS_ELF_EXEC_PENDING (-2147483647 - 1)
 
 enum {
@@ -75,6 +76,7 @@ typedef struct {
     int (*graphics_blit_ex)(const tabos_graphics_blit_options_t *options);
     int (*tty_get_mode)(int descriptor);
     int (*tty_set_mode)(int descriptor, uint32_t mode);
+    int (*input_poll)(tabos_input_event_t *event);
 } tabos_elf_api_t;
 
 typedef int (*tabos_elf_entry_fn)(const tabos_elf_api_t *api,

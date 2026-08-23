@@ -118,6 +118,11 @@ tabos_enable_warnings(tabos_core)
 tabos_enable_sanitizers(tabos_core)
 
 add_library(tabos_platform_host STATIC ${TABOS_HOST_PLATFORM_SOURCES})
+# RV32 interpretation is the host application's execution engine. Keep this hot
+# translation unit optimized even in debug builds; other host code retains the
+# selected build type and sanitizer instrumentation.
+set_property(SOURCE "${TABOS_ROOT}/platform/host/sdl/executable.c"
+    APPEND PROPERTY COMPILE_OPTIONS -O3)
 target_include_directories(tabos_platform_host
     PUBLIC "${TABOS_ROOT}/platform/include"
     PRIVATE

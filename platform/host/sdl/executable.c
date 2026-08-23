@@ -68,9 +68,10 @@ static const uint32_t HOST_RV32_GRAPHICS_CAPABILITIES = UINT32_C(0xffff0084);
 static const uint32_t HOST_RV32_GRAPHICS_BLIT_EX = UINT32_C(0xffff0088);
 static const uint32_t HOST_RV32_TTY_GET_MODE = UINT32_C(0xffff008c);
 static const uint32_t HOST_RV32_TTY_SET_MODE = UINT32_C(0xffff0090);
+static const uint32_t HOST_RV32_INPUT_POLL = UINT32_C(0xffff0094);
 
 enum {
-    HOST_RV32_API_SIZE = 148,
+    HOST_RV32_API_SIZE = 152,
 };
 
 struct platform_riscv32_context {
@@ -228,6 +229,7 @@ platform_riscv32_context_t *platform_riscv32_create(
     write_u32(context->memory, api_address + 136U, HOST_RV32_GRAPHICS_BLIT_EX);
     write_u32(context->memory, api_address + 140U, HOST_RV32_TTY_GET_MODE);
     write_u32(context->memory, api_address + 144U, HOST_RV32_TTY_SET_MODE);
+    write_u32(context->memory, api_address + 148U, HOST_RV32_INPUT_POLL);
 
     uint32_t argument_data_address = api_address + HOST_RV32_API_SIZE;
     uint32_t argument_data_end = argument_data_address;
@@ -523,6 +525,18 @@ platform_riscv32_result_t platform_riscv32_step(
             context->state.pc = context->state.regs[1];
             continue;
         }
+        if (context->state.pc == HOST_RV32_INPUT_POLL) {
+            tabos_input_event_t *event = guest_buffer(
+                context->memory, context->state.regs[10], sizeof(*event));
+            if (event == NULL || context->api.input_poll == NULL) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data = context->user_data;
+            context->state.regs[10] = (uint32_t)context->api.input_poll(event);
+            current_user_data = NULL;
+            context->state.pc = context->state.regs[1];
+            continue;
+        }
         if (context->state.pc == HOST_RV32_HEAP_SBRK) {
             const int32_t increment = (int32_t)context->state.regs[10];
             const uint32_t previous = context->heap_break;
@@ -566,6 +580,7 @@ platform_riscv32_result_t platform_riscv32_step(
         if (context->state.pc == HOST_RV32_GRAPHICS_CLEAR ||
             context->state.pc == HOST_RV32_GRAPHICS_PRESENT ||
             context->state.pc == HOST_RV32_GRAPHICS_CLOSE) {
+            const bool presented = context->state.pc == HOST_RV32_GRAPHICS_PRESENT;
             int result;
             current_user_data = context->user_data;
             if (context->state.pc == HOST_RV32_GRAPHICS_CLEAR && context->api.graphics_clear != NULL)
@@ -578,6 +593,7 @@ platform_riscv32_result_t platform_riscv32_step(
             current_user_data = NULL;
             context->state.regs[10] = (uint32_t)result;
             context->state.pc = context->state.regs[1];
+            if (presented) return PLATFORM_RISCV32_YIELDED;
             continue;
         }
         if (context->state.pc == HOST_RV32_GRAPHICS_FILL_RECT) {

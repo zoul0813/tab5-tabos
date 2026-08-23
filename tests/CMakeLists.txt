@@ -25,6 +25,24 @@ tabos_enable_warnings(tabos_raster)
 tabos_enable_sanitizers(tabos_raster)
 add_test(NAME unit.raster COMMAND tabos_raster)
 
+add_executable(tabos_sdk_graphics
+    unit/sdk_graphics.c
+    "${TABOS_ROOT}/sdk/lib/graphics.c"
+)
+target_include_directories(tabos_sdk_graphics PRIVATE "${TABOS_ROOT}/sdk/include")
+tabos_enable_warnings(tabos_sdk_graphics)
+tabos_enable_sanitizers(tabos_sdk_graphics)
+add_test(NAME unit.sdk_graphics COMMAND tabos_sdk_graphics)
+
+add_executable(tabos_sdk_input
+    unit/sdk_input.c
+    "${TABOS_ROOT}/sdk/lib/input.c"
+)
+target_include_directories(tabos_sdk_input PRIVATE "${TABOS_ROOT}/sdk/include")
+tabos_enable_warnings(tabos_sdk_input)
+tabos_enable_sanitizers(tabos_sdk_input)
+add_test(NAME unit.sdk_input COMMAND tabos_sdk_input)
+
 add_executable(tabos_display_diagnostic unit/display_diagnostic.c ${TABOS_TEST_PLATFORM_FAKES})
 target_include_directories(tabos_display_diagnostic PRIVATE
     "${TABOS_ROOT}/graphics/include"

@@ -462,6 +462,58 @@ static bool native_blit_cpu(const tabos_graphics_blit_options_t *options)
     return true;
 }
 
+static bool native_blit_ppa(const tabos_graphics_blit_options_t *options)
+{
+    if (!ppa_ready || options == NULL || options->pixels == NULL ||
+        options->source.x < 0 || options->source.y < 0 ||
+        options->source.width == 0U || options->source.height == 0U ||
+        options->destination.width == 0U || options->destination.height == 0U ||
+        options->destination.x < 0 || options->destination.y < 0 ||
+        (uint64_t)(uint32_t)options->source.x + options->source.width >
+            options->bitmap_width ||
+        (uint64_t)(uint32_t)options->source.y + options->source.height >
+            options->bitmap_height ||
+        (uint64_t)(uint32_t)options->destination.x + options->destination.width >
+            TABOS_DISPLAY_WIDTH ||
+        (uint64_t)(uint32_t)options->destination.y + options->destination.height >
+            TABOS_DISPLAY_HEIGHT ||
+        options->rotation != TABOS_GRAPHICS_ROTATE_0 || options->mirror_x ||
+        options->mirror_y || options->opacity != 255U || options->color_key_enabled ||
+        (uint64_t)options->destination.width * options->destination.height <
+            TAB5_PPA_BLIT_MIN_PIXELS) return false;
+    if (!prepare_direct_back_buffer(false)) return false;
+
+    const uint32_t native_x = (uint32_t)options->destination.y;
+    const uint32_t native_y = TABOS_DISPLAY_WIDTH -
+        ((uint32_t)options->destination.x + options->destination.width);
+    while (xSemaphoreTake(ppa_done, 0) == pdTRUE) {}
+    const ppa_srm_oper_config_t config = {
+        .in = {
+            .buffer = options->pixels, .pic_w = options->bitmap_width,
+            .pic_h = options->bitmap_height, .block_w = options->source.width,
+            .block_h = options->source.height,
+            .block_offset_x = (uint32_t)options->source.x,
+            .block_offset_y = (uint32_t)options->source.y,
+            .srm_cm = PPA_SRM_COLOR_MODE_RGB565,
+        },
+        .out = {
+            .buffer = native_pixels,
+            .buffer_size = TABOS_DISPLAY_WIDTH * TABOS_DISPLAY_HEIGHT *
+                sizeof(*native_pixels),
+            .pic_w = TABOS_DISPLAY_HEIGHT, .pic_h = TABOS_DISPLAY_WIDTH,
+            .block_offset_x = native_x, .block_offset_y = native_y,
+            .srm_cm = PPA_SRM_COLOR_MODE_RGB565,
+        },
+        .rotation_angle = PPA_SRM_ROTATION_ANGLE_90,
+        .scale_x = (float)options->destination.width / options->source.width,
+        .scale_y = (float)options->destination.height / options->source.height,
+        .mode = PPA_TRANS_MODE_NON_BLOCKING, .user_data = ppa_done,
+    };
+    if (!wait_for_ppa(ppa_do_scale_rotate_mirror(ppa_srm_client, &config))) return false;
+    direct_frame_dirty = true;
+    return true;
+}
+
 bool platform_graphics_fill(platform_framebuffer_t *framebuffer, int32_t x, int32_t y,
                             uint32_t width, uint32_t height, platform_pixel_t color)
 {
@@ -542,7 +594,9 @@ bool platform_graphics_fill(platform_framebuffer_t *framebuffer, int32_t x, int3
 bool platform_graphics_blit(platform_framebuffer_t *framebuffer,
                             const tabos_graphics_blit_options_t *options)
 {
-    if (direct_graphics_active) return native_blit_cpu(options);
+    if (direct_graphics_active) {
+        return native_blit_ppa(options) || native_blit_cpu(options);
+    }
     if (!ppa_ready || framebuffer == NULL || options == NULL || options->pixels == NULL ||
         options->source.x < 0 ||
         options->source.y < 0 || options->destination.x < 0 || options->destination.y < 0 ||

@@ -16,6 +16,11 @@ static tabos_key_t held_key;
 static uint8_t held_modifiers;
 static uint64_t next_repeat_ms;
 
+static bool modifier_key(tabos_key_t key)
+{
+    return key >= TABOS_KEY_CTRL && key <= TABOS_KEY_GUI;
+}
+
 static void lock_queue(void)
 {
     while (atomic_flag_test_and_set_explicit(&queue_lock, memory_order_acquire)) {
@@ -50,7 +55,7 @@ bool input_submit(const tabos_input_event_t *event)
     }
     /* Platform repeat timing differs. TabOS generates one portable repeat stream. */
     if (event->repeat) return true;
-    if (event->type == TABOS_INPUT_KEY_DOWN) {
+    if (event->type == TABOS_INPUT_KEY_DOWN && !modifier_key(event->key)) {
         held_key = event->key;
         held_modifiers = event->modifiers;
         next_repeat_ms = platform_time_ms() + TABOS_KEY_REPEAT_DELAY_MS;

@@ -9,8 +9,10 @@ Portable code renders into a 1280×720 RGB565 framebuffer. Each pixel is a 16-bi
 Portable graphics code supplies an embedded 8×12 CP437 bitmap font, scaled text rendering, and an RGB565 terminal framebuffer with cursor movement, line wrapping, color selection, clearing, and scrolling.
 
 Tab5 terminal raster spans may use private ESP32-P4 PIE SIMD fill/copy kernels. PPA
-continues to handle display rotation and supported bulk graphics operations. Hosts use
-matching scalar rendering. Applications and terminal callers do not select accelerators.
+continues to handle display rotation and supported bulk graphics operations, including
+logical-canvas scaling directly into native scanout orientation. Hosts use SDL surface
+operations for matching fills and opaque nearest-neighbor scaling, with scalar fallback.
+Applications and terminal callers do not select accelerators.
 
 Font rendering and glyph data are separate. `graphics/font.c` contains drawing and byte-to-glyph indexing. `graphics/blueterm.f12` is the default raw 3072-byte font asset: 256 glyphs in CP437 byte order, with twelve one-byte rows per 8-pixel glyph. Build-generated assembly uses `.incbin` to place the raw file in firmware or host executable; no generated C bitmap table exists.
 
@@ -20,10 +22,10 @@ Default renderer can address all 256 CP437 glyphs. Console text still assigns co
 
 All targets use identical terminal scaling. Change `TABOS_TERMINAL_SCALE` in `config/Display.cmake` and rebuild to adjust compiled default. Default is 2. The 8×12 glyph becomes 16×24 pixels inside a 16×30-pixel terminal cell, producing exactly 80 columns and 24 rows on the 1280×720 display. Glyphs have no added horizontal spacing; six vertical pixels remain between rows. `TABOS_TERMINAL_SCROLLBACK_LINES` controls additional retained history rows and defaults to 256. Keeping settings shared makes macOS/Linux output faithful size, wrapping, and history preview of Tab5 output.
 
-SDL host graphics applications are paced to `TABOS_HOST_REFRESH_RATE_HZ`, default 58 Hz,
-to approximate ST7121 Tab5 presentation timing. Terminal updates remain event-driven,
-and headless tests are not artificially delayed. Configure the value with
-`./tools/tabos config`.
+SDL host graphics applications use renderer VSYNC when available. Timer pacing uses
+`TABOS_HOST_REFRESH_RATE_HZ`, default 58 Hz, only as fallback. Terminal updates remain
+event-driven, and headless tests are not artificially delayed. Configure the fallback
+value with `./tools/tabos config`.
 
 Software can change scale from 1 through 8 at runtime using `tabos_terminal_set_scale()` from `<tabos/terminal.h>` and inspect it with `tabos_terminal_get_scale()`. A value set before runtime startup becomes initial boot scale. A value set after startup rebuilds geometry, reflows retained hard and soft-wrapped cell history, preserves colors and cursor, and redraws current viewport. Runtime value is retained for life of running system but is not yet persisted across restarts; persistent preference storage will depend on future filesystem/configuration service.
 

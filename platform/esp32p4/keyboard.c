@@ -63,6 +63,26 @@ static tabos_key_t normalized_key(uint8_t usage)
 static void submit_report(uint8_t hid_modifiers, uint8_t usage)
 {
     const uint8_t modifiers = normalized_modifiers(hid_modifiers);
+    const uint8_t changed_modifiers = previous_modifiers ^ modifiers;
+    static const struct {
+        uint8_t flag;
+        tabos_key_t key;
+    } modifier_keys[] = {
+        {TABOS_MODIFIER_CONTROL, TABOS_KEY_CTRL},
+        {TABOS_MODIFIER_SHIFT, TABOS_KEY_SHIFT},
+        {TABOS_MODIFIER_ALT, TABOS_KEY_ALT},
+        {TABOS_MODIFIER_GUI, TABOS_KEY_GUI},
+    };
+    for (size_t index = 0U; index < sizeof(modifier_keys) / sizeof(modifier_keys[0]); ++index) {
+        if ((changed_modifiers & modifier_keys[index].flag) == 0U) continue;
+        const tabos_input_event_t modifier_event = {
+            .type = (modifiers & modifier_keys[index].flag) != 0U
+                ? TABOS_INPUT_KEY_DOWN : TABOS_INPUT_KEY_UP,
+            .key = modifier_keys[index].key,
+            .modifiers = modifiers,
+        };
+        (void)input_submit(&modifier_event);
+    }
     if (previous_usage != 0U && previous_usage != usage) {
         const tabos_input_event_t release = {
             .type = TABOS_INPUT_KEY_UP,

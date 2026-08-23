@@ -29,6 +29,7 @@ TABOS_LDFLAGS += -Wl,--build-id=none -Wl,--gc-sections -Wl,-N -Wl,--emit-relocs
 TABOS_RUNTIME_SOURCES := $(SDK_ROOT)/crt/crt0.c $(SDK_ROOT)/libc/syscalls.c \
                          $(SDK_ROOT)/lib/process.c \
                          $(SDK_ROOT)/lib/graphics.c \
+                         $(SDK_ROOT)/lib/input.c \
                          $(SDK_ROOT)/lib/runtime.c \
                          $(SDK_ROOT)/lib/posix_filesystem.c
 

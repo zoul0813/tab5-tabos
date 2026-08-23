@@ -31,9 +31,14 @@ system information. TabOS does not claim complete POSIX compatibility.
 
 The initial public graphics contract provides fullscreen RGB565 drawing through
 OS-owned clear, clipped primitive, bitmap blit, and present operations. Applications
-do not own display hardware. Fullscreen ownership pauses the terminal cursor; returning
-from graphics restores the terminal and cursor. TabOS normalizes held-key repeat timing
-above platform keyboard backends so host and Tab5 applications receive repeat events.
+do not own display hardware. Applications may request an SDK-owned logical canvas by
+initializing both context dimensions before the single graphics-open call; zero dimensions
+select native mode. TabOS chooses the largest fitting uniform integer scale and centers it over a
+runtime-changeable black-by-default letterbox color. Normal drawing targets the smaller
+RGB565 buffer and present performs one accelerated nearest-neighbor upscale. Fullscreen
+ownership suspends terminal rendering, presentation, cursor, and TTY shortcuts; returning
+from graphics redraws the retained terminal. TabOS normalizes held-key repeat timing above
+platform keyboard backends so host and Tab5 applications receive repeat events.
 
 ## 2. Hardware Baseline
 
@@ -516,7 +521,18 @@ The current ST712x touch-controller access exists only to identify the attached 
 
 ### Current implementation: keyboard input
 
-The public `<tabos/input.h>` API exposes physical key-down/key-up events, modifiers, repeat state, UTF-8 text events, and blocking/nonblocking reads through a thread-safe 64-event queue. SDL3 supplies host physical/text events. Tab5 uses ExtPort1 I2C controller 0 on GPIO0/GPIO1, probes address `0x6D`, reports firmware register `0xFE`, and reads HID-mode reports. It polls at 10 ms; GPIO50 interrupt support is a later optimization that must not change public semantics. Tab5 text translation is currently US ANSI. Missing keyboard hardware is a boot warning, not a fatal initialization error. Optional CMake flag `TABOS_ENABLE_KEYBOARD_DIAGNOSTICS` logs normalized events without consuming them and defaults off. USB HID keyboards on Tab5 are a future backend; they should coexist with the I2C keyboard through the same queue. Touch remains excluded.
+The public `<tabos/input.h>` API exposes physical key-down/key-up events, modifiers,
+repeat state, CP437 text events, and polling/waiting through a thread-safe 64-event queue.
+Loaded ELF applications receive this raw API through ABI v6. Terminal stdin preserves
+ANSI arrow sequences; raw and terminal reads share one foreground queue and an application
+must choose one. SDL3 supplies host physical/text events. Tab5 uses ExtPort1 I2C controller
+0 on GPIO0/GPIO1, probes address `0x6D`, reports firmware register `0xFE`, and reads HID-mode
+reports. It polls at 10 ms; GPIO50 interrupt support is a later optimization that must not
+change public semantics. Tab5 text translation is currently US ANSI. Missing keyboard
+hardware is a boot warning, not a fatal initialization error. Optional CMake flag
+`TABOS_ENABLE_KEYBOARD_DIAGNOSTICS` logs normalized events without consuming them and
+defaults off. USB HID keyboards on Tab5 are a future backend; they should coexist with the
+I2C keyboard through the same queue. Touch remains excluded.
 
 ## 11. Networking
 

@@ -87,6 +87,10 @@ typedef enum {
     TABOS_KEY_LEFT,
     TABOS_KEY_DOWN,
     TABOS_KEY_UP,
+    TABOS_KEY_CTRL = 0x100,
+    TABOS_KEY_SHIFT,
+    TABOS_KEY_ALT,
+    TABOS_KEY_GUI,
 } tabos_key_t;
 
 enum {
