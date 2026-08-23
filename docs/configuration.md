@@ -22,6 +22,7 @@ Current settings cover:
 - terminal scrollback capacity
 - cursor blink interval
 - held-key repeat delay and interval
+- Tab5 PIE SIMD acceleration and optional serial boot diagnostics
 - controlled host drive-container directory
 - filesystem-backed ELF startup path, defaulting to `T:/bin/hello`
 - filesystem-backed PID 0 shell path, defaulting to `T:/bin/shell`

@@ -33,6 +33,24 @@ bool platform_graphics_blit(platform_framebuffer_t *framebuffer,
     return false;
 }
 
+bool platform_raster_fill_span(platform_pixel_t *destination, size_t count,
+                               platform_pixel_t color)
+{
+    (void)destination; (void)count; (void)color;
+    return false;
+}
+
+bool platform_raster_copy_span(platform_pixel_t *destination,
+                               const platform_pixel_t *source, size_t count)
+{
+    (void)destination; (void)source; (void)count;
+    return false;
+}
+
+void platform_raster_diagnostics(void)
+{
+}
+
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>

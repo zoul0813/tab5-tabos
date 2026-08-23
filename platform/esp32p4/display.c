@@ -6,6 +6,7 @@
 #include <bsp/esp-bsp.h>
 #include <driver/i2c_master.h>
 #include <driver/ppa.h>
+#include "include/pie.h"
 #include <esp_cache.h>
 #include <esp_heap_caps.h>
 #include <esp_lcd_mipi_dsi.h>
@@ -352,9 +353,9 @@ static void native_fill_cpu(int32_t left, int32_t top, int32_t right, int32_t bo
     for (int32_t row = native_y; row < native_bottom; ++row) {
         platform_pixel_t *destination = native_pixels +
             (size_t)row * TABOS_DISPLAY_HEIGHT + (size_t)native_x;
-        for (int32_t column = native_x; column < native_right; ++column) {
-            *destination++ = color;
-        }
+        const size_t count = (size_t)(native_right - native_x);
+        if (!esp32p4_pie_fill16(destination, count, &color))
+            for (size_t column = 0U; column < count; ++column) destination[column] = color;
     }
     const size_t first = (size_t)native_y * TABOS_DISPLAY_HEIGHT + (size_t)native_x;
     const size_t last = (size_t)(native_bottom - 1) * TABOS_DISPLAY_HEIGHT +
@@ -394,7 +395,9 @@ static bool prepare_direct_back_buffer(bool replaces_entire_frame)
     if (replaces_entire_frame) return true;
     const size_t bytes = (size_t)TABOS_DISPLAY_WIDTH * TABOS_DISPLAY_HEIGHT *
         sizeof(*native_pixels);
-    memcpy(native_pixels, native_front_pixels, bytes);
+    const size_t pixels = bytes / sizeof(*native_pixels);
+    if (!esp32p4_pie_copy16(native_pixels, native_front_pixels, pixels))
+        memcpy(native_pixels, native_front_pixels, bytes);
     return esp_cache_msync(native_pixels, bytes, ESP_CACHE_MSYNC_FLAG_DIR_C2M) == ESP_OK;
 }
 
@@ -723,6 +726,7 @@ bool platform_display_init(platform_framebuffer_t *framebuffer)
         .stride_pixels = TABOS_DISPLAY_WIDTH,
     };
     ESP_LOGI(TAG, "Tab5 display initialized at %dx%d RGB565", TABOS_DISPLAY_WIDTH, TABOS_DISPLAY_HEIGHT);
+    platform_raster_diagnostics();
     return true;
 }
 

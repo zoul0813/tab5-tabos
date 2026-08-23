@@ -1,5 +1,6 @@
 #include <tabos/internal/font.h>
 #include <tabos/internal/font_data.h>
+#include <tabos/internal/raster.h>
 
 #include <stdint.h>
 
@@ -14,13 +15,6 @@ static const uint8_t *glyph_rows(char character)
     return font_data + (glyph * FONT_GLYPH_HEIGHT * FONT_BYTES_PER_ROW);
 }
 
-static void put_pixel(platform_framebuffer_t *framebuffer, int x, int y, platform_pixel_t color)
-{
-    if (x >= 0 && y >= 0 && (size_t)x < framebuffer->width && (size_t)y < framebuffer->height) {
-        framebuffer->pixels[((size_t)y * framebuffer->stride_pixels) + (size_t)x] = color;
-    }
-}
-
 bool font_draw_char(platform_framebuffer_t *framebuffer, int x, int y, char character,
                         unsigned int scale, platform_pixel_t foreground, platform_pixel_t background)
 {
@@ -29,15 +23,40 @@ bool font_draw_char(platform_framebuffer_t *framebuffer, int x, int y, char char
     }
     const uint8_t *rows = glyph_rows(character);
     for (unsigned int row = 0; row < FONT_GLYPH_HEIGHT; ++row) {
-        for (unsigned int column = 0; column < FONT_GLYPH_WIDTH; ++column) {
-            const size_t byte = row * FONT_BYTES_PER_ROW + (column / 8U);
-            const uint8_t mask = (uint8_t)(0x80U >> (column % 8U));
-            const platform_pixel_t color = (rows[byte] & mask) != 0U ? foreground : background;
-            for (unsigned int sy = 0; sy < scale; ++sy) {
-                for (unsigned int sx = 0; sx < scale; ++sx) {
-                    put_pixel(framebuffer, x + (int)(column * scale + sx),
-                              y + (int)(row * scale + sy), color);
+        for (unsigned int sy = 0; sy < scale; ++sy) {
+            const int output_y = y + (int)(row * scale + sy);
+            if (output_y < 0 || (size_t)output_y >= framebuffer->height) continue;
+            unsigned int column = 0U;
+            while (column < FONT_GLYPH_WIDTH) {
+                const size_t byte = row * FONT_BYTES_PER_ROW + (column / 8U);
+                const uint8_t mask = (uint8_t)(0x80U >> (column % 8U));
+                const platform_pixel_t color =
+                    (rows[byte] & mask) != 0U ? foreground : background;
+                unsigned int run = 1U;
+                while (column + run < FONT_GLYPH_WIDTH) {
+                    const unsigned int next = column + run;
+                    const size_t next_byte = row * FONT_BYTES_PER_ROW + (next / 8U);
+                    const uint8_t next_mask = (uint8_t)(0x80U >> (next % 8U));
+                    const platform_pixel_t next_color =
+                        (rows[next_byte] & next_mask) != 0U ? foreground : background;
+                    if (next_color != color) break;
+                    ++run;
                 }
+                int output_x = x + (int)(column * scale);
+                size_t count = (size_t)run * scale;
+                if (output_x < 0) {
+                    const size_t clipped = (size_t)(-output_x);
+                    if (clipped >= count) { column += run; continue; }
+                    output_x = 0; count -= clipped;
+                }
+                if ((size_t)output_x < framebuffer->width) {
+                    const size_t available = framebuffer->width - (size_t)output_x;
+                    if (count > available) count = available;
+                    raster_fill_span(framebuffer->pixels +
+                        (size_t)output_y * framebuffer->stride_pixels + (size_t)output_x,
+                        count, color);
+                }
+                column += run;
             }
         }
     }

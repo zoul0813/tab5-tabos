@@ -645,7 +645,14 @@ framebuffer/display service
 
 Fullscreen applications may eventually receive optimized paths, but must not own the display hardware in a way that breaks the OS.
 
-### 11.2 Future GUI
+### 11.2 Hardware Acceleration
+
+[DECIDED] Public graphics remain RGB565 and accelerator-independent. Tab5 platform
+selects PPA for supported bulk operations, PIE SIMD for measured-beneficial CPU raster
+spans, and scalar C otherwise. PIE instructions and ESP-IDF handles remain private.
+Host scalar output defines portability behavior and must remain pixel-identical.
+
+### 11.3 Future GUI
 
 A window manager or desktop environment should be implemented as a client of normal TabOS graphics and input services.
 

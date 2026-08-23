@@ -8,6 +8,10 @@ Portable code renders into a 1280×720 RGB565 framebuffer. Each pixel is a 16-bi
 
 Portable graphics code supplies an embedded 8×12 CP437 bitmap font, scaled text rendering, and an RGB565 terminal framebuffer with cursor movement, line wrapping, color selection, clearing, and scrolling.
 
+Tab5 terminal raster spans may use private ESP32-P4 PIE SIMD fill/copy kernels. PPA
+continues to handle display rotation and supported bulk graphics operations. Hosts use
+matching scalar rendering. Applications and terminal callers do not select accelerators.
+
 Font rendering and glyph data are separate. `graphics/font.c` contains drawing and byte-to-glyph indexing. `graphics/blueterm.f12` is the default raw 3072-byte font asset: 256 glyphs in CP437 byte order, with twelve one-byte rows per 8-pixel glyph. Build-generated assembly uses `.incbin` to place the raw file in firmware or host executable; no generated C bitmap table exists.
 
 Compile-time font settings live in `config/Font.cmake`. They select asset path, glyph width, glyph height, available glyph count, and terminal cell dimensions. Fonts may contain 1 through 256 fixed-width glyphs. Requested byte values beyond configured glyph count render glyph zero. Rows are packed most-significant bit first and use `ceil(width / 8)` bytes, so widths above eight pixels are supported. Unused low bits in final row byte should be zero. Build configuration rejects missing assets, invalid dimensions, counts above 256, cells smaller than glyphs, and files whose exact size does not match `glyph_count × glyph_height × ceil(glyph_width / 8)`.
@@ -35,7 +39,7 @@ The host window remains resizable and remembers its last valid screen position. 
 
 ## Tab5 Presentation
 
-The Tab5 target uses the official `espressif/m5stack_tab5_noglib` BSP component, pinned by the ESP-IDF dependency lock. Display buffers are allocated in external PSRAM.
+The Tab5 target uses the official `espressif/m5stack_tab5_noglib` BSP component, pinned by the ESP-IDF dependency lock. Display buffers are allocated in external PSRAM. PIE SIMD acceleration is enabled by default and can be disabled through `./tools/tabos config`; optional boot diagnostics compare scalar and PIE internal-RAM and PSRAM throughput over serial.
 
 At boot, the platform detects and reports the installed display controller over serial in both debug and release builds. Current detection supports ILI9881C, ST7123, and ST7121 Tab5 variants. The detected controller name is also available through the platform interface for a future on-screen boot driver list.
 

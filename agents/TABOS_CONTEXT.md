@@ -462,6 +462,11 @@ MIPI-DSI display
 
 A future window system should use the public graphics/input services rather than bypassing them.
 
+Current Tab5 acceleration is private and layered: PPA handles supported bulk graphics
+and presentation transforms, PIE SIMD handles measured-beneficial CPU RGB565 spans,
+and scalar C provides exact fallback and host behavior. Applications never receive
+PPA/PIE handles or accelerator-specific APIs.
+
 ### Open
 
 Still to determine:

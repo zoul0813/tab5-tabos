@@ -389,6 +389,8 @@ but is not a substitute for this execution path.
 - [x] Add a portable interactive graphics demo and tester coverage.
 - [x] Define portable queued transform, blend, color-key, and capability APIs.
 - [x] Add ESP32-P4 PPA acceleration with transparent software fallback.
+- [x] Add private ESP32-P4 PIE span acceleration with transparent scalar fallback.
+- [x] Record physical PIE internal-RAM/PSRAM benchmarks and tune thresholds.
 - [x] Add direct native-orientation scanout for fullscreen Tab5 graphics applications.
 - [x] Add VSYNC-paced native double buffering for tear-free Tab5 graphics.
 - [x] Add deterministic pixel-level clipping and framebuffer regression tests.

@@ -28,9 +28,10 @@ boundary. A full command queue drains old work until room exists. Closing or ter
 an application also fences pending work and restores the terminal.
 
 The host uses the portable software renderer. Tab5 uses ESP32-P4 PPA for supported
-fills, opaque transforms, and framebuffer rotation. Unsupported operations and hardware
-failures transparently use identical software rendering. PPA and framebuffer pointers
-are never exposed to applications.
+bulk fills, transforms, blending, and framebuffer rotation. CPU-rendered RGB565 spans
+and terminal glyph spans may transparently use ESP32-P4 PIE SIMD. Unsupported operations,
+small spans, unsuitable alignment, and disabled or failed acceleration use pixel-identical
+scalar rendering. PPA, PIE, and framebuffer pointers are never exposed to applications.
 
 Tab5 may choose CPU rendering for operations unsupported by PPA. Applications see the
 same queued API and output regardless of which backend executes an individual command.

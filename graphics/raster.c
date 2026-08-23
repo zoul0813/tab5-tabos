@@ -1,6 +1,27 @@
 #include <tabos/internal/raster.h>
 
 #include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+
+void raster_fill_span(platform_pixel_t *destination, size_t count, platform_pixel_t color)
+{
+    if (destination == NULL || count == 0U) return;
+    if (platform_raster_fill_span(destination, count, color)) return;
+    for (size_t index = 0U; index < count; ++index) destination[index] = color;
+}
+
+void raster_copy_span(platform_pixel_t *destination, const platform_pixel_t *source,
+                      size_t count)
+{
+    if (destination == NULL || source == NULL || count == 0U || destination == source) return;
+    const uintptr_t destination_begin = (uintptr_t)destination;
+    const uintptr_t source_begin = (uintptr_t)source;
+    const size_t bytes = count * sizeof(*destination);
+    if ((destination_begin + bytes <= source_begin || source_begin + bytes <= destination_begin) &&
+        platform_raster_copy_span(destination, source, count)) return;
+    memmove(destination, source, bytes);
+}
 
 void raster_fill(platform_framebuffer_t *framebuffer, int32_t x, int32_t y,
                  uint32_t width, uint32_t height, tabos_color_t color)
@@ -14,9 +35,10 @@ void raster_fill(platform_framebuffer_t *framebuffer, int32_t x, int32_t y,
         ? (int32_t)framebuffer->width : (int32_t)right;
     const int32_t clipped_bottom = bottom > (int64_t)framebuffer->height
         ? (int32_t)framebuffer->height : (int32_t)bottom;
-    for (int32_t row = top; row < clipped_bottom; ++row)
-        for (int32_t column = left; column < clipped_right; ++column)
-            framebuffer->pixels[(size_t)row * framebuffer->stride_pixels + (size_t)column] = color;
+    for (int32_t row = top; row < clipped_bottom; ++row) {
+        raster_fill_span(framebuffer->pixels + (size_t)row * framebuffer->stride_pixels +
+                         (size_t)left, (size_t)(clipped_right - left), color);
+    }
 }
 
 static bool keyed(tabos_color_t color, tabos_color_t low, tabos_color_t high)
@@ -52,6 +74,44 @@ bool raster_blit(platform_framebuffer_t *framebuffer,
         (uint64_t)(uint32_t)options->source.x + options->source.width > options->bitmap_width ||
         (uint64_t)(uint32_t)options->source.y + options->source.height > options->bitmap_height ||
         options->rotation > TABOS_GRAPHICS_ROTATE_270) return false;
+
+    if (options->rotation == TABOS_GRAPHICS_ROTATE_0 && !options->mirror_x &&
+        !options->mirror_y && options->source.width == options->destination.width &&
+        options->source.height == options->destination.height && options->opacity == 255U) {
+        for (uint32_t row = 0U; row < options->destination.height; ++row) {
+            const int64_t output_y = (int64_t)options->destination.y + row;
+            if (output_y < 0 || output_y >= (int64_t)framebuffer->height) continue;
+            int64_t output_x = options->destination.x;
+            uint32_t source_x = (uint32_t)options->source.x;
+            uint32_t count = options->destination.width;
+            if (output_x < 0) {
+                const uint32_t clipped = (uint32_t)(-output_x);
+                if (clipped >= count) continue;
+                output_x = 0; source_x += clipped; count -= clipped;
+            }
+            if (output_x >= (int64_t)framebuffer->width) continue;
+            const size_t available = framebuffer->width - (size_t)output_x;
+            if (count > available) count = (uint32_t)available;
+            platform_pixel_t *destination = framebuffer->pixels +
+                (size_t)output_y * framebuffer->stride_pixels + (size_t)output_x;
+            const platform_pixel_t *source = options->pixels +
+                ((size_t)(uint32_t)options->source.y + row) * options->bitmap_width + source_x;
+            if (!options->color_key_enabled) {
+                raster_copy_span(destination, source, count);
+                continue;
+            }
+            uint32_t column = 0U;
+            while (column < count) {
+                while (column < count && keyed(source[column], options->color_key_low,
+                                               options->color_key_high)) ++column;
+                const uint32_t start = column;
+                while (column < count && !keyed(source[column], options->color_key_low,
+                                                options->color_key_high)) ++column;
+                raster_copy_span(destination + start, source + start, column - start);
+            }
+        }
+        return true;
+    }
 
     const uint32_t rotated_width = options->rotation == TABOS_GRAPHICS_ROTATE_90 ||
         options->rotation == TABOS_GRAPHICS_ROTATE_270

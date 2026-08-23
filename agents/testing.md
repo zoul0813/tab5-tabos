@@ -828,6 +828,12 @@ Reference-image tests can be useful, but they should be used selectively because
 
 For lower-level primitives, direct pixel/region assertions are preferable.
 
+Accelerated Tab5 kernels must match scalar output byte-for-byte. Test aligned and
+unaligned buffers, tails, overlap, clipping, RGB565 blend boundaries, color keys,
+font scaling, cursor inversion, and full terminal redraw. Physical diagnostics must
+measure internal RAM and PSRAM separately. Keep only repeatable speedups; host tests
+cannot establish PIE performance or context-switch correctness.
+
 ---
 
 ## 22. Input Tests

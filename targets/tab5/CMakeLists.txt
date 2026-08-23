@@ -7,6 +7,7 @@ include("${TABOS_ROOT}/config/Font.cmake")
 include("${TABOS_ROOT}/config/Filesystem.cmake")
 include("${TABOS_ROOT}/config/Input.cmake")
 include("${TABOS_ROOT}/config/Console.cmake")
+include("${TABOS_ROOT}/config/Acceleration.cmake")
 include("${TABOS_ROOT}/config/Loader.cmake")
 
 set(TABOS_GENERATED_INCLUDE_DIR "${CMAKE_BINARY_DIR}/generated")
@@ -50,6 +51,10 @@ configure_file(
 configure_file(
     "${TABOS_ROOT}/config/console.h.in"
     "${TABOS_GENERATED_INCLUDE_DIR}/tabos/config/console.h"
+)
+configure_file(
+    "${TABOS_ROOT}/config/acceleration.h.in"
+    "${TABOS_GENERATED_INCLUDE_DIR}/tabos/config/acceleration.h"
 )
 
 set(EXTRA_COMPONENT_DIRS

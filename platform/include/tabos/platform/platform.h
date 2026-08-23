@@ -61,6 +61,11 @@ bool platform_graphics_fill(platform_framebuffer_t *framebuffer, int32_t x, int3
                             uint32_t width, uint32_t height, platform_pixel_t color);
 bool platform_graphics_blit(platform_framebuffer_t *framebuffer,
                             const tabos_graphics_blit_options_t *options);
+bool platform_raster_fill_span(platform_pixel_t *destination, size_t count,
+                               platform_pixel_t color);
+bool platform_raster_copy_span(platform_pixel_t *destination,
+                               const platform_pixel_t *source, size_t count);
+void platform_raster_diagnostics(void);
 void *platform_executable_alloc(size_t size);
 void *platform_executable_prepare(void *memory, size_t size);
 bool platform_executable_finalize(void *memory, size_t size);

@@ -21,6 +21,8 @@ CONFIG_DEFAULTS = {
     "TABOS_TERMINAL_SCROLLBACK_LINES": "256",
     "TABOS_HOST_REFRESH_RATE_HZ": "58",
     "TABOS_CURSOR_BLINK_INTERVAL_MS": "500",
+    "TABOS_ENABLE_PIE": "ON",
+    "TABOS_ENABLE_PIE_DIAGNOSTICS": "OFF",
     "TABOS_ELF_STARTUP_PATH": "T:/bin/hello",
     "TABOS_SHELL_PATH": "T:/bin/shell",
     "TABOS_HOST_STARTUP_APP": "none",
@@ -48,6 +50,9 @@ def validate_project_config(config: dict[str, str]) -> None:
     ):
         if not re.fullmatch(r"[1-9][0-9]*", config[name]):
             fail(f"{name} must be a positive integer")
+    for name in ("TABOS_ENABLE_PIE", "TABOS_ENABLE_PIE_DIAGNOSTICS"):
+        if config[name] not in {"ON", "OFF"}:
+            fail(f"{name} must be ON or OFF")
     if not re.fullmatch(r"(?:[1-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-6])",
                         config["TABOS_FONT_GLYPH_COUNT"]):
         fail("TABOS_FONT_GLYPH_COUNT must be an integer from 1 through 256")
@@ -176,6 +181,13 @@ def command_config(_args: argparse.Namespace) -> None:
         config["TABOS_CURSOR_BLINK_INTERVAL_MS"] = prompt_integer(
             "Cursor blink half-period (ms)", config["TABOS_CURSOR_BLINK_INTERVAL_MS"], 1
         )
+        config["TABOS_ENABLE_PIE"] = prompt_choice(
+            "Tab5 PIE SIMD acceleration", config["TABOS_ENABLE_PIE"], ("ON", "OFF")
+        )
+        config["TABOS_ENABLE_PIE_DIAGNOSTICS"] = prompt_choice(
+            "Tab5 PIE SIMD boot diagnostics", config["TABOS_ENABLE_PIE_DIAGNOSTICS"],
+            ("ON", "OFF")
+        )
     except (EOFError, KeyboardInterrupt):
         print("\ntabos: configuration aborted", file=sys.stderr)
         raise SystemExit(2)
@@ -212,6 +224,8 @@ def project_cmake_arguments(target: str) -> list[str]:
         f"-DTABOS_TERMINAL_SCROLLBACK_LINES={config['TABOS_TERMINAL_SCROLLBACK_LINES']}",
         f"-DTABOS_HOST_REFRESH_RATE_HZ={config['TABOS_HOST_REFRESH_RATE_HZ']}",
         f"-DTABOS_CURSOR_BLINK_INTERVAL_MS={config['TABOS_CURSOR_BLINK_INTERVAL_MS']}",
+        f"-DTABOS_ENABLE_PIE={config['TABOS_ENABLE_PIE']}",
+        f"-DTABOS_ENABLE_PIE_DIAGNOSTICS={config['TABOS_ENABLE_PIE_DIAGNOSTICS']}",
         f"-DTABOS_ELF_STARTUP_PATH={config['TABOS_ELF_STARTUP_PATH']}",
         f"-DTABOS_SHELL_PATH={config['TABOS_SHELL_PATH']}",
         f"-DTABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP={'ON' if startup_app == 'console-test' else 'OFF'}",

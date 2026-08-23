@@ -6,6 +6,7 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/config/Font.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/config/Filesystem.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/config/Input.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/config/Console.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/config/Acceleration.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/config/Loader.cmake")
 project(${TABOS_CMAKE_PROJECT_NAME} VERSION ${TABOS_PROJECT_VERSION} LANGUAGES C ASM)
 
@@ -50,6 +51,10 @@ configure_file(
 configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/config/console.h.in"
     "${TABOS_GENERATED_INCLUDE_DIR}/tabos/config/console.h"
+)
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/config/acceleration.h.in"
+    "${TABOS_GENERATED_INCLUDE_DIR}/tabos/config/acceleration.h"
 )
 
 set(TABOS_TARGET "" CACHE STRING "${TABOS_SYSTEM_NAME} target platform (macos or linux)")

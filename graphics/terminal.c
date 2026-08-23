@@ -1,6 +1,7 @@
 #include <tabos/internal/terminal.h>
 
 #include <tabos/internal/font.h>
+#include <tabos/internal/raster.h>
 
 #include <tabos/config/display.h>
 
@@ -248,11 +249,9 @@ static void draw_cell(terminal_t *terminal, size_t column, size_t row,
     const size_t origin_x = column * width;
     const size_t origin_y = row * height;
     for (size_t y = 0U; y < height; ++y) {
-        for (size_t x = 0U; x < width; ++x) {
-            terminal->framebuffer->pixels[
-                (origin_y + y) * terminal->framebuffer->stride_pixels + origin_x + x
-            ] = rendered_background;
-        }
+        raster_fill_span(terminal->framebuffer->pixels +
+            (origin_y + y) * terminal->framebuffer->stride_pixels + origin_x,
+            width, rendered_background);
     }
     (void)font_draw_char(terminal->framebuffer,
                              (int)origin_x, (int)origin_y, character,

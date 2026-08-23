@@ -46,5 +46,12 @@ int main(void)
     pixels[0] = 0U;
     assert(raster_blit(&framebuffer, &blended));
     assert(pixels[0] == 0x8410U);
+
+    platform_pixel_t spans[] = {1U, 2U, 3U, 4U, 5U, 6U, 7U, 8U, 9U};
+    raster_copy_span(spans + 1U, spans, 8U);
+    const platform_pixel_t shifted[] = {1U, 1U, 2U, 3U, 4U, 5U, 6U, 7U, 8U};
+    assert(memcmp(spans, shifted, sizeof(spans)) == 0);
+    raster_fill_span(spans + 1U, 7U, 0xa55aU);
+    for (size_t index = 1U; index < 8U; ++index) assert(spans[index] == 0xa55aU);
     return 0;
 }
