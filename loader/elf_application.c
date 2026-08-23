@@ -23,7 +23,7 @@ enum {
        event loop for an unbounded period. */
     ELF_INSTRUCTIONS_PER_UPDATE = 2000000,
     ELF_DESCRIPTOR_CAPACITY = 16,
-    ELF_HEAP_MAX = 256 * 1024,
+    ELF_HEAP_MAX = 1024 * 1024,
     ELF_GRAPHICS_COMMAND_CAPACITY = 64,
 };
 

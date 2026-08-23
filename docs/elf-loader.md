@@ -58,7 +58,7 @@ not this internal call table.
 
 Each process starts with console descriptors 0, 1, and 2 and allocates file/device
 descriptors from 3 upward. It owns an inherited working directory, errno state, 16 KiB
-stack, and a heap that grows on demand to 256 KiB by default. Process cleanup closes open
+stack, and a heap that grows on demand to 1 MiB by default. Process cleanup closes open
 descriptors and releases heap and executable memory.
 
 ## Tab5 Hardware Test

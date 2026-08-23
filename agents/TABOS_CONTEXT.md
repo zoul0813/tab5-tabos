@@ -323,7 +323,7 @@ deferred.
 - its errno state
 - a bounded heap arena, initially unused and grown by `sbrk`
 
-The default maximum application heap is 256 KiB and the current stack remains
+The default maximum application heap is 1 MiB and the current stack remains
 16 KiB. ELF segments determine static image memory, not dynamic heap demand.
 Future executable metadata may override heap and stack limits. All descriptors,
 heap memory, and other runtime resources are reclaimed deterministically at

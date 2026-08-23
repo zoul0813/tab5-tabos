@@ -73,7 +73,7 @@ heap-backed long filename support through 255 characters, matching
 `TABOS_FS_NAME_MAX`; the default ESP-IDF 8.3-only mode is not used.
 
 Each native loaded application runs with a 16 KiB task stack. Its default heap limit is
-256 KiB, allocated and advanced on demand rather than inferred from ELF static segments.
+1 MiB, allocated and advanced on demand rather than inferred from ELF static segments.
 
 ### Boot USB Storage Mode
 

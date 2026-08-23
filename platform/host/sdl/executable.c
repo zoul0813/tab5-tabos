@@ -261,7 +261,7 @@ platform_riscv32_context_t *platform_riscv32_create(
     write_u32(context->memory, argv_address + (uint32_t)argc * 4U, 0U);
     context->heap_base = (argv_address + ((uint32_t)argc + 1U) * 4U + 15U) & ~15U;
     context->heap_break = context->heap_base;
-    context->heap_end = context->heap_base + 256U * 1024U;
+    context->heap_end = context->heap_base + 1024U * 1024U;
     if (context->heap_end > HOST_RV32_RAM_SIZE - 16U * 1024U) {
         platform_riscv32_destroy(context);
         return NULL;

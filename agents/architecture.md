@@ -332,7 +332,7 @@ stdin is default, with `fcntl(..., O_NONBLOCK)` supported immediately and
 empty nonblocking reads returning `EAGAIN`.
 
 [DECIDED] Each process has a 16 KiB stack and a lazily used, contiguous heap
-arena capped at 256 KiB by default. `_sbrk` advances within that arena. ELF
+arena capped at 1 MiB by default. `_sbrk` advances within that arena. ELF
 describes static load/BSS requirements only; later executable metadata may
 override resource limits.
 

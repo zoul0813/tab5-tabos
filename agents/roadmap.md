@@ -25,7 +25,7 @@
 - [x] Decide `main(argc, argv)` entry contract and hidden `crt0` lifecycle.
 - [x] Decide versioned API-table transport and initial newlib integration.
 - [x] Decide process-local descriptor, cwd, errno, and cleanup semantics.
-- [x] Decide 16 KiB stack and default 256 KiB bounded growing heap.
+- [x] Decide 16 KiB stack and default 1 MiB bounded growing heap.
 - [x] Decide CP437 byte-text, binary file, and stdio buffering semantics.
 - [x] Decide blocking stdin plus immediate `O_NONBLOCK`/`EAGAIN` support.
 - [x] Implement process-owned descriptors, cwd, errno, and heap arena.
