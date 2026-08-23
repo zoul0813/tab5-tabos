@@ -42,9 +42,9 @@ int main(void)
     const bool tty_mode_valid = application != NULL &&
         loader_elf_application_tty_mode(application) == 0U &&
         loader_elf_application_set_tty_mode(
-            application, (uint32_t)TABOS_TTY_MODE_SCROLL_KEYS) &&
+            application, (uint32_t)(TABOS_TTY_MODE_SCROLL_KEYS | TABOS_TTY_MODE_RAW_INPUT)) &&
         loader_elf_application_tty_mode(application) ==
-            (uint32_t)TABOS_TTY_MODE_SCROLL_KEYS &&
+            (uint32_t)(TABOS_TTY_MODE_SCROLL_KEYS | TABOS_TTY_MODE_RAW_INPUT) &&
         !loader_elf_application_set_tty_mode(application, UINT32_C(0x80000000));
     loader_elf_application_destroy(application);
     (void)tabos_fs_unlink(path);

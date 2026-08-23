@@ -57,6 +57,11 @@ int main(void)
         .key = TABOS_KEY_W,
     };
     if (!input_submit(&held) || !tabos_input_poll(&received)) return 1;
+    const tabos_input_event_t held_text = {
+        .type = TABOS_INPUT_TEXT,
+        .text = "w",
+    };
+    if (!input_submit(&held_text) || !tabos_input_poll(&received)) return 1;
     test_platform_advance_time_ms(TABOS_KEY_REPEAT_DELAY_MS - 1U);
     input_update();
     if (tabos_input_poll(&received)) return 1;

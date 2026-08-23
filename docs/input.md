@@ -21,9 +21,9 @@ if (tabos_input_wait(&event)) {
 Events are `TABOS_INPUT_KEY_DOWN`, `TABOS_INPUT_KEY_UP`, or `TABOS_INPUT_TEXT`.
 Key events carry a portable physical key, modifier mask, and repeat flag. The public
 header defines codes such as `TABOS_KEY_UP`, `TABOS_KEY_ENTER`, `TABOS_KEY_CTRL`,
-`TABOS_KEY_SHIFT`, `TABOS_KEY_ALT`, and `TABOS_KEY_GUI`. Test modifiers accompanying
+`TABOS_KEY_SHIFT`, `TABOS_KEY_ALT`, `TABOS_KEY_GUI`, and `TABOS_KEY_SYM`. Test modifiers accompanying
 any event with `TABOS_MODIFIER_CONTROL`, `TABOS_MODIFIER_SHIFT`,
-`TABOS_MODIFIER_ALT`, and `TABOS_MODIFIER_GUI`. Text events carry up to nine CP437
+`TABOS_MODIFIER_ALT`, `TABOS_MODIFIER_GUI`, and `TABOS_MODIFIER_SYM`. Text events carry up to nine CP437
 bytes plus a null terminator.
 
 Raw input and standard input consume the same foreground event stream. An application
@@ -31,6 +31,11 @@ should choose one interface rather than mix them. Terminal applications may use
 `read(STDIN_FILENO, ...)`; arrow keys are encoded as ANSI CSI `A`, `B`, `C`, and `D`
 sequences. Games and other interactive applications should use this raw event API to
 observe key-up, key-down, held-key repeats, and modifiers directly.
+
+Input policy is process-owned and inherited by children. Cooked input is default.
+Set `TABOS_TTY_MODE_RAW_INPUT` through `TABOS_TTY_SET_MODE` when physical key
+events are required; raw polling omits translated text events. Clear that bit for
+cooked text input. Preserve unrelated TTY mode bits when changing policy.
 
 The queue holds 64 events and is protected for host-thread and FreeRTOS-task access. If producers outrun consumers, the oldest event is discarded so current input remains responsive.
 
@@ -41,6 +46,10 @@ text input becomes CP437 text events. SDL does not consistently provide text eve
 Enter, Tab, or operating-system key repeat, so the host backend synthesizes missing
 normalized text events and suppresses matching SDL duplicates.
 
+macOS maps either Option key to TabOS Sym and keeps Command as GUI. Windows and Linux
+map either Win/Super key to Sym and retain their Alt keys as TabOS Alt. Key events and
+modifier masks use same mapping.
+
 Cmd+Shift+F12 on macOS (Super+Shift+F12 on Linux) saves the current logical
 1280x720 framebuffer as a timestamped PNG under `screenshots/`. The host backend
 consumes both shortcut key events, while unmodified F12 remains available to TabOS
@@ -50,11 +59,17 @@ applications.
 
 The Tab5 Keyboard is connected through ExtPort1 using SDA GPIO0, SCL GPIO1, and default I²C address `0x6D`. TabOS uses ESP32-P4 I²C controller 0 at 400 kHz; the Tab5 BSP's internal device bus remains on controller 1.
 
-At platform initialization, TabOS probes the keyboard, reads firmware register `0xFE`, selects HID mode through register `0x10`, and clears the device event queue. The run loop polls event-count register `0x02` every 10 ms and drains two-byte HID reports from register `0x30`.
+At platform initialization, TabOS probes the keyboard, reads firmware register `0xFE`, selects Normal mode through register `0x10`, and clears the device event queue. The run loop polls event-count register `0x02` every 10 ms and drains matrix press/release events from register `0x20`. Normal mode preserves independent held state for simultaneous keys; TabOS translates matrix positions into its portable key codes and text events.
 
-HID reports are normalized into the same physical key, modifier, and text events used by host builds. Current hardware text translation uses a US ANSI mapping. Ctrl, Alt, or GUI-modified key combinations produce physical key events but no text event.
+Matrix events are normalized into the same physical key, modifier, and text events used by host builds. Current hardware text translation uses a US ANSI mapping. Ctrl or Alt-modified key combinations produce physical key events but no text event.
 
-Keyboard presence, firmware version, and HID mode appear in both serial and on-screen boot diagnostics. Missing keyboard hardware is a warning and does not prevent TabOS from booting.
+Tab5 `Aa` is exposed as `TABOS_KEY_SHIFT`/`TABOS_MODIFIER_SHIFT`; `Sym` is exposed
+as `TABOS_KEY_SYM`/`TABOS_MODIFIER_SYM`. Raw mode reports physical presses,
+releases, and held state. Cooked translation also implements keyboard-style one-shot
+behavior: tapping `Aa` or `Sym` modifies next ordinary key, then clears. Holding either
+modifier applies it until release. Modified key repeats with its cooked text.
+
+Keyboard presence, firmware version, and Normal mode appear in both serial and on-screen boot diagnostics. Missing keyboard hardware is a warning and does not prevent TabOS from booting.
 
 ## Keyboard Diagnostic Monitor
 

@@ -38,7 +38,10 @@ runtime-changeable black-by-default letterbox color. Normal drawing targets the 
 RGB565 buffer and present performs one accelerated nearest-neighbor upscale. Fullscreen
 ownership suspends terminal rendering, presentation, cursor, and TTY shortcuts; returning
 from graphics redraws the retained terminal. TabOS normalizes held-key repeat timing above
-platform keyboard backends so host and Tab5 applications receive repeat events.
+platform keyboard backends so host and Tab5 applications receive repeat events. Input
+policy is process-owned: cooked mode is default, while raw mode exposes physical key
+press/release without translated text events. Tab5 Normal matrix mode exposes Sym and
+Aa/Shift directly; cooked translation provides one-shot tap and held modifier behavior.
 
 ## 2. Hardware Baseline
 

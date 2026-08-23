@@ -14,11 +14,13 @@ static size_t queue_count;
 static atomic_flag queue_lock = ATOMIC_FLAG_INIT;
 static tabos_key_t held_key;
 static uint8_t held_modifiers;
+static char held_text[TABOS_INPUT_TEXT_MAX_BYTES + 1U];
+static uint8_t held_text_modifiers;
 static uint64_t next_repeat_ms;
 
 static bool modifier_key(tabos_key_t key)
 {
-    return key >= TABOS_KEY_CTRL && key <= TABOS_KEY_GUI;
+    return key >= TABOS_KEY_CTRL && key <= TABOS_KEY_SYM;
 }
 
 static void lock_queue(void)
@@ -39,6 +41,8 @@ void input_init(void)
     queue_count = 0U;
     held_key = TABOS_KEY_UNKNOWN;
     held_modifiers = 0U;
+    held_text[0] = '\0';
+    held_text_modifiers = 0U;
     next_repeat_ms = 0U;
     unlock_queue();
 }
@@ -58,11 +62,19 @@ bool input_submit(const tabos_input_event_t *event)
     if (event->type == TABOS_INPUT_KEY_DOWN && !modifier_key(event->key)) {
         held_key = event->key;
         held_modifiers = event->modifiers;
+        held_text[0] = '\0';
+        held_text_modifiers = 0U;
         next_repeat_ms = platform_time_ms() + TABOS_KEY_REPEAT_DELAY_MS;
     } else if (event->type == TABOS_INPUT_KEY_UP && event->key == held_key) {
         held_key = TABOS_KEY_UNKNOWN;
         held_modifiers = 0U;
+        held_text[0] = '\0';
+        held_text_modifiers = 0U;
         next_repeat_ms = 0U;
+    } else if (event->type == TABOS_INPUT_TEXT && held_key != TABOS_KEY_UNKNOWN) {
+        (void)strncpy(held_text, event->text, sizeof(held_text) - 1U);
+        held_text[sizeof(held_text) - 1U] = '\0';
+        held_text_modifiers = event->modifiers;
     }
     lock_queue();
     if (queue_count == INPUT_QUEUE_CAPACITY) {
@@ -99,13 +111,14 @@ void input_update(void)
     unlock_queue();
     input_diagnostic_log(&key_event);
 
-    tabos_input_event_t text_event = {
-        .type = TABOS_INPUT_TEXT,
-        .modifiers = held_modifiers,
-        .repeat = true,
-    };
-    if (input_text_from_hid((uint8_t)held_key, held_modifiers,
-                            text_event.text, sizeof(text_event.text)) > 0U) {
+    if (held_text[0] != '\0') {
+        tabos_input_event_t text_event = {
+            .type = TABOS_INPUT_TEXT,
+            .modifiers = held_text_modifiers,
+            .repeat = true,
+        };
+        (void)strncpy(text_event.text, held_text, sizeof(text_event.text) - 1U);
+        text_event.text[sizeof(text_event.text) - 1U] = '\0';
         lock_queue();
         if (queue_count == INPUT_QUEUE_CAPACITY) {
             queue_head = (queue_head + 1U) % INPUT_QUEUE_CAPACITY;

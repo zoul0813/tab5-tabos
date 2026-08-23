@@ -4,9 +4,12 @@
 
 #include <errno.h>
 #include <stdio.h>
+#include <sys/ioctl.h>
 #include <tabos/graphics.h>
 #include <tabos/input.h>
 #include <tabos/runtime_time.h>
+#include <tabos/tty.h>
+#include <unistd.h>
 
 static void set_held(starfall_input_t *input, tabos_key_t key, bool down)
 {
@@ -20,6 +23,11 @@ static void set_held(starfall_input_t *input, tabos_key_t key, bool down)
 
 int main(void)
 {
+    uint32_t tty_mode = 0U;
+    if (ioctl(STDIN_FILENO, TABOS_TTY_GET_MODE, &tty_mode) == 0)
+        (void)ioctl(STDIN_FILENO, TABOS_TTY_SET_MODE,
+                    (tty_mode & ~(uint32_t)TABOS_TTY_MODE_SCROLL_KEYS) |
+                        (uint32_t)TABOS_TTY_MODE_RAW_INPUT);
     tabos_graphics_t graphics = {.width = STARFALL_WIDTH, .height = STARFALL_HEIGHT};
     if (tabos_graphics_open(&graphics) != 0) {
         fprintf(stderr, "starfall: graphics open failed: %d\n", errno);

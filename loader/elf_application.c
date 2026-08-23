@@ -310,7 +310,10 @@ static int elf_input_poll(tabos_input_event_t *event)
         return -TABOS_EINVAL;
     }
     while (tabos_console_poll(application->console, event)) {
-        if (!elf_handle_tty_navigation(application, event)) return 1;
+        if (elf_handle_tty_navigation(application, event)) continue;
+        if ((application->tty_mode & TABOS_TTY_MODE_RAW_INPUT) != 0U &&
+            event->type == TABOS_INPUT_TEXT) continue;
+        return 1;
     }
     return 0;
 }
@@ -360,7 +363,8 @@ static int elf_tty_set_mode(int descriptor, uint32_t mode)
 {
     loader_elf_application_t *application = platform_riscv32_current_user_data();
     if (application == NULL || descriptor < 0 || descriptor > 2) return -TABOS_ENOTTY;
-    if ((mode & ~(uint32_t)TABOS_TTY_MODE_SCROLL_KEYS) != 0U) return -TABOS_EINVAL;
+    if ((mode & ~(uint32_t)(TABOS_TTY_MODE_SCROLL_KEYS | TABOS_TTY_MODE_RAW_INPUT)) != 0U)
+        return -TABOS_EINVAL;
     application->tty_mode = mode;
     return 0;
 }
@@ -1015,7 +1019,8 @@ uint32_t loader_elf_application_tty_mode(const loader_elf_application_t *applica
 bool loader_elf_application_set_tty_mode(loader_elf_application_t *application, uint32_t mode)
 {
     if (application == NULL ||
-        (mode & ~(uint32_t)TABOS_TTY_MODE_SCROLL_KEYS) != 0U) return false;
+        (mode & ~(uint32_t)(TABOS_TTY_MODE_SCROLL_KEYS | TABOS_TTY_MODE_RAW_INPUT)) != 0U)
+        return false;
     application->tty_mode = mode;
     return true;
 }

@@ -91,6 +91,7 @@ typedef enum {
     TABOS_KEY_SHIFT,
     TABOS_KEY_ALT,
     TABOS_KEY_GUI,
+    TABOS_KEY_SYM,
 } tabos_key_t;
 
 enum {
@@ -98,6 +99,7 @@ enum {
     TABOS_MODIFIER_SHIFT = 1U << 1U,
     TABOS_MODIFIER_ALT = 1U << 2U,
     TABOS_MODIFIER_GUI = 1U << 3U,
+    TABOS_MODIFIER_SYM = 1U << 4U,
 };
 
 enum { TABOS_INPUT_TEXT_MAX_BYTES = 9 };

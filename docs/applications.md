@@ -99,7 +99,8 @@ line-buffered, and stderr is unbuffered. Each process owns descriptors, errno, c
 working directory, and a bounded heap; children inherit a copy of the parent's working
 directory. TTY input mode is also inherited by value. Applications can include
 `<sys/ioctl.h>` and `<tabos/tty.h>` to query or replace that mode. For example, a game
-can call `ioctl(STDIN_FILENO, TABOS_TTY_SET_MODE, 0U)` to receive Ctrl+Arrow keys itself;
+can preserve current mode, clear `TABOS_TTY_MODE_SCROLL_KEYS`, and set
+`TABOS_TTY_MODE_RAW_INPUT` to receive physical key events without cooked text events;
 the blocked parent's mode remains unchanged and is restored with that parent.
 
 `<tabos/process.h>` provides synchronous `tabos_exec(path, argc, argv)`. Parent remains

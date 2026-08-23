@@ -161,7 +161,10 @@
 - [x] Define platform-neutral key, text, modifier, repeat, and key-up/down events.
 - [x] Implement thread-safe fixed-capacity input queue.
 - [x] Implement SDL3 host keyboard backend.
-- [x] Implement Tab5 I2C keyboard backend in HID mode.
+- [x] Map macOS Option and Windows/Linux Win/Super keys to portable Sym input.
+- [x] Implement Tab5 I2C keyboard backend in Normal matrix-event mode for independent multi-key state.
+- [x] Expose Tab5 Sym and Aa/Shift physical keys and modifier state.
+- [x] Implement process-owned cooked/raw input policy and Tab5 one-shot Sym/Aa translation.
 - [x] Report Tab5 keyboard firmware and mode.
 - [x] Keep missing Tab5 keyboard nonfatal and report warning.
 - [x] Implement host Enter, Tab, held-key, and duplicate-text handling.

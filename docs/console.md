@@ -57,9 +57,11 @@ Changing terminal scale rebuilds geometry, reflows retained hard and soft-wrappe
 `tabos_console_poll()` reads one queued event without blocking. `tabos_console_wait()` waits for one. Both use the normalized events documented in [Keyboard Input](input.md) and only work for foreground session.
 
 Filesystem applications control terminal input policy with `ioctl()` and
-`<tabos/tty.h>`. `TABOS_TTY_SET_MODE` accepts `TABOS_TTY_MODE_SCROLL_KEYS` or zero;
+`<tabos/tty.h>`. `TABOS_TTY_SET_MODE` accepts any combination of
+`TABOS_TTY_MODE_SCROLL_KEYS` and `TABOS_TTY_MODE_RAW_INPUT`;
 `TABOS_TTY_GET_MODE` reads the current process mode. Enabled navigation events are
-consumed by the terminal and are not delivered to the application.
+consumed by the terminal and are not delivered to the application. Cooked input is
+default; raw input omits translated text events from raw polling.
 
 ## Diagnostic Application
 

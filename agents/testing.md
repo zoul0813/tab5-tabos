@@ -405,6 +405,10 @@ A pointer event received in the scaled host window should be translated back to 
 
 SDL keyboard input should feed the same TabOS input subsystem used on hardware.
 
+Tab5 keyboard validation must cover independent simultaneous keys, raw Sym and Aa/Shift
+press/release state, cooked one-shot Sym/Aa text, held modifiers, and modified repeats.
+Raw application mode must omit cooked text events without affecting physical key events.
+
 Conceptually:
 
 ```text

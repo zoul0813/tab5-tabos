@@ -57,6 +57,11 @@ static const char *key_name(tabos_key_t key)
     case TABOS_KEY_LEFT: return "LEFT";
     case TABOS_KEY_DOWN: return "DOWN";
     case TABOS_KEY_UP: return "UP";
+    case TABOS_KEY_CTRL: return "CTRL";
+    case TABOS_KEY_SHIFT: return "SHIFT";
+    case TABOS_KEY_ALT: return "ALT";
+    case TABOS_KEY_GUI: return "GUI";
+    case TABOS_KEY_SYM: return "SYM";
     default: return "UNKNOWN";
     }
 }
@@ -98,6 +103,7 @@ void input_diagnostic_log(const tabos_input_event_t *event)
         if ((event->modifiers & TABOS_MODIFIER_SHIFT) != 0U) append_modifier(line, sizeof(line), "SHIFT", &first);
         if ((event->modifiers & TABOS_MODIFIER_ALT) != 0U) append_modifier(line, sizeof(line), "ALT", &first);
         if ((event->modifiers & TABOS_MODIFIER_GUI) != 0U) append_modifier(line, sizeof(line), "GUI", &first);
+        if ((event->modifiers & TABOS_MODIFIER_SYM) != 0U) append_modifier(line, sizeof(line), "SYM", &first);
         if (first) append_modifier(line, sizeof(line), "NONE", &first);
         const size_t used = strlen(line);
         (void)snprintf(line + used, sizeof(line) - used, " repeat=%s",

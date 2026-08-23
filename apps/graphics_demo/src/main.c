@@ -1,8 +1,11 @@
 #include <errno.h>
 #include <stdio.h>
+#include <sys/ioctl.h>
 #include <tabos/graphics.h>
 #include <tabos/input.h>
 #include <tabos/runtime_time.h>
+#include <tabos/tty.h>
+#include <unistd.h>
 
 #define DEMO_SCREEN_WIDTH 320U
 #define DEMO_SCREEN_HEIGHT 240U
@@ -71,6 +74,11 @@ static const tabos_color_t demo_vga_palette[DEMO_VGA_COLOR_COUNT] = {
 #endif
 
 int main(void) {
+    uint32_t tty_mode = 0U;
+    if (ioctl(STDIN_FILENO, TABOS_TTY_GET_MODE, &tty_mode) == 0)
+        (void)ioctl(STDIN_FILENO, TABOS_TTY_SET_MODE,
+                    (tty_mode & ~(uint32_t)TABOS_TTY_MODE_SCROLL_KEYS) |
+                        (uint32_t)TABOS_TTY_MODE_RAW_INPUT);
     tabos_graphics_t graphics = {
         .width = DEMO_SCREEN_WIDTH,
         .height = DEMO_SCREEN_HEIGHT,
