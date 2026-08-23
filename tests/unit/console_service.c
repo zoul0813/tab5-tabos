@@ -9,6 +9,7 @@
 #include "platform_test.h"
 
 #include <stdlib.h>
+#include <string.h>
 
 int main(void)
 {
@@ -71,12 +72,22 @@ int main(void)
         return 1;
     }
 
+    platform_framebuffer_t *framebuffer = display_framebuffer();
+    const size_t framebuffer_bytes = framebuffer->stride_pixels * framebuffer->height *
+        sizeof(*framebuffer->pixels);
+    platform_pixel_t *graphics_snapshot = malloc(framebuffer_bytes);
+    if (graphics_snapshot == NULL) return 1;
+    memcpy(graphics_snapshot, framebuffer->pixels, framebuffer_bytes);
     console_set_graphics_active(true);
-    if (!input_submit(&submitted) || !tabos_console_poll(&foreground, &received)) return 1;
+    if (!tabos_console_write(&foreground, "graphics-hidden") ||
+        tabos_console_page_up(&foreground) ||
+        memcmp(graphics_snapshot, framebuffer->pixels, framebuffer_bytes) != 0 ||
+        !input_submit(&submitted) || !tabos_console_poll(&foreground, &received)) return 1;
     test_platform_advance_time_ms(TABOS_CURSOR_BLINK_INTERVAL_MS);
     console_update();
     if (terminal.cursor_visible || !terminal.cursor_phase_visible) return 1;
     console_set_graphics_active(false);
+    free(graphics_snapshot);
 
     tabos_console_release(&foreground);
     if (tabos_console_is_foreground(&foreground) ||

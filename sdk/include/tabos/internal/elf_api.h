@@ -5,7 +5,7 @@
 
 #include <stdint.h>
 
-#define TABOS_ELF_API_VERSION 4U
+#define TABOS_ELF_API_VERSION 5U
 #define TABOS_ELF_EXEC_PENDING (-2147483647 - 1)
 
 enum {
@@ -73,6 +73,8 @@ typedef struct {
     int (*graphics_close)(void);
     uint32_t (*graphics_capabilities)(void);
     int (*graphics_blit_ex)(const tabos_graphics_blit_options_t *options);
+    int (*tty_get_mode)(int descriptor);
+    int (*tty_set_mode)(int descriptor, uint32_t mode);
 } tabos_elf_api_t;
 
 typedef int (*tabos_elf_entry_fn)(const tabos_elf_api_t *api,

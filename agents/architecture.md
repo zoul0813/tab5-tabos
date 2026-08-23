@@ -53,6 +53,12 @@ Applications never receive display-driver ownership. They may clear, draw clippe
 primitives, blit RGB565 pixels, and explicitly present a frame. Closing or exiting
 the graphics application restores the retained terminal display.
 
+[DECIDED] Fullscreen graphics ownership automatically suspends TTY shortcut interception
+and all terminal rendering/presentation. Terminal cell/history state may continue changing
+but cannot touch the graphics framebuffer. Raw input reaches the graphics application;
+applications do not manage TTY policy merely because they enter graphics mode. Closing or
+exiting graphics redraws and presents the retained terminal once.
+
 ESP-IDF and FreeRTOS are implementation foundations, not the application programming model.
 
 ---
@@ -604,6 +610,11 @@ The future `usb-storage` application must call the same service and follow the
 same ownership transition.
 
 The portable console service provides cooperative foreground ownership above this queue. One session at a time may consume console input and update framebuffer terminal. Terminal owns colored cell/history ring, live cursor, independent viewport, reflow metadata, and rendering into platform framebuffer. Session tokens reject background and stale callers but are not a security boundary. Future process manager must own foreground assignment policy. Optional console diagnostic application uses only public console API and remains outside kernel shell policy.
+
+[DECIDED] Terminal navigation shortcuts are per-process opt-in TTY policy, not global
+input policy. Shell enables scroll keys through the public `ioctl()` wrapper. Children
+inherit a value copy; a child may disable the mode for raw/game input without changing
+the blocked parent's retained mode. Enabled navigation keys are consumed before stdin.
 
 Portable monotonic time and polling timers live behind platform clock source. Console uses repeating timer for cursor phase; service remains reusable for future runtime scheduling. Terminal tracks dirty visible cells for ordinary text/cursor changes and reserves full redraw for viewport, clear, or resize changes.
 

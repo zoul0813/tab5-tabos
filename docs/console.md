@@ -48,13 +48,18 @@ Terminal retains visible rows plus `TABOS_TERMINAL_SCROLLBACK_LINES` history row
 - `tabos_console_is_at_end()` reports whether viewport follows live output.
 - `tabos_console_get_history_line_count()` reports currently retained physical rows.
 
-Oldest history row is discarded when ring fills. Any new console output automatically returns viewport to live end. Full keyboards use Page Up, Page Down, Home, and End. Tab5 Keyboard has no physical keys for these HID usages, so diagnostic application maps Ctrl+Up/Down to Page Up/Down and Ctrl+Left/Right to Home/End. Plain arrows remain available for future cursor editing.
+Oldest history row is discarded when ring fills. Any new console output automatically returns viewport to live end. Scrollback keyboard handling is process-owned and opt-in rather than a global kernel shortcut. The shell enables it: Page Up or Ctrl+Up moves up, Page Down or Ctrl+Down moves down, Home or Ctrl+Left moves to oldest history, and End or Ctrl+Right returns to live output. A child inherits its parent's mode, may disable it for raw keyboard use, and cannot change the retained parent's mode.
 
 Changing terminal scale rebuilds geometry, reflows retained hard and soft-wrapped lines, preserves colors and cursor, and redraws current viewport. Console content no longer falls back to boot-only redraw after scale change.
 
 ## Input
 
 `tabos_console_poll()` reads one queued event without blocking. `tabos_console_wait()` waits for one. Both use the normalized events documented in [Keyboard Input](input.md) and only work for foreground session.
+
+Filesystem applications control terminal input policy with `ioctl()` and
+`<tabos/tty.h>`. `TABOS_TTY_SET_MODE` accepts `TABOS_TTY_MODE_SCROLL_KEYS` or zero;
+`TABOS_TTY_GET_MODE` reads the current process mode. Enabled navigation events are
+consumed by the terminal and are not delivered to the application.
 
 ## Diagnostic Application
 

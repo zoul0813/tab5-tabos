@@ -13,6 +13,7 @@ static bool wrote_first_argument;
 static bool wrote_quoted_argument;
 static bool requested_exit;
 static int requested_status = -1;
+static uint32_t tty_mode;
 
 static void test_console_write(const char *text)
 {
@@ -33,6 +34,18 @@ static void test_request_exit(int status)
     requested_status = status;
 }
 
+static int test_tty_get_mode(int descriptor)
+{
+    return descriptor == 0 ? (int)tty_mode : -1;
+}
+
+static int test_tty_set_mode(int descriptor, uint32_t mode)
+{
+    if (descriptor != 0) return -1;
+    tty_mode = mode;
+    return 0;
+}
+
 static platform_riscv32_result_t execute_raw(
     const uint32_t *instructions,
     size_t size,
@@ -43,6 +56,8 @@ static platform_riscv32_result_t execute_raw(
         .console_write = test_console_write,
         .console_write_raw = test_console_write_raw,
         .request_exit = test_request_exit,
+        .tty_get_mode = test_tty_get_mode,
+        .tty_set_mode = test_tty_set_mode,
     };
     int returned_status = -1;
     platform_riscv32_context_t *context = platform_riscv32_create(
@@ -64,6 +79,8 @@ int main(void)
         .console_write = test_console_write,
         .console_write_raw = test_console_write_raw,
         .request_exit = test_request_exit,
+        .tty_get_mode = test_tty_get_mode,
+        .tty_set_mode = test_tty_set_mode,
     };
     const char *const arguments[] = {"hello", "one", "two words"};
     int returned_status = -1;
@@ -79,7 +96,7 @@ int main(void)
 
     if (result != PLATFORM_RISCV32_RETURNED || !wrote_expected_message ||
         !wrote_first_argument || !wrote_quoted_argument || !requested_exit ||
-        requested_status != 0 || returned_status != 0) {
+        requested_status != 0 || returned_status != 0 || tty_mode != 1U) {
         fprintf(stderr, "result=%d message=%d arg1=%d arg2=%d exit=%d status=%d returned=%d\n",
                 result, wrote_expected_message, wrote_first_argument, wrote_quoted_argument,
                 requested_exit, requested_status, returned_status);

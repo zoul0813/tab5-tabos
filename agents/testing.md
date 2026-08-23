@@ -453,7 +453,7 @@ This section describes eventual GUI/input testing, not current implementation pr
 
 Current keyboard coverage includes host tests for HID-to-text translation, key/text event ordering, queue overflow policy, and runtime bootstrap with a fake keyboard platform. SDL3 and the Tab5 I2C backend feed the same public queue. Hardware validation must confirm that boot diagnostics show `TAB5 KEYBOARD FW ...; HID MODE`; missing keyboard must remain a warning rather than preventing boot. Builds configured with `TABOS_ENABLE_KEYBOARD_DIAGNOSTICS=ON` also log every normalized key/text event without consuming the queue; this flag defaults off. USB HID keyboards on Tab5 are not yet supported.
 
-Console tests cover exclusive foreground acquisition, background and stale-session rejection, rejected-read non-consumption, cursor pixels and blink phase, clearing, history ring overflow, Page Up/Down/Home/End navigation, automatic return to live output, and scale reflow with retained cells. Timer tests cover one-shot, repeating, late-poll skipping, and cancellation behavior with fake monotonic time. Tab5 manual validation uses Ctrl+Up/Down for Page Up/Down and Ctrl+Left/Right for Home/End because physical keyboard omits dedicated keys. `TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP=ON` provides manual cross-target keyboard-to-framebuffer validation and defaults off. Diagnostic application is not shell.
+Console tests cover exclusive foreground acquisition, background and stale-session rejection, rejected-read non-consumption, cursor pixels and blink phase, clearing, history ring overflow, Page Up/Down/Home/End navigation, automatic return to live output, and scale reflow with retained cells. Timer tests cover one-shot, repeating, late-poll skipping, and cancellation behavior with fake monotonic time. Manual validation must verify shell opt-in consumes Page Up/Down/Home/End and Tab5 Ctrl+Arrow equivalents, a disabled mode delivers those events to the application, children inherit by value, and returning to the parent restores its unchanged mode. `TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP=ON` provides manual cross-target keyboard-to-framebuffer validation and defaults off. Diagnostic application is not shell.
 
 Application lifecycle tests cover descriptor validation, duplicate rejection, registry lookup, startup failure cleanup, PID metadata, process-table retention, PID 0→1→2 nesting, blocked-parent state, console focus transfer, reverse-order status unwind, root-exit panic transition, and shutdown cleanup. Runtime smoke test verifies configured `console-test` remains PID 0 after Ctrl+Q reports completion. Same portable lifecycle code compiles into host and Tab5; host executes deterministic tests while Tab5 cross-build verifies target compatibility.
 
@@ -833,6 +833,11 @@ unaligned buffers, tails, overlap, clipping, RGB565 blend boundaries, color keys
 font scaling, cursor inversion, and full terminal redraw. Physical diagnostics must
 measure internal RAM and PSRAM separately. Keep only repeatable speedups; host tests
 cannot establish PIE performance or context-switch correctness.
+
+Fullscreen graphics tests must verify terminal writes, redraws, cursor timers, and
+scrollback navigation cannot alter or present the graphics framebuffer. TTY navigation
+keys must reach the graphics application regardless of its inherited TTY mode. Closing
+or faulting the application must redraw and present the retained terminal exactly once.
 
 ---
 

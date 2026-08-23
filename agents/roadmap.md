@@ -148,6 +148,7 @@
 - [x] Implement Page Up, Page Down, Home, End, and return-to-live behavior.
 - [x] Map Tab5 Ctrl+Up/Down to Page Up/Down.
 - [x] Map Tab5 Ctrl+Left/Right to Home/End.
+- [x] Make scrollback shortcuts process-owned, opt-in TTY policy with child inheritance.
 - [x] Hide cursor while viewing history.
 - [x] Implement visible blinking cursor.
 - [x] Build reusable monotonic polling timer service for cursor and future uses.
@@ -386,6 +387,7 @@ but is not a substitute for this execution path.
 - [x] Define initial public fullscreen RGB565 graphics API.
 - [x] Add clipped fill, pixel, line, rectangle, bitmap blit, and explicit present operations.
 - [x] Restore the terminal framebuffer when a graphics application closes or exits.
+- [x] Suspend terminal rendering and TTY shortcuts automatically during fullscreen graphics.
 - [x] Add a portable interactive graphics demo and tester coverage.
 - [x] Define portable queued transform, blend, color-key, and capability APIs.
 - [x] Add ESP32-P4 PPA acceleration with transparent software fallback.

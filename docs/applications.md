@@ -97,7 +97,10 @@ or raw ELF entry. SDK `crt0` and newlib stubs translate standard C/POSIX calls t
 versioned TabOS ABI. Standard streams are console-backed: stdin is unbuffered, stdout is
 line-buffered, and stderr is unbuffered. Each process owns descriptors, errno, current
 working directory, and a bounded heap; children inherit a copy of the parent's working
-directory.
+directory. TTY input mode is also inherited by value. Applications can include
+`<sys/ioctl.h>` and `<tabos/tty.h>` to query or replace that mode. For example, a game
+can call `ioctl(STDIN_FILENO, TABOS_TTY_SET_MODE, 0U)` to receive Ctrl+Arrow keys itself;
+the blocked parent's mode remains unchanged and is restored with that parent.
 
 `<tabos/process.h>` provides synchronous `tabos_exec(path, argc, argv)`. Parent remains
 loaded but blocked while child owns foreground console/input. Function returns child's

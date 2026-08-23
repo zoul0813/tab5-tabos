@@ -10,6 +10,7 @@
 #include <tabos/internal/raster.h>
 #include <tabos/platform/platform.h>
 #include <tabos/config/display.h>
+#include <tabos/tty.h>
 
 #include <stdio.h>
 #include <stdatomic.h>
@@ -77,7 +78,38 @@ struct loader_elf_application {
     char working_directory[TABOS_FS_PATH_MAX];
     uint8_t *heap;
     size_t heap_used;
+    uint32_t tty_mode;
 };
+
+static bool elf_handle_tty_navigation(loader_elf_application_t *application,
+                                      const tabos_input_event_t *event)
+{
+    if (application == NULL || event == NULL ||
+        application->graphics_active ||
+        (application->tty_mode & TABOS_TTY_MODE_SCROLL_KEYS) == 0U ||
+        event->type != TABOS_INPUT_KEY_DOWN) return false;
+    if (event->key == TABOS_KEY_PAGE_UP ||
+        (event->key == TABOS_KEY_UP &&
+         (event->modifiers & TABOS_MODIFIER_CONTROL) != 0U)) {
+        (void)tabos_console_page_up(application->console); return true;
+    }
+    if (event->key == TABOS_KEY_PAGE_DOWN ||
+        (event->key == TABOS_KEY_DOWN &&
+         (event->modifiers & TABOS_MODIFIER_CONTROL) != 0U)) {
+        (void)tabos_console_page_down(application->console); return true;
+    }
+    if (event->key == TABOS_KEY_HOME ||
+        (event->key == TABOS_KEY_LEFT &&
+         (event->modifiers & TABOS_MODIFIER_CONTROL) != 0U)) {
+        (void)tabos_console_scroll_to_start(application->console); return true;
+    }
+    if (event->key == TABOS_KEY_END ||
+        (event->key == TABOS_KEY_RIGHT &&
+         (event->modifiers & TABOS_MODIFIER_CONTROL) != 0U)) {
+        (void)tabos_console_scroll_to_end(application->console); return true;
+    }
+    return false;
+}
 
 static bool copy_arguments(size_t argc,
                            const char *const *argv,
@@ -237,6 +269,7 @@ static int elf_fd_read(int descriptor, void *buffer, uint32_t count)
         if (count == 0U) return 0;
         tabos_input_event_t event;
         while (tabos_console_poll(application->console, &event)) {
+            if (elf_handle_tty_navigation(application, &event)) continue;
             if (event.type == TABOS_INPUT_TEXT) {
                 const size_t length = strlen(event.text);
                 const size_t copied = length < count ? length : count;
@@ -255,6 +288,22 @@ static int elf_fd_read(int descriptor, void *buffer, uint32_t count)
     const tabos_ssize_t result = tabos_fs_read(
         application->descriptors[descriptor].kernel_descriptor, buffer, count);
     return result >= 0 ? (int)result : -*tabos_errno_location();
+}
+
+static int elf_tty_get_mode(int descriptor)
+{
+    loader_elf_application_t *application = platform_riscv32_current_user_data();
+    if (application == NULL || descriptor < 0 || descriptor > 2) return -TABOS_ENOTTY;
+    return (int)application->tty_mode;
+}
+
+static int elf_tty_set_mode(int descriptor, uint32_t mode)
+{
+    loader_elf_application_t *application = platform_riscv32_current_user_data();
+    if (application == NULL || descriptor < 0 || descriptor > 2) return -TABOS_ENOTTY;
+    if ((mode & ~(uint32_t)TABOS_TTY_MODE_SCROLL_KEYS) != 0U) return -TABOS_EINVAL;
+    application->tty_mode = mode;
+    return 0;
 }
 
 static int elf_fd_write(int descriptor, const void *buffer, uint32_t count)
@@ -732,6 +781,8 @@ static bool elf_entry(tabos_app_context_t *context)
         .graphics_close = elf_graphics_close,
         .graphics_capabilities = elf_graphics_capabilities,
         .graphics_blit_ex = elf_graphics_blit_ex,
+        .tty_get_mode = elf_tty_get_mode,
+        .tty_set_mode = elf_tty_set_mode,
     };
     application->execution = platform_riscv32_create(
         application->image.entry, application->image.memory, application->image.memory_size,
@@ -893,5 +944,18 @@ bool loader_elf_application_set_working_directory(loader_elf_application_t *appl
     if (application == NULL || working_directory == NULL ||
         strlen(working_directory) >= sizeof(application->working_directory)) return false;
     memcpy(application->working_directory, working_directory, strlen(working_directory) + 1U);
+    return true;
+}
+
+uint32_t loader_elf_application_tty_mode(const loader_elf_application_t *application)
+{
+    return application != NULL ? application->tty_mode : 0U;
+}
+
+bool loader_elf_application_set_tty_mode(loader_elf_application_t *application, uint32_t mode)
+{
+    if (application == NULL ||
+        (mode & ~(uint32_t)TABOS_TTY_MODE_SCROLL_KEYS) != 0U) return false;
+    application->tty_mode = mode;
     return true;
 }

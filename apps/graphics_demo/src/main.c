@@ -31,7 +31,8 @@ int main(void)
         const ssize_t count = read(STDIN_FILENO, input, sizeof(input));
         for (ssize_t index = 0; index < count; ++index) {
             switch (input[index]) {
-                case 'w': case 'W': y -= 8; break;
+                // EASD because Tab5 keyboards WASD isn't naturally spaced
+                case 'e': case 'E': y -= 8; break;
                 case 's': case 'S': y += 8; break;
                 case 'a': case 'A': x -= 8; break;
                 case 'd': case 'D': x += 8; break;

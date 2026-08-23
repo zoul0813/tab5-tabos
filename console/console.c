@@ -16,6 +16,11 @@ static tabos_timer_t cursor_timer;
 static bool cursor_phase_visible = true;
 static bool graphics_active;
 
+static bool present_console(void)
+{
+    return graphics_active || display_present();
+}
+
 static bool restart_cursor_blink(void)
 {
     const bool changed = !cursor_phase_visible;
@@ -79,7 +84,7 @@ bool console_write_panic(const char *text)
         return false;
     }
     terminal_write_line(active_terminal, text);
-    const bool presented = display_present();
+    const bool presented = present_console();
     unlock_console();
     return presented;
 }
@@ -115,7 +120,7 @@ bool tabos_console_acquire(tabos_console_session_t *session)
     session->token = foreground_token;
     terminal_set_cursor_visible(active_terminal, true);
     restart_cursor_blink();
-    const bool presented = display_present();
+    const bool presented = present_console();
     if (!presented) {
         terminal_set_cursor_visible(active_terminal, false);
         foreground_token = 0U;
@@ -136,7 +141,7 @@ void tabos_console_release(tabos_console_session_t *session)
     if (owns_console(session)) {
         terminal_set_cursor_visible(active_terminal, false);
         tabos_timer_cancel(&cursor_timer);
-        (void)display_present();
+        (void)present_console();
         foreground_token = 0U;
     }
     session->token = 0U;
@@ -164,7 +169,7 @@ bool tabos_console_write(const tabos_console_session_t *session, const char *tex
     }
     terminal_write(active_terminal, text);
     restart_cursor_blink();
-    const bool presented = display_present();
+    const bool presented = present_console();
     unlock_console();
     return presented;
 }
@@ -182,7 +187,7 @@ bool tabos_console_write_line(const tabos_console_session_t *session, const char
     }
     terminal_write_line(active_terminal, text);
     restart_cursor_blink();
-    const bool presented = display_present();
+    const bool presented = present_console();
     unlock_console();
     return presented;
 }
@@ -196,7 +201,7 @@ bool tabos_console_clear(const tabos_console_session_t *session)
     }
     terminal_clear(active_terminal);
     restart_cursor_blink();
-    const bool presented = display_present();
+    const bool presented = present_console();
     unlock_console();
     return presented;
 }
@@ -223,11 +228,12 @@ static bool update_viewport(const tabos_console_session_t *session,
                             bool (*operation)(terminal_t *terminal))
 {
     lock_console();
-    if (!owns_console(session) || active_terminal == NULL || !operation(active_terminal)) {
+    if (!owns_console(session) || active_terminal == NULL || graphics_active ||
+        !operation(active_terminal)) {
         unlock_console();
         return false;
     }
-    const bool presented = display_present();
+    const bool presented = present_console();
     unlock_console();
     return presented;
 }
@@ -235,12 +241,12 @@ static bool update_viewport(const tabos_console_session_t *session,
 bool tabos_console_scroll_lines(const tabos_console_session_t *session, int lines)
 {
     lock_console();
-    if (!owns_console(session) || active_terminal == NULL ||
+    if (!owns_console(session) || active_terminal == NULL || graphics_active ||
         !terminal_scroll_lines(active_terminal, lines)) {
         unlock_console();
         return false;
     }
-    const bool presented = display_present();
+    const bool presented = present_console();
     unlock_console();
     return presented;
 }
@@ -331,7 +337,7 @@ void console_update(void)
         tabos_timer_poll(&cursor_timer)) {
         cursor_phase_visible = !cursor_phase_visible;
         terminal_set_cursor_phase(active_terminal, cursor_phase_visible);
-        (void)display_present();
+        (void)present_console();
     }
     unlock_console();
 }
@@ -339,9 +345,9 @@ void console_update(void)
 void console_redraw(void)
 {
     lock_console();
-    if (active_terminal != NULL) {
+    if (!graphics_active && active_terminal != NULL) {
         terminal_redraw(active_terminal);
-        (void)display_present();
+        (void)present_console();
     }
     unlock_console();
 }
@@ -355,13 +361,17 @@ void console_set_graphics_active(bool active)
     }
     graphics_active = active;
     if (active) {
+        terminal_set_rendering_enabled(active_terminal, false);
         tabos_timer_cancel(&cursor_timer);
         terminal_set_cursor_visible(active_terminal, false);
-    } else if (foreground_token != 0U) {
-        terminal_set_cursor_visible(active_terminal, true);
-        (void)restart_cursor_blink();
+    } else {
+        terminal_set_rendering_enabled(active_terminal, true);
+        if (foreground_token != 0U) {
+            terminal_set_cursor_visible(active_terminal, true);
+            (void)restart_cursor_blink();
+        }
         terminal_redraw(active_terminal);
-        (void)display_present();
+        (void)present_console();
     }
     unlock_console();
 }

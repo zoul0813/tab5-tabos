@@ -9,6 +9,8 @@
 #include <shell/parser.h>
 
 #include <stdint.h>
+#include <sys/ioctl.h>
+#include <tabos/tty.h>
 #include <stdbool.h>
 
 enum {
@@ -202,6 +204,10 @@ int main(int argc, char **argv)
 
     // disable buffering
     setvbuf(stdout, NULL, _IONBF, 0);
+    if (ioctl(STDIN_FILENO, TABOS_TTY_SET_MODE,
+              (uint32_t)TABOS_TTY_MODE_SCROLL_KEYS) != 0) {
+        fprintf(stderr, "shell: could not enable terminal scrollback\n");
+    }
 
     printf("TabOS shell\n");
     prompt();

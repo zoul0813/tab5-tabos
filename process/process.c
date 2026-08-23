@@ -330,6 +330,12 @@ tabos_app_result_t tabos_app_exec_args(tabos_app_context_t *context,
             loader_elf_application_destroy(application);
             return TABOS_APP_RESULT_INVALID;
         }
+        const uint32_t tty_mode = loader_elf_application_tty_mode(
+            foreground_process->context.application_data);
+        if (!loader_elf_application_set_tty_mode(application, tty_mode)) {
+            loader_elf_application_destroy(application);
+            return TABOS_APP_RESULT_INVALID;
+        }
     }
     return launch_child_descriptor(
         context, loader_elf_application_descriptor(application), application,

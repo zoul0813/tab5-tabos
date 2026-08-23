@@ -15,5 +15,7 @@ const char *loader_elf_application_working_directory(
     const loader_elf_application_t *application);
 bool loader_elf_application_set_working_directory(loader_elf_application_t *application,
                                                   const char *working_directory);
+uint32_t loader_elf_application_tty_mode(const loader_elf_application_t *application);
+bool loader_elf_application_set_tty_mode(loader_elf_application_t *application, uint32_t mode);
 
 #endif

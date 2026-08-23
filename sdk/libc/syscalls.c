@@ -7,7 +7,9 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <sys/stat.h>
+#include <sys/ioctl.h>
 #include <sys/types.h>
+#include <tabos/tty.h>
 #include <unistd.h>
 
 const char *strerror(int error)
@@ -27,6 +29,7 @@ const char *strerror(int error)
         case EINVAL: return "Invalid argument";
         case ENFILE: return "Too many open files";
         case EMFILE: return "Too many open files";
+        case ENOTTY: return "Inappropriate ioctl for device";
         case ENOSPC: return "No space left on device";
         case EROFS: return "Read-only filesystem";
         case ENAMETOOLONG: return "File name too long";
@@ -264,6 +267,30 @@ int fcntl(int descriptor, int command, ...)
         const int flags = va_arg(arguments, int);
         va_end(arguments);
         return fail_result(tabos_runtime_api->fd_set_flags(descriptor, runtime_flags(flags)));
+    }
+    errno = EINVAL;
+    return -1;
+}
+
+int ioctl(int descriptor, unsigned long request, ...)
+{
+    if (request == TABOS_TTY_GET_MODE) {
+        va_list arguments;
+        va_start(arguments, request);
+        uint32_t *mode = va_arg(arguments, uint32_t *);
+        va_end(arguments);
+        if (mode == NULL) { errno = EINVAL; return -1; }
+        const int result = tabos_runtime_api->tty_get_mode(descriptor);
+        if (result < 0) return fail_result(result);
+        *mode = (uint32_t)result;
+        return 0;
+    }
+    if (request == TABOS_TTY_SET_MODE) {
+        va_list arguments;
+        va_start(arguments, request);
+        const uint32_t mode = va_arg(arguments, uint32_t);
+        va_end(arguments);
+        return fail_result(tabos_runtime_api->tty_set_mode(descriptor, mode));
     }
     errno = EINVAL;
     return -1;

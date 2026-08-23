@@ -66,6 +66,12 @@ static const uint32_t HOST_RV32_GRAPHICS_PRESENT = UINT32_C(0xffff007c);
 static const uint32_t HOST_RV32_GRAPHICS_CLOSE = UINT32_C(0xffff0080);
 static const uint32_t HOST_RV32_GRAPHICS_CAPABILITIES = UINT32_C(0xffff0084);
 static const uint32_t HOST_RV32_GRAPHICS_BLIT_EX = UINT32_C(0xffff0088);
+static const uint32_t HOST_RV32_TTY_GET_MODE = UINT32_C(0xffff008c);
+static const uint32_t HOST_RV32_TTY_SET_MODE = UINT32_C(0xffff0090);
+
+enum {
+    HOST_RV32_API_SIZE = 148,
+};
 
 struct platform_riscv32_context {
     uint8_t *memory;
@@ -181,7 +187,7 @@ platform_riscv32_context_t *platform_riscv32_create(
 
     const uint32_t image_end = minimum_address + (uint32_t)memory_size;
     const uint32_t api_address = (image_end + 15U) & ~15U;
-    if (api_address > HOST_RV32_RAM_SIZE - 140U) {
+    if (api_address > HOST_RV32_RAM_SIZE - HOST_RV32_API_SIZE) {
         platform_riscv32_destroy(context);
         return NULL;
     }
@@ -220,8 +226,10 @@ platform_riscv32_context_t *platform_riscv32_create(
     write_u32(context->memory, api_address + 128U, HOST_RV32_GRAPHICS_CLOSE);
     write_u32(context->memory, api_address + 132U, HOST_RV32_GRAPHICS_CAPABILITIES);
     write_u32(context->memory, api_address + 136U, HOST_RV32_GRAPHICS_BLIT_EX);
+    write_u32(context->memory, api_address + 140U, HOST_RV32_TTY_GET_MODE);
+    write_u32(context->memory, api_address + 144U, HOST_RV32_TTY_SET_MODE);
 
-    uint32_t argument_data_address = api_address + 140U;
+    uint32_t argument_data_address = api_address + HOST_RV32_API_SIZE;
     uint32_t argument_data_end = argument_data_address;
     for (size_t index = 0U; index < argc; ++index) {
         if (argv[index] == NULL) {
@@ -493,6 +501,24 @@ platform_riscv32_result_t platform_riscv32_step(
             current_user_data = context->user_data;
             context->state.regs[10] = (uint32_t)context->api.fd_set_flags(
                 (int)context->state.regs[10], (int)context->state.regs[11]);
+            current_user_data = NULL;
+            context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_TTY_GET_MODE) {
+            if (context->api.tty_get_mode == NULL) return PLATFORM_RISCV32_FAULT;
+            current_user_data = context->user_data;
+            context->state.regs[10] = (uint32_t)context->api.tty_get_mode(
+                (int)context->state.regs[10]);
+            current_user_data = NULL;
+            context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_TTY_SET_MODE) {
+            if (context->api.tty_set_mode == NULL) return PLATFORM_RISCV32_FAULT;
+            current_user_data = context->user_data;
+            context->state.regs[10] = (uint32_t)context->api.tty_set_mode(
+                (int)context->state.regs[10], context->state.regs[11]);
             current_user_data = NULL;
             context->state.pc = context->state.regs[1];
             continue;

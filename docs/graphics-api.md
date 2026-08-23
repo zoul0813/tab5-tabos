@@ -51,8 +51,11 @@ animation timing resembles the ST7121 Tab5 panel. Change `TABOS_HOST_REFRESH_RAT
 through `./tools/tabos config` when another emulated refresh rate is needed. Headless
 tests remain unpaced.
 
-Opening fullscreen graphics automatically hides and pauses the terminal cursor. Closing
-the graphics context—or exiting without closing it—restores the terminal and cursor.
+Opening fullscreen graphics automatically suspends terminal rendering, presentation,
+cursor blinking, and TTY scrollback shortcuts. Keyboard events—including Ctrl+Arrow—go
+to the graphics application without requiring it to know about TTY modes. Terminal state
+remains retained but cannot overwrite or present over fullscreen graphics. Closing the
+graphics context—or exiting without closing it—redraws and restores the terminal once.
 
 Run `graphics-demo`; use W/A/S/D to move, R to rotate, and Q to exit. Run
 `graphics-benchmark` to measure 120 queued frames and report active acceleration.

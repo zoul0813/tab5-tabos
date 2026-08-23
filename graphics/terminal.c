@@ -265,6 +265,7 @@ static void render(terminal_t *terminal)
     if (terminal == NULL || terminal->framebuffer == NULL || terminal->cells == NULL) {
         return;
     }
+    if (!terminal->rendering_enabled) return;
     if (terminal->full_redraw) {
         clear_framebuffer(terminal);
         for (size_t row = 0U; row < terminal->rows; ++row) {
@@ -307,7 +308,10 @@ static void render(terminal_t *terminal)
     }
 }
 
-bool terminal_init(terminal_t *terminal, platform_framebuffer_t *framebuffer, unsigned int scale)
+static bool terminal_init_with_rendering(terminal_t *terminal,
+                                         platform_framebuffer_t *framebuffer,
+                                         unsigned int scale,
+                                         bool rendering_enabled)
 {
     if (terminal == NULL || framebuffer == NULL || framebuffer->pixels == NULL || scale == 0U) {
         return false;
@@ -351,9 +355,16 @@ bool terminal_init(terminal_t *terminal, platform_framebuffer_t *framebuffer, un
         .line_capacity = line_capacity,
         .cursor_phase_visible = true,
         .full_redraw = true,
+        .rendering_enabled = rendering_enabled,
     };
     render(terminal);
     return true;
+}
+
+bool terminal_init(terminal_t *terminal, platform_framebuffer_t *framebuffer,
+                   unsigned int scale)
+{
+    return terminal_init_with_rendering(terminal, framebuffer, scale, true);
 }
 
 void terminal_shutdown(terminal_t *terminal)
@@ -376,7 +387,8 @@ bool terminal_resize(terminal_t *terminal, platform_framebuffer_t *framebuffer,
     }
 
     terminal_t resized;
-    if (!terminal_init(&resized, framebuffer, scale)) {
+    if (!terminal_init_with_rendering(
+            &resized, framebuffer, scale, terminal->rendering_enabled)) {
         return false;
     }
     resized.foreground = terminal->foreground;
@@ -453,6 +465,13 @@ void terminal_redraw(terminal_t *terminal)
     if (terminal == NULL) return;
     terminal->full_redraw = true;
     render(terminal);
+}
+
+void terminal_set_rendering_enabled(terminal_t *terminal, bool enabled)
+{
+    if (terminal == NULL || terminal->rendering_enabled == enabled) return;
+    terminal->rendering_enabled = enabled;
+    if (enabled) terminal_redraw(terminal);
 }
 
 void terminal_write(terminal_t *terminal, const char *text)
