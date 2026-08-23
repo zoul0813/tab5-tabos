@@ -7,7 +7,7 @@
 static void print_hex_byte(unsigned char value)
 {
     static const char digits[] = "0123456789abcdef";
-    char text[3] = {digits[value >> 4U], digits[value & 0x0fU], '\0'};
+    char text[3]               = {digits[value >> 4U], digits[value & 0x0fU], '\0'};
     printf("%s", text);
 }
 
@@ -16,14 +16,14 @@ static void print_offset(unsigned int offset)
     static const char digits[] = "0123456789abcdef";
     char text[9];
     for (int index = 7; index >= 0; --index) {
-        text[index] = digits[offset & 0x0fU];
-        offset >>= 4U;
+        text[index]   = digits[offset & 0x0fU];
+        offset      >>= 4U;
     }
     text[8] = '\0';
     printf("%s  ", text);
 }
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
     if (argc != 2) {
         fprintf(stderr, "usage: hexdump file\n");
@@ -42,10 +42,12 @@ int main(int argc, char **argv)
         const ssize_t count = read(descriptor, buffer, sizeof(buffer));
         if (count < 0) {
             fprintf(stderr, "hexdump: read failed: %s\n", strerror(errno));
-            (void)close(descriptor);
+            (void) close(descriptor);
             return 1;
         }
-        if (count == 0) break;
+        if (count == 0) {
+            break;
+        }
 
         print_offset(offset);
         for (ssize_t index = 0; index < 16; ++index) {
@@ -60,10 +62,10 @@ int main(int argc, char **argv)
         printf(" | ");
         for (ssize_t index = 0; index < count; ++index) {
             const unsigned char value = buffer[index];
-            putchar(value >= 32U && value <= 126U ? (int)value : '.');
+            putchar(value >= 32U && value <= 126U ? (int) value : '.');
         }
         putchar('\n');
-        offset += (unsigned int)count;
+        offset += (unsigned int) count;
     }
 
     return close(descriptor) == 0 ? 0 : 1;

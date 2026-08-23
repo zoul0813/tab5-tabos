@@ -10,32 +10,32 @@ uint64_t tabos_time_monotonic_ms(void)
     return platform_time_ms();
 }
 
-void tabos_timer_start(tabos_timer_t *timer, uint64_t delay_ms, uint64_t interval_ms)
+void tabos_timer_start(tabos_timer_t* timer, uint64_t delay_ms, uint64_t interval_ms)
 {
     if (timer == NULL) {
         return;
     }
     const uint64_t now = tabos_time_monotonic_ms();
-    *timer = (tabos_timer_t){
-        .deadline_ms = UINT64_MAX - now < delay_ms ? UINT64_MAX : now + delay_ms,
-        .interval_ms = interval_ms,
-        .active = true,
+    *timer             = (tabos_timer_t) {
+                    .deadline_ms = UINT64_MAX - now < delay_ms ? UINT64_MAX : now + delay_ms,
+                    .interval_ms = interval_ms,
+                    .active      = true,
     };
 }
 
-void tabos_timer_cancel(tabos_timer_t *timer)
+void tabos_timer_cancel(tabos_timer_t* timer)
 {
     if (timer != NULL) {
-        *timer = (tabos_timer_t){0};
+        *timer = (tabos_timer_t) {0};
     }
 }
 
-bool tabos_timer_is_active(const tabos_timer_t *timer)
+bool tabos_timer_is_active(const tabos_timer_t* timer)
 {
     return timer != NULL && timer->active;
 }
 
-bool tabos_timer_poll(tabos_timer_t *timer)
+bool tabos_timer_poll(tabos_timer_t* timer)
 {
     if (timer == NULL || !timer->active) {
         return false;

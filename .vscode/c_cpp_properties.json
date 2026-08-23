@@ -1,0 +1,15 @@
+{
+    "configurations": [
+        {
+            "name": "Tab5 (ESP32-P4)",
+            "compileCommands": "${workspaceFolder}/build/tab5-debug/compile_commands.json",
+            "cStandard": "c17"
+        },
+        {
+            "name": "Host (macOS)",
+            "compileCommands": "${workspaceFolder}/build/macos-debug/compile_commands.json",
+            "cStandard": "c17"
+        }
+    ],
+    "version": 4
+}

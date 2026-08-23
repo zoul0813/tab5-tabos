@@ -7,20 +7,20 @@
 #include <string.h>
 
 enum {
-    FILESYSTEM_MAX_FILES = 32,
+    FILESYSTEM_MAX_FILES       = 32,
     FILESYSTEM_MAX_DIRECTORIES = 8,
 };
 
 typedef struct {
-    platform_file_t platform_file;
-    uint16_t generation;
-    bool open;
+        platform_file_t platform_file;
+        uint16_t generation;
+        bool open;
 } file_slot_t;
 
 typedef struct {
-    platform_dir_t platform_directory;
-    uint16_t generation;
-    bool open;
+        platform_dir_t platform_directory;
+        uint16_t generation;
+        bool open;
 } directory_slot_t;
 
 static file_slot_t files[FILESYSTEM_MAX_FILES];
@@ -33,8 +33,7 @@ static char working_directory[TABOS_FS_PATH_MAX] = "A:/";
 
 static void lock_filesystem(void)
 {
-    while (atomic_flag_test_and_set_explicit(&filesystem_lock, memory_order_acquire)) {
-    }
+    while (atomic_flag_test_and_set_explicit(&filesystem_lock, memory_order_acquire)) {}
 }
 
 static void unlock_filesystem(void)
@@ -48,19 +47,18 @@ static int fail(int error)
     return -1;
 }
 
-static bool resolve_path(const char *path, char resolved[TABOS_FS_PATH_MAX])
+static bool resolve_path(const char* path, char resolved[TABOS_FS_PATH_MAX])
 {
     if (!filesystem_initialized || !filesystem_mounted) {
-        (void)fail(TABOS_ENODEV);
+        (void) fail(TABOS_ENODEV);
         return false;
     }
     if (!filesystem_normalize_path(path, working_directory, resolved, TABOS_FS_PATH_MAX)) {
-        (void)fail(path != NULL && strlen(path) >= TABOS_FS_PATH_MAX
-            ? TABOS_ENAMETOOLONG : TABOS_EINVAL);
+        (void) fail(path != NULL && strlen(path) >= TABOS_FS_PATH_MAX ? TABOS_ENAMETOOLONG : TABOS_EINVAL);
         return false;
     }
     if (!platform_storage_has_drive(resolved[0])) {
-        (void)fail(TABOS_ENODEV);
+        (void) fail(TABOS_ENODEV);
         return false;
     }
     return true;
@@ -68,37 +66,39 @@ static bool resolve_path(const char *path, char resolved[TABOS_FS_PATH_MAX])
 
 static tabos_fd_t encode_file(size_t index, uint16_t generation)
 {
-    return (tabos_fd_t)(((uint32_t)generation << 8U) | (uint32_t)(index + 1U));
+    return (tabos_fd_t) (((uint32_t) generation << 8U) | (uint32_t) (index + 1U));
 }
 
-static file_slot_t *file_for_descriptor(tabos_fd_t descriptor)
+static file_slot_t* file_for_descriptor(tabos_fd_t descriptor)
 {
-    const uint32_t value = (uint32_t)descriptor;
+    const uint32_t value         = (uint32_t) descriptor;
     const uint32_t encoded_index = value & 0xffU;
-    const uint16_t generation = (uint16_t)(value >> 8U);
-    if (descriptor <= 0 || encoded_index == 0U || encoded_index > FILESYSTEM_MAX_FILES) return NULL;
-    file_slot_t *slot = &files[encoded_index - 1U];
+    const uint16_t generation    = (uint16_t) (value >> 8U);
+    if (descriptor <= 0 || encoded_index == 0U || encoded_index > FILESYSTEM_MAX_FILES) {
+        return NULL;
+    }
+    file_slot_t* slot = &files[encoded_index - 1U];
     return slot->open && slot->generation == generation ? slot : NULL;
 }
 
 static tabos_dir_t encode_directory(size_t index, uint16_t generation)
 {
-    return (tabos_dir_t)(((uint32_t)generation << 8U) | (uint32_t)(index + 1U));
+    return (tabos_dir_t) (((uint32_t) generation << 8U) | (uint32_t) (index + 1U));
 }
 
-static directory_slot_t *directory_for_descriptor(tabos_dir_t descriptor)
+static directory_slot_t* directory_for_descriptor(tabos_dir_t descriptor)
 {
-    const uint32_t value = (uint32_t)descriptor;
+    const uint32_t value         = (uint32_t) descriptor;
     const uint32_t encoded_index = value & 0xffU;
-    const uint16_t generation = (uint16_t)(value >> 8U);
+    const uint16_t generation    = (uint16_t) (value >> 8U);
     if (descriptor <= 0 || encoded_index == 0U || encoded_index > FILESYSTEM_MAX_DIRECTORIES) {
         return NULL;
     }
-    directory_slot_t *slot = &directories[encoded_index - 1U];
+    directory_slot_t* slot = &directories[encoded_index - 1U];
     return slot->open && slot->generation == generation ? slot : NULL;
 }
 
-int *tabos_errno_location(void)
+int* tabos_errno_location(void)
 {
     return &filesystem_errno;
 }
@@ -108,52 +108,64 @@ size_t tabos_fs_drive_count(void)
     return filesystem_initialized ? platform_storage_drive_count() : 0U;
 }
 
-bool tabos_fs_drive_info(size_t index, tabos_drive_info_t *info)
+bool tabos_fs_drive_info(size_t index, tabos_drive_info_t* info)
 {
-    if (!filesystem_initialized || info == NULL) return false;
+    if (!filesystem_initialized || info == NULL) {
+        return false;
+    }
     platform_storage_info_t platform_info;
-    if (!platform_storage_info(index, &platform_info)) return false;
-    *info = (tabos_drive_info_t){
+    if (!platform_storage_info(index, &platform_info)) {
+        return false;
+    }
+    *info = (tabos_drive_info_t) {
         .total_bytes = platform_info.total_bytes,
-        .free_bytes = platform_info.free_bytes,
-        .name = platform_info.name,
-        .letter = platform_info.letter,
-        .mounted = platform_info.mounted,
-        .removable = platform_info.removable,
+        .free_bytes  = platform_info.free_bytes,
+        .name        = platform_info.name,
+        .letter      = platform_info.letter,
+        .mounted     = platform_info.mounted,
+        .removable   = platform_info.removable,
     };
     return true;
 }
 
 bool filesystem_init(void)
 {
-    if (filesystem_initialized) return true;
+    if (filesystem_initialized) {
+        return true;
+    }
     memset(files, 0, sizeof(files));
     memset(directories, 0, sizeof(directories));
     memcpy(working_directory, "A:/", 4U);
-    filesystem_errno = 0;
-    filesystem_initialized = true;
-    filesystem_mounted = platform_storage_init();
+    filesystem_errno         = 0;
+    filesystem_initialized   = true;
+    filesystem_mounted       = platform_storage_init();
     const char default_drive = platform_storage_default_drive();
-    if (filesystem_mounted && default_drive != '\0') working_directory[0] = default_drive;
+    if (filesystem_mounted && default_drive != '\0') {
+        working_directory[0] = default_drive;
+    }
     return true;
 }
 
 void filesystem_shutdown(void)
 {
-    if (!filesystem_initialized) return;
+    if (!filesystem_initialized) {
+        return;
+    }
     lock_filesystem();
     for (size_t index = 0; index < FILESYSTEM_MAX_FILES; ++index) {
-        if (files[index].open) (void)platform_storage_close(files[index].platform_file);
+        if (files[index].open) {
+            (void) platform_storage_close(files[index].platform_file);
+        }
     }
     for (size_t index = 0; index < FILESYSTEM_MAX_DIRECTORIES; ++index) {
         if (directories[index].open) {
-            (void)platform_storage_closedir(directories[index].platform_directory);
+            (void) platform_storage_closedir(directories[index].platform_directory);
         }
     }
     memset(files, 0, sizeof(files));
     memset(directories, 0, sizeof(directories));
     platform_storage_shutdown();
-    filesystem_mounted = false;
+    filesystem_mounted     = false;
     filesystem_initialized = false;
     unlock_filesystem();
 }
@@ -163,7 +175,7 @@ bool filesystem_is_mounted(void)
     return filesystem_initialized && filesystem_mounted;
 }
 
-tabos_fd_t tabos_fs_open(const char *path, int flags, uint32_t mode)
+tabos_fd_t tabos_fs_open(const char* path, int flags, uint32_t mode)
 {
     char resolved[TABOS_FS_PATH_MAX];
     lock_filesystem();
@@ -172,24 +184,27 @@ tabos_fd_t tabos_fs_open(const char *path, int flags, uint32_t mode)
         return -1;
     }
     size_t index = 0U;
-    while (index < FILESYSTEM_MAX_FILES && files[index].open) ++index;
+    while (index < FILESYSTEM_MAX_FILES && files[index].open) {
+        ++index;
+    }
     if (index == FILESYSTEM_MAX_FILES) {
         unlock_filesystem();
         return fail(TABOS_EMFILE);
     }
     platform_file_t platform_file = 0U;
-    const int error = platform_storage_open(resolved[0], resolved + 2U, flags, mode,
-                                            &platform_file);
+    const int error               = platform_storage_open(resolved[0], resolved + 2U, flags, mode, &platform_file);
     if (error != 0) {
         unlock_filesystem();
         return fail(error);
     }
-    file_slot_t *slot = &files[index];
-    if (++slot->generation == 0U) ++slot->generation;
-    slot->platform_file = platform_file;
-    slot->open = true;
+    file_slot_t* slot = &files[index];
+    if (++slot->generation == 0U) {
+        ++slot->generation;
+    }
+    slot->platform_file         = platform_file;
+    slot->open                  = true;
     const tabos_fd_t descriptor = encode_file(index, slot->generation);
-    filesystem_errno = 0;
+    filesystem_errno            = 0;
     unlock_filesystem();
     return descriptor;
 }
@@ -197,64 +212,70 @@ tabos_fd_t tabos_fs_open(const char *path, int flags, uint32_t mode)
 int tabos_fs_close(tabos_fd_t descriptor)
 {
     lock_filesystem();
-    file_slot_t *slot = file_for_descriptor(descriptor);
+    file_slot_t* slot = file_for_descriptor(descriptor);
     if (slot == NULL) {
         unlock_filesystem();
         return fail(TABOS_EBADF);
     }
     const int error = platform_storage_close(slot->platform_file);
-    slot->open = false;
+    slot->open      = false;
     unlock_filesystem();
     return error == 0 ? 0 : fail(error);
 }
 
-tabos_ssize_t tabos_fs_read(tabos_fd_t descriptor, void *buffer, size_t count)
+tabos_ssize_t tabos_fs_read(tabos_fd_t descriptor, void* buffer, size_t count)
 {
-    if (buffer == NULL && count != 0U) return fail(TABOS_EINVAL);
+    if (buffer == NULL && count != 0U) {
+        return fail(TABOS_EINVAL);
+    }
     lock_filesystem();
-    file_slot_t *slot = file_for_descriptor(descriptor);
+    file_slot_t* slot = file_for_descriptor(descriptor);
     if (slot == NULL) {
         unlock_filesystem();
         return fail(TABOS_EBADF);
     }
     size_t bytes_read = 0U;
-    const int error = platform_storage_read(slot->platform_file, buffer, count, &bytes_read);
+    const int error   = platform_storage_read(slot->platform_file, buffer, count, &bytes_read);
     unlock_filesystem();
-    return error == 0 ? (tabos_ssize_t)bytes_read : fail(error);
+    return error == 0 ? (tabos_ssize_t) bytes_read : fail(error);
 }
 
-tabos_ssize_t tabos_fs_write(tabos_fd_t descriptor, const void *buffer, size_t count)
+tabos_ssize_t tabos_fs_write(tabos_fd_t descriptor, const void* buffer, size_t count)
 {
-    if (buffer == NULL && count != 0U) return fail(TABOS_EINVAL);
+    if (buffer == NULL && count != 0U) {
+        return fail(TABOS_EINVAL);
+    }
     lock_filesystem();
-    file_slot_t *slot = file_for_descriptor(descriptor);
+    file_slot_t* slot = file_for_descriptor(descriptor);
     if (slot == NULL) {
         unlock_filesystem();
         return fail(TABOS_EBADF);
     }
     size_t bytes_written = 0U;
-    const int error = platform_storage_write(slot->platform_file, buffer, count, &bytes_written);
+    const int error      = platform_storage_write(slot->platform_file, buffer, count, &bytes_written);
     unlock_filesystem();
-    return error == 0 ? (tabos_ssize_t)bytes_written : fail(error);
+    return error == 0 ? (tabos_ssize_t) bytes_written : fail(error);
 }
 
 tabos_off_t tabos_fs_seek(tabos_fd_t descriptor, tabos_off_t offset, int whence)
 {
     lock_filesystem();
-    file_slot_t *slot = file_for_descriptor(descriptor);
+    file_slot_t* slot = file_for_descriptor(descriptor);
     if (slot == NULL) {
         unlock_filesystem();
         return fail(TABOS_EBADF);
     }
     tabos_off_t position = 0;
-    const int error = platform_storage_seek(slot->platform_file, offset, whence, &position);
+    const int error      = platform_storage_seek(slot->platform_file, offset, whence, &position);
     unlock_filesystem();
     return error == 0 ? position : fail(error);
 }
 
-int tabos_fs_stat(const char *path, tabos_stat_t *status)
+int tabos_fs_stat(const char* path, tabos_stat_t* status)
 {
-    if (status == NULL) return fail(TABOS_EINVAL);
+    if (status == NULL) {
+        return fail(TABOS_EINVAL);
+    }
     char resolved[TABOS_FS_PATH_MAX];
     lock_filesystem();
     if (!resolve_path(path, resolved)) {
@@ -266,11 +287,13 @@ int tabos_fs_stat(const char *path, tabos_stat_t *status)
     return error == 0 ? 0 : fail(error);
 }
 
-int tabos_fs_fstat(tabos_fd_t descriptor, tabos_stat_t *status)
+int tabos_fs_fstat(tabos_fd_t descriptor, tabos_stat_t* status)
 {
-    if (status == NULL) return fail(TABOS_EINVAL);
+    if (status == NULL) {
+        return fail(TABOS_EINVAL);
+    }
     lock_filesystem();
-    file_slot_t *slot = file_for_descriptor(descriptor);
+    file_slot_t* slot = file_for_descriptor(descriptor);
     if (slot == NULL) {
         unlock_filesystem();
         return fail(TABOS_EBADF);
@@ -280,7 +303,7 @@ int tabos_fs_fstat(tabos_fd_t descriptor, tabos_stat_t *status)
     return error == 0 ? 0 : fail(error);
 }
 
-static int path_operation(const char *path, int (*operation)(char, const char *))
+static int path_operation(const char* path, int (*operation)(char, const char*))
 {
     char resolved[TABOS_FS_PATH_MAX];
     lock_filesystem();
@@ -293,17 +316,17 @@ static int path_operation(const char *path, int (*operation)(char, const char *)
     return error == 0 ? 0 : fail(error);
 }
 
-int tabos_fs_unlink(const char *path)
+int tabos_fs_unlink(const char* path)
 {
     return path_operation(path, platform_storage_unlink);
 }
 
-int tabos_fs_rmdir(const char *path)
+int tabos_fs_rmdir(const char* path)
 {
     return path_operation(path, platform_storage_rmdir);
 }
 
-int tabos_fs_mkdir(const char *path, uint32_t mode)
+int tabos_fs_mkdir(const char* path, uint32_t mode)
 {
     char resolved[TABOS_FS_PATH_MAX];
     lock_filesystem();
@@ -316,7 +339,7 @@ int tabos_fs_mkdir(const char *path, uint32_t mode)
     return error == 0 ? 0 : fail(error);
 }
 
-int tabos_fs_rename(const char *old_path, const char *new_path)
+int tabos_fs_rename(const char* old_path, const char* new_path)
 {
     char old_resolved[TABOS_FS_PATH_MAX];
     char new_resolved[TABOS_FS_PATH_MAX];
@@ -329,13 +352,12 @@ int tabos_fs_rename(const char *old_path, const char *new_path)
         unlock_filesystem();
         return fail(TABOS_EXDEV);
     }
-    const int error = platform_storage_rename(old_resolved[0], old_resolved + 2U,
-                                              new_resolved + 2U);
+    const int error = platform_storage_rename(old_resolved[0], old_resolved + 2U, new_resolved + 2U);
     unlock_filesystem();
     return error == 0 ? 0 : fail(error);
 }
 
-int tabos_fs_chdir(const char *path)
+int tabos_fs_chdir(const char* path)
 {
     tabos_stat_t status;
     char resolved[TABOS_FS_PATH_MAX];
@@ -354,17 +376,17 @@ int tabos_fs_chdir(const char *path)
     return 0;
 }
 
-char *tabos_fs_getcwd(char *buffer, size_t size)
+char* tabos_fs_getcwd(char* buffer, size_t size)
 {
     if (buffer == NULL || size == 0U) {
-        (void)fail(TABOS_EINVAL);
+        (void) fail(TABOS_EINVAL);
         return NULL;
     }
     lock_filesystem();
     const size_t required = strlen(working_directory) + 1U;
     if (required > size) {
         unlock_filesystem();
-        (void)fail(TABOS_ENAMETOOLONG);
+        (void) fail(TABOS_ENAMETOOLONG);
         return NULL;
     }
     memcpy(buffer, working_directory, required);
@@ -372,7 +394,7 @@ char *tabos_fs_getcwd(char *buffer, size_t size)
     return buffer;
 }
 
-tabos_dir_t tabos_fs_opendir(const char *path)
+tabos_dir_t tabos_fs_opendir(const char* path)
 {
     char resolved[TABOS_FS_PATH_MAX];
     lock_filesystem();
@@ -381,37 +403,42 @@ tabos_dir_t tabos_fs_opendir(const char *path)
         return -1;
     }
     size_t index = 0U;
-    while (index < FILESYSTEM_MAX_DIRECTORIES && directories[index].open) ++index;
+    while (index < FILESYSTEM_MAX_DIRECTORIES && directories[index].open) {
+        ++index;
+    }
     if (index == FILESYSTEM_MAX_DIRECTORIES) {
         unlock_filesystem();
         return fail(TABOS_EMFILE);
     }
     platform_dir_t platform_directory = 0U;
-    const int error = platform_storage_opendir(resolved[0], resolved + 2U,
-                                               &platform_directory);
+    const int error                   = platform_storage_opendir(resolved[0], resolved + 2U, &platform_directory);
     if (error != 0) {
         unlock_filesystem();
         return fail(error);
     }
-    directory_slot_t *slot = &directories[index];
-    if (++slot->generation == 0U) ++slot->generation;
-    slot->platform_directory = platform_directory;
-    slot->open = true;
+    directory_slot_t* slot = &directories[index];
+    if (++slot->generation == 0U) {
+        ++slot->generation;
+    }
+    slot->platform_directory     = platform_directory;
+    slot->open                   = true;
     const tabos_dir_t descriptor = encode_directory(index, slot->generation);
     unlock_filesystem();
     return descriptor;
 }
 
-int tabos_fs_readdir(tabos_dir_t directory, tabos_dirent_t *entry)
+int tabos_fs_readdir(tabos_dir_t directory, tabos_dirent_t* entry)
 {
-    if (entry == NULL) return fail(TABOS_EINVAL);
+    if (entry == NULL) {
+        return fail(TABOS_EINVAL);
+    }
     lock_filesystem();
-    directory_slot_t *slot = directory_for_descriptor(directory);
+    directory_slot_t* slot = directory_for_descriptor(directory);
     if (slot == NULL) {
         unlock_filesystem();
         return fail(TABOS_EBADF);
     }
-    bool end = false;
+    bool end        = false;
     const int error = platform_storage_readdir(slot->platform_directory, entry, &end);
     unlock_filesystem();
     return error == 0 ? (end ? 0 : 1) : fail(error);
@@ -420,13 +447,13 @@ int tabos_fs_readdir(tabos_dir_t directory, tabos_dirent_t *entry)
 int tabos_fs_closedir(tabos_dir_t directory)
 {
     lock_filesystem();
-    directory_slot_t *slot = directory_for_descriptor(directory);
+    directory_slot_t* slot = directory_for_descriptor(directory);
     if (slot == NULL) {
         unlock_filesystem();
         return fail(TABOS_EBADF);
     }
     const int error = platform_storage_closedir(slot->platform_directory);
-    slot->open = false;
+    slot->open      = false;
     unlock_filesystem();
     return error == 0 ? 0 : fail(error);
 }

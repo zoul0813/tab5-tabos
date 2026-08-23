@@ -6,16 +6,12 @@
 
 #include <tabos/platform/platform.h>
 
-static inline bool platform_framebuffer_rotate_clockwise(
-    const platform_framebuffer_t *source,
-    platform_pixel_t *destination,
-    size_t destination_width,
-    size_t destination_height
-)
+static inline bool platform_framebuffer_rotate_clockwise(const platform_framebuffer_t* source,
+                                                         platform_pixel_t* destination, size_t destination_width,
+                                                         size_t destination_height)
 {
-    if (source == NULL || source->pixels == NULL || destination == NULL ||
-        source->stride_pixels < source->width || destination_width != source->height ||
-        destination_height != source->width) {
+    if (source == NULL || source->pixels == NULL || destination == NULL || source->stride_pixels < source->width ||
+        destination_width != source->height || destination_height != source->width) {
         return false;
     }
 
@@ -31,16 +27,12 @@ static inline bool platform_framebuffer_rotate_clockwise(
     return true;
 }
 
-static inline bool platform_framebuffer_rotate_counter_clockwise(
-    const platform_framebuffer_t *source,
-    platform_pixel_t *destination,
-    size_t destination_width,
-    size_t destination_height
-)
+static inline bool platform_framebuffer_rotate_counter_clockwise(const platform_framebuffer_t* source,
+                                                                 platform_pixel_t* destination,
+                                                                 size_t destination_width, size_t destination_height)
 {
-    if (source == NULL || source->pixels == NULL || destination == NULL ||
-        source->stride_pixels < source->width || destination_width != source->height ||
-        destination_height != source->width) {
+    if (source == NULL || source->pixels == NULL || destination == NULL || source->stride_pixels < source->width ||
+        destination_width != source->height || destination_height != source->width) {
         return false;
     }
 

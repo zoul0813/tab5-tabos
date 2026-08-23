@@ -12,13 +12,12 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
-static const char *const TAG = TABOS_SYSTEM_LOG_TAG;
+static const char* const TAG = TABOS_SYSTEM_LOG_TAG;
 
 static void run_usb_storage_mode(void)
 {
     terminal_t terminal;
-    if (!display_init() ||
-        !terminal_init(&terminal, display_framebuffer(), TABOS_TERMINAL_SCALE)) {
+    if (!display_init() || !terminal_init(&terminal, display_framebuffer(), TABOS_TERMINAL_SCALE)) {
         ESP_LOGE(TAG, "Could not display USB storage status");
         vTaskDelay(pdMS_TO_TICKS(2000));
         esp_restart();
@@ -32,17 +31,19 @@ static void run_usb_storage_mode(void)
     terminal_write_line(&terminal, "T: microSD will appear as a removable disk.");
     terminal_write_line(&terminal, "Eject the disk safely when finished.");
     terminal_write_line(&terminal, "Tab5 will restart automatically after eject.");
-    (void)display_present();
+    (void) display_present();
 
     if (!tab5_usb_storage_start()) {
         terminal_write_line(&terminal, "");
         terminal_write_line(&terminal, "Could not start USB storage mode.");
         terminal_write_line(&terminal, "Restarting...");
-        (void)display_present();
+        (void) display_present();
         vTaskDelay(pdMS_TO_TICKS(3000));
         esp_restart();
     }
-    for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
+    for (;;) {
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
 }
 
 void app_main(void)
@@ -70,13 +71,7 @@ void app_main(void)
         return;
     }
 
-    ESP_LOGI(
-        TAG,
-        "%s %s bootstrapped on %s",
-        TABOS_SYSTEM_NAME,
-        kernel_runtime_version(),
-        platform_name()
-    );
+    ESP_LOGI(TAG, "%s %s bootstrapped on %s", TABOS_SYSTEM_NAME, kernel_runtime_version(), platform_name());
 
-    (void)platform_run(kernel_runtime_update);
+    (void) platform_run(kernel_runtime_update);
 }

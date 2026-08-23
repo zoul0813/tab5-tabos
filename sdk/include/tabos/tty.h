@@ -5,7 +5,7 @@
 
 enum {
     TABOS_TTY_MODE_SCROLL_KEYS = 1U << 0U,
-    TABOS_TTY_MODE_RAW_INPUT = 1U << 1U,
+    TABOS_TTY_MODE_RAW_INPUT   = 1U << 1U,
 };
 
 enum {

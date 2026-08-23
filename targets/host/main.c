@@ -12,12 +12,12 @@
 #include <stdio.h>
 #include <string.h>
 
-static bool is_smoke_test(int argc, char **argv)
+static bool is_smoke_test(int argc, char** argv)
 {
     return argc == 2 && strcmp(argv[1], "--smoke") == 0;
 }
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
     const bool headless = is_smoke_test(argc, argv);
 

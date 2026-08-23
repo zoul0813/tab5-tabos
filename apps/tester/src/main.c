@@ -5,13 +5,19 @@
 #include <stdio.h>
 #include <string.h>
 
-static int run_process_fixture(int argc, char **argv)
+static int run_process_fixture(int argc, char** argv)
 {
-    if (argc != 2 || argv == NULL) return -1;
-    if (strcmp(argv[1], "--process-leaf") == 0) return 23;
-    if (strcmp(argv[1], "--process-child") != 0) return -1;
+    if (argc != 2 || argv == NULL) {
+        return -1;
+    }
+    if (strcmp(argv[1], "--process-leaf") == 0) {
+        return 23;
+    }
+    if (strcmp(argv[1], "--process-child") != 0) {
+        return -1;
+    }
 
-    const char *const arguments[] = {
+    const char* const arguments[] = {
         "T:/bin/tester",
         "--process-leaf",
         NULL,
@@ -20,20 +26,22 @@ static int run_process_fixture(int argc, char **argv)
     return status == 23 ? 37 : 38;
 }
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
     const int fixture_status = run_process_fixture(argc, argv);
-    if (fixture_status >= 0) return fixture_status;
+    if (fixture_status >= 0) {
+        return fixture_status;
+    }
 
     static const tester_test_t tests[] = {
-        {"Arguments", tester_test_arguments},
-        {"Standard I/O", tester_test_stdio},
-        {"Heap", tester_test_heap},
+        {                       "Arguments",  tester_test_arguments},
+        {                    "Standard I/O",      tester_test_stdio},
+        {                            "Heap",       tester_test_heap},
         {"Filesystem and working directory", tester_test_filesystem},
-        {"Nonblocking input", tester_test_input},
-        {"Nested process execution", tester_test_process},
-        {"Time and system information", tester_test_runtime},
-        {"Fullscreen graphics", tester_test_graphics},
+        {               "Nonblocking input",      tester_test_input},
+        {        "Nested process execution",    tester_test_process},
+        {     "Time and system information",    tester_test_runtime},
+        {             "Fullscreen graphics",   tester_test_graphics},
     };
     tester_context_t context = {.argc = argc, .argv = argv};
 

@@ -15,8 +15,8 @@
 
 #include <stdlib.h>
 
-static const char *const TAG = "tabos_usb_storage";
-static sdmmc_card_t *storage_card;
+static const char* const TAG = "tabos_usb_storage";
+static sdmmc_card_t* storage_card;
 static sd_pwr_ctrl_handle_t storage_power;
 static tinyusb_msc_storage_handle_t storage_handle;
 static bool usb_attached;
@@ -39,29 +39,33 @@ bool tab5_boot_usb_storage_requested(uint32_t window_ms)
 
 static void request_restart(void)
 {
-    if (restart_requested) return;
+    if (restart_requested) {
+        return;
+    }
     restart_requested = true;
     ESP_LOGI(TAG, "USB storage session ended; restarting Tab5");
     esp_restart();
 }
 
-static void storage_event(tinyusb_msc_storage_handle_t handle,
-                          tinyusb_msc_event_t *event, void *arg)
+static void storage_event(tinyusb_msc_storage_handle_t handle, tinyusb_msc_event_t* event, void* arg)
 {
-    (void)handle;
-    (void)arg;
-    if (event == NULL || !usb_attached ||
-        event->mount_point != TINYUSB_MSC_STORAGE_MOUNT_APP) return;
-    if (event->id == TINYUSB_MSC_EVENT_MOUNT_COMPLETE ||
-        event->id == TINYUSB_MSC_EVENT_MOUNT_FAILED ||
-        event->id == TINYUSB_MSC_EVENT_FORMAT_REQUIRED ||
-        event->id == TINYUSB_MSC_EVENT_FORMAT_FAILED) request_restart();
+    (void) handle;
+    (void) arg;
+    if (event == NULL || !usb_attached || event->mount_point != TINYUSB_MSC_STORAGE_MOUNT_APP) {
+        return;
+    }
+    if (event->id == TINYUSB_MSC_EVENT_MOUNT_COMPLETE || event->id == TINYUSB_MSC_EVENT_MOUNT_FAILED ||
+        event->id == TINYUSB_MSC_EVENT_FORMAT_REQUIRED || event->id == TINYUSB_MSC_EVENT_FORMAT_FAILED) {
+        request_restart();
+    }
 }
 
-static void usb_event(tinyusb_event_t *event, void *arg)
+static void usb_event(tinyusb_event_t* event, void* arg)
 {
-    (void)arg;
-    if (event == NULL) return;
+    (void) arg;
+    if (event == NULL) {
+        return;
+    }
     if (event->id == TINYUSB_EVENT_ATTACHED) {
         usb_attached = true;
     } else if (event->id == TINYUSB_EVENT_DETACHED && usb_attached) {
@@ -77,18 +81,28 @@ static esp_err_t initialize_card(void)
     bsp_sdcard_sdmmc_get_slot(SDMMC_HOST_SLOT_0, &slot);
 
     const sd_pwr_ctrl_ldo_config_t power_config = {.ldo_chan_id = 4};
-    esp_err_t result = sd_pwr_ctrl_new_on_chip_ldo(&power_config, &storage_power);
-    if (result != ESP_OK) return result;
+    esp_err_t result                            = sd_pwr_ctrl_new_on_chip_ldo(&power_config, &storage_power);
+    if (result != ESP_OK) {
+        return result;
+    }
     host.pwr_ctrl_handle = storage_power;
 
     storage_card = calloc(1U, sizeof(*storage_card));
-    if (storage_card == NULL) return ESP_ERR_NO_MEM;
+    if (storage_card == NULL) {
+        return ESP_ERR_NO_MEM;
+    }
     result = host.init();
-    if (result != ESP_OK) return result;
+    if (result != ESP_OK) {
+        return result;
+    }
     result = sdmmc_host_init_slot(host.slot, &slot);
-    if (result != ESP_OK) return result;
+    if (result != ESP_OK) {
+        return result;
+    }
     result = sdmmc_card_init(&host, storage_card);
-    if (result == ESP_OK) sdmmc_card_print_info(stdout, storage_card);
+    if (result == ESP_OK) {
+        sdmmc_card_print_info(stdout, storage_card);
+    }
     return result;
 }
 
@@ -99,7 +113,9 @@ bool tab5_usb_storage_start(void)
      * connector.  Remove the board's host-mode 5 V supply before turning that
      * connector into a device port; VBUS must come from the attached host.
      */
-    if (!platform_usb_port_disable_host_power()) return false;
+    if (!platform_usb_port_disable_host_power()) {
+        return false;
+    }
 
     esp_err_t result = initialize_card();
     if (result != ESP_OK) {
@@ -118,11 +134,12 @@ bool tab5_usb_storage_start(void)
 
     const tinyusb_msc_storage_config_t storage_config = {
         .medium.card = storage_card,
-        .fat_fs = {
-            .base_path = BSP_SD_MOUNT_POINT,
-            .config.max_files = 5,
-            .do_not_format = true,
-        },
+        .fat_fs =
+            {
+                     .base_path        = BSP_SD_MOUNT_POINT,
+                     .config.max_files = 5,
+                     .do_not_format    = true,
+                     },
         .mount_point = TINYUSB_MSC_STORAGE_MOUNT_USB,
     };
     result = tinyusb_msc_new_storage_sdmmc(&storage_config, &storage_handle);
@@ -132,7 +149,7 @@ bool tab5_usb_storage_start(void)
     }
 
     tinyusb_config_t usb_config = TINYUSB_DEFAULT_CONFIG(usb_event, NULL);
-    result = tinyusb_driver_install(&usb_config);
+    result                      = tinyusb_driver_install(&usb_config);
     if (result != ESP_OK) {
         ESP_LOGE(TAG, "Could not start USB device: %s", esp_err_to_name(result));
         return false;

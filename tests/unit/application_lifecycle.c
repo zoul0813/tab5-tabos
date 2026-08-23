@@ -23,15 +23,19 @@ static unsigned int file_root_stage;
 static bool file_child_cleanup_complete;
 static tabos_process_termination_t requested_panic_cause;
 
-static bool terminal_contains(const terminal_t *terminal, const char *text)
+static bool terminal_contains(const terminal_t* terminal, const char* text)
 {
     const size_t length = strlen(text);
-    if (length == 0U) return true;
-    size_t matched = 0U;
+    if (length == 0U) {
+        return true;
+    }
+    size_t matched          = 0U;
     const size_t cell_count = terminal->line_capacity * terminal->columns;
     for (size_t index = 0U; index < cell_count; ++index) {
         if (terminal->cells[index].character == text[matched]) {
-            if (++matched == length) return true;
+            if (++matched == length) {
+                return true;
+            }
         } else {
             matched = terminal->cells[index].character == text[0] ? 1U : 0U;
         }
@@ -39,12 +43,12 @@ static bool terminal_contains(const terminal_t *terminal, const char *text)
     return false;
 }
 
-static bool nested_entry(tabos_app_context_t *context)
+static bool nested_entry(tabos_app_context_t* context)
 {
     return tabos_app_console(context) != NULL;
 }
 
-static void root_update(tabos_app_context_t *context)
+static void root_update(tabos_app_context_t* context)
 {
     if (root_stage++ == 0U) {
         if (kernel_process_launch_child(context, "nested-child") != TABOS_APP_RESULT_OK) {
@@ -58,7 +62,7 @@ static void root_update(tabos_app_context_t *context)
     }
 }
 
-static void child_update(tabos_app_context_t *context)
+static void child_update(tabos_app_context_t* context)
 {
     if (child_stage++ == 0U) {
         if (kernel_process_launch_child(context, "nested-grandchild") != TABOS_APP_RESULT_OK) {
@@ -72,39 +76,39 @@ static void child_update(tabos_app_context_t *context)
     }
 }
 
-static void grandchild_update(tabos_app_context_t *context)
+static void grandchild_update(tabos_app_context_t* context)
 {
     tabos_app_request_exit(context, 33);
 }
 
 static const tabos_app_descriptor_t root_app = {
-    .abi_version = TABOS_APPLICATION_ABI_VERSION,
-    .name = "nested-root",
-    .version = "1.0.0",
+    .abi_version  = TABOS_APPLICATION_ABI_VERSION,
+    .name         = "nested-root",
+    .version      = "1.0.0",
     .capabilities = TABOS_APP_CAPABILITY_CONSOLE,
-    .entry = nested_entry,
-    .update = root_update,
+    .entry        = nested_entry,
+    .update       = root_update,
 };
 
 static const tabos_app_descriptor_t child_app = {
-    .abi_version = TABOS_APPLICATION_ABI_VERSION,
-    .name = "nested-child",
-    .version = "1.0.0",
+    .abi_version  = TABOS_APPLICATION_ABI_VERSION,
+    .name         = "nested-child",
+    .version      = "1.0.0",
     .capabilities = TABOS_APP_CAPABILITY_CONSOLE,
-    .entry = nested_entry,
-    .update = child_update,
+    .entry        = nested_entry,
+    .update       = child_update,
 };
 
 static const tabos_app_descriptor_t grandchild_app = {
-    .abi_version = TABOS_APPLICATION_ABI_VERSION,
-    .name = "nested-grandchild",
-    .version = "1.0.0",
+    .abi_version  = TABOS_APPLICATION_ABI_VERSION,
+    .name         = "nested-grandchild",
+    .version      = "1.0.0",
     .capabilities = TABOS_APP_CAPABILITY_CONSOLE,
-    .entry = nested_entry,
-    .update = grandchild_update,
+    .entry        = nested_entry,
+    .update       = grandchild_update,
 };
 
-static void file_root_update(tabos_app_context_t *context)
+static void file_root_update(tabos_app_context_t* context)
 {
     if (file_root_stage++ == 0U) {
         if (tabos_app_exec(context, "T:/missing.bin") != TABOS_APP_RESULT_START_FAILED) {
@@ -119,72 +123,72 @@ static void file_root_update(tabos_app_context_t *context)
 }
 
 static const tabos_app_descriptor_t file_root_app = {
-    .abi_version = TABOS_APPLICATION_ABI_VERSION,
-    .name = "file-root",
-    .version = "1.0.0",
+    .abi_version  = TABOS_APPLICATION_ABI_VERSION,
+    .name         = "file-root",
+    .version      = "1.0.0",
     .capabilities = TABOS_APP_CAPABILITY_CONSOLE,
-    .entry = nested_entry,
-    .update = file_root_update,
+    .entry        = nested_entry,
+    .update       = file_root_update,
 };
 
-static bool test_entry(tabos_app_context_t *context)
+static bool test_entry(tabos_app_context_t* context)
 {
     ++entry_calls;
-    entry_process_id = tabos_app_process_id(context);
-    const tabos_console_session_t *console = tabos_app_console(context);
+    entry_process_id                       = tabos_app_process_id(context);
+    const tabos_console_session_t* console = tabos_app_console(context);
     return console != NULL && tabos_console_write(console, "APP STARTED");
 }
 
-static void test_update(tabos_app_context_t *context)
+static void test_update(tabos_app_context_t* context)
 {
     ++update_calls;
     tabos_app_request_exit(context, 7);
 }
 
-static void test_cleanup(tabos_app_context_t *context, int exit_status)
+static void test_cleanup(tabos_app_context_t* context, int exit_status)
 {
-    (void)context;
+    (void) context;
     ++cleanup_calls;
     cleanup_status = exit_status;
 }
 
-static bool failing_entry(tabos_app_context_t *context)
+static bool failing_entry(tabos_app_context_t* context)
 {
-    (void)context;
+    (void) context;
     return false;
 }
 
 static const tabos_app_descriptor_t test_app = {
-    .abi_version = TABOS_APPLICATION_ABI_VERSION,
-    .name = "lifecycle-test",
-    .version = "1.0.0",
+    .abi_version  = TABOS_APPLICATION_ABI_VERSION,
+    .name         = "lifecycle-test",
+    .version      = "1.0.0",
     .capabilities = TABOS_APP_CAPABILITY_CONSOLE,
-    .entry = test_entry,
-    .update = test_update,
-    .cleanup = test_cleanup,
+    .entry        = test_entry,
+    .update       = test_update,
+    .cleanup      = test_cleanup,
 };
 
 static const tabos_app_descriptor_t failing_app = {
-    .abi_version = TABOS_APPLICATION_ABI_VERSION,
-    .name = "failing-test",
-    .version = "1.0.0",
+    .abi_version  = TABOS_APPLICATION_ABI_VERSION,
+    .name         = "failing-test",
+    .version      = "1.0.0",
     .capabilities = TABOS_APP_CAPABILITY_CONSOLE,
-    .entry = failing_entry,
-    .cleanup = test_cleanup,
+    .entry        = failing_entry,
+    .cleanup      = test_cleanup,
 };
 
-static void panic_update(tabos_app_context_t *context)
+static void panic_update(tabos_app_context_t* context)
 {
     kernel_process_fail(context, requested_panic_cause, 41);
 }
 
 static const tabos_app_descriptor_t panic_app = {
-    .abi_version = TABOS_APPLICATION_ABI_VERSION,
-    .name = "panic-test",
-    .version = "1.0.0",
+    .abi_version  = TABOS_APPLICATION_ABI_VERSION,
+    .name         = "panic-test",
+    .version      = "1.0.0",
     .capabilities = TABOS_APP_CAPABILITY_CONSOLE,
-    .entry = nested_entry,
-    .update = panic_update,
+    .entry        = nested_entry,
+    .update       = panic_update,
 };
 
 int main(void)
@@ -203,57 +207,48 @@ int main(void)
     }
     kernel_application_system_init();
 
-    if (!application_registry_register(&root_app) ||
-        !application_registry_register(&child_app) ||
-        !application_registry_register(&grandchild_app) ||
-        tabos_app_launch("nested-root") != TABOS_APP_RESULT_OK) {
+    if (!application_registry_register(&root_app) || !application_registry_register(&child_app) ||
+        !application_registry_register(&grandchild_app) || tabos_app_launch("nested-root") != TABOS_APP_RESULT_OK) {
         return 1;
     }
     kernel_application_system_update();
     tabos_process_info_t process_info;
-    if (tabos_process_count() != 2U ||
-        !tabos_process_info(0U, &process_info) ||
-        process_info.state != TABOS_PROCESS_BLOCKED ||
-        !tabos_process_info(1U, &process_info) || process_info.parent_id != 0U ||
+    if (tabos_process_count() != 2U || !tabos_process_info(0U, &process_info) ||
+        process_info.state != TABOS_PROCESS_BLOCKED || !tabos_process_info(1U, &process_info) ||
+        process_info.parent_id != 0U || process_info.state != TABOS_PROCESS_RUNNING) {
+        return 1;
+    }
+    kernel_application_system_update();
+    if (tabos_process_count() != 3U || !tabos_process_info(2U, &process_info) || process_info.parent_id != 1U ||
         process_info.state != TABOS_PROCESS_RUNNING) {
         return 1;
     }
     kernel_application_system_update();
-    if (tabos_process_count() != 3U ||
-        !tabos_process_info(2U, &process_info) || process_info.parent_id != 1U ||
-        process_info.state != TABOS_PROCESS_RUNNING) {
-        return 1;
-    }
     kernel_application_system_update();
     kernel_application_system_update();
-    kernel_application_system_update();
-    if (!nested_complete || tabos_process_count() != 1U ||
-        !tabos_process_info(0U, &process_info) ||
+    if (!nested_complete || tabos_process_count() != 1U || !tabos_process_info(0U, &process_info) ||
         process_info.state != TABOS_PROCESS_RUNNING || tabos_process_system_panicked()) {
         return 1;
     }
     kernel_application_system_shutdown();
     kernel_application_system_init();
 
-    if (!application_registry_register(&file_root_app) ||
-        tabos_app_launch("file-root") != TABOS_APP_RESULT_OK) {
+    if (!application_registry_register(&file_root_app) || tabos_app_launch("file-root") != TABOS_APP_RESULT_OK) {
         return 1;
     }
     kernel_application_system_update();
     kernel_application_system_update();
-    if (!file_child_cleanup_complete || tabos_process_count() != 1U ||
-        !tabos_process_info(0U, &process_info) ||
+    if (!file_child_cleanup_complete || tabos_process_count() != 1U || !tabos_process_info(0U, &process_info) ||
         process_info.state != TABOS_PROCESS_RUNNING || tabos_process_system_panicked()) {
         return 1;
     }
     kernel_application_system_shutdown();
     kernel_application_system_init();
 
-    if (tabos_app_launch_path("T:/missing-shell.bin") != TABOS_APP_RESULT_START_FAILED ||
-        tabos_process_count() != 0U) {
+    if (tabos_app_launch_path("T:/missing-shell.bin") != TABOS_APP_RESULT_START_FAILED || tabos_process_count() != 0U) {
         return 1;
     }
-    const char *too_many_arguments[TABOS_ELF_ARG_MAX + 1U];
+    const char* too_many_arguments[TABOS_ELF_ARG_MAX + 1U];
     for (size_t index = 0U; index < TABOS_ELF_ARG_MAX + 1U; ++index) {
         too_many_arguments[index] = "x";
     }
@@ -262,45 +257,38 @@ int main(void)
         oversized_argument[index] = 'x';
     }
     oversized_argument[sizeof(oversized_argument) - 1U] = '\0';
-    const char *oversized_arguments[] = {oversized_argument};
-    if (tabos_app_launch_path_args("T:/missing-shell.bin", TABOS_ELF_ARG_MAX + 1U,
-                                   too_many_arguments) != TABOS_APP_RESULT_INVALID ||
-        tabos_app_launch_path_args("T:/missing-shell.bin", 1U,
-                                   oversized_arguments) != TABOS_APP_RESULT_INVALID ||
+    const char* oversized_arguments[]                   = {oversized_argument};
+    if (tabos_app_launch_path_args("T:/missing-shell.bin", TABOS_ELF_ARG_MAX + 1U, too_many_arguments) !=
+            TABOS_APP_RESULT_INVALID ||
+        tabos_app_launch_path_args("T:/missing-shell.bin", 1U, oversized_arguments) != TABOS_APP_RESULT_INVALID ||
         tabos_process_count() != 0U) {
         return 1;
     }
 
     tabos_app_descriptor_t invalid = test_app;
-    invalid.abi_version = TABOS_APPLICATION_ABI_VERSION + 1U;
-    if (application_registry_register(&invalid) ||
-        !application_registry_register(&test_app) ||
-        application_registry_register(&test_app) ||
-        !application_registry_register(&failing_app) ||
-        tabos_app_count() != 2U || tabos_app_at(2U) != NULL ||
-        tabos_app_find("lifecycle-test") != &test_app ||
+    invalid.abi_version            = TABOS_APPLICATION_ABI_VERSION + 1U;
+    if (application_registry_register(&invalid) || !application_registry_register(&test_app) ||
+        application_registry_register(&test_app) || !application_registry_register(&failing_app) ||
+        tabos_app_count() != 2U || tabos_app_at(2U) != NULL || tabos_app_find("lifecycle-test") != &test_app ||
         tabos_app_launch(NULL) != TABOS_APP_RESULT_INVALID ||
         tabos_app_launch("missing") != TABOS_APP_RESULT_NOT_FOUND) {
         return 1;
     }
 
     int exit_status = 0;
-    if (tabos_app_launch("failing-test") != TABOS_APP_RESULT_START_FAILED ||
-        tabos_process_count() != 0U || cleanup_calls != 1U || cleanup_status != -1 ||
-        !tabos_app_last_exit_status(&exit_status) || exit_status != -1) {
+    if (tabos_app_launch("failing-test") != TABOS_APP_RESULT_START_FAILED || tabos_process_count() != 0U ||
+        cleanup_calls != 1U || cleanup_status != -1 || !tabos_app_last_exit_status(&exit_status) || exit_status != -1) {
         return 1;
     }
 
-    if (tabos_app_launch("lifecycle-test") != TABOS_APP_RESULT_OK ||
-        !tabos_app_is_running() || tabos_app_active() != &test_app ||
-        entry_calls != 1U || entry_process_id != 0U || tabos_process_count() != 1U ||
+    if (tabos_app_launch("lifecycle-test") != TABOS_APP_RESULT_OK || !tabos_app_is_running() ||
+        tabos_app_active() != &test_app || entry_calls != 1U || entry_process_id != 0U || tabos_process_count() != 1U ||
         tabos_app_launch("failing-test") != TABOS_APP_RESULT_BUSY) {
         return 1;
     }
 
     if (!tabos_process_info(0U, &process_info) || process_info.id != 0U ||
-        process_info.parent_id != TABOS_PROCESS_ID_INVALID ||
-        process_info.state != TABOS_PROCESS_RUNNING ||
+        process_info.parent_id != TABOS_PROCESS_ID_INVALID || process_info.state != TABOS_PROCESS_RUNNING ||
         process_info.name != test_app.name || tabos_process_info(1U, &process_info)) {
         return 1;
     }
@@ -312,23 +300,18 @@ int main(void)
 
     kernel_application_system_update();
     tabos_process_termination_t panic_cause = TABOS_PROCESS_TERMINATION_NONE;
-    if (tabos_app_is_running() || tabos_app_active() != &test_app || update_calls != 1U ||
-        cleanup_calls != 1U || tabos_process_count() != 1U ||
-        !tabos_process_system_panicked() ||
-        !tabos_process_info(0U, &process_info) ||
-        process_info.state != TABOS_PROCESS_PANICKED ||
-        !tabos_app_last_exit_status(&exit_status) || exit_status != 7 ||
+    if (tabos_app_is_running() || tabos_app_active() != &test_app || update_calls != 1U || cleanup_calls != 1U ||
+        tabos_process_count() != 1U || !tabos_process_system_panicked() || !tabos_process_info(0U, &process_info) ||
+        process_info.state != TABOS_PROCESS_PANICKED || !tabos_app_last_exit_status(&exit_status) || exit_status != 7 ||
         !tabos_process_panic_info(&panic_cause, &exit_status) ||
         panic_cause != TABOS_PROCESS_TERMINATION_EXIT_REQUEST || exit_status != 7 ||
-        strstr(test_platform_last_log(), "exit request") == NULL ||
-        !terminal_contains(&terminal, "KERNEL PANIC") ||
+        strstr(test_platform_last_log(), "exit request") == NULL || !terminal_contains(&terminal, "KERNEL PANIC") ||
         tabos_console_acquire(&denied)) {
         return 1;
     }
 
     kernel_application_system_shutdown();
-    if (tabos_app_count() != 0U || tabos_process_count() != 0U ||
-        cleanup_calls != 2U || cleanup_status != 7 ||
+    if (tabos_app_count() != 0U || tabos_process_count() != 0U || cleanup_calls != 2U || cleanup_status != 7 ||
         !tabos_console_acquire(&denied)) {
         return 1;
     }
@@ -341,19 +324,19 @@ int main(void)
     };
     for (size_t index = 0U; index < sizeof(panic_causes) / sizeof(panic_causes[0]); ++index) {
         kernel_application_system_init();
-        if (!application_registry_register(&panic_app) ||
-            tabos_app_launch("panic-test") != TABOS_APP_RESULT_OK) {
+        if (!application_registry_register(&panic_app) || tabos_app_launch("panic-test") != TABOS_APP_RESULT_OK) {
             return 1;
         }
         requested_panic_cause = panic_causes[index];
         test_platform_clear_log();
         if (requested_panic_cause == TABOS_PROCESS_TERMINATION_FORCED) {
-            if (!kernel_process_force_terminate(0U, 41)) return 1;
+            if (!kernel_process_force_terminate(0U, 41)) {
+                return 1;
+            }
         }
         kernel_application_system_update();
-        if (!tabos_process_panic_info(&panic_cause, &exit_status) ||
-            panic_cause != requested_panic_cause || exit_status != 41 ||
-            tabos_process_count() != 1U || strlen(test_platform_last_log()) == 0U) {
+        if (!tabos_process_panic_info(&panic_cause, &exit_status) || panic_cause != requested_panic_cause ||
+            exit_status != 41 || tabos_process_count() != 1U || strlen(test_platform_last_log()) == 0U) {
             return 1;
         }
         kernel_application_system_shutdown();

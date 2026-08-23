@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-static void check(bool condition, const char *message)
+static void check(bool condition, const char* message)
 {
     if (!condition) {
         fprintf(stderr, "terminal ANSI test failed: %s\n", message);
@@ -12,17 +12,23 @@ static void check(bool condition, const char *message)
     }
 }
 
-static terminal_cell_t *cell(terminal_t *terminal, size_t column, size_t row)
+static terminal_cell_t* cell(terminal_t* terminal, size_t column, size_t row)
 {
     return &terminal->cells[(row * terminal->columns) + column];
 }
 
 int main(void)
 {
-    enum { WIDTH = 160, HEIGHT = 60 };
+    enum {
+        WIDTH  = 160,
+        HEIGHT = 60
+    };
     platform_pixel_t pixels[WIDTH * HEIGHT];
     platform_framebuffer_t framebuffer = {
-        .pixels = pixels, .width = WIDTH, .height = HEIGHT, .stride_pixels = WIDTH,
+        .pixels        = pixels,
+        .width         = WIDTH,
+        .height        = HEIGHT,
+        .stride_pixels = WIDTH,
     };
     terminal_t terminal;
     check(terminal_init(&terminal, &framebuffer, 1U), "initialize");
@@ -37,8 +43,7 @@ int main(void)
     check(cell(&terminal, 3U, 0U)->character == 'B', "cursor movement destination");
 
     terminal_write(&terminal, "\033[31mR\033[0mN");
-    check(cell(&terminal, 3U, 0U)->foreground != cell(&terminal, 4U, 0U)->foreground,
-          "foreground color");
+    check(cell(&terminal, 3U, 0U)->foreground != cell(&terminal, 4U, 0U)->foreground, "foreground color");
 
     terminal_write(&terminal, "\033[2Hxy\033[s\033[3Cz\033[uQ");
     check(cell(&terminal, 0U, 1U)->character == 'x', "row positioning");

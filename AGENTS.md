@@ -7,6 +7,10 @@ Before making architectural, platform, build, or testing changes, read:
 - `agents/testing.md`
 - `agents/roadmap.md`
 
+Before writing or modifying C code, also read:
+
+- `agents/coding-style.md`
+
 Treat decisions marked `[DECIDED]` as project requirements unless
 the user explicitly asks to reconsider them.
 

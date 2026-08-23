@@ -14,35 +14,41 @@
 #include <stdbool.h>
 
 enum {
-    SHELL_LINE_CAPACITY = 256,
-    SHELL_IO_CAPACITY = 1024,
+    SHELL_LINE_CAPACITY     = 256,
+    SHELL_IO_CAPACITY       = 1024,
     SHELL_ARGUMENT_CAPACITY = TABOS_PROCESS_ARG_MAX,
 };
 
 static char shell_path[256] = "T:/bin";
 
-static uint32_t string_length(const char *text)
+static uint32_t string_length(const char* text)
 {
     uint32_t length = 0U;
-    while (text[length] != '\0') length++;
+    while (text[length] != '\0') {
+        length++;
+    }
     return length;
 }
 
-static int string_equal(const char *left, const char *right)
+static int string_equal(const char* left, const char* right)
 {
     uint32_t index = 0U;
-    while (left[index] != '\0' && left[index] == right[index]) index++;
+    while (left[index] != '\0' && left[index] == right[index]) {
+        index++;
+    }
     return left[index] == right[index];
 }
 
-static int string_starts_with(const char *text, const char *prefix)
+static int string_starts_with(const char* text, const char* prefix)
 {
     uint32_t index = 0U;
-    while (prefix[index] != '\0' && text[index] == prefix[index]) index++;
+    while (prefix[index] != '\0' && text[index] == prefix[index]) {
+        index++;
+    }
     return prefix[index] == '\0';
 }
 
-static void copy_string(char *destination, uint32_t capacity, const char *source)
+static void copy_string(char* destination, uint32_t capacity, const char* source)
 {
     uint32_t index = 0U;
     while (index + 1U < capacity && source[index] != '\0') {
@@ -52,9 +58,9 @@ static void copy_string(char *destination, uint32_t capacity, const char *source
     destination[index] = '\0';
 }
 
-static void append_string(char *destination, uint32_t capacity, const char *source)
+static void append_string(char* destination, uint32_t capacity, const char* source)
 {
-    uint32_t used = string_length(destination);
+    uint32_t used  = string_length(destination);
     uint32_t index = 0U;
     while (used + 1U < capacity && source[index] != '\0') {
         destination[used++] = source[index++];
@@ -62,21 +68,23 @@ static void append_string(char *destination, uint32_t capacity, const char *sour
     destination[used] = '\0';
 }
 
-static void write_error(const char *operation, int status)
+static void write_error(const char* operation, int status)
 {
     char number[16];
     char message[96];
-    uint32_t used = 0U;
-    unsigned int value = (unsigned int)(status < 0 ? -status : status);
+    uint32_t used      = 0U;
+    unsigned int value = (unsigned int) (status < 0 ? -status : status);
     do {
-        number[used++] = (char)('0' + (value % 10U));
-        value /= 10U;
+        number[used++]  = (char) ('0' + (value % 10U));
+        value          /= 10U;
     } while (value != 0U && used < sizeof(number) - 1U);
-    if (status < 0 && used < sizeof(number) - 1U) number[used++] = '-';
+    if (status < 0 && used < sizeof(number) - 1U) {
+        number[used++] = '-';
+    }
     for (uint32_t left = 0U, right = used - 1U; left < right; left++, right--) {
         const char temporary = number[left];
-        number[left] = number[right];
-        number[right] = temporary;
+        number[left]         = number[right];
+        number[right]        = temporary;
     }
     number[used] = '\0';
     copy_string(message, sizeof(message), operation);
@@ -89,17 +97,19 @@ static void write_exit_status(int status)
 {
     char number[16];
     char message[40];
-    uint32_t used = 0U;
-    unsigned int value = (unsigned int)(status < 0 ? -status : status);
+    uint32_t used      = 0U;
+    unsigned int value = (unsigned int) (status < 0 ? -status : status);
     do {
-        number[used++] = (char)('0' + (value % 10U));
-        value /= 10U;
+        number[used++]  = (char) ('0' + (value % 10U));
+        value          /= 10U;
     } while (value != 0U && used < sizeof(number) - 1U);
-    if (status < 0 && used < sizeof(number) - 1U) number[used++] = '-';
+    if (status < 0 && used < sizeof(number) - 1U) {
+        number[used++] = '-';
+    }
     for (uint32_t left = 0U, right = used - 1U; left < right; left++, right--) {
         const char temporary = number[left];
-        number[left] = number[right];
-        number[right] = temporary;
+        number[left]         = number[right];
+        number[right]        = temporary;
     }
     number[used] = '\0';
     copy_string(message, sizeof(message), "Exit status: ");
@@ -107,18 +117,19 @@ static void write_exit_status(int status)
     printf("%s\n", message);
 }
 
-static void execute_command(char *line)
+static void execute_command(char* line)
 {
-    char *argv[SHELL_ARGUMENT_CAPACITY];
+    char* argv[SHELL_ARGUMENT_CAPACITY];
     const int parsed = shell_parse_arguments(line, argv, SHELL_ARGUMENT_CAPACITY);
-    if (parsed == 0) return;
-    if (parsed < 0) {
-        printf("%s\n", parsed == SHELL_PARSE_UNTERMINATED_QUOTE
-            ? "Unterminated quote" : "Too many arguments");
+    if (parsed == 0) {
         return;
     }
-    const uint32_t argc = (uint32_t)parsed;
-    const char *command = argv[0];
+    if (parsed < 0) {
+        printf("%s\n", parsed == SHELL_PARSE_UNTERMINATED_QUOTE ? "Unterminated quote" : "Too many arguments");
+        return;
+    }
+    const uint32_t argc = (uint32_t) parsed;
+    const char* command = argv[0];
 
     if (string_equal(command, "help")) {
         printf("Commands: help clear pwd cd set echo <program>\n");
@@ -143,8 +154,11 @@ static void execute_command(char *line)
     }
     if (string_equal(command, "pwd")) {
         char path[512];
-        if (getcwd(path, sizeof(path)) != NULL) printf("%s\n", path);
-        else write_error("pwd", -errno);
+        if (getcwd(path, sizeof(path)) != NULL) {
+            printf("%s\n", path);
+        } else {
+            write_error("pwd", -errno);
+        }
         return;
     }
     if (string_equal(command, "cd")) {
@@ -152,7 +166,9 @@ static void execute_command(char *line)
             printf("Usage: cd <path>\n");
             return;
         }
-        if (chdir(argv[1]) != 0) write_error("cd", -errno);
+        if (chdir(argv[1]) != 0) {
+            write_error("cd", -errno);
+        }
         return;
     }
 
@@ -160,11 +176,11 @@ static void execute_command(char *line)
     if (strchr(command, '/') != NULL) {
         copy_string(path, sizeof(path), command);
     } else {
-        bool found = false;
-        const char *start = shell_path;
+        bool found        = false;
+        const char* start = shell_path;
         while (*start != '\0' && !found) {
-            const char *end = strchr(start, ';');
-            const size_t length = end == NULL ? string_length(start) : (size_t)(end - start);
+            const char* end     = strchr(start, ';');
+            const size_t length = end == NULL ? string_length(start) : (size_t) (end - start);
             if (length + 1U + string_length(command) + 1U < sizeof(path)) {
                 memcpy(path, start, length);
                 path[length] = '/';
@@ -172,15 +188,23 @@ static void execute_command(char *line)
                 struct stat status;
                 found = stat(path, &status) == 0 && S_ISREG(status.st_mode);
             }
-            if (end == NULL) break;
+            if (end == NULL) {
+                break;
+            }
             start = end + 1U;
         }
-        if (!found) copy_string(path, sizeof(path), command);
+        if (!found) {
+            copy_string(path, sizeof(path), command);
+        }
     }
-    const int pid = tabos_spawn(path, (int)argc, (const char *const *)argv);
-    int status = pid < 0 ? pid : 0;
-    if (pid >= 0 && waitpid(pid, &status, 0) < 0) status = -errno;
-    if (status != 0) write_exit_status(status);
+    const int pid = tabos_spawn(path, (int) argc, (const char* const*) argv);
+    int status    = pid < 0 ? pid : 0;
+    if (pid >= 0 && waitpid(pid, &status, 0) < 0) {
+        status = -errno;
+    }
+    if (status != 0) {
+        write_exit_status(status);
+    }
 }
 
 static void prompt(void)
@@ -193,19 +217,18 @@ static void prompt(void)
     }
 }
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
-    (void)argc;
-    (void)argv;
+    (void) argc;
+    (void) argv;
 
     char line[SHELL_LINE_CAPACITY];
     uint32_t used = 0U;
-    line[0] = '\0';
+    line[0]       = '\0';
 
     // disable buffering
     setvbuf(stdout, NULL, _IONBF, 0);
-    if (ioctl(STDIN_FILENO, TABOS_TTY_SET_MODE,
-              (uint32_t)TABOS_TTY_MODE_SCROLL_KEYS) != 0) {
+    if (ioctl(STDIN_FILENO, TABOS_TTY_SET_MODE, (uint32_t) TABOS_TTY_MODE_SCROLL_KEYS) != 0) {
         fprintf(stderr, "shell: could not enable terminal scrollback\n");
     }
 
@@ -213,9 +236,11 @@ int main(int argc, char **argv)
     prompt();
     for (;;) {
         char input[16];
-        const int count = (int)read(STDIN_FILENO, input, sizeof(input));
+        const int count = (int) read(STDIN_FILENO, input, sizeof(input));
         if (count <= 0) {
-            if (count < 0 && errno != EAGAIN) break;
+            if (count < 0 && errno != EAGAIN) {
+                break;
+            }
             continue;
         }
         for (int index = 0; index < count; ++index) {
@@ -224,7 +249,7 @@ int main(int argc, char **argv)
                 line[used] = '\0';
                 putchar('\n');
                 execute_command(line);
-                used = 0U;
+                used    = 0U;
                 line[0] = '\0';
                 prompt();
             } else if (character == '\b') {
@@ -233,10 +258,10 @@ int main(int argc, char **argv)
                     line[used] = '\0';
                     putchar('\b');
                 }
-            } else if ((unsigned char)character >= 32U && used + 1U < sizeof(line)) {
+            } else if ((unsigned char) character >= 32U && used + 1U < sizeof(line)) {
                 line[used++] = character;
-                line[used] = '\0';
-                putchar((unsigned char)character);
+                line[used]   = '\0';
+                putchar((unsigned char) character);
             }
         }
     }

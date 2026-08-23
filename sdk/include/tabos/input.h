@@ -12,7 +12,7 @@ typedef enum {
 
 typedef enum {
     TABOS_KEY_UNKNOWN = 0,
-    TABOS_KEY_A = 4,
+    TABOS_KEY_A       = 4,
     TABOS_KEY_B,
     TABOS_KEY_C,
     TABOS_KEY_D,
@@ -96,23 +96,25 @@ typedef enum {
 
 enum {
     TABOS_MODIFIER_CONTROL = 1U << 0U,
-    TABOS_MODIFIER_SHIFT = 1U << 1U,
-    TABOS_MODIFIER_ALT = 1U << 2U,
-    TABOS_MODIFIER_GUI = 1U << 3U,
-    TABOS_MODIFIER_SYM = 1U << 4U,
+    TABOS_MODIFIER_SHIFT   = 1U << 1U,
+    TABOS_MODIFIER_ALT     = 1U << 2U,
+    TABOS_MODIFIER_GUI     = 1U << 3U,
+    TABOS_MODIFIER_SYM     = 1U << 4U,
 };
 
-enum { TABOS_INPUT_TEXT_MAX_BYTES = 9 };
+enum {
+    TABOS_INPUT_TEXT_MAX_BYTES = 9
+};
 
 typedef struct {
-    tabos_input_event_type_t type;
-    tabos_key_t key;
-    uint8_t modifiers;
-    bool repeat;
-    char text[TABOS_INPUT_TEXT_MAX_BYTES + 1U];
+        tabos_input_event_type_t type;
+        tabos_key_t key;
+        uint8_t modifiers;
+        bool repeat;
+        char text[TABOS_INPUT_TEXT_MAX_BYTES + 1U];
 } tabos_input_event_t;
 
-bool tabos_input_poll(tabos_input_event_t *event);
-bool tabos_input_wait(tabos_input_event_t *event);
+bool tabos_input_poll(tabos_input_event_t* event);
+bool tabos_input_wait(tabos_input_event_t* event);
 
 #endif

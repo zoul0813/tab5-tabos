@@ -14,10 +14,9 @@ bool display_init(void)
     }
 
     if (framebuffer.pixels == NULL || framebuffer.width != TABOS_DISPLAY_WIDTH ||
-        framebuffer.height != TABOS_DISPLAY_HEIGHT ||
-        framebuffer.stride_pixels < TABOS_DISPLAY_WIDTH) {
+        framebuffer.height != TABOS_DISPLAY_HEIGHT || framebuffer.stride_pixels < TABOS_DISPLAY_WIDTH) {
         platform_display_shutdown();
-        framebuffer = (platform_framebuffer_t){0};
+        framebuffer = (platform_framebuffer_t) {0};
         return false;
     }
 
@@ -30,7 +29,7 @@ bool display_present(void)
     return display_initialized && platform_display_present(&framebuffer);
 }
 
-platform_framebuffer_t *display_framebuffer(void)
+platform_framebuffer_t* display_framebuffer(void)
 {
     return display_initialized ? &framebuffer : NULL;
 }
@@ -42,6 +41,6 @@ void display_shutdown(void)
     }
 
     platform_display_shutdown();
-    framebuffer = (platform_framebuffer_t){0};
+    framebuffer         = (platform_framebuffer_t) {0};
     display_initialized = false;
 }

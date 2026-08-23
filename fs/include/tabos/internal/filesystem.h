@@ -7,7 +7,6 @@
 bool filesystem_init(void);
 void filesystem_shutdown(void);
 bool filesystem_is_mounted(void);
-bool filesystem_normalize_path(const char *path, const char *working_directory,
-                           char *output, size_t output_size);
+bool filesystem_normalize_path(const char* path, const char* working_directory, char* output, size_t output_size);
 
 #endif

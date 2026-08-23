@@ -5,7 +5,7 @@
 
 #include <SDL3/SDL.h>
 
-extern SDL_Window *host_window;
+extern SDL_Window* host_window;
 
 bool host_is_headless(void);
 void host_request_quit(void);

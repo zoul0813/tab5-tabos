@@ -7,7 +7,7 @@
 bool tab5_keyboard_init(void);
 void tab5_keyboard_poll(void);
 void tab5_keyboard_shutdown(void);
-const char *tab5_keyboard_name(void);
+const char* tab5_keyboard_name(void);
 bool tab5_keyboard_present(void);
 bool tab5_keyboard_delete_held(uint32_t window_ms);
 bool platform_usb_port_disable_host_power(void);

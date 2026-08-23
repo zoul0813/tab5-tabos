@@ -8,6 +8,6 @@ enum {
     SHELL_PARSE_UNTERMINATED_QUOTE = -2,
 };
 
-int shell_parse_arguments(char *line, char **argv, uint32_t capacity);
+int shell_parse_arguments(char* line, char** argv, uint32_t capacity);
 
 #endif

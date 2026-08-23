@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <sys/stat.h>
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
     if (argc != 2) {
         fprintf(stderr, "Usage: mkdir <path>\n");

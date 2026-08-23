@@ -7,7 +7,7 @@
 
 bool display_init(void);
 bool display_present(void);
-platform_framebuffer_t *display_framebuffer(void);
+platform_framebuffer_t* display_framebuffer(void);
 void display_shutdown(void);
 
 #endif

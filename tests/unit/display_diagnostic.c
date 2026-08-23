@@ -5,28 +5,26 @@
 
 #include <stddef.h>
 
-static platform_pixel_t pixel_at(const platform_framebuffer_t *framebuffer, size_t x, size_t y)
+static platform_pixel_t pixel_at(const platform_framebuffer_t* framebuffer, size_t x, size_t y)
 {
     return framebuffer->pixels[(y * framebuffer->stride_pixels) + x];
 }
 
 int main(void)
 {
-    platform_pixel_t source_pixels[] = {1, 2, 3, 4, 5, 6};
-    platform_pixel_t rotated_pixels[6] = {0};
+    platform_pixel_t source_pixels[]    = {1, 2, 3, 4, 5, 6};
+    platform_pixel_t rotated_pixels[6]  = {0};
     const platform_framebuffer_t source = {
-        .pixels = source_pixels,
-        .width = 3,
-        .height = 2,
+        .pixels        = source_pixels,
+        .width         = 3,
+        .height        = 2,
         .stride_pixels = 3,
     };
-    const platform_pixel_t expected_rotation[] = {4, 1, 5, 2, 6, 3};
+    const platform_pixel_t expected_rotation[]         = {4, 1, 5, 2, 6, 3};
     const platform_pixel_t expected_counter_rotation[] = {3, 6, 2, 5, 1, 4};
 
-    if (font_glyph_index(FONT_GLYPH_COUNT - 1U) != FONT_GLYPH_COUNT - 1U ||
-        font_glyph_index(FONT_GLYPH_COUNT) != 0U ||
-        font_glyph_index(256U) != 0U ||
-        (FONT_GLYPH_COUNT <= 220U && font_glyph_index(220U) != 0U)) {
+    if (font_glyph_index(FONT_GLYPH_COUNT - 1U) != FONT_GLYPH_COUNT - 1U || font_glyph_index(FONT_GLYPH_COUNT) != 0U ||
+        font_glyph_index(256U) != 0U || (FONT_GLYPH_COUNT <= 220U && font_glyph_index(220U) != 0U)) {
         return 1;
     }
 
@@ -50,7 +48,7 @@ int main(void)
     if (!display_init()) {
         return 1;
     }
-    platform_framebuffer_t *framebuffer = display_framebuffer();
+    platform_framebuffer_t* framebuffer = display_framebuffer();
     if (framebuffer == NULL || framebuffer->width != TABOS_DISPLAY_WIDTH ||
         framebuffer->height != TABOS_DISPLAY_HEIGHT) {
         return 1;
@@ -66,8 +64,8 @@ int main(void)
     terminal_clear(&terminal);
     terminal_write_line(&terminal, "A");
 
-    if (pixel_at(framebuffer, 6, 2) != 0xffff || pixel_at(framebuffer, 0, 0) != 0x0000 ||
-        terminal.row != 1U || terminal.column != 0U) {
+    if (pixel_at(framebuffer, 6, 2) != 0xffff || pixel_at(framebuffer, 0, 0) != 0x0000 || terminal.row != 1U ||
+        terminal.column != 0U) {
         return 1;
     }
 

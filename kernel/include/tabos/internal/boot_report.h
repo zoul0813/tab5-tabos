@@ -14,24 +14,26 @@ typedef enum {
 } kernel_boot_status_t;
 
 typedef struct {
-    const char *component;
-    const char *detail;
-    kernel_boot_status_t status;
+        const char* component;
+        const char* detail;
+        kernel_boot_status_t status;
 } kernel_boot_entry_t;
 
-enum { KERNEL_BOOT_REPORT_MAX_ENTRIES = 12 };
+enum {
+    KERNEL_BOOT_REPORT_MAX_ENTRIES = 12
+};
 
 typedef struct {
-    const char *system_name;
-    const char *version;
-    kernel_boot_entry_t entries[KERNEL_BOOT_REPORT_MAX_ENTRIES];
-    size_t entry_count;
+        const char* system_name;
+        const char* version;
+        kernel_boot_entry_t entries[KERNEL_BOOT_REPORT_MAX_ENTRIES];
+        size_t entry_count;
 } kernel_boot_report_t;
 
-void kernel_boot_report_init(kernel_boot_report_t *report, const char *system_name, const char *version);
-bool kernel_boot_report_add(kernel_boot_report_t *report, const char *component, const char *detail,
-                         kernel_boot_status_t status);
-void kernel_boot_report_write_serial(const kernel_boot_report_t *report);
-void kernel_boot_report_write_terminal(const kernel_boot_report_t *report, terminal_t *terminal);
+void kernel_boot_report_init(kernel_boot_report_t* report, const char* system_name, const char* version);
+bool kernel_boot_report_add(kernel_boot_report_t* report, const char* component, const char* detail,
+                            kernel_boot_status_t status);
+void kernel_boot_report_write_serial(const kernel_boot_report_t* report);
+void kernel_boot_report_write_terminal(const kernel_boot_report_t* report, terminal_t* terminal);
 
 #endif

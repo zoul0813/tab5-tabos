@@ -4,6 +4,6 @@
 #include <starfall/game.h>
 #include <tabos/graphics.h>
 
-int starfall_render(tabos_graphics_t *graphics, const starfall_game_t *game);
+int starfall_render(tabos_graphics_t* graphics, const starfall_game_t* game);
 
 #endif

@@ -7,6 +7,6 @@ bool kernel_runtime_init(void);
 bool kernel_runtime_start(void);
 void kernel_runtime_update(void);
 void kernel_runtime_shutdown(void);
-const char *kernel_runtime_version(void);
+const char* kernel_runtime_version(void);
 
 #endif

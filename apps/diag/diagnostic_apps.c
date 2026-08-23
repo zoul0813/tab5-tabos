@@ -31,7 +31,7 @@ bool diagnostic_apps_register(void)
 #endif
 }
 
-const char *diagnostic_startup_app(void)
+const char* diagnostic_startup_app(void)
 {
 #if TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP
     return console_diagnostic_app.name;

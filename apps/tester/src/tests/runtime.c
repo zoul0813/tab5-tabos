@@ -5,7 +5,7 @@
 
 #include <string.h>
 
-void tester_test_runtime(tester_context_t *context)
+void tester_test_runtime(tester_context_t* context)
 {
     const uint64_t before = tabos_monotonic_ms();
     tester_expect(context, tabos_sleep_ms(1U) == 0, "sleep completes");
@@ -20,7 +20,6 @@ void tester_test_runtime(tester_context_t *context)
     tester_expect(context, tabos_system_info(&info) == 0, "system information available");
     tester_expect(context, info.target[0] != '\0', "target name available");
     tester_expect(context, info.device[0] != '\0', "device name available");
-    tester_expect(context, info.display_width > 0U && info.display_height > 0U,
-                  "display dimensions available");
+    tester_expect(context, info.display_width > 0U && info.display_height > 0U, "display dimensions available");
     tester_expect(context, info.cpu_cores > 0U, "processor core count available");
 }

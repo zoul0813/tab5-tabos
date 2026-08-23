@@ -4,6 +4,6 @@
 #include <stdbool.h>
 
 bool diagnostic_apps_register(void);
-const char *diagnostic_startup_app(void);
+const char* diagnostic_startup_app(void);
 
 #endif
