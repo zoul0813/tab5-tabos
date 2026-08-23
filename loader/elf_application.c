@@ -7,6 +7,7 @@
 #include <tabos/internal/filesystem.h>
 #include <tabos/internal/display.h>
 #include <tabos/internal/console.h>
+#include <tabos/internal/raster.h>
 #include <tabos/platform/platform.h>
 #include <tabos/config/display.h>
 
@@ -19,7 +20,27 @@ enum {
     ELF_INSTRUCTIONS_PER_UPDATE = 10000,
     ELF_DESCRIPTOR_CAPACITY = 16,
     ELF_HEAP_MAX = 256 * 1024,
+    ELF_GRAPHICS_COMMAND_CAPACITY = 64,
 };
+
+typedef enum {
+    ELF_GRAPHICS_FILL,
+    ELF_GRAPHICS_BLIT,
+} elf_graphics_command_type_t;
+
+typedef struct {
+    elf_graphics_command_type_t type;
+    union {
+        struct {
+            int32_t x;
+            int32_t y;
+            uint32_t width;
+            uint32_t height;
+            tabos_color_t color;
+        } fill;
+        tabos_graphics_blit_options_t blit;
+    } data;
+} elf_graphics_command_t;
 
 typedef struct {
     tabos_fd_t kernel_descriptor;
@@ -44,6 +65,9 @@ struct loader_elf_application {
     atomic_bool exec_in_flight;
     atomic_bool exec_status_ready;
     bool graphics_active;
+    elf_graphics_command_t graphics_commands[ELF_GRAPHICS_COMMAND_CAPACITY];
+    size_t graphics_command_head;
+    size_t graphics_command_count;
     atomic_int exec_status;
     char exec_path[TABOS_FS_PATH_MAX];
     size_t exec_argc;
@@ -446,6 +470,7 @@ static int elf_graphics_open(uint32_t *width, uint32_t *height)
     loader_elf_application_t *application = platform_riscv32_current_user_data();
     platform_framebuffer_t *framebuffer = display_framebuffer();
     if (application == NULL || framebuffer == NULL || width == NULL || height == NULL) return -TABOS_EINVAL;
+    if (!platform_graphics_begin()) return -TABOS_EIO;
     application->graphics_active = true;
     console_set_graphics_active(true);
     *width = (uint32_t)framebuffer->width;
@@ -453,15 +478,68 @@ static int elf_graphics_open(uint32_t *width, uint32_t *height)
     return 0;
 }
 
+static bool elf_graphics_execute_one(loader_elf_application_t *application)
+{
+    if (application == NULL || application->graphics_command_count == 0U) return true;
+    platform_framebuffer_t *framebuffer = display_framebuffer();
+    if (framebuffer == NULL) return false;
+    elf_graphics_command_t *command =
+        &application->graphics_commands[application->graphics_command_head];
+    bool result = true;
+    if (command->type == ELF_GRAPHICS_FILL) {
+        if (!platform_graphics_fill(framebuffer, command->data.fill.x,
+                                    command->data.fill.y, command->data.fill.width,
+                                    command->data.fill.height,
+                                    command->data.fill.color)) {
+            raster_fill(framebuffer, command->data.fill.x, command->data.fill.y,
+                        command->data.fill.width, command->data.fill.height,
+                        command->data.fill.color);
+        }
+    } else {
+        result = platform_graphics_blit(framebuffer, &command->data.blit) ||
+            raster_blit(framebuffer, &command->data.blit);
+    }
+    application->graphics_command_head =
+        (application->graphics_command_head + 1U) % ELF_GRAPHICS_COMMAND_CAPACITY;
+    --application->graphics_command_count;
+    return result;
+}
+
+static bool elf_graphics_drain(loader_elf_application_t *application)
+{
+    bool result = true;
+    while (application != NULL && application->graphics_command_count != 0U) {
+        if (!elf_graphics_execute_one(application)) result = false;
+    }
+    return result;
+}
+
+static bool elf_graphics_enqueue(loader_elf_application_t *application,
+                                 const elf_graphics_command_t *command)
+{
+    if (application == NULL || command == NULL) return false;
+    if (application->graphics_command_count == ELF_GRAPHICS_COMMAND_CAPACITY &&
+        !elf_graphics_execute_one(application)) return false;
+    const size_t tail = (application->graphics_command_head +
+                         application->graphics_command_count) %
+        ELF_GRAPHICS_COMMAND_CAPACITY;
+    application->graphics_commands[tail] = *command;
+    ++application->graphics_command_count;
+    return true;
+}
+
 static int elf_graphics_clear(uint32_t color)
 {
     loader_elf_application_t *application = platform_riscv32_current_user_data();
     platform_framebuffer_t *framebuffer = display_framebuffer();
     if (application == NULL || !application->graphics_active || framebuffer == NULL) return -TABOS_EINVAL;
-    for (size_t y = 0U; y < framebuffer->height; ++y)
-        for (size_t x = 0U; x < framebuffer->width; ++x)
-            framebuffer->pixels[y * framebuffer->stride_pixels + x] = (platform_pixel_t)color;
-    return 0;
+    const elf_graphics_command_t command = {
+        .type = ELF_GRAPHICS_FILL,
+        .data.fill = {.x = 0, .y = 0, .width = (uint32_t)framebuffer->width,
+                      .height = (uint32_t)framebuffer->height,
+                      .color = (tabos_color_t)color},
+    };
+    return elf_graphics_enqueue(application, &command) ? 0 : -TABOS_EIO;
 }
 
 static int elf_graphics_fill_rect(int32_t x, int32_t y, uint32_t width, uint32_t height,
@@ -470,14 +548,12 @@ static int elf_graphics_fill_rect(int32_t x, int32_t y, uint32_t width, uint32_t
     loader_elf_application_t *application = platform_riscv32_current_user_data();
     platform_framebuffer_t *framebuffer = display_framebuffer();
     if (application == NULL || !application->graphics_active || framebuffer == NULL) return -TABOS_EINVAL;
-    const int64_t right = (int64_t)x + width, bottom = (int64_t)y + height;
-    const int32_t left = x < 0 ? 0 : x, top = y < 0 ? 0 : y;
-    const int32_t clipped_right = right > (int64_t)framebuffer->width ? (int32_t)framebuffer->width : (int32_t)right;
-    const int32_t clipped_bottom = bottom > (int64_t)framebuffer->height ? (int32_t)framebuffer->height : (int32_t)bottom;
-    for (int32_t row = top; row < clipped_bottom; ++row)
-        for (int32_t column = left; column < clipped_right; ++column)
-            framebuffer->pixels[(size_t)row * framebuffer->stride_pixels + (size_t)column] = (platform_pixel_t)color;
-    return 0;
+    const elf_graphics_command_t command = {
+        .type = ELF_GRAPHICS_FILL,
+        .data.fill = {.x = x, .y = y, .width = width, .height = height,
+                      .color = (tabos_color_t)color},
+    };
+    return elf_graphics_enqueue(application, &command) ? 0 : -TABOS_EIO;
 }
 
 static int elf_graphics_blit(int32_t x, int32_t y, uint32_t width, uint32_t height,
@@ -491,30 +567,64 @@ static int elf_graphics_blit(int32_t x, int32_t y, uint32_t width, uint32_t heig
     const uint16_t *source = platform_executable_data_pointer(pixels, pixel_bytes);
     if (application == NULL || !application->graphics_active || framebuffer == NULL || source == NULL ||
         width == 0U || height == 0U || width > SIZE_MAX / height) return -TABOS_EINVAL;
-    for (uint32_t row = 0U; row < height; ++row) {
-        const int64_t destination_y = (int64_t)y + row;
-        if (destination_y < 0 || destination_y >= (int64_t)framebuffer->height) continue;
-        for (uint32_t column = 0U; column < width; ++column) {
-            const int64_t destination_x = (int64_t)x + column;
-            if (destination_x < 0 || destination_x >= (int64_t)framebuffer->width) continue;
-            framebuffer->pixels[(size_t)destination_y * framebuffer->stride_pixels + (size_t)destination_x] =
-                source[(size_t)row * width + column];
-        }
-    }
-    return 0;
+    const elf_graphics_command_t command = {
+        .type = ELF_GRAPHICS_BLIT,
+        .data.blit = {
+            .pixels = source, .bitmap_width = width, .bitmap_height = height,
+            .source = {.x = 0, .y = 0, .width = width, .height = height},
+            .destination = {.x = x, .y = y, .width = width, .height = height},
+            .rotation = TABOS_GRAPHICS_ROTATE_0, .opacity = 255U,
+        },
+    };
+    return elf_graphics_enqueue(application, &command) ? 0 : -TABOS_EIO;
+}
+
+static uint32_t elf_graphics_capabilities(void)
+{
+    loader_elf_application_t *application = platform_riscv32_current_user_data();
+    if (application == NULL || !application->graphics_active) return 0U;
+    return TABOS_GRAPHICS_CAP_QUEUED | TABOS_GRAPHICS_CAP_TRANSFORM |
+        TABOS_GRAPHICS_CAP_BLEND | TABOS_GRAPHICS_CAP_COLOR_KEY |
+        platform_graphics_capabilities();
+}
+
+static int elf_graphics_blit_ex(const tabos_graphics_blit_options_t *options)
+{
+    loader_elf_application_t *application = platform_riscv32_current_user_data();
+    const tabos_graphics_blit_options_t *readable =
+        platform_executable_data_pointer(options, sizeof(*options));
+    if (application == NULL || !application->graphics_active || readable == NULL ||
+        readable->bitmap_width == 0U || readable->bitmap_height == 0U ||
+        readable->bitmap_width > SIZE_MAX / readable->bitmap_height ||
+        (size_t)readable->bitmap_width * readable->bitmap_height >
+            SIZE_MAX / sizeof(*readable->pixels)) return -TABOS_EINVAL;
+    tabos_graphics_blit_options_t copied = *readable;
+    const size_t bytes = (size_t)copied.bitmap_width * copied.bitmap_height *
+        sizeof(*copied.pixels);
+    copied.pixels = platform_executable_data_pointer(copied.pixels, bytes);
+    if (copied.pixels == NULL) return -TABOS_EINVAL;
+    const elf_graphics_command_t command = {
+        .type = ELF_GRAPHICS_BLIT, .data.blit = copied,
+    };
+    return elf_graphics_enqueue(application, &command) ? 0 : -TABOS_EIO;
 }
 
 static int elf_graphics_present(void)
 {
     loader_elf_application_t *application = platform_riscv32_current_user_data();
-    return application != NULL && application->graphics_active && display_present() ? 0 : -TABOS_EIO;
+    return application != NULL && application->graphics_active &&
+        elf_graphics_drain(application) && platform_graphics_present(display_framebuffer())
+            ? 0 : -TABOS_EIO;
 }
 
 static int elf_graphics_close(void)
 {
     loader_elf_application_t *application = platform_riscv32_current_user_data();
     if (application == NULL || !application->graphics_active) return -TABOS_EINVAL;
+    if (!elf_graphics_drain(application) ||
+        !platform_graphics_present(display_framebuffer())) return -TABOS_EIO;
     application->graphics_active = false;
+    platform_graphics_end();
     console_set_graphics_active(false);
     return 0;
 }
@@ -620,6 +730,8 @@ static bool elf_entry(tabos_app_context_t *context)
         .graphics_blit = elf_graphics_blit,
         .graphics_present = elf_graphics_present,
         .graphics_close = elf_graphics_close,
+        .graphics_capabilities = elf_graphics_capabilities,
+        .graphics_blit_ex = elf_graphics_blit_ex,
     };
     application->execution = platform_riscv32_create(
         application->image.entry, application->image.memory, application->image.memory_size,
@@ -686,6 +798,13 @@ static void elf_cleanup(tabos_app_context_t *context, int exit_status)
     (void)exit_status;
     loader_elf_application_t *application = application_from_context(context);
     if (application == NULL) return;
+    if (application->graphics_active) {
+        (void)elf_graphics_drain(application);
+        (void)platform_graphics_present(display_framebuffer());
+        application->graphics_active = false;
+        platform_graphics_end();
+        console_set_graphics_active(false);
+    }
     platform_riscv32_destroy(application->execution);
     application->execution = NULL;
     loader_elf_unload(&application->image);
@@ -756,6 +875,7 @@ void loader_elf_application_destroy(void *application)
 {
     loader_elf_application_t *elf_application = application;
     if (elf_application != NULL && elf_application->graphics_active) {
+        platform_graphics_end();
         console_set_graphics_active(false);
     }
     free(elf_application);

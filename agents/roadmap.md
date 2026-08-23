@@ -387,8 +387,15 @@ but is not a substitute for this execution path.
 - [x] Add clipped fill, pixel, line, rectangle, bitmap blit, and explicit present operations.
 - [x] Restore the terminal framebuffer when a graphics application closes or exits.
 - [x] Add a portable interactive graphics demo and tester coverage.
+- [x] Define portable queued transform, blend, color-key, and capability APIs.
+- [x] Add ESP32-P4 PPA acceleration with transparent software fallback.
+- [x] Add direct native-orientation scanout for fullscreen Tab5 graphics applications.
+- [x] Add VSYNC-paced native double buffering for tear-free Tab5 graphics.
+- [x] Add deterministic pixel-level clipping and framebuffer regression tests.
+- [x] Add a portable graphics benchmark application.
+- [ ] Validate PPA orientation, transforms, and fallback on physical Tab5 variants.
+- [ ] Record host and Tab5 benchmark results.
 - [ ] Decide framebuffer placement and buffering strategy from measurements.
-- [ ] Add deterministic pixel-level clipping and framebuffer regression tests.
 - [ ] Add damage tracking and compositor service.
 - [ ] Implement window manager as client of public graphics/input services.
 - [ ] Support fullscreen application optimization without granting hardware ownership.

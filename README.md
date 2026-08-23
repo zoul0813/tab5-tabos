@@ -126,7 +126,7 @@ Run host display:
 
 Host executable opens a resizable window containing the shared 1280x720 RGB565 boot console.
 It remembers its last window position in the SDL per-user preferences directory. If that position is no longer visible on a connected display, normal system placement is used instead.
-Cmd+Shift+F12 captures the logical framebuffer to a timestamped BMP under
+Cmd+Shift+F12 captures the logical framebuffer to a timestamped PNG under
 `screenshots/`; plain F12 remains available to TabOS applications.
 
 Tab5 firmware initializes the built-in display and presents the same structured boot report shown over serial. See the [display system guide](docs/display.md) for the current contract and hardware-validation procedure.

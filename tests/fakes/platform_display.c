@@ -1,5 +1,38 @@
 #include <tabos/platform/platform.h>
 
+uint32_t platform_graphics_capabilities(void)
+{
+    return 0U;
+}
+
+bool platform_graphics_begin(void)
+{
+    return true;
+}
+
+void platform_graphics_end(void)
+{
+}
+
+bool platform_graphics_present(platform_framebuffer_t *framebuffer)
+{
+    return platform_display_present(framebuffer);
+}
+
+bool platform_graphics_fill(platform_framebuffer_t *framebuffer, int32_t x, int32_t y,
+                            uint32_t width, uint32_t height, platform_pixel_t color)
+{
+    (void)framebuffer; (void)x; (void)y; (void)width; (void)height; (void)color;
+    return false;
+}
+
+bool platform_graphics_blit(platform_framebuffer_t *framebuffer,
+                            const tabos_graphics_blit_options_t *options)
+{
+    (void)framebuffer; (void)options;
+    return false;
+}
+
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>

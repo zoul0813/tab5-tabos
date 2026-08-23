@@ -16,6 +16,11 @@ Default renderer can address all 256 CP437 glyphs. Console text still assigns co
 
 All targets use identical terminal scaling. Change `TABOS_TERMINAL_SCALE` in `config/Display.cmake` and rebuild to adjust compiled default. Default is 2. The 8×12 glyph becomes 16×24 pixels inside a 16×30-pixel terminal cell, producing exactly 80 columns and 24 rows on the 1280×720 display. Glyphs have no added horizontal spacing; six vertical pixels remain between rows. `TABOS_TERMINAL_SCROLLBACK_LINES` controls additional retained history rows and defaults to 256. Keeping settings shared makes macOS/Linux output faithful size, wrapping, and history preview of Tab5 output.
 
+SDL host graphics applications are paced to `TABOS_HOST_REFRESH_RATE_HZ`, default 58 Hz,
+to approximate ST7121 Tab5 presentation timing. Terminal updates remain event-driven,
+and headless tests are not artificially delayed. Configure the value with
+`./tools/tabos config`.
+
 Software can change scale from 1 through 8 at runtime using `tabos_terminal_set_scale()` from `<tabos/terminal.h>` and inspect it with `tabos_terminal_get_scale()`. A value set before runtime startup becomes initial boot scale. A value set after startup rebuilds geometry, reflows retained hard and soft-wrapped cell history, preserves colors and cursor, and redraws current viewport. Runtime value is retained for life of running system but is not yet persisted across restarts; persistent preference storage will depend on future filesystem/configuration service.
 
 At startup, the kernel creates one structured boot report and writes it to both the platform log and the terminal framebuffer. The report identifies the TabOS version, target, detected display, logical framebuffer, processor, memory, storage state, and kernel runtime state. Tab5 also reports internal heap availability, PSRAM availability, and physical flash capacity. This prevents serial and on-screen diagnostics from evolving as separate lists.

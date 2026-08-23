@@ -9,6 +9,7 @@ set(TABOS_CORE_SOURCES
     "${TABOS_ROOT}/kernel/boot_report.c"
     "${TABOS_ROOT}/apps/diag/diagnostic_apps.c"
     "${TABOS_ROOT}/graphics/display.c"
+    "${TABOS_ROOT}/graphics/raster.c"
     "${TABOS_ROOT}/graphics/font.c"
     "${TABOS_GENERATED_FONT_SOURCE}"
     "${TABOS_ROOT}/graphics/terminal.c"

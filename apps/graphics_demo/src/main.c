@@ -24,6 +24,7 @@ int main(void)
             sprite[row * 16U + column] = ((row / 4U) + (column / 4U)) % 2U == 0U
                 ? TABOS_RGB565(255, 255, 255) : TABOS_RGB565(255, 64, 96);
     bool running = true;
+    tabos_graphics_rotation_t rotation = TABOS_GRAPHICS_ROTATE_0;
 
     while (running) {
         char input[8];
@@ -35,6 +36,7 @@ int main(void)
                 case 'a': case 'A': x -= 8; break;
                 case 'd': case 'D': x += 8; break;
                 case 'q': case 'Q': running = false; break;
+                case 'r': case 'R': rotation = (tabos_graphics_rotation_t)((rotation + 1) % 4); break;
                 default: break;
             }
         }
@@ -49,7 +51,16 @@ int main(void)
         (void)tabos_graphics_fill_rect(&graphics, x, y, 64U, 64U, TABOS_RGB565(255, 176, 32));
         (void)tabos_graphics_fill_rect(&graphics, x + 12, y + 12, 40U, 40U,
                                        TABOS_RGB565(48, 128, 255));
-        (void)tabos_graphics_blit(&graphics, x + 24, y + 24, 16U, 16U, sprite);
+        const tabos_graphics_blit_options_t transformed = {
+            .pixels = sprite, .bitmap_width = 16U, .bitmap_height = 16U,
+            .source = {.width = 16U, .height = 16U},
+            .destination = {.x = x + 16, .y = y + 16, .width = 32U, .height = 32U},
+            .rotation = rotation, .opacity = 192U,
+            .color_key_enabled = true,
+            .color_key_low = TABOS_RGB565(255, 255, 255),
+            .color_key_high = TABOS_RGB565(255, 255, 255),
+        };
+        (void)tabos_graphics_blit_ex(&graphics, &transformed);
         (void)tabos_graphics_present(&graphics);
         (void)tabos_sleep_ms(16U);
     }

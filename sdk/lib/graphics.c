@@ -5,6 +5,12 @@
 
 extern const tabos_elf_api_t *tabos_runtime_api;
 
+#if defined(TABOS_APPLICATION)
+_Static_assert(sizeof(void *) == 4U, "TabOS applications require 32-bit pointers");
+_Static_assert(sizeof(tabos_graphics_blit_options_t) == 56U,
+               "graphics ABI layout changed");
+#endif
+
 static int result(int value)
 {
     if (value < 0) { errno = -value; return -1; }
@@ -84,6 +90,22 @@ int tabos_graphics_blit(tabos_graphics_t *graphics, int32_t x, int32_t y,
     if (!valid(graphics) || pixels == NULL) { errno = EINVAL; return -1; }
     if (tabos_runtime_api->graphics_blit == NULL) { errno = ENOSYS; return -1; }
     return result(tabos_runtime_api->graphics_blit(x, y, width, height, pixels));
+}
+
+uint32_t tabos_graphics_capabilities(const tabos_graphics_t *graphics)
+{
+    if (!valid(graphics) || tabos_runtime_api->graphics_capabilities == NULL) return 0U;
+    return tabos_runtime_api->graphics_capabilities();
+}
+
+int tabos_graphics_blit_ex(tabos_graphics_t *graphics,
+                           const tabos_graphics_blit_options_t *options)
+{
+    if (!valid(graphics) || options == NULL || options->pixels == NULL) {
+        errno = EINVAL; return -1;
+    }
+    if (tabos_runtime_api->graphics_blit_ex == NULL) { errno = ENOSYS; return -1; }
+    return result(tabos_runtime_api->graphics_blit_ex(options));
 }
 int tabos_graphics_present(tabos_graphics_t *graphics)
 {

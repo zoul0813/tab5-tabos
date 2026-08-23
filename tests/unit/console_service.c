@@ -71,6 +71,13 @@ int main(void)
         return 1;
     }
 
+    console_set_graphics_active(true);
+    if (!input_submit(&submitted) || !tabos_console_poll(&foreground, &received)) return 1;
+    test_platform_advance_time_ms(TABOS_CURSOR_BLINK_INTERVAL_MS);
+    console_update();
+    if (terminal.cursor_visible || !terminal.cursor_phase_visible) return 1;
+    console_set_graphics_active(false);
+
     tabos_console_release(&foreground);
     if (tabos_console_is_foreground(&foreground) ||
         tabos_console_write(&foreground, "stale") ||

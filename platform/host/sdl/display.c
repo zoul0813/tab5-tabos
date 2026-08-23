@@ -3,6 +3,7 @@
 #include <tabos/platform/platform.h>
 
 #include <tabos/config/identity.h>
+#include <tabos/config/display.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,6 +12,7 @@
 static SDL_Renderer *renderer;
 static SDL_Texture *texture;
 static platform_pixel_t *framebuffer_pixels;
+static Uint64 graphics_present_deadline_ns;
 
 bool host_capture_screenshot(void)
 {
@@ -27,7 +29,7 @@ bool host_capture_screenshot(void)
         return false;
     }
     char path[80];
-    if (strftime(path, sizeof(path), "screenshots/tabos-%Y%m%d-%H%M%S.bmp", &local_time) == 0U) {
+    if (strftime(path, sizeof(path), "screenshots/tabos-%Y%m%d-%H%M%S.png", &local_time) == 0U) {
         SDL_Log("Could not format screenshot path");
         return false;
     }
@@ -40,7 +42,7 @@ bool host_capture_screenshot(void)
         SDL_Log("Could not create screenshot surface: %s", SDL_GetError());
         return false;
     }
-    const bool saved = SDL_SaveBMP(surface, path);
+    const bool saved = SDL_SavePNG(surface, path);
     SDL_DestroySurface(surface);
     if (!saved) {
         SDL_Log("Could not save screenshot: %s", SDL_GetError());
@@ -53,6 +55,51 @@ bool host_capture_screenshot(void)
 const char *platform_display_name(void)
 {
     return "SDL3 RGB565";
+}
+
+uint32_t platform_graphics_capabilities(void)
+{
+    return 0U;
+}
+
+bool platform_graphics_begin(void)
+{
+    graphics_present_deadline_ns = SDL_GetTicksNS();
+    return true;
+}
+
+void platform_graphics_end(void)
+{
+    graphics_present_deadline_ns = 0U;
+}
+
+bool platform_graphics_present(platform_framebuffer_t *framebuffer)
+{
+    if (!host_is_headless()) {
+        const Uint64 period_ns = UINT64_C(1000000000) / TABOS_HOST_REFRESH_RATE_HZ;
+        graphics_present_deadline_ns += period_ns;
+        const Uint64 now = SDL_GetTicksNS();
+        if (now < graphics_present_deadline_ns) {
+            SDL_DelayPrecise(graphics_present_deadline_ns - now);
+        } else if (now - graphics_present_deadline_ns > period_ns) {
+            graphics_present_deadline_ns = now;
+        }
+    }
+    return platform_display_present(framebuffer);
+}
+
+bool platform_graphics_fill(platform_framebuffer_t *framebuffer, int32_t x, int32_t y,
+                            uint32_t width, uint32_t height, platform_pixel_t color)
+{
+    (void)framebuffer; (void)x; (void)y; (void)width; (void)height; (void)color;
+    return false;
+}
+
+bool platform_graphics_blit(platform_framebuffer_t *framebuffer,
+                            const tabos_graphics_blit_options_t *options)
+{
+    (void)framebuffer; (void)options;
+    return false;
 }
 
 bool platform_display_init(platform_framebuffer_t *framebuffer)

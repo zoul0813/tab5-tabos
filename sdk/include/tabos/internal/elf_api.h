@@ -1,6 +1,8 @@
 #ifndef TABOS_INTERNAL_ELF_API_H
 #define TABOS_INTERNAL_ELF_API_H
 
+#include <tabos/graphics.h>
+
 #include <stdint.h>
 
 #define TABOS_ELF_API_VERSION 4U
@@ -69,6 +71,8 @@ typedef struct {
                          const uint16_t *pixels);
     int (*graphics_present)(void);
     int (*graphics_close)(void);
+    uint32_t (*graphics_capabilities)(void);
+    int (*graphics_blit_ex)(const tabos_graphics_blit_options_t *options);
 } tabos_elf_api_t;
 
 typedef int (*tabos_elf_entry_fn)(const tabos_elf_api_t *api,

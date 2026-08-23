@@ -20,7 +20,6 @@ static bool restart_cursor_blink(void)
 {
     const bool changed = !cursor_phase_visible;
     cursor_phase_visible = true;
-    graphics_active = false;
     if (!graphics_active && active_terminal != NULL) {
         terminal_set_cursor_phase(active_terminal, true);
     }

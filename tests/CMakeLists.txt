@@ -14,6 +14,17 @@ tabos_enable_sanitizers(tabos_core_smoke)
 
 add_test(NAME unit.core_smoke COMMAND tabos_core_smoke)
 
+add_executable(tabos_raster unit/raster.c ${TABOS_TEST_PLATFORM_FAKES})
+target_include_directories(tabos_raster PRIVATE
+    "${TABOS_ROOT}/graphics/include"
+    "${TABOS_ROOT}/platform/include"
+    "${TABOS_ROOT}/sdk/include"
+)
+target_link_libraries(tabos_raster PRIVATE tabos_core)
+tabos_enable_warnings(tabos_raster)
+tabos_enable_sanitizers(tabos_raster)
+add_test(NAME unit.raster COMMAND tabos_raster)
+
 add_executable(tabos_display_diagnostic unit/display_diagnostic.c ${TABOS_TEST_PLATFORM_FAKES})
 target_include_directories(tabos_display_diagnostic PRIVATE
     "${TABOS_ROOT}/graphics/include"

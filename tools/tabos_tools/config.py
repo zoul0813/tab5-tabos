@@ -19,6 +19,7 @@ CONFIG_DEFAULTS = {
     "TABOS_FONT_CELL_HEIGHT": "15",
     "TABOS_TERMINAL_SCALE": "2",
     "TABOS_TERMINAL_SCROLLBACK_LINES": "256",
+    "TABOS_HOST_REFRESH_RATE_HZ": "58",
     "TABOS_CURSOR_BLINK_INTERVAL_MS": "500",
     "TABOS_ELF_STARTUP_PATH": "T:/bin/hello",
     "TABOS_SHELL_PATH": "T:/bin/shell",
@@ -67,7 +68,11 @@ def validate_project_config(config: dict[str, str]) -> None:
             f"TABOS_FONT_FILE is {font_path.stat().st_size} bytes; expected {expected_size} "
             f"for {glyph_count} glyphs of {glyph_width}x{glyph_height}"
         )
-    for name in ("TABOS_TERMINAL_SCROLLBACK_LINES", "TABOS_CURSOR_BLINK_INTERVAL_MS"):
+    for name in (
+        "TABOS_TERMINAL_SCROLLBACK_LINES",
+        "TABOS_HOST_REFRESH_RATE_HZ",
+        "TABOS_CURSOR_BLINK_INTERVAL_MS",
+    ):
         if not re.fullmatch(r"[1-9][0-9]*", config[name]):
             fail(f"{name} must be a positive integer")
     if config["TABOS_HOST_STARTUP_APP"] not in {
@@ -165,6 +170,9 @@ def command_config(_args: argparse.Namespace) -> None:
         config["TABOS_TERMINAL_SCROLLBACK_LINES"] = prompt_integer(
             "Terminal scrollback lines", config["TABOS_TERMINAL_SCROLLBACK_LINES"], 1
         )
+        config["TABOS_HOST_REFRESH_RATE_HZ"] = prompt_integer(
+            "Host graphics refresh rate (Hz)", config["TABOS_HOST_REFRESH_RATE_HZ"], 1
+        )
         config["TABOS_CURSOR_BLINK_INTERVAL_MS"] = prompt_integer(
             "Cursor blink half-period (ms)", config["TABOS_CURSOR_BLINK_INTERVAL_MS"], 1
         )
@@ -202,6 +210,7 @@ def project_cmake_arguments(target: str) -> list[str]:
         f"-DTABOS_FONT_CELL_HEIGHT={config['TABOS_FONT_CELL_HEIGHT']}",
         f"-DTABOS_TERMINAL_SCALE={config['TABOS_TERMINAL_SCALE']}",
         f"-DTABOS_TERMINAL_SCROLLBACK_LINES={config['TABOS_TERMINAL_SCROLLBACK_LINES']}",
+        f"-DTABOS_HOST_REFRESH_RATE_HZ={config['TABOS_HOST_REFRESH_RATE_HZ']}",
         f"-DTABOS_CURSOR_BLINK_INTERVAL_MS={config['TABOS_CURSOR_BLINK_INTERVAL_MS']}",
         f"-DTABOS_ELF_STARTUP_PATH={config['TABOS_ELF_STARTUP_PATH']}",
         f"-DTABOS_SHELL_PATH={config['TABOS_SHELL_PATH']}",

@@ -64,6 +64,8 @@ static const uint32_t HOST_RV32_GRAPHICS_FILL_RECT = UINT32_C(0xffff0074);
 static const uint32_t HOST_RV32_GRAPHICS_BLIT = UINT32_C(0xffff0078);
 static const uint32_t HOST_RV32_GRAPHICS_PRESENT = UINT32_C(0xffff007c);
 static const uint32_t HOST_RV32_GRAPHICS_CLOSE = UINT32_C(0xffff0080);
+static const uint32_t HOST_RV32_GRAPHICS_CAPABILITIES = UINT32_C(0xffff0084);
+static const uint32_t HOST_RV32_GRAPHICS_BLIT_EX = UINT32_C(0xffff0088);
 
 struct platform_riscv32_context {
     uint8_t *memory;
@@ -83,6 +85,19 @@ static void write_u32(uint8_t *memory, uint32_t address, uint32_t value)
     memory[address + 1U] = (uint8_t)(value >> 8U);
     memory[address + 2U] = (uint8_t)(value >> 16U);
     memory[address + 3U] = (uint8_t)(value >> 24U);
+}
+
+static uint16_t read_u16(const uint8_t *memory, uint32_t address)
+{
+    return (uint16_t)((uint16_t)memory[address] |
+                      ((uint16_t)memory[address + 1U] << 8U));
+}
+
+static uint32_t read_u32(const uint8_t *memory, uint32_t address)
+{
+    return (uint32_t)memory[address] | ((uint32_t)memory[address + 1U] << 8U) |
+        ((uint32_t)memory[address + 2U] << 16U) |
+        ((uint32_t)memory[address + 3U] << 24U);
 }
 
 static const char *guest_string(const uint8_t *memory, uint32_t address)
@@ -166,7 +181,7 @@ platform_riscv32_context_t *platform_riscv32_create(
 
     const uint32_t image_end = minimum_address + (uint32_t)memory_size;
     const uint32_t api_address = (image_end + 15U) & ~15U;
-    if (api_address > HOST_RV32_RAM_SIZE - 132U) {
+    if (api_address > HOST_RV32_RAM_SIZE - 140U) {
         platform_riscv32_destroy(context);
         return NULL;
     }
@@ -203,8 +218,10 @@ platform_riscv32_context_t *platform_riscv32_create(
     write_u32(context->memory, api_address + 120U, HOST_RV32_GRAPHICS_BLIT);
     write_u32(context->memory, api_address + 124U, HOST_RV32_GRAPHICS_PRESENT);
     write_u32(context->memory, api_address + 128U, HOST_RV32_GRAPHICS_CLOSE);
+    write_u32(context->memory, api_address + 132U, HOST_RV32_GRAPHICS_CAPABILITIES);
+    write_u32(context->memory, api_address + 136U, HOST_RV32_GRAPHICS_BLIT_EX);
 
-    uint32_t argument_data_address = api_address + 132U;
+    uint32_t argument_data_address = api_address + 140U;
     uint32_t argument_data_end = argument_data_address;
     for (size_t index = 0U; index < argc; ++index) {
         if (argv[index] == NULL) {
@@ -559,6 +576,52 @@ platform_riscv32_result_t platform_riscv32_step(
             context->state.regs[10] = (uint32_t)context->api.graphics_blit(
                 (int32_t)context->state.regs[10], (int32_t)context->state.regs[11],
                 width, height, pixels);
+            current_user_data = NULL;
+            context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_GRAPHICS_CAPABILITIES) {
+            if (context->api.graphics_capabilities == NULL) return PLATFORM_RISCV32_FAULT;
+            current_user_data = context->user_data;
+            context->state.regs[10] = context->api.graphics_capabilities();
+            current_user_data = NULL;
+            context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_GRAPHICS_BLIT_EX) {
+            const uint32_t address = context->state.regs[10];
+            const uint8_t *guest = guest_buffer(context->memory, address, 56U);
+            if (guest == NULL || context->api.graphics_blit_ex == NULL) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            tabos_graphics_blit_options_t options = {
+                .bitmap_width = read_u32(guest, 4U),
+                .bitmap_height = read_u32(guest, 8U),
+                .source = {
+                    .x = (int32_t)read_u32(guest, 12U), .y = (int32_t)read_u32(guest, 16U),
+                    .width = read_u32(guest, 20U), .height = read_u32(guest, 24U),
+                },
+                .destination = {
+                    .x = (int32_t)read_u32(guest, 28U), .y = (int32_t)read_u32(guest, 32U),
+                    .width = read_u32(guest, 36U), .height = read_u32(guest, 40U),
+                },
+                .rotation = (tabos_graphics_rotation_t)read_u32(guest, 44U),
+                .mirror_x = guest[48U] != 0U, .mirror_y = guest[49U] != 0U,
+                .opacity = guest[50U], .color_key_enabled = guest[51U] != 0U,
+                .color_key_low = read_u16(guest, 52U),
+                .color_key_high = read_u16(guest, 54U),
+            };
+            if (options.bitmap_width != 0U &&
+                options.bitmap_height > UINT32_MAX / options.bitmap_width) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            const uint32_t pixel_count = options.bitmap_width * options.bitmap_height;
+            if (pixel_count > UINT32_MAX / sizeof(uint16_t)) return PLATFORM_RISCV32_FAULT;
+            options.pixels = guest_buffer(context->memory, read_u32(guest, 0U),
+                                           pixel_count * sizeof(uint16_t));
+            if (options.pixels == NULL) return PLATFORM_RISCV32_FAULT;
+            current_user_data = context->user_data;
+            context->state.regs[10] = (uint32_t)context->api.graphics_blit_ex(&options);
             current_user_data = NULL;
             context->state.pc = context->state.regs[1];
             continue;
