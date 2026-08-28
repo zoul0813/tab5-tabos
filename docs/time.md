@@ -16,6 +16,22 @@ The first duration is delay before first expiration. The second is repeat interv
 
 `tabos_time_monotonic_ms()` is suitable for elapsed-time measurement and scheduling. It is not wall-clock time and has no date, timezone, or calendar meaning.
 
+The `date` core utility displays the current UTC wall clock:
+
+```sh
+date
+```
+
+Set the Tab5 RTC or host-simulator clock offset with a UTC value:
+
+```sh
+date -s "2026-08-28 14:30:00"
+```
+
+Tab5 RTC values are limited to years 2000 through 2099. `date -u` is accepted explicitly;
+UTC is always used because TabOS does not currently implement timezones or daylight-saving
+rules.
+
 ## RTC and Wall Clock
 
 Loaded applications include `<tabos/clock.h>` for UTC calendar and Unix-epoch access:

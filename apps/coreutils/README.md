@@ -14,7 +14,8 @@ Build one utility:
 ```sh
 make -C apps/coreutils ls
 make -C apps/coreutils mkdir
+make -C apps/coreutils date
 ```
 
-Use `build-ls` or `build-mkdir` to compile without installing. Runnable binaries install
-to `.local/rootfs/T/bin/ls.bin` and `.local/rootfs/T/bin/mkdir.bin`.
+Use `build-ls`, `build-mkdir`, or `build-date` to compile without installing. Runnable
+binaries install to `.local/rootfs/T/bin/` without filename extensions.

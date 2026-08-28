@@ -27,6 +27,7 @@
 - [x] Expose portable calendar read/write and libc wall-clock functions.
 - [x] Add private ELF transport and host interpreter support.
 - [x] Extend unit tests and maintained tester coverage.
+- [x] Add UTC `date` utility for reading and setting wall-clock time.
 - [ ] Validate RX8130 read/write behavior on physical Tab5 hardware.
 
 ### C17 Application Runtime
