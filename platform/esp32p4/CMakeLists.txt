@@ -11,5 +11,5 @@ idf_component_register(
         "${TABOS_ROOT}/sdk/include"
         "${TABOS_ROOT}/time/include"
         "${CMAKE_BINARY_DIR}/generated"
-    REQUIRES esp_driver_i2c esp_driver_ppa esp_hw_support esp_lcd esp_lcd_st7121 esp_lcd_touch_gt911 esp_lcd_touch_st7123 esp_mm esp_system esp_timer esp_tinyusb fatfs log m5stack_tab5_noglib sdmmc spi_flash vfs
+    REQUIRES esp_driver_i2c esp_driver_ppa esp_hosted esp_hw_support esp_lcd esp_lcd_st7121 esp_lcd_touch_gt911 esp_lcd_touch_st7123 esp_mm esp_system esp_timer esp_tinyusb esp_wifi_remote fatfs log m5stack_tab5_noglib sdmmc spi_flash vfs
 )

@@ -46,22 +46,28 @@ Use official `esp_hosted` and `esp_wifi_remote` over 4-bit SDIO.
   then rename it. Failed writes leave old config intact.
 - Treat missing `T:`, missing file, malformed config, or failed autoconnect as
   nonfatal. Report useful error without printing password.
-- Store password as plaintext because TabOS lacks secret storage, access
-  permissions, or encryption. Document this clearly.
 - Default `auto_connect` to `true` when key is omitted. `false` loads saved
   credentials but requires manual saved connection.
+- Permit an empty password for open networks.
+- Serialize configuration reads and writes so concurrent processes cannot
+  corrupt `wifi.conf`.
+- If `T:` is removed after configuration loads, retain credentials in memory
+  for current session but report that persistent configuration is unavailable.
 - Never place password in argv, shell history, boot report, serial logs, or
   normal status output.
 
 ### Portable Network Service
 
 - Add public `<tabos/network.h>` exposing Wi-Fi status, scan, connect,
-  disconnect, DNS, and bounded BSD-like socket operations.
+  disconnect, DNS, bounded ICMP echo, and bounded BSD-like socket operations.
 - Support IPv4 and IPv6, TCP and UDP, `socket`, `bind`, `listen`, `accept`,
   `connect`, `send`, `receive`, `shutdown`, options, and close.
 - Use portable addresses and opaque process-owned handles. Never expose
   ESP-IDF, lwIP, POSIX handles, or native structures.
 - Support blocking calls and nonblocking `EAGAIN`.
+- Implement ICMP echo through portable network API rather than exposing raw
+  sockets. Return resolved address, sequence, response size, round-trip time,
+  timeout, and network errors.
 - Close sockets and cancel pending work on normal exit, faults, and partial
   startup failures.
 - Defer TLS/HTTPS, static addressing, custom DNS, mDNS, SoftAP, routing, and
@@ -85,6 +91,13 @@ Use official `esp_hosted` and `esp_wifi_remote` over 4-bit SDIO.
   block runtime task.
 - During boot, load config after `T:` mount. Autoconnect asynchronously when
   enabled; shell and other services start without waiting for network success.
+- Model network state as offline, starting, scanning, connecting, online,
+  disconnecting, or failed. Preserve last failure for diagnostics.
+- Attempt autoconnect at most three times. Use bounded delay between attempts,
+  then enter failed state without an endless retry loop. Explicit connect or
+  reboot starts a new three-attempt sequence.
+- Make explicit disconnect cancel pending connection and retry work and suppress
+  further autoconnect until explicit connect or reboot.
 - Map host sockets to native macOS/Linux sockets. Simulate TabOS Wi-Fi state
   without changing workstation Wi-Fi.
 - Add external `netctl` application with:
@@ -102,8 +115,35 @@ Use official `esp_hosted` and `esp_wifi_remote` over 4-bit SDIO.
 - Never overwrite saved working credentials after failed connection.
 - Make `forget` remove SSID and password while preserving other config sections.
 - Restore terminal mode on success, error, interruption, and process cleanup.
+- Make `netctl status` show transport/firmware state, connection state, SSID,
+  signal strength, IPv4 and IPv6 addresses, prefix/netmask, gateway, DNS servers,
+  autoconnect state, saved-config availability, and last failure. Never show or
+  imply password content.
+- Bound scan results, order them by signal strength, and show SSID, security,
+  channel, and signal strength without exposing backend-specific records.
 - Show C6 initialization, saved-config availability, autoconnect result, link
   state, and addresses in boot report. Never show credentials.
+
+### Ping Utility
+
+- Add `ping` under `apps/coreutils` as general external utility using public DNS
+  and ICMP echo APIs only.
+- Support:
+
+  - `ping <host>`
+  - `ping -4 <host>`
+  - `ping -6 <host>`
+  - `ping -c <count> <host>`
+  - `ping -W <timeout-ms> <host>`
+
+- Default to four requests with bounded timeout. Resolve names once, print
+  resolved address, then show response bytes, sequence, round-trip time, or
+  timeout for each request.
+- Print transmitted, received, loss percentage, and minimum/average/maximum
+  round-trip summary. Return nonzero when name resolution fails, no response is
+  received, or local network operation fails.
+- Allow Ctrl+C to stop early, print partial summary, cancel pending echo, and
+  restore input state.
 
 ## Test Plan
 
@@ -112,13 +152,17 @@ Use official `esp_hosted` and `esp_wifi_remote` over 4-bit SDIO.
   `auto_connect` behavior, forget, and redaction.
 - Test address conversion, DNS results, table exhaustion, stale handles,
   blocking/nonblocking behavior, wait readiness/timeouts/cancellation,
-  reconnect, and error mapping.
+  reconnect, the three-attempt autoconnect limit, explicit retry cancellation,
+  connection state transitions, and error mapping.
 - Test host IPv4/IPv6 loopback TCP, UDP, listen/accept, DNS, partial I/O, peer
   shutdown, disconnect during wait, and reconnect.
 - Prove process exit and fault close sockets, cancel waits, restore TTY mode,
   preserve parent resources, and leave foreground stack intact.
 - Extend independently built RV32 tester to exercise DNS, TCP, UDP, nonblocking
-  sockets, wait sets, and cleanup.
+  sockets, ICMP echo, wait sets, and cleanup.
+- Test `netctl status` redaction and fields plus `ping` IPv4/IPv6 success,
+  timeout, unknown host, disconnect, early interruption, summary, and exit
+  status behavior.
 - Keep old ABI-v1 fixtures unchanged. Add architecture checks rejecting native
   networking headers above platform boundary.
 - Run macOS and Linux Debug and Release tests and Tab5 Debug and Release
@@ -133,7 +177,8 @@ Use official `esp_hosted` and `esp_wifi_remote` over 4-bit SDIO.
 - Version 1 supports one saved Wi-Fi network profile.
 - Station mode only.
 - DNS, TCP, and UDP define basic networking.
-- Saved credentials are optional and plaintext.
+- Saved credentials are optional.
 - `auto_connect` defaults enabled.
+- Autoconnect stops after three failed attempts.
 - Static IP and DNS fields remain reserved and uninterpreted.
 - Generic device registry remains deferred.

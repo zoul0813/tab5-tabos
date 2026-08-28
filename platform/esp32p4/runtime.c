@@ -5,29 +5,57 @@
 #include <tabos/config/identity.h>
 
 #include <esp_flash.h>
+#include <esp_hosted.h>
 #include <esp_heap_caps.h>
 #include <esp_log.h>
 #include <esp_timer.h>
+#include <bsp/m5stack_tab5.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <sdkconfig.h>
 
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdatomic.h>
 
 static const char* const TAG = TABOS_PLATFORM_LOG_TAG;
 static atomic_bool stop_requested;
+static bool hosted_initialized;
+
+static void tab5_network_init(void)
+{
+    if (bsp_feature_enable(BSP_FEATURE_WIFI, true) != ESP_OK) {
+        ESP_LOGW(TAG, "Could not enable ESP32-C6 power");
+        return;
+    }
+    vTaskDelay(pdMS_TO_TICKS(200));
+    if (esp_hosted_init() != ESP_OK) {
+        ESP_LOGW(TAG, "ESP32-C6 hosted transport unavailable");
+        (void) bsp_feature_enable(BSP_FEATURE_WIFI, false);
+        return;
+    }
+    hosted_initialized = true;
+    esp_hosted_coprocessor_fwver_t version;
+    if (esp_hosted_get_coprocessor_fwversion(&version) == ESP_OK) {
+        ESP_LOGI(TAG, "ESP32-C6 hosted firmware %" PRIu32 ".%" PRIu32 ".%" PRIu32, version.major1, version.minor1,
+                 version.patch1);
+    } else {
+        ESP_LOGW(TAG, "ESP32-C6 hosted firmware version unavailable");
+    }
+}
 
 bool platform_init(bool headless)
 {
     (void) headless;
     atomic_store_explicit(&stop_requested, false, memory_order_release);
+    hosted_initialized = false;
     if (!platform_usb_port_disable_host_power()) {
         ESP_LOGE(TAG, "Could not place USB-A port in safe unpowered state");
         return false;
     }
     (void) tab5_keyboard_init();
     (void) tab5_rtc_init();
+    tab5_network_init();
     return true;
 }
 
@@ -51,6 +79,11 @@ void platform_stop_run_loop(void)
 
 void platform_shutdown(void)
 {
+    if (hosted_initialized) {
+        (void) esp_hosted_deinit();
+        hosted_initialized = false;
+    }
+    (void) bsp_feature_enable(BSP_FEATURE_WIFI, false);
     platform_display_shutdown();
     tab5_keyboard_shutdown();
     tab5_rtc_shutdown();
