@@ -10,6 +10,7 @@ tabos/
 ├── agents/              Context and implementation guidance for coding agents
 ├── apps/                Application sources and all-application build helper
 │   ├── build.sh         Build/install every independently loaded application
+│   ├── clock/           Graphical UTC wall-clock application
 │   ├── diag/            Optional built-in diagnostics and diagnostic registry
 │   │   ├── console/     Console/input diagnostic
 │   │   ├── elf_loader/  Embedded-ELF loader/execution diagnostic

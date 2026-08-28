@@ -32,6 +32,10 @@ Tab5 RTC values are limited to years 2000 through 2099. `date -u` is accepted ex
 UTC is always used because TabOS does not currently implement timezones or daylight-saving
 rules.
 
+The standalone `clock` application presents the same UTC wall clock graphically on a
+640x360 logical canvas. It displays the date in the upper-right corner and a centered
+seven-segment `HH:MM:SS` time. Press Q or Escape to return to the shell.
+
 ## RTC and Wall Clock
 
 Loaded applications include `<tabos/clock.h>` for UTC calendar and Unix-epoch access:
