@@ -2,8 +2,32 @@
 
 #include <tabos/process.h>
 
+#include <fcntl.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+
+enum {
+    PROCESS_LEAK_DESCRIPTOR_COUNT = 8,
+};
+
+static int run_resource_failure_fixture(void)
+{
+    void* allocation = malloc(4096U);
+    if (allocation == NULL) {
+        return 74;
+    }
+    memset(allocation, 0x5a, 4096U);
+
+    for (unsigned int index = 0U; index < PROCESS_LEAK_DESCRIPTOR_COUNT; ++index) {
+        const int descriptor = open("T:/tabos-process-resource.tmp", O_CREAT | O_RDWR, 0644);
+        if (descriptor < 0) {
+            return 75;
+        }
+    }
+    return 73;
+}
 
 static int run_process_fixture(int argc, char** argv)
 {
@@ -12,6 +36,9 @@ static int run_process_fixture(int argc, char** argv)
     }
     if (strcmp(argv[1], "--process-leaf") == 0) {
         return 23;
+    }
+    if (strcmp(argv[1], "--process-resource-failure") == 0) {
+        return run_resource_failure_fixture();
     }
     if (strcmp(argv[1], "--process-child") != 0) {
         return -1;

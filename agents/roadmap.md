@@ -36,6 +36,18 @@
 - [ ] Add RVC/compressed-instruction support to host execution, then select compressed
   application multilib for shared artifacts.
 
+### Process Ownership and Failure Containment
+
+- [x] Audit process, ELF mapping, execution task, descriptor, heap, graphics,
+  console, and nested-parent ownership.
+- [x] Make filesystem ELF resource teardown idempotent across partial startup,
+  normal exit, requested exit, and platform-detected faults.
+- [x] Add heap boundary guards and cleanup diagnostics.
+- [x] Extend the maintained tester with leaked-resource and nested-failure cases.
+- [x] Preserve host invalid-memory fault containment and PID 0 panic behavior.
+- [x] Document that native Tab5 application faults remain device-fatal until a
+  user-mode/PMP execution boundary and recoverable trap path are implemented.
+
 - [x] Replace generated C glyph tables with directly embedded raw bitmap font data.
 - [x] Support compile-time fixed-width font width, height, cell size, and 1-256 glyphs.
 - [x] Render glyph zero when requested byte is outside configured glyph count.

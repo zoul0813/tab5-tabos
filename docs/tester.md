@@ -12,6 +12,8 @@ Tests are separate modules under `apps/tester/src/tests/`. The current modules c
 - `malloc`, `calloc`, `realloc`, and `free`
 - files, metadata, binary/CP437 byte preservation, and working directories
 - nonblocking stdin through `fcntl`, `O_NONBLOCK`, and `EAGAIN`
+- nested child/grandchild status delivery and parent restoration
+- process-owned heap and leaked-descriptor cleanup after nonzero child exit
 
 Build and install into the host root filesystem:
 
@@ -33,6 +35,9 @@ ends with `[PASS] TabOS SDK tester` and status zero. The filesystem test creates
 Process test launches tester as its own child; child launches another tester as
 grandchild. Known leaf and child exit statuses verify reverse-order status delivery.
 Parent repeats entire chain to verify cleanup and reloading without another app binary.
+It also repeatedly launches a child that allocates heap memory, deliberately leaves
+eight file descriptors open, and exits nonzero. The parent then reopens and removes the
+fixture file, proving child teardown reclaimed descriptors before resuming the parent.
 
 Add future API coverage as another focused source module and register it in
 `apps/tester/src/main.c`. Tests should remain deterministic, clean up persistent state,

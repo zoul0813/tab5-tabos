@@ -24,6 +24,8 @@ enum {
     ELF_INSTRUCTIONS_PER_UPDATE   = 2000000,
     ELF_DESCRIPTOR_CAPACITY       = 16,
     ELF_HEAP_MAX                  = 1024 * 1024,
+    ELF_HEAP_GUARD_SIZE           = 32,
+    ELF_HEAP_GUARD_VALUE          = 0xa5,
     ELF_GRAPHICS_COMMAND_CAPACITY = 64,
 };
 
@@ -79,6 +81,7 @@ struct loader_elf_application {
         const char* exec_argv[TABOS_ELF_ARG_MAX + 1U];
         elf_descriptor_t descriptors[ELF_DESCRIPTOR_CAPACITY];
         char working_directory[TABOS_FS_PATH_MAX];
+        uint8_t* heap_allocation;
         uint8_t* heap;
         size_t heap_used;
         uint32_t tty_mode;
@@ -597,10 +600,14 @@ static void* elf_heap_sbrk(int32_t increment)
         return (void*) -1;
     }
     if (application->heap == NULL) {
-        application->heap = malloc(ELF_HEAP_MAX);
-        if (application->heap == NULL) {
+        application->heap_allocation = malloc(ELF_HEAP_MAX + (2U * ELF_HEAP_GUARD_SIZE));
+        if (application->heap_allocation == NULL) {
             return (void*) -1;
         }
+        memset(application->heap_allocation, ELF_HEAP_GUARD_VALUE, ELF_HEAP_GUARD_SIZE);
+        memset(application->heap_allocation + ELF_HEAP_GUARD_SIZE + ELF_HEAP_MAX, ELF_HEAP_GUARD_VALUE,
+               ELF_HEAP_GUARD_SIZE);
+        application->heap = application->heap_allocation + ELF_HEAP_GUARD_SIZE;
     }
     void* previous          = application->heap + application->heap_used;
     application->heap_used += (size_t) increment;
@@ -1032,10 +1039,22 @@ static void elf_update(tabos_app_context_t* context)
     }
 }
 
-static void elf_cleanup(tabos_app_context_t* context, int exit_status)
+static bool elf_heap_guards_intact(const loader_elf_application_t* application)
 {
-    (void) exit_status;
-    loader_elf_application_t* application = application_from_context(context);
+    if (application->heap_allocation == NULL) {
+        return true;
+    }
+    for (size_t index = 0U; index < ELF_HEAP_GUARD_SIZE; ++index) {
+        if (application->heap_allocation[index] != ELF_HEAP_GUARD_VALUE ||
+            application->heap_allocation[ELF_HEAP_GUARD_SIZE + ELF_HEAP_MAX + index] != ELF_HEAP_GUARD_VALUE) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static void elf_release_resources(loader_elf_application_t* application)
+{
     if (application == NULL) {
         return;
     }
@@ -1055,11 +1074,21 @@ static void elf_cleanup(tabos_app_context_t* context, int exit_status)
             application->descriptors[index] = (elf_descriptor_t) {0};
         }
     }
-    free(application->heap);
-    application->heap      = NULL;
-    application->heap_used = 0U;
-    application->context   = NULL;
-    application->console   = NULL;
+    if (!elf_heap_guards_intact(application)) {
+        platform_log("ELF heap boundary corruption detected during process cleanup");
+    }
+    free(application->heap_allocation);
+    application->heap_allocation = NULL;
+    application->heap            = NULL;
+    application->heap_used       = 0U;
+    application->context         = NULL;
+    application->console         = NULL;
+}
+
+static void elf_cleanup(tabos_app_context_t* context, int exit_status)
+{
+    (void) exit_status;
+    elf_release_resources(application_from_context(context));
 }
 
 loader_elf_application_t* loader_elf_application_create(const char* path, size_t argc, const char* const* argv)
@@ -1117,10 +1146,7 @@ const tabos_app_descriptor_t* loader_elf_application_descriptor(const loader_elf
 void loader_elf_application_destroy(void* application)
 {
     loader_elf_application_t* elf_application = application;
-    if (elf_application != NULL && elf_application->graphics_active) {
-        platform_graphics_end();
-        console_set_graphics_active(false);
-    }
+    elf_release_resources(elf_application);
     free(elf_application);
 }
 

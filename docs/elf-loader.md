@@ -127,7 +127,7 @@ Loader does not yet provide:
 - dynamic relocation and imported-symbol processing
 - imported symbol resolution
 - multiple code/data permission regions
-- process isolation or crash containment
+- Tab5 native process memory isolation or crash containment; host interpreter faults are contained
 - signing, discovery, or package metadata
 
 Host tests parse, load, and execute the same RV32 application artifact used by Tab5 through a resumable RV32IMA interpreter. Guest state persists across bounded instruction slices so host tests cover loader, ABI, output, exit status, and execution faults without replacing RV32 code with a host-native build.

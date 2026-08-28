@@ -152,6 +152,20 @@ Current implementation is deliberately small:
 - shared console state uses platform mutexes: SDL mutex on host and a FreeRTOS mutex with
   priority inheritance on Tab5
 
+Filesystem ELF processes own their loaded image, executable mapping, execution
+context, heap arena, open descriptors, graphics session, arguments, working directory,
+and terminal policy. TabOS releases these resources through one idempotent teardown path
+after normal return, requested exit, launch failure, or a fault reported by the execution
+backend. A child failure returns a nonzero status after teardown and restores its parent;
+a PID 0 failure enters kernel panic.
+
+The host RV32 interpreter bounds-checks guest memory and turns invalid guest accesses
+into child-process faults. Tab5 currently executes ELF code natively in a FreeRTOS task
+with kernel privilege. The task provides independent scheduling and stack allocation, but
+not memory isolation: an arbitrary native memory or instruction fault can still invoke
+the ESP-IDF panic handler and reboot the device. True Tab5 crash containment requires a
+future user-mode/PMP execution boundary and recoverable trap handler.
+
 Descriptor and public application API avoid assumptions about executable container.
 Loader reads ELF with debug sections removed and static relocations retained through
 TabOS filesystem API and maps its entry into this
