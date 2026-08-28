@@ -881,9 +881,9 @@ bool platform_display_present(const platform_framebuffer_t* framebuffer)
         return false;
     }
     if (!backlight_enabled) {
-        const esp_err_t result = bsp_display_backlight_on();
+        const esp_err_t result = bsp_display_brightness_set(75);
         if (result != ESP_OK) {
-            ESP_LOGE(TAG, "Could not enable Tab5 backlight: %s", esp_err_to_name(result));
+            ESP_LOGE(TAG, "Could not set Tab5 backlight brightness: %s", esp_err_to_name(result));
             return false;
         }
         backlight_enabled = true;

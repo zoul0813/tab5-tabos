@@ -45,7 +45,7 @@ The Tab5 target uses the official `espressif/m5stack_tab5_noglib` BSP component,
 
 At boot, the platform detects and reports the installed display controller over serial in both debug and release builds. Current detection supports ILI9881C, ST7123, and ST7121 Tab5 variants. The detected controller name is also available through the platform interface for a future on-screen boot driver list.
 
-TabOS keeps its shared logical orientation at 1280×720. Before presenting, the Tab5 backend rotates that frame counter-clockwise into the panel's native 720×1280 layout, sends it to the LCD, and then enables the backlight. The pure rotation operation is covered by a host unit test.
+TabOS keeps its shared logical orientation at 1280×720. Before presenting, the Tab5 backend rotates that frame counter-clockwise into the panel's native 720×1280 layout, sends it to the LCD, and then enables the backlight at 75% brightness. The pure rotation operation is covered by a host unit test.
 
 The BSP integration deliberately excludes LVGL. UI composition remains owned by TabOS and will be designed separately.
 
