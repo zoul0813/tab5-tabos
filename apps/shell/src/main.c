@@ -7,6 +7,7 @@
 #include <tabos/process.h>
 
 #include <shell/parser.h>
+#include <shell/input.h>
 
 #include <stdint.h>
 #include <sys/ioctl.h>
@@ -223,8 +224,9 @@ int main(int argc, char** argv)
     (void) argv;
 
     char line[SHELL_LINE_CAPACITY];
-    uint32_t used = 0U;
-    line[0]       = '\0';
+    shell_input_filter_t input_filter = {.state = SHELL_INPUT_TEXT};
+    uint32_t used                     = 0U;
+    line[0]                           = '\0';
 
     // disable buffering
     setvbuf(stdout, NULL, _IONBF, 0);
@@ -244,21 +246,28 @@ int main(int argc, char** argv)
             continue;
         }
         for (int index = 0; index < count; ++index) {
-            const char character = input[index];
-            if (character == '\n') {
+            const uint8_t input_byte = (uint8_t) input[index];
+            if (input_byte == '\n' && input_filter.state == SHELL_INPUT_TEXT) {
                 line[used] = '\0';
                 putchar('\n');
                 execute_command(line);
                 used    = 0U;
                 line[0] = '\0';
                 prompt();
-            } else if (character == '\b') {
+            } else if (input_byte == '\b' && input_filter.state == SHELL_INPUT_TEXT) {
                 if (used > 0U) {
                     used--;
                     line[used] = '\0';
                     putchar('\b');
                 }
-            } else if ((unsigned char) character >= 32U && used + 1U < sizeof(line)) {
+            } else {
+                char character;
+                if (!shell_input_filter(&input_filter, input_byte, &character)) {
+                    continue;
+                }
+                if (used + 1U >= sizeof(line)) {
+                    continue;
+                }
                 line[used++] = character;
                 line[used]   = '\0';
                 putchar((unsigned char) character);

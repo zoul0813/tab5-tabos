@@ -17,4 +17,7 @@ installs it as `.local/rootfs/T/bin/shell`. Use `make -C apps/shell build` to bu
 without installing. The unstripped ELF remains at
 `build/apps/shell/shell.elf` for debugging.
 
+Command entry accepts and echoes printable ASCII. ANSI escape sequences, including
+arrow-key sequences, and non-ASCII input bytes are ignored.
+
 See `docs/shell.md` for commands and runtime behavior.

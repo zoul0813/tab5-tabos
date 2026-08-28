@@ -144,6 +144,18 @@ tabos_enable_sanitizers(tabos_shell_parser)
 
 add_test(NAME unit.shell_parser COMMAND tabos_shell_parser)
 
+add_executable(tabos_shell_input
+    unit/shell_input.c
+    "${TABOS_ROOT}/apps/shell/src/input.c"
+)
+target_include_directories(tabos_shell_input PRIVATE
+    "${TABOS_ROOT}/apps/shell/include"
+)
+tabos_enable_warnings(tabos_shell_input)
+tabos_enable_sanitizers(tabos_shell_input)
+
+add_test(NAME unit.shell_input COMMAND tabos_shell_input)
+
 add_executable(tabos_application_lifecycle unit/application_lifecycle.c ${TABOS_TEST_PLATFORM_FAKES})
 target_include_directories(tabos_application_lifecycle PRIVATE
     "${TABOS_ROOT}/console/include"
