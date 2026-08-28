@@ -111,6 +111,7 @@ target_include_directories(tabos_core
         "${TABOS_ROOT}/input/include"
         "${TABOS_ROOT}/kernel/include"
         "${TABOS_ROOT}/loader/include"
+        "${TABOS_ROOT}/net/include"
         "${TABOS_ROOT}/platform/include"
         "${TABOS_ROOT}/time/include"
         "${TABOS_GENERATED_INCLUDE_DIR}"
