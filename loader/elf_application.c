@@ -1037,6 +1037,12 @@ static void elf_update(tabos_app_context_t* context)
         const tabos_app_result_t launch_result =
             tabos_app_exec_args(context, application->exec_path, application->exec_argc, application->exec_argv);
         if (launch_result != TABOS_APP_RESULT_OK) {
+            /* A child whose entry function fails is finished synchronously and
+             * leaves its exit status on the parent. The launch error below is
+             * the authoritative result for this exec request, so discard that
+             * duplicate child status before it can satisfy the next request. */
+            int discarded_status = 0;
+            (void) tabos_app_take_child_status(context, &discarded_status);
             atomic_store_explicit(&application->exec_status, -(100 + (int) launch_result), memory_order_release);
             atomic_store_explicit(&application->exec_status_ready, true, memory_order_release);
         } else {
