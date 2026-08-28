@@ -14,6 +14,8 @@ iteration, and nonblocking flags. TabOS does not claim full POSIX compatibility.
 ## Time and System Information
 
 `<tabos/runtime_time.h>` provides monotonic milliseconds and cooperative sleep.
+`<tabos/clock.h>` provides UTC RTC calendar and Unix-epoch access; normal libc
+`time()`, `gettimeofday()`, and realtime/monotonic `clock_gettime()` are supported.
 `<tabos/system.h>` provides portable target, device, display, processor, and memory data.
 
 ## Fullscreen Graphics

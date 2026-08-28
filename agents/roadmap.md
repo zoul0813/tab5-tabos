@@ -20,6 +20,15 @@
 
 ## Current Work
 
+### RTC and Wall Clock
+
+- [x] Add validated Gregorian calendar and signed Unix-epoch conversion.
+- [x] Implement host wall clock and Tab5 RX8130CE backend.
+- [x] Expose portable calendar read/write and libc wall-clock functions.
+- [x] Add private ELF transport and host interpreter support.
+- [x] Extend unit tests and maintained tester coverage.
+- [ ] Validate RX8130 read/write behavior on physical Tab5 hardware.
+
 ### C17 Application Runtime
 
 - [x] Decide `main(argc, argv)` entry contract and hidden `crt0` lifecycle.

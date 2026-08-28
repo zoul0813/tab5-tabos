@@ -48,6 +48,15 @@ and SDK runtime sources. ABI v1 uses newlib for C17 allocation and stdio, provid
 documented filesystem subset, monotonic time/cooperative sleep, foreground process
 launch/wait, and portable system information. TabOS does not promise full POSIX compatibility.
 
+### RTC and wall clock [DECIDED]
+
+TabOS wall-clock values are signed Unix seconds in UTC. Tab5 reads and writes its
+RX8130CE RTC at I2C address `0x32`; host targets follow the host clock and simulate
+setting it with a private offset rather than changing the workstation clock. Kernel and
+drivers do not apply timezone or daylight-saving policy. Applications receive a portable
+calendar API plus standard `time()`, `gettimeofday()`, and `clock_gettime()` access.
+The existing monotonic clock remains separate and must be used for elapsed time.
+
 Fullscreen graphics use an OS-owned RGB565 framebuffer through public SDK calls.
 Applications never receive display-driver ownership. They may clear, draw clipped
 primitives, blit RGB565 pixels, and explicitly present a frame. Closing or exiting

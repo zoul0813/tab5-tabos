@@ -43,6 +43,8 @@ typedef struct {
         uint64_t flash_capacity_bytes;
         const char* keyboard_name;
         bool keyboard_present;
+        const char* rtc_name;
+        bool rtc_present;
 } platform_diagnostics_t;
 
 bool platform_init(bool headless);
@@ -53,6 +55,8 @@ const char* platform_display_name(void);
 bool platform_get_diagnostics(platform_diagnostics_t* diagnostics);
 void platform_log(const char* message);
 uint64_t platform_time_ms(void);
+bool platform_wall_clock_get(int64_t* seconds);
+bool platform_wall_clock_set(int64_t seconds);
 uint32_t platform_graphics_capabilities(void);
 bool platform_graphics_begin(void);
 void platform_graphics_end(void);

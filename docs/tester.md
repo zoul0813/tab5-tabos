@@ -14,6 +14,7 @@ Tests are separate modules under `apps/tester/src/tests/`. The current modules c
 - nonblocking stdin through `fcntl`, `O_NONBLOCK`, and `EAGAIN`
 - nested child/grandchild status delivery and parent restoration
 - process-owned heap and leaked-descriptor cleanup after nonzero child exit
+- RTC calendar, Unix time, `time()`, `gettimeofday()`, and realtime/monotonic clocks
 
 Build and install into the host root filesystem:
 
@@ -38,6 +39,10 @@ Parent repeats entire chain to verify cleanup and reloading without another app 
 It also repeatedly launches a child that allocates heap memory, deliberately leaves
 eight file descriptors open, and exits nonzero. The parent then reopens and removes the
 fixture file, proving child teardown reclaimed descriptors before resuming the parent.
+
+Runtime tests read the UTC wall clock through TabOS and libc interfaces. They write
+the immediately reread epoch value back unchanged to verify the RTC write path without
+intentionally changing the clock.
 
 Add future API coverage as another focused source module and register it in
 `apps/tester/src/main.c`. Tests should remain deterministic, clean up persistent state,

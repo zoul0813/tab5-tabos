@@ -121,6 +121,17 @@ tabos_enable_sanitizers(tabos_timer)
 
 add_test(NAME unit.timer COMMAND tabos_timer)
 
+add_executable(tabos_wall_clock unit/wall_clock.c ${TABOS_TEST_PLATFORM_FAKES})
+target_include_directories(tabos_wall_clock PRIVATE
+    "${TABOS_ROOT}/platform/include"
+    "${TABOS_ROOT}/sdk/include"
+    "${TABOS_ROOT}/time/include"
+)
+target_link_libraries(tabos_wall_clock PRIVATE tabos_core)
+tabos_enable_warnings(tabos_wall_clock)
+tabos_enable_sanitizers(tabos_wall_clock)
+add_test(NAME unit.wall_clock COMMAND tabos_wall_clock)
+
 add_executable(tabos_shell_parser
     unit/shell_parser.c
     "${TABOS_ROOT}/apps/shell/src/parser.c"

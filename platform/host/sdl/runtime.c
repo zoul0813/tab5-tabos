@@ -197,6 +197,8 @@ bool platform_get_diagnostics(platform_diagnostics_t* diagnostics)
                    .memory_total_bytes = ram_mebibytes > 0 ? (uint64_t) (unsigned int) ram_mebibytes * 1024U * 1024U : 0U,
                    .keyboard_name      = "SDL3 keyboard",
                    .keyboard_present   = true,
+                   .rtc_name           = "Host system clock",
+                   .rtc_present        = true,
     };
     return true;
 }

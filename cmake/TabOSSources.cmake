@@ -20,6 +20,7 @@ set(TABOS_CORE_SOURCES
     "${TABOS_ROOT}/fs/path.c"
     "${TABOS_ROOT}/sdk/lib/posix_filesystem.c"
     "${TABOS_ROOT}/time/time.c"
+    "${TABOS_ROOT}/time/wall_clock.c"
     "${TABOS_ROOT}/loader/elf_loader.c"
     "${TABOS_ROOT}/loader/elf_application.c"
 )
@@ -44,6 +45,7 @@ endif()
 
 set(TABOS_HOST_PLATFORM_SOURCES
     "${TABOS_ROOT}/platform/host/sdl/runtime.c"
+    "${TABOS_ROOT}/platform/host/sdl/clock.c"
     "${TABOS_ROOT}/platform/host/sdl/mutex.c"
     "${TABOS_ROOT}/platform/host/sdl/input.c"
     "${TABOS_ROOT}/platform/host/sdl/display.c"
@@ -54,6 +56,7 @@ set(TABOS_HOST_PLATFORM_SOURCES
 
 set(TABOS_ESP32P4_PLATFORM_SOURCES
     "${TABOS_ROOT}/platform/esp32p4/runtime.c"
+    "${TABOS_ROOT}/platform/esp32p4/rtc.c"
     "${TABOS_ROOT}/platform/esp32p4/mutex.c"
     "${TABOS_ROOT}/platform/esp32p4/keyboard.c"
     "${TABOS_ROOT}/platform/esp32p4/usb_storage.c"

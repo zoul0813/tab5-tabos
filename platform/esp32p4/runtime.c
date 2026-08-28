@@ -24,6 +24,7 @@ bool platform_init(bool headless)
         return false;
     }
     (void) tab5_keyboard_init();
+    (void) tab5_rtc_init();
     return true;
 }
 
@@ -43,6 +44,7 @@ void platform_shutdown(void)
 {
     platform_display_shutdown();
     tab5_keyboard_shutdown();
+    tab5_rtc_shutdown();
 }
 
 const char* platform_name(void)
@@ -70,6 +72,8 @@ bool platform_get_diagnostics(platform_diagnostics_t* diagnostics)
         .flash_capacity_bytes        = flash_capacity,
         .keyboard_name               = tab5_keyboard_name(),
         .keyboard_present            = tab5_keyboard_present(),
+        .rtc_name                    = "RX8130",
+        .rtc_present                 = tab5_rtc_present(),
     };
     return true;
 }

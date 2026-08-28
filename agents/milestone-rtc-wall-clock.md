@@ -1,0 +1,44 @@
+# RTC and Wall-Clock Milestone
+
+## Goal
+
+Provide one portable UTC wall clock across host targets and Tab5, backed by the
+Tab5 RX8130CE RTC. Expose calendar and Unix-epoch access to applications while
+preserving the existing monotonic clock for elapsed-time measurement.
+
+## Decisions
+
+- [DECIDED] Wall-clock values use signed Unix seconds since
+  `1970-01-01 00:00:00 UTC`.
+- [DECIDED] The hardware RTC stores UTC. TabOS kernel and RTC drivers do not
+  apply timezones or daylight-saving rules.
+- [DECIDED] Public calendar values contain year, month, day, weekday, hour,
+  minute, and second. Years use the full Gregorian year.
+- [DECIDED] Applications receive `tabos_clock_get()` and `tabos_clock_set()` in
+  addition to standard C/POSIX-style `time()`, `gettimeofday()`, and
+  `clock_gettime()` support.
+- [DECIDED] `CLOCK_REALTIME` uses the RTC/wall clock. `CLOCK_MONOTONIC` retains
+  the existing boot-relative monotonic service. Setting monotonic time is not
+  supported.
+- [DECIDED] The host backend reads the host UTC clock. Setting simulated RTC
+  time changes a process-local host-backend offset and never changes the host
+  operating system clock.
+- [DECIDED] Tab5 uses the documented RX8130CE on the BSP internal I2C bus at
+  address `0x32`. Missing or invalid RTC data is nonfatal and reported as an
+  unavailable wall clock.
+- [DECIDED] Initial scope excludes timezone databases, locale formatting,
+  alarms, periodic RTC interrupts, network time synchronization, and automatic
+  host-to-RTC synchronization.
+
+## Checklist
+
+- [x] Add validated Gregorian calendar and Unix-epoch conversion.
+- [x] Add platform wall-clock read/write contract.
+- [x] Implement host wall clock with safe simulated setting.
+- [x] Implement Tab5 RX8130CE read/write backend.
+- [x] Add wall-clock calls to the private ELF transport and host interpreter.
+- [x] Add public SDK calendar functions and libc time hooks.
+- [x] Add unit, host, and maintained tester coverage.
+- [x] Document API, UTC semantics, limitations, and hardware validation steps.
+- [ ] Validate RX8130CE detection, calendar read, and unchanged-value write on
+  physical Tab5 hardware.

@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #include <tabos/tty.h>
 #include <unistd.h>
 
@@ -117,6 +118,30 @@ int sched_yield(void)
         return -1;
     }
     tabos_runtime_api->yield();
+    return 0;
+}
+
+int _gettimeofday(struct timeval* time_value, void* timezone)
+{
+    (void) timezone;
+    if (time_value == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (tabos_runtime_api == NULL || tabos_runtime_api->wall_time_get == NULL) {
+        errno = ENOSYS;
+        return -1;
+    }
+    tabos_elf_wall_time_t runtime_time;
+    const int result = tabos_runtime_api->wall_time_get(&runtime_time);
+    if (result < 0) {
+        errno = -result;
+        return -1;
+    }
+    const int64_t seconds =
+        (int64_t) ((uint64_t) runtime_time.seconds_low | (uint64_t) (uint32_t) runtime_time.seconds_high << 32U);
+    time_value->tv_sec  = (time_t) seconds;
+    time_value->tv_usec = 0;
     return 0;
 }
 

@@ -69,9 +69,11 @@ static const uint32_t HOST_RV32_GRAPHICS_BLIT_EX      = UINT32_C(0xffff0088);
 static const uint32_t HOST_RV32_TTY_GET_MODE          = UINT32_C(0xffff008c);
 static const uint32_t HOST_RV32_TTY_SET_MODE          = UINT32_C(0xffff0090);
 static const uint32_t HOST_RV32_INPUT_POLL            = UINT32_C(0xffff0094);
+static const uint32_t HOST_RV32_WALL_TIME_GET         = UINT32_C(0xffff0098);
+static const uint32_t HOST_RV32_WALL_TIME_SET         = UINT32_C(0xffff009c);
 
 enum {
-    HOST_RV32_API_SIZE = 152,
+    HOST_RV32_API_SIZE = 160,
 };
 
 struct platform_riscv32_context {
@@ -227,6 +229,8 @@ platform_riscv32_context_t* platform_riscv32_create(const void* entry, const voi
     write_u32(context->memory, api_address + 140U, HOST_RV32_TTY_GET_MODE);
     write_u32(context->memory, api_address + 144U, HOST_RV32_TTY_SET_MODE);
     write_u32(context->memory, api_address + 148U, HOST_RV32_INPUT_POLL);
+    write_u32(context->memory, api_address + 152U, HOST_RV32_WALL_TIME_GET);
+    write_u32(context->memory, api_address + 156U, HOST_RV32_WALL_TIME_SET);
 
     uint32_t argument_data_address = api_address + HOST_RV32_API_SIZE;
     uint32_t argument_data_end     = argument_data_address;
@@ -550,6 +554,28 @@ platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* cont
             }
             current_user_data       = context->user_data;
             context->state.regs[10] = (uint32_t) context->api.input_poll(event);
+            current_user_data       = NULL;
+            context->state.pc       = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_WALL_TIME_GET) {
+            tabos_elf_wall_time_t* time = guest_buffer(context->memory, context->state.regs[10], sizeof(*time));
+            if (time == NULL || context->api.wall_time_get == NULL) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data       = context->user_data;
+            context->state.regs[10] = (uint32_t) context->api.wall_time_get(time);
+            current_user_data       = NULL;
+            context->state.pc       = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_WALL_TIME_SET) {
+            const tabos_elf_wall_time_t* time = guest_buffer(context->memory, context->state.regs[10], sizeof(*time));
+            if (time == NULL || context->api.wall_time_set == NULL) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data       = context->user_data;
+            context->state.regs[10] = (uint32_t) context->api.wall_time_set(time);
             current_user_data       = NULL;
             context->state.pc       = context->state.regs[1];
             continue;

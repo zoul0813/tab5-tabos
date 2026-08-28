@@ -661,6 +661,33 @@ static uint64_t elf_monotonic_ms(void)
     return platform_time_ms();
 }
 
+static int elf_wall_time_get(tabos_elf_wall_time_t* time)
+{
+    tabos_elf_wall_time_t* writable_time =
+        (tabos_elf_wall_time_t*) platform_executable_data_pointer(time, sizeof(*time));
+    int64_t seconds = 0;
+    if (writable_time == NULL) {
+        return -TABOS_EINVAL;
+    }
+    if (!platform_wall_clock_get(&seconds)) {
+        return -TABOS_EIO;
+    }
+    writable_time->seconds_low  = (uint32_t) seconds;
+    writable_time->seconds_high = (int32_t) (seconds >> 32U);
+    return 0;
+}
+
+static int elf_wall_time_set(const tabos_elf_wall_time_t* time)
+{
+    const tabos_elf_wall_time_t* readable_time = platform_executable_data_pointer(time, sizeof(*time));
+    if (readable_time == NULL || readable_time->seconds_high < 0) {
+        return -TABOS_EINVAL;
+    }
+    const int64_t seconds =
+        (int64_t) ((uint64_t) readable_time->seconds_low | (uint64_t) (uint32_t) readable_time->seconds_high << 32U);
+    return platform_wall_clock_set(seconds) ? 0 : -TABOS_EIO;
+}
+
 static int elf_system_info(tabos_elf_system_info_t* info)
 {
     if (info == NULL) {
@@ -980,6 +1007,8 @@ static bool elf_entry(tabos_app_context_t* context)
         .tty_get_mode          = elf_tty_get_mode,
         .tty_set_mode          = elf_tty_set_mode,
         .input_poll            = elf_input_poll,
+        .wall_time_get         = elf_wall_time_get,
+        .wall_time_set         = elf_wall_time_set,
     };
     application->execution = platform_riscv32_create(
         application->image.entry, application->image.memory, application->image.memory_size,

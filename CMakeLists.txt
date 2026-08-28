@@ -112,6 +112,7 @@ target_include_directories(tabos_core
         "${TABOS_ROOT}/kernel/include"
         "${TABOS_ROOT}/loader/include"
         "${TABOS_ROOT}/platform/include"
+        "${TABOS_ROOT}/time/include"
         "${TABOS_GENERATED_INCLUDE_DIR}"
 )
 tabos_enable_warnings(tabos_core)
@@ -128,6 +129,7 @@ target_include_directories(tabos_platform_host
     PRIVATE
         "${TABOS_ROOT}/input/include"
         "${TABOS_ROOT}/sdk/include"
+        "${TABOS_ROOT}/time/include"
         "${TABOS_GENERATED_INCLUDE_DIR}"
         "${mini_rv32ima_SOURCE_DIR}/mini-rv32ima"
 )

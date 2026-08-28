@@ -8,6 +8,7 @@
 #include <tabos/internal/filesystem.h>
 #include <tabos/internal/input.h>
 #include <tabos/internal/terminal.h>
+#include <tabos/internal/wall_clock.h>
 
 #include <tabos/terminal.h>
 #include <tabos/filesystem.h>
@@ -32,6 +33,7 @@ static char memory_detail[80];
 static char external_memory_detail[80];
 static char flash_detail[48];
 static char storage_detail[512];
+static char clock_detail[80];
 
 static void format_size(char* buffer, size_t buffer_size, uint64_t bytes)
 {
@@ -172,6 +174,19 @@ bool kernel_runtime_start(void)
             (void) kernel_boot_report_add(&boot_report, "Keyboard", diagnostics.keyboard_name,
                                           diagnostics.keyboard_present ? KERNEL_BOOT_STATUS_OK :
                                                                          KERNEL_BOOT_STATUS_WARNING);
+        }
+        if (diagnostics.rtc_name != NULL) {
+            int64_t epoch_seconds = 0;
+            tabos_datetime_t datetime;
+            if (diagnostics.rtc_present && platform_wall_clock_get(&epoch_seconds) &&
+                wall_clock_epoch_to_datetime(epoch_seconds, &datetime)) {
+                (void) snprintf(clock_detail, sizeof(clock_detail), "%s; %04" PRId32 "-%02u-%02u %02u:%02u:%02u UTC",
+                                diagnostics.rtc_name, datetime.year, datetime.month, datetime.day, datetime.hour,
+                                datetime.minute, datetime.second);
+                (void) kernel_boot_report_add(&boot_report, "RTC", clock_detail, KERNEL_BOOT_STATUS_OK);
+            } else {
+                (void) kernel_boot_report_add(&boot_report, "RTC", diagnostics.rtc_name, KERNEL_BOOT_STATUS_WARNING);
+            }
         }
     }
     (void) add_storage_report();

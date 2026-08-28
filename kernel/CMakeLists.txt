@@ -12,6 +12,7 @@ idf_component_register(
         "${TABOS_ROOT}/loader/include"
         "${CMAKE_CURRENT_LIST_DIR}/include"
         "${TABOS_ROOT}/sdk/include"
+        "${TABOS_ROOT}/time/include"
     PRIV_INCLUDE_DIRS
         "${TABOS_ROOT}/apps/diag/console/include"
         "${TABOS_ROOT}/apps/diag/filesystem/include"

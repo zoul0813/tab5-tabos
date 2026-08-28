@@ -37,6 +37,11 @@ typedef struct {
 } tabos_elf_system_info_t;
 
 typedef struct {
+        uint32_t seconds_low;
+        int32_t seconds_high;
+} tabos_elf_wall_time_t;
+
+typedef struct {
         uint32_t abi_version;
         void (*console_write)(const char* text);
         void (*request_exit)(int exit_status);
@@ -75,6 +80,8 @@ typedef struct {
         int (*tty_get_mode)(int descriptor);
         int (*tty_set_mode)(int descriptor, uint32_t mode);
         int (*input_poll)(tabos_input_event_t* event);
+        int (*wall_time_get)(tabos_elf_wall_time_t* time);
+        int (*wall_time_set)(const tabos_elf_wall_time_t* time);
 } tabos_elf_api_t;
 
 typedef int (*tabos_elf_entry_fn)(const tabos_elf_api_t* api, int argc, const char* const* argv);

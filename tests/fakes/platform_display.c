@@ -118,6 +118,8 @@ bool platform_get_diagnostics(platform_diagnostics_t* diagnostics)
         .memory_free_known  = true,
         .keyboard_name      = "TEST KEYBOARD",
         .keyboard_present   = true,
+        .rtc_name           = "TEST RTC",
+        .rtc_present        = true,
     };
     return true;
 }
@@ -140,6 +142,20 @@ void test_platform_clear_log(void)
 uint64_t platform_time_ms(void)
 {
     return monotonic_ms;
+}
+
+bool platform_wall_clock_get(int64_t* seconds)
+{
+    if (seconds == NULL) {
+        return false;
+    }
+    *seconds = 1704067200;
+    return true;
+}
+
+bool platform_wall_clock_set(int64_t seconds)
+{
+    return seconds >= 0;
 }
 
 void* platform_executable_alloc(size_t size)
