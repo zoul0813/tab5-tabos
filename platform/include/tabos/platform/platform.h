@@ -18,6 +18,12 @@ typedef struct platform_riscv32_context platform_riscv32_context_t;
 typedef struct platform_mutex platform_mutex_t;
 
 typedef enum {
+    PLATFORM_SYSTEM_ACTION_NONE = 0,
+    PLATFORM_SYSTEM_ACTION_REBOOT,
+    PLATFORM_SYSTEM_ACTION_POWER_OFF,
+} platform_system_action_t;
+
+typedef enum {
     PLATFORM_RISCV32_YIELDED = 0,
     PLATFORM_RISCV32_RETURNED,
     PLATFORM_RISCV32_FAULT,
@@ -50,6 +56,8 @@ typedef struct {
 bool platform_init(bool headless);
 int platform_run(platform_update_fn update);
 void platform_shutdown(void);
+void platform_stop_run_loop(void);
+void platform_perform_system_action(platform_system_action_t action);
 const char* platform_name(void);
 const char* platform_display_name(void);
 bool platform_get_diagnostics(platform_diagnostics_t* diagnostics);

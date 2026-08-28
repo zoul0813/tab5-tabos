@@ -74,4 +74,8 @@ void app_main(void)
     ESP_LOGI(TAG, "%s %s bootstrapped on %s", TABOS_SYSTEM_NAME, kernel_runtime_version(), platform_name());
 
     (void) platform_run(kernel_runtime_update);
+    const platform_system_action_t action = kernel_runtime_take_system_action();
+    kernel_runtime_shutdown();
+    platform_shutdown();
+    platform_perform_system_action(action);
 }

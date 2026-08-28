@@ -31,6 +31,15 @@
 - [x] Add standalone 640x360 graphical UTC `clock` application.
 - [ ] Validate RX8130 read/write behavior on physical Tab5 hardware.
 
+### Reboot and Shutdown
+
+- [x] Add deferred kernel reboot and power-off request state.
+- [x] Add Linux-style application `reboot()` API and private ELF transport.
+- [x] Add host restart/exit behavior and Tab5 reset/power-control backends.
+- [x] Add immediate `reboot` and `shutdown` core utilities.
+- [x] Add host unit, build, and application validation.
+- [ ] Validate orderly restart, battery power-off, externally powered halt, and TF integrity on Tab5.
+
 ### C17 Application Runtime
 
 - [x] Decide `main(argc, argv)` entry contract and hidden `crt0` lifecycle.

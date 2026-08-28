@@ -71,9 +71,10 @@ static const uint32_t HOST_RV32_TTY_SET_MODE          = UINT32_C(0xffff0090);
 static const uint32_t HOST_RV32_INPUT_POLL            = UINT32_C(0xffff0094);
 static const uint32_t HOST_RV32_WALL_TIME_GET         = UINT32_C(0xffff0098);
 static const uint32_t HOST_RV32_WALL_TIME_SET         = UINT32_C(0xffff009c);
+static const uint32_t HOST_RV32_SYSTEM_ACTION         = UINT32_C(0xffff00a0);
 
 enum {
-    HOST_RV32_API_SIZE = 160,
+    HOST_RV32_API_SIZE = 164,
 };
 
 struct platform_riscv32_context {
@@ -231,6 +232,7 @@ platform_riscv32_context_t* platform_riscv32_create(const void* entry, const voi
     write_u32(context->memory, api_address + 148U, HOST_RV32_INPUT_POLL);
     write_u32(context->memory, api_address + 152U, HOST_RV32_WALL_TIME_GET);
     write_u32(context->memory, api_address + 156U, HOST_RV32_WALL_TIME_SET);
+    write_u32(context->memory, api_address + 160U, HOST_RV32_SYSTEM_ACTION);
 
     uint32_t argument_data_address = api_address + HOST_RV32_API_SIZE;
     uint32_t argument_data_end     = argument_data_address;
@@ -576,6 +578,16 @@ platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* cont
             }
             current_user_data       = context->user_data;
             context->state.regs[10] = (uint32_t) context->api.wall_time_set(time);
+            current_user_data       = NULL;
+            context->state.pc       = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_SYSTEM_ACTION) {
+            if (context->api.system_action == NULL) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data       = context->user_data;
+            context->state.regs[10] = (uint32_t) context->api.system_action(context->state.regs[10]);
             current_user_data       = NULL;
             context->state.pc       = context->state.regs[1];
             continue;

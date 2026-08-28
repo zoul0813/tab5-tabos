@@ -13,12 +13,15 @@
 #include <sdkconfig.h>
 
 #include <stdio.h>
+#include <stdatomic.h>
 
 static const char* const TAG = TABOS_PLATFORM_LOG_TAG;
+static atomic_bool stop_requested;
 
 bool platform_init(bool headless)
 {
     (void) headless;
+    atomic_store_explicit(&stop_requested, false, memory_order_release);
     if (!platform_usb_port_disable_host_power()) {
         ESP_LOGE(TAG, "Could not place USB-A port in safe unpowered state");
         return false;
@@ -31,13 +34,19 @@ bool platform_init(bool headless)
 int platform_run(platform_update_fn update)
 {
     ESP_LOGI(TAG, "Tab5 platform run loop started");
-    for (;;) {
+    while (!atomic_load_explicit(&stop_requested, memory_order_acquire)) {
         tab5_keyboard_poll();
         if (update != NULL) {
             update();
         }
         vTaskDelay(pdMS_TO_TICKS(10));
     }
+    return 0;
+}
+
+void platform_stop_run_loop(void)
+{
+    atomic_store_explicit(&stop_requested, true, memory_order_release);
 }
 
 void platform_shutdown(void)

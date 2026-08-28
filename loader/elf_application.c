@@ -8,6 +8,7 @@
 #include <tabos/internal/display.h>
 #include <tabos/internal/console.h>
 #include <tabos/internal/raster.h>
+#include <tabos/internal/runtime.h>
 #include <tabos/platform/platform.h>
 #include <tabos/config/display.h>
 #include <tabos/tty.h>
@@ -688,6 +689,19 @@ static int elf_wall_time_set(const tabos_elf_wall_time_t* time)
     return platform_wall_clock_set(seconds) ? 0 : -TABOS_EIO;
 }
 
+static int elf_system_action(uint32_t action)
+{
+    platform_system_action_t platform_action;
+    if (action == TABOS_ELF_SYSTEM_REBOOT) {
+        platform_action = PLATFORM_SYSTEM_ACTION_REBOOT;
+    } else if (action == TABOS_ELF_SYSTEM_POWER_OFF) {
+        platform_action = PLATFORM_SYSTEM_ACTION_POWER_OFF;
+    } else {
+        return -TABOS_EINVAL;
+    }
+    return kernel_runtime_request_system_action(platform_action) ? 0 : -TABOS_EBUSY;
+}
+
 static int elf_system_info(tabos_elf_system_info_t* info)
 {
     if (info == NULL) {
@@ -1009,6 +1023,7 @@ static bool elf_entry(tabos_app_context_t* context)
         .input_poll            = elf_input_poll,
         .wall_time_get         = elf_wall_time_get,
         .wall_time_set         = elf_wall_time_set,
+        .system_action         = elf_system_action,
     };
     application->execution = platform_riscv32_create(
         application->image.entry, application->image.memory, application->image.memory_size,

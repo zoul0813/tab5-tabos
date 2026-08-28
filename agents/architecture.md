@@ -57,6 +57,17 @@ drivers do not apply timezone or daylight-saving policy. Applications receive a 
 calendar API plus standard `time()`, `gettimeofday()`, and `clock_gettime()` access.
 The existing monotonic clock remains separate and must be used for elapsed time.
 
+### Reboot and power-off [DECIDED]
+
+Applications request immediate reboot or power-off through Linux-compatible
+`reboot(RB_AUTOBOOT)` and `reboot(RB_POWER_OFF)`. TabOS does not define a generic
+`shutdown()` C function because that name belongs to the POSIX socket API. Requests are
+deferred to a safe runtime boundary; application cleanup, descriptor close, filesystem
+unmount, display shutdown, and platform shutdown complete before reset or power control.
+The first accepted request wins. Host reboot reinitializes TabOS in the same process;
+host power-off exits. Tab5 power-off uses the second PI4IO expander power signal and
+remains halted if external power prevents complete removal.
+
 Fullscreen graphics use an OS-owned RGB565 framebuffer through public SDK calls.
 Applications never receive display-driver ownership. They may clear, draw clipped
 primitives, blit RGB565 pixels, and explicitly present a frame. Closing or exiting

@@ -470,6 +470,12 @@ growth and limit failure, and deterministic cleanup after success and failure.
 Test blocking stdin plus `O_NONBLOCK`/`EAGAIN`. Text fixtures use raw CP437 bytes;
 host Unicode input outside CP437 must be rejected or explicitly substituted.
 
+System-action tests cover invalid reboot commands, unavailable and rejected ELF gates,
+first-request-wins kernel state, and action consumption. Host integration must verify
+power-off exits and reboot performs full teardown plus in-process reinitialization. Tab5
+hardware validation must separately verify reset, battery-powered shutdown, externally
+powered halt fallback, and microSD integrity after repeated orderly actions.
+
 ELF loader tests use real RV32 fixture and cover format metadata, segment bounds, executable entry, supported static `SHT_RELA` processing, unsupported relocation rejection, image-size limit, memory copy, unload, and malformed inputs under host sanitizers. Host executes same RV32 bytes through resumable interpreter and must cover multiple instruction slices, API-table calls, argument vectors, console output, return status, illegal instructions, and invalid guest memory access. Tab5 hardware validation covers dual PSRAM aliases, load-bias relocation, final cache synchronization, globals/BSS/newlib state, native API-table calls, arguments, console output, return status, and cleanup. Expected success text begins with `Hello TabOS!`.
 
 Manual console validation must include prompt-boundary Backspace, held Backspace, held printable keys, Enter, and Tab followed by visible text. Host backend synthesizes missing Enter/Tab/repeat text while retaining SDL text input for normal layout and IME behavior; matching SDL text events are suppressed to prevent duplicates.

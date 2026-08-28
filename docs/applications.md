@@ -40,6 +40,11 @@ program. Build one with `make -C apps/coreutils ls` or `make -C apps/coreutils m
 Sources live in `apps/coreutils/src/<name>/main.c`; each output installs directly under
 `T:/bin/`.
 
+Applications may include `<sys/reboot.h>` and call `reboot(RB_AUTOBOOT)` or
+`reboot(RB_POWER_OFF)`. A successful request does not return. TabOS stops applications,
+closes and unmounts storage, and shuts down platform services before applying the action.
+The `reboot` and `shutdown` core utilities expose these actions directly.
+
 ## Descriptor
 
 Built-in applications export `tabos_app_descriptor_t` from `<tabos/application.h>`:

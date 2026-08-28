@@ -24,6 +24,15 @@ int main(void)
         return 1;
     }
 
+    if (kernel_runtime_take_system_action() != PLATFORM_SYSTEM_ACTION_NONE ||
+        kernel_runtime_request_system_action(PLATFORM_SYSTEM_ACTION_NONE) ||
+        !kernel_runtime_request_system_action(PLATFORM_SYSTEM_ACTION_REBOOT) ||
+        kernel_runtime_request_system_action(PLATFORM_SYSTEM_ACTION_POWER_OFF) ||
+        kernel_runtime_take_system_action() != PLATFORM_SYSTEM_ACTION_REBOOT ||
+        kernel_runtime_take_system_action() != PLATFORM_SYSTEM_ACTION_NONE) {
+        return 1;
+    }
+
     if (tabos_terminal_set_scale(0U) || tabos_terminal_set_scale(9U) || !tabos_terminal_set_scale(3U) ||
         tabos_terminal_get_scale() != 3U) {
         return 1;

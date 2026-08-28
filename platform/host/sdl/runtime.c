@@ -107,6 +107,16 @@ void host_request_quit(void)
     quit_requested = true;
 }
 
+void platform_stop_run_loop(void)
+{
+    host_request_quit();
+}
+
+void platform_perform_system_action(platform_system_action_t action)
+{
+    (void) action;
+}
+
 bool platform_init(bool headless)
 {
     is_headless               = headless;

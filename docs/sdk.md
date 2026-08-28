@@ -18,6 +18,13 @@ iteration, and nonblocking flags. TabOS does not claim full POSIX compatibility.
 `time()`, `gettimeofday()`, and realtime/monotonic `clock_gettime()` are supported.
 `<tabos/system.h>` provides portable target, device, display, processor, and memory data.
 
+## Reboot and Power-Off
+
+`<sys/reboot.h>` provides `reboot(RB_AUTOBOOT)` and `reboot(RB_POWER_OFF)`. Successful
+requests do not return. TabOS flushes application stdio, stops processes, closes and
+unmounts storage, and shuts down services before applying the platform action. See
+`docs/power.md`.
+
 ## Fullscreen Graphics
 
 `<tabos/graphics.h>` provides foreground fullscreen RGB565 clear, clipped rectangle,

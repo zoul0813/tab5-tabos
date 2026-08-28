@@ -94,6 +94,15 @@ void platform_display_shutdown(void)
 {
 }
 
+void platform_stop_run_loop(void)
+{
+}
+
+void platform_perform_system_action(platform_system_action_t action)
+{
+    (void) action;
+}
+
 const char* platform_name(void)
 {
     return "test";

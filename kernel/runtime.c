@@ -21,6 +21,7 @@
 #include <tabos/config/console.h>
 
 #include <inttypes.h>
+#include <stdatomic.h>
 #include <stdio.h>
 
 static bool runtime_initialized;
@@ -34,6 +35,7 @@ static char external_memory_detail[80];
 static char flash_detail[48];
 static char storage_detail[512];
 static char clock_detail[80];
+static atomic_int requested_system_action;
 
 static void format_size(char* buffer, size_t buffer_size, uint64_t bytes)
 {
@@ -116,9 +118,30 @@ bool kernel_runtime_init(void)
         return true;
     }
 
+    atomic_store_explicit(&requested_system_action, PLATFORM_SYSTEM_ACTION_NONE, memory_order_release);
     runtime_initialized = true;
     input_init();
     return true;
+}
+
+bool kernel_runtime_request_system_action(platform_system_action_t action)
+{
+    if (action != PLATFORM_SYSTEM_ACTION_REBOOT && action != PLATFORM_SYSTEM_ACTION_POWER_OFF) {
+        return false;
+    }
+    int expected = PLATFORM_SYSTEM_ACTION_NONE;
+    if (!atomic_compare_exchange_strong_explicit(&requested_system_action, &expected, action, memory_order_acq_rel,
+                                                 memory_order_acquire)) {
+        return false;
+    }
+    platform_stop_run_loop();
+    return true;
+}
+
+platform_system_action_t kernel_runtime_take_system_action(void)
+{
+    return (platform_system_action_t) atomic_exchange_explicit(&requested_system_action, PLATFORM_SYSTEM_ACTION_NONE,
+                                                               memory_order_acq_rel);
 }
 
 bool kernel_runtime_start(void)

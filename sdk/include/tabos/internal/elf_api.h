@@ -10,8 +10,10 @@
 #define TABOS_ELF_EXEC_PENDING (-2147483647 - 1)
 
 enum {
-    TABOS_ELF_ARG_MAX       = 16,
-    TABOS_ELF_ARG_BYTES_MAX = 512,
+    TABOS_ELF_ARG_MAX          = 16,
+    TABOS_ELF_ARG_BYTES_MAX    = 512,
+    TABOS_ELF_SYSTEM_REBOOT    = 1,
+    TABOS_ELF_SYSTEM_POWER_OFF = 2,
 };
 
 typedef struct {
@@ -82,6 +84,7 @@ typedef struct {
         int (*input_poll)(tabos_input_event_t* event);
         int (*wall_time_get)(tabos_elf_wall_time_t* time);
         int (*wall_time_set)(const tabos_elf_wall_time_t* time);
+        int (*system_action)(uint32_t action);
 } tabos_elf_api_t;
 
 typedef int (*tabos_elf_entry_fn)(const tabos_elf_api_t* api, int argc, const char* const* argv);

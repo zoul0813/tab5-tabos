@@ -14,6 +14,7 @@ This directory contains user and contributor documentation for TabOS.
 - [SDK Tester Application](tester.md): end-to-end public SDK and ABI validation on host and Tab5.
 - [ELF Loader Experiment](elf-loader.md): stripped RV32 ELF contract, build pipeline, and Tab5 validation.
 - [Time and Timers](time.md): monotonic clock and reusable polling timers.
+- [Reboot and Shutdown](power.md): orderly restart, power-off commands, and application API.
 - [Filesystem and Storage](filesystem.md): POSIX-style file API, host root, and Tab5 microSD behavior.
 - [Shell](shell.md): build, install, start, and use filesystem-backed PID 0 shell.
 
