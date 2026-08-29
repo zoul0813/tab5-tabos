@@ -65,6 +65,14 @@ instead create isolated temporary roots.
 Tab5 exposes BSP-mounted TF/microSD card as `T:`. `T:/` maps internally to `/sdcard`.
 A missing or unmountable card is nonfatal: filesystem calls report `ENODEV`. When a
 card mounts, boot diagnostics list `T:/`, its FAT filesystem, capacity, and free space.
+The shared `TABOS_FILESYSTEM_MAX_FILES` project setting controls both the TabOS
+filesystem table and the Tab5 FAT mount limit, so host and hardware builds expose the
+same system-wide open-file capacity. It defaults to 32 and can be changed through
+`./tools/tabos config`.
+The corresponding `TABOS_FILESYSTEM_MAX_DIRECTORIES` setting controls the
+system-wide open-directory table on every target and defaults to 8. Each loaded
+application also has a separate eight-entry `DIR*` wrapper pool; this per-process SDK
+limit is independent of the shared kernel capacity.
 
 Disk format is FAT filesystem supported by Tab5 BSP. `A:` is unavailable until internal
 flash filesystem is implemented, then appears separately in boot diagnostics. Live

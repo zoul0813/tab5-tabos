@@ -6,10 +6,10 @@
 #include <string.h>
 
 enum {
-    TABOS_POSIX_MAX_DIRECTORIES = 8
+    TABOS_POSIX_DIRECTORY_CAPACITY = 8
 };
 
-static tabos_posix_dir_t directory_pool[TABOS_POSIX_MAX_DIRECTORIES];
+static tabos_posix_dir_t directory_pool[TABOS_POSIX_DIRECTORY_CAPACITY];
 const tabos_elf_api_t* tabos_runtime_api __attribute__((weak));
 
 int tabos_posix_open(const char* path, int flags, ...)
@@ -98,7 +98,7 @@ char* tabos_posix_getcwd(char* buffer, size_t size)
 
 tabos_posix_dir_t* tabos_posix_opendir(const char* path)
 {
-    for (size_t index = 0U; index < TABOS_POSIX_MAX_DIRECTORIES; ++index) {
+    for (size_t index = 0U; index < TABOS_POSIX_DIRECTORY_CAPACITY; ++index) {
         if (directory_pool[index].allocated) {
             continue;
         }

@@ -4,6 +4,7 @@
 
 #include <fcntl.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <unistd.h>
 
 void tester_test_process(tester_context_t* context)
@@ -27,7 +28,9 @@ void tester_test_process(tester_context_t* context)
     };
     bool failures_returned = true;
     for (unsigned int index = 0U; index < 6U; ++index) {
-        if (tabos_exec(resource_arguments[0], 2, resource_arguments) != 73) {
+        const int status = tabos_exec(resource_arguments[0], 2, resource_arguments);
+        if (status != 73) {
+            printf("    resource child %u returned %d; expected 73\n", index + 1U, status);
             failures_returned = false;
             break;
         }

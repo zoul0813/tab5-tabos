@@ -24,6 +24,8 @@ Current settings cover:
 - held-key repeat delay and interval
 - Tab5 PIE SIMD acceleration and optional serial boot diagnostics
 - controlled host drive-container directory
+- maximum files open across TabOS (default 32, range 1 through 255)
+- maximum directories open across TabOS (default 8, range 1 through 255)
 - filesystem-backed ELF startup path, defaulting to `T:/bin/hello`
 - filesystem-backed PID 0 shell path, defaulting to `T:/bin/shell`
 

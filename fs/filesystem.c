@@ -1,15 +1,11 @@
 #include <tabos/filesystem.h>
 
+#include <tabos/config/filesystem.h>
 #include <tabos/internal/filesystem.h>
 #include <tabos/platform/storage.h>
 
 #include <stdatomic.h>
 #include <string.h>
-
-enum {
-    FILESYSTEM_MAX_FILES       = 32,
-    FILESYSTEM_MAX_DIRECTORIES = 8,
-};
 
 typedef struct {
         platform_file_t platform_file;
@@ -23,8 +19,8 @@ typedef struct {
         bool open;
 } directory_slot_t;
 
-static file_slot_t files[FILESYSTEM_MAX_FILES];
-static directory_slot_t directories[FILESYSTEM_MAX_DIRECTORIES];
+static file_slot_t files[TABOS_FILESYSTEM_MAX_FILES];
+static directory_slot_t directories[TABOS_FILESYSTEM_MAX_DIRECTORIES];
 static atomic_flag filesystem_lock = ATOMIC_FLAG_INIT;
 static _Thread_local int filesystem_errno;
 static bool filesystem_initialized;
@@ -74,7 +70,7 @@ static file_slot_t* file_for_descriptor(tabos_fd_t descriptor)
     const uint32_t value         = (uint32_t) descriptor;
     const uint32_t encoded_index = value & 0xffU;
     const uint16_t generation    = (uint16_t) (value >> 8U);
-    if (descriptor <= 0 || encoded_index == 0U || encoded_index > FILESYSTEM_MAX_FILES) {
+    if (descriptor <= 0 || encoded_index == 0U || encoded_index > TABOS_FILESYSTEM_MAX_FILES) {
         return NULL;
     }
     file_slot_t* slot = &files[encoded_index - 1U];
@@ -91,7 +87,7 @@ static directory_slot_t* directory_for_descriptor(tabos_dir_t descriptor)
     const uint32_t value         = (uint32_t) descriptor;
     const uint32_t encoded_index = value & 0xffU;
     const uint16_t generation    = (uint16_t) (value >> 8U);
-    if (descriptor <= 0 || encoded_index == 0U || encoded_index > FILESYSTEM_MAX_DIRECTORIES) {
+    if (descriptor <= 0 || encoded_index == 0U || encoded_index > TABOS_FILESYSTEM_MAX_DIRECTORIES) {
         return NULL;
     }
     directory_slot_t* slot = &directories[encoded_index - 1U];
@@ -152,12 +148,12 @@ void filesystem_shutdown(void)
         return;
     }
     lock_filesystem();
-    for (size_t index = 0; index < FILESYSTEM_MAX_FILES; ++index) {
+    for (size_t index = 0; index < TABOS_FILESYSTEM_MAX_FILES; ++index) {
         if (files[index].open) {
             (void) platform_storage_close(files[index].platform_file);
         }
     }
-    for (size_t index = 0; index < FILESYSTEM_MAX_DIRECTORIES; ++index) {
+    for (size_t index = 0; index < TABOS_FILESYSTEM_MAX_DIRECTORIES; ++index) {
         if (directories[index].open) {
             (void) platform_storage_closedir(directories[index].platform_directory);
         }
@@ -184,10 +180,10 @@ tabos_fd_t tabos_fs_open(const char* path, int flags, uint32_t mode)
         return -1;
     }
     size_t index = 0U;
-    while (index < FILESYSTEM_MAX_FILES && files[index].open) {
+    while (index < TABOS_FILESYSTEM_MAX_FILES && files[index].open) {
         ++index;
     }
-    if (index == FILESYSTEM_MAX_FILES) {
+    if (index == TABOS_FILESYSTEM_MAX_FILES) {
         unlock_filesystem();
         return fail(TABOS_EMFILE);
     }
@@ -403,10 +399,10 @@ tabos_dir_t tabos_fs_opendir(const char* path)
         return -1;
     }
     size_t index = 0U;
-    while (index < FILESYSTEM_MAX_DIRECTORIES && directories[index].open) {
+    while (index < TABOS_FILESYSTEM_MAX_DIRECTORIES && directories[index].open) {
         ++index;
     }
-    if (index == FILESYSTEM_MAX_DIRECTORIES) {
+    if (index == TABOS_FILESYSTEM_MAX_DIRECTORIES) {
         unlock_filesystem();
         return fail(TABOS_EMFILE);
     }

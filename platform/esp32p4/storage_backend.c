@@ -4,6 +4,7 @@
 #include <esp_err.h>
 #include <esp_log.h>
 #include <esp_vfs_fat.h>
+#include <tabos/config/filesystem.h>
 
 #include <string.h>
 
@@ -20,7 +21,15 @@ bool storage_backend_mount(size_t index, char* letter, char* root, size_t root_s
     if (index != 0U || letter == NULL || root == NULL || removable == NULL || name == NULL) {
         return false;
     }
-    const esp_err_t result = bsp_sdcard_mount();
+    const esp_vfs_fat_sdmmc_mount_config_t mount_config = {
+        .format_if_mount_failed = false,
+        .max_files              = TABOS_FILESYSTEM_MAX_FILES,
+        .allocation_unit_size   = 16U * 1024U,
+    };
+    bsp_sdcard_cfg_t configuration = {
+        .mount = &mount_config,
+    };
+    const esp_err_t result = bsp_sdcard_sdmmc_mount(&configuration);
     if (result != ESP_OK) {
         ESP_LOGW(TAG, "microSD not mounted: %s", esp_err_to_name(result));
         return false;
