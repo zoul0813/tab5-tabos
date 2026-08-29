@@ -107,6 +107,8 @@ void platform_network_shutdown(void);
 bool platform_network_connect(const char* ssid, const char* password);
 bool platform_network_disconnect(void);
 bool platform_network_status(platform_network_status_t* status);
+bool platform_network_operations_init(void);
+void platform_network_operations_shutdown(void);
 platform_network_operation_result_t platform_network_resolve(const char* hostname, uint32_t family,
                                                              platform_network_address_t* address);
 platform_network_operation_result_t platform_network_echo(const platform_network_address_t* address,

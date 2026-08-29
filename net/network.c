@@ -61,6 +61,12 @@ bool network_service_init(void)
         initialized = true;
         return true;
     }
+    if (!platform_network_operations_init()) {
+        platform_network_shutdown();
+        set_failure("network operations unavailable");
+        initialized = true;
+        return true;
+    }
     current.state = NETWORK_STATE_OFFLINE;
     if (result == NETWORK_CONFIG_OK) {
         current.config_available = true;
@@ -120,6 +126,7 @@ void network_service_shutdown(void)
     }
     retry_pending = false;
     (void) platform_network_disconnect();
+    platform_network_operations_shutdown();
     platform_network_shutdown();
     memset(password, 0, sizeof(password));
     current     = (network_status_t) {0};

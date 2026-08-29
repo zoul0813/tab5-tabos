@@ -210,6 +210,15 @@ bool platform_network_status(platform_network_status_t* status)
     return true;
 }
 
+bool platform_network_operations_init(void)
+{
+    return true;
+}
+
+void platform_network_operations_shutdown(void)
+{
+}
+
 platform_network_operation_result_t platform_network_resolve(const char* hostname, uint32_t family,
                                                              platform_network_address_t* address)
 {
