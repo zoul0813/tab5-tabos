@@ -75,9 +75,11 @@ static const uint32_t HOST_RV32_SYSTEM_ACTION         = UINT32_C(0xffff00a0);
 static const uint32_t HOST_RV32_NETWORK_STATUS        = UINT32_C(0xffff00a4);
 static const uint32_t HOST_RV32_NETWORK_CONNECT_SAVED = UINT32_C(0xffff00a8);
 static const uint32_t HOST_RV32_NETWORK_DISCONNECT    = UINT32_C(0xffff00ac);
+static const uint32_t HOST_RV32_NETWORK_RESOLVE       = UINT32_C(0xffff00b0);
+static const uint32_t HOST_RV32_NETWORK_ECHO          = UINT32_C(0xffff00b4);
 
 enum {
-    HOST_RV32_API_SIZE = 176,
+    HOST_RV32_API_SIZE = 184,
 };
 
 struct platform_riscv32_context {
@@ -239,6 +241,8 @@ platform_riscv32_context_t* platform_riscv32_create(const void* entry, const voi
     write_u32(context->memory, api_address + 164U, HOST_RV32_NETWORK_STATUS);
     write_u32(context->memory, api_address + 168U, HOST_RV32_NETWORK_CONNECT_SAVED);
     write_u32(context->memory, api_address + 172U, HOST_RV32_NETWORK_DISCONNECT);
+    write_u32(context->memory, api_address + 176U, HOST_RV32_NETWORK_RESOLVE);
+    write_u32(context->memory, api_address + 180U, HOST_RV32_NETWORK_ECHO);
 
     uint32_t argument_data_address = api_address + HOST_RV32_API_SIZE;
     uint32_t argument_data_end     = argument_data_address;
@@ -628,6 +632,35 @@ platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* cont
             context->state.regs[10] = (uint32_t) context->api.network_disconnect();
             current_user_data       = NULL;
             context->state.pc       = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_NETWORK_RESOLVE) {
+            const char* hostname = guest_string(context->memory, context->state.regs[10]);
+            tabos_elf_network_address_t* address =
+                guest_buffer(context->memory, context->state.regs[12], sizeof(*address));
+            if (hostname == NULL || address == NULL || context->api.network_resolve == NULL) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data = context->user_data;
+            context->state.regs[10] =
+                (uint32_t) context->api.network_resolve(hostname, context->state.regs[11], address);
+            current_user_data = NULL;
+            context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_NETWORK_ECHO) {
+            const tabos_elf_network_address_t* address =
+                guest_buffer(context->memory, context->state.regs[10], sizeof(*address));
+            tabos_elf_network_echo_result_t* echo_result =
+                guest_buffer(context->memory, context->state.regs[14], sizeof(*echo_result));
+            if (address == NULL || echo_result == NULL || context->api.network_echo == NULL) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data = context->user_data;
+            context->state.regs[10] = (uint32_t) context->api.network_echo(
+                address, context->state.regs[11], context->state.regs[12], context->state.regs[13], echo_result);
+            current_user_data = NULL;
+            context->state.pc = context->state.regs[1];
             continue;
         }
         if (context->state.pc == HOST_RV32_HEAP_SBRK) {

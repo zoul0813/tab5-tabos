@@ -61,6 +61,57 @@ int tabos_network_disconnect(void)
     return api_result(tabos_runtime_api->network_disconnect());
 }
 
+int tabos_network_resolve(const char* hostname, tabos_network_family_t family, tabos_network_address_t* address)
+{
+    if (hostname == NULL || address == NULL || hostname[0] == '\0' ||
+        (family != TABOS_NETWORK_FAMILY_ANY && family != TABOS_NETWORK_FAMILY_IPV4 &&
+         family != TABOS_NETWORK_FAMILY_IPV6)) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (tabos_runtime_api == NULL || tabos_runtime_api->network_resolve == NULL) {
+        errno = ENOSYS;
+        return -1;
+    }
+    tabos_elf_network_address_t resolved;
+    const int operation = tabos_runtime_api->network_resolve(hostname, (uint32_t) family, &resolved);
+    if (operation < 0) {
+        return api_result(operation);
+    }
+    memset(address, 0, sizeof(*address));
+    address->family = (tabos_network_family_t) resolved.family;
+    memcpy(address->text, resolved.text, sizeof(address->text));
+    return 0;
+}
+
+int tabos_network_echo(const tabos_network_address_t* address, uint16_t sequence, uint16_t payload_bytes,
+                       uint32_t timeout_ms, tabos_network_echo_result_t* result)
+{
+    if (address == NULL || result == NULL ||
+        (address->family != TABOS_NETWORK_FAMILY_IPV4 && address->family != TABOS_NETWORK_FAMILY_IPV6) ||
+        address->text[0] == '\0' || memchr(address->text, '\0', sizeof(address->text)) == NULL ||
+        payload_bytes > 1024U || timeout_ms == 0U || timeout_ms > 60000U) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (tabos_runtime_api == NULL || tabos_runtime_api->network_echo == NULL) {
+        errno = ENOSYS;
+        return -1;
+    }
+    tabos_elf_network_address_t target = {.family = (uint32_t) address->family};
+    memcpy(target.text, address->text, sizeof(target.text));
+    tabos_elf_network_echo_result_t echoed;
+    const int operation =
+        tabos_runtime_api->network_echo(&target, sequence, payload_bytes, timeout_ms, &echoed);
+    if (operation < 0) {
+        return api_result(operation);
+    }
+    result->sequence      = echoed.sequence;
+    result->bytes         = echoed.bytes;
+    result->round_trip_ms = echoed.round_trip_ms;
+    return 0;
+}
+
 const char* tabos_network_state_name(tabos_network_state_t state)
 {
     static const char* const names[] = {

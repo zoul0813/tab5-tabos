@@ -26,9 +26,29 @@ typedef struct {
         char last_failure[96];
 } tabos_network_status_t;
 
+typedef enum {
+    TABOS_NETWORK_FAMILY_ANY = 0,
+    TABOS_NETWORK_FAMILY_IPV4 = 4,
+    TABOS_NETWORK_FAMILY_IPV6 = 6,
+} tabos_network_family_t;
+
+typedef struct {
+    tabos_network_family_t family;
+    char text[46];
+} tabos_network_address_t;
+
+typedef struct {
+    uint32_t sequence;
+    uint32_t bytes;
+    uint32_t round_trip_ms;
+} tabos_network_echo_result_t;
+
 int tabos_network_get_status(tabos_network_status_t* status);
 int tabos_network_connect_saved(void);
 int tabos_network_disconnect(void);
+int tabos_network_resolve(const char* hostname, tabos_network_family_t family, tabos_network_address_t* address);
+int tabos_network_echo(const tabos_network_address_t* address, uint16_t sequence, uint16_t payload_bytes,
+                       uint32_t timeout_ms, tabos_network_echo_result_t* result);
 const char* tabos_network_state_name(tabos_network_state_t state);
 
 #endif

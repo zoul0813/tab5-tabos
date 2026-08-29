@@ -169,6 +169,50 @@ bool network_service_status(network_status_t* status)
     return true;
 }
 
+network_operation_result_t network_service_resolve(const char* hostname, uint32_t family, network_address_t* address)
+{
+    if (!initialized || hostname == NULL || address == NULL || hostname[0] == '\0' ||
+        (family != 0U && family != 4U && family != 6U)) {
+        return NETWORK_OPERATION_INVALID;
+    }
+    if (current.state != NETWORK_STATE_ONLINE) {
+        return NETWORK_OPERATION_OFFLINE;
+    }
+    platform_network_address_t platform_address;
+    const platform_network_operation_result_t result = platform_network_resolve(hostname, family, &platform_address);
+    if (result == PLATFORM_NETWORK_OPERATION_OK) {
+        address->family = platform_address.family;
+        (void) snprintf(address->text, sizeof(address->text), "%s", platform_address.text);
+    }
+    return (network_operation_result_t) result;
+}
+
+network_operation_result_t network_service_echo(const network_address_t* address, uint16_t sequence,
+                                                uint16_t payload_bytes, uint32_t timeout_ms,
+                                                network_echo_result_t* result)
+{
+    if (!initialized || address == NULL || result == NULL || (address->family != 4U && address->family != 6U) ||
+        address->text[0] == '\0' || memchr(address->text, '\0', sizeof(address->text)) == NULL ||
+        payload_bytes > 1024U || timeout_ms == 0U || timeout_ms > 60000U) {
+        return NETWORK_OPERATION_INVALID;
+    }
+    if (current.state != NETWORK_STATE_ONLINE) {
+        return NETWORK_OPERATION_OFFLINE;
+    }
+    const platform_network_address_t platform_address = {.family = address->family};
+    platform_network_address_t copied_address = platform_address;
+    (void) snprintf(copied_address.text, sizeof(copied_address.text), "%s", address->text);
+    platform_network_echo_result_t platform_result;
+    const platform_network_operation_result_t operation =
+        platform_network_echo(&copied_address, sequence, payload_bytes, timeout_ms, &platform_result);
+    if (operation == PLATFORM_NETWORK_OPERATION_OK) {
+        result->sequence      = platform_result.sequence;
+        result->bytes         = platform_result.bytes;
+        result->round_trip_ms = platform_result.round_trip_ms;
+    }
+    return (network_operation_result_t) operation;
+}
+
 const char* network_state_name(network_state_t state)
 {
     switch (state) {

@@ -55,6 +55,8 @@ enum {
     TABOS_ENAMETOOLONG = 36,
     TABOS_ENOTEMPTY    = 39,
     TABOS_ENOTSUP      = 95,
+    TABOS_ENETDOWN     = 115,
+    TABOS_ETIMEDOUT    = 116,
     TABOS_EBUSY        = 16,
     TABOS_ECHILD       = 10,
 };

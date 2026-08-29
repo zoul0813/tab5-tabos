@@ -53,7 +53,17 @@ int main(void)
     expect(network_service_status(&status) && status.state == NETWORK_STATE_ONLINE &&
                strcmp(status.ipv4, "192.0.2.10") == 0 && status.signal_dbm == -42,
            "online status propagated");
+    network_address_t address;
+    expect(network_service_resolve("localhost", 4U, &address) == NETWORK_OPERATION_OK &&
+               address.family == 4U && strcmp(address.text, "127.0.0.1") == 0,
+           "online resolver delegates to platform");
+    network_echo_result_t echo;
+    expect(network_service_echo(&address, 7U, 56U, 1000U, &echo) == NETWORK_OPERATION_OK &&
+               echo.sequence == 7U && echo.bytes == 56U && echo.round_trip_ms == 2U,
+           "online echo delegates to platform");
     expect(network_service_disconnect(), "explicit disconnect succeeds");
+    expect(network_service_resolve("localhost", 4U, &address) == NETWORK_OPERATION_OFFLINE,
+           "resolver rejects offline operation");
     test_platform_network_set_state(PLATFORM_NETWORK_FAILED, "late failure");
     network_service_update();
     test_platform_advance_time_ms(5000U);

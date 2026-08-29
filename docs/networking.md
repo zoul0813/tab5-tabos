@@ -48,9 +48,29 @@ slice and currently reports an unsupported operation.
 policy, attempt count, SSID, IPv4 address, signal strength, and last failure
 when those fields are available. It never reports the password.
 
-Interactive credential entry, scanning, forgetting credentials, DNS, sockets,
-and ping are not implemented yet.
+Interactive credential entry, scanning, forgetting credentials, and general
+TCP/UDP sockets are not implemented yet.
+
+## Application API
 
 Applications can include `<tabos/network.h>` and call
 `tabos_network_get_status()`, `tabos_network_connect_saved()`, and
-`tabos_network_disconnect()`.
+`tabos_network_disconnect()`. The same header exposes bounded networking
+operations for independently loaded applications:
+
+- `tabos_network_resolve()` resolves a hostname to one numeric IPv4 or IPv6
+  address.
+
+- `tabos_network_echo()` sends one bounded ICMP echo request to a resolved
+  address.
+
+## Ping
+
+The `ping` core utility uses only these public APIs. Build and install it with:
+
+```sh
+make -C apps/coreutils ping
+```
+
+It accepts `-4` or `-6`, `-c count`, and `-W timeout-ms`; without options it
+sends four requests with a one-second timeout.

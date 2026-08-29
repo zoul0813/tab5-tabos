@@ -129,9 +129,9 @@ Use official `esp_hosted` and `esp_wifi_remote` over 4-bit SDIO.
 
 ### Ping Utility
 
-- [ ] Add `ping` under `apps/coreutils` as general external utility using public DNS
+- [x] Add `ping` under `apps/coreutils` as general external utility using public DNS
   and ICMP echo APIs only.
-- [ ] Support:
+- [x] Support:
 
   - `ping <host>`
   - `ping -4 <host>`
@@ -139,10 +139,10 @@ Use official `esp_hosted` and `esp_wifi_remote` over 4-bit SDIO.
   - `ping -c <count> <host>`
   - `ping -W <timeout-ms> <host>`
 
-- [ ] Default to four requests with bounded timeout. Resolve names once, print
+- [x] Default to four requests with bounded timeout. Resolve names once, print
   resolved address, then show response bytes, sequence, round-trip time, or
   timeout for each request.
-- [ ] Print transmitted, received, loss percentage, and minimum/average/maximum
+- [x] Print transmitted, received, loss percentage, and minimum/average/maximum
   round-trip summary. Return nonzero when name resolution fails, no response is
   received, or local network operation fails.
 - [ ] Allow Ctrl+C to stop early, print partial summary, cancel pending echo, and
@@ -163,7 +163,7 @@ Use official `esp_hosted` and `esp_wifi_remote` over 4-bit SDIO.
   preserve parent resources, and leave foreground stack intact.
 - [ ] Extend independently built RV32 tester to exercise DNS, TCP, UDP, nonblocking
   sockets, ICMP echo, wait sets, and cleanup.
-- [x] Test `netctl status` redaction and fields plus `ping` IPv4/IPv6 success,
+- [ ] Test `netctl status` redaction and fields plus `ping` IPv4/IPv6 success,
   timeout, unknown host, disconnect, early interruption, summary, and exit
   status behavior.
 - [x] Keep old ABI-v1 fixtures unchanged. Add architecture checks rejecting native

@@ -34,6 +34,27 @@ typedef struct {
 } platform_network_status_t;
 
 typedef enum {
+    PLATFORM_NETWORK_OPERATION_OK = 0,
+    PLATFORM_NETWORK_OPERATION_INVALID,
+    PLATFORM_NETWORK_OPERATION_OFFLINE,
+    PLATFORM_NETWORK_OPERATION_NOT_FOUND,
+    PLATFORM_NETWORK_OPERATION_TIMEOUT,
+    PLATFORM_NETWORK_OPERATION_IO,
+    PLATFORM_NETWORK_OPERATION_UNSUPPORTED,
+} platform_network_operation_result_t;
+
+typedef struct {
+    uint32_t family;
+    char text[46];
+} platform_network_address_t;
+
+typedef struct {
+    uint32_t sequence;
+    uint32_t bytes;
+    uint32_t round_trip_ms;
+} platform_network_echo_result_t;
+
+typedef enum {
     PLATFORM_SYSTEM_ACTION_NONE = 0,
     PLATFORM_SYSTEM_ACTION_REBOOT,
     PLATFORM_SYSTEM_ACTION_POWER_OFF,
@@ -86,6 +107,12 @@ void platform_network_shutdown(void);
 bool platform_network_connect(const char* ssid, const char* password);
 bool platform_network_disconnect(void);
 bool platform_network_status(platform_network_status_t* status);
+platform_network_operation_result_t platform_network_resolve(const char* hostname, uint32_t family,
+                                                             platform_network_address_t* address);
+platform_network_operation_result_t platform_network_echo(const platform_network_address_t* address,
+                                                          uint16_t sequence, uint16_t payload_bytes,
+                                                          uint32_t timeout_ms,
+                                                          platform_network_echo_result_t* result);
 uint32_t platform_graphics_capabilities(void);
 bool platform_graphics_begin(void);
 void platform_graphics_end(void);

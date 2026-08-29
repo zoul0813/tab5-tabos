@@ -746,6 +746,68 @@ static int elf_network_disconnect(void)
     return network_service_disconnect() ? 0 : -TABOS_EIO;
 }
 
+static int network_operation_error(network_operation_result_t result)
+{
+    switch (result) {
+        case NETWORK_OPERATION_OK: return 0;
+        case NETWORK_OPERATION_INVALID: return -TABOS_EINVAL;
+        case NETWORK_OPERATION_OFFLINE: return -TABOS_ENETDOWN;
+        case NETWORK_OPERATION_NOT_FOUND: return -TABOS_ENOENT;
+        case NETWORK_OPERATION_TIMEOUT: return -TABOS_ETIMEDOUT;
+        case NETWORK_OPERATION_UNSUPPORTED: return -TABOS_ENOTSUP;
+        case NETWORK_OPERATION_IO: return -TABOS_EIO;
+    }
+    return -TABOS_EIO;
+}
+
+static int elf_network_resolve(const char* hostname, uint32_t family, tabos_elf_network_address_t* address)
+{
+    const char* readable_hostname = platform_executable_data_pointer(hostname, 254U);
+    tabos_elf_network_address_t* writable_address =
+        (tabos_elf_network_address_t*) platform_executable_data_pointer(address, sizeof(*address));
+    if (readable_hostname == NULL || writable_address == NULL) {
+        return -TABOS_EINVAL;
+    }
+    const size_t length = strnlen(readable_hostname, 254U);
+    if (length == 0U || length == 254U) {
+        return -TABOS_EINVAL;
+    }
+    network_address_t resolved;
+    const network_operation_result_t operation = network_service_resolve(readable_hostname, family, &resolved);
+    if (operation != NETWORK_OPERATION_OK) {
+        return network_operation_error(operation);
+    }
+    memset(writable_address, 0, sizeof(*writable_address));
+    writable_address->family = resolved.family;
+    (void) snprintf(writable_address->text, sizeof(writable_address->text), "%s", resolved.text);
+    return 0;
+}
+
+static int elf_network_echo(const tabos_elf_network_address_t* address, uint32_t sequence, uint32_t payload_bytes,
+                            uint32_t timeout_ms, tabos_elf_network_echo_result_t* result)
+{
+    const tabos_elf_network_address_t* readable_address =
+        platform_executable_data_pointer(address, sizeof(*address));
+    tabos_elf_network_echo_result_t* writable_result =
+        (tabos_elf_network_echo_result_t*) platform_executable_data_pointer(result, sizeof(*result));
+    if (readable_address == NULL || writable_result == NULL || sequence > UINT16_MAX || payload_bytes > UINT16_MAX) {
+        return -TABOS_EINVAL;
+    }
+    network_address_t target = {.family = readable_address->family};
+    memcpy(target.text, readable_address->text, sizeof(target.text));
+    target.text[sizeof(target.text) - 1U] = '\0';
+    network_echo_result_t echoed;
+    const network_operation_result_t operation = network_service_echo(
+        &target, (uint16_t) sequence, (uint16_t) payload_bytes, timeout_ms, &echoed);
+    if (operation != NETWORK_OPERATION_OK) {
+        return network_operation_error(operation);
+    }
+    writable_result->sequence      = echoed.sequence;
+    writable_result->bytes         = echoed.bytes;
+    writable_result->round_trip_ms = echoed.round_trip_ms;
+    return 0;
+}
+
 static int elf_system_info(tabos_elf_system_info_t* info)
 {
     if (info == NULL) {
@@ -1071,6 +1133,8 @@ static bool elf_entry(tabos_app_context_t* context)
         .network_status        = elf_network_status,
         .network_connect_saved = elf_network_connect_saved,
         .network_disconnect    = elf_network_disconnect,
+        .network_resolve       = elf_network_resolve,
+        .network_echo          = elf_network_echo,
     };
     application->execution = platform_riscv32_create(
         application->image.entry, application->image.memory, application->image.memory_size,

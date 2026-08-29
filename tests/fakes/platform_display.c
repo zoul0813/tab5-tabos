@@ -210,6 +210,31 @@ bool platform_network_status(platform_network_status_t* status)
     return true;
 }
 
+platform_network_operation_result_t platform_network_resolve(const char* hostname, uint32_t family,
+                                                             platform_network_address_t* address)
+{
+    if (hostname == NULL || address == NULL) {
+        return PLATFORM_NETWORK_OPERATION_INVALID;
+    }
+    address->family = family == 6U ? 6U : 4U;
+    (void) snprintf(address->text, sizeof(address->text), "%s", address->family == 6U ? "::1" : "127.0.0.1");
+    return PLATFORM_NETWORK_OPERATION_OK;
+}
+
+platform_network_operation_result_t platform_network_echo(const platform_network_address_t* address,
+                                                          uint16_t sequence, uint16_t payload_bytes,
+                                                          uint32_t timeout_ms,
+                                                          platform_network_echo_result_t* result)
+{
+    if (address == NULL || result == NULL || timeout_ms == 0U) {
+        return PLATFORM_NETWORK_OPERATION_INVALID;
+    }
+    result->sequence = sequence;
+    result->bytes = payload_bytes;
+    result->round_trip_ms = 2U;
+    return PLATFORM_NETWORK_OPERATION_OK;
+}
+
 void test_platform_network_set_state(platform_network_state_t state, const char* failure)
 {
     fake_network.state = state;
