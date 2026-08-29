@@ -52,7 +52,7 @@ static void elf_task_main(void* argument)
     vTaskSetThreadLocalStoragePointer(NULL, 0, context->user_data);
     context->returned_status = context->entry(&context->api, (int) context->argc, context->argv);
     atomic_store_explicit(&context->finished, true, memory_order_release);
-    vTaskDelete(NULL);
+    vTaskSuspend(NULL);
 }
 
 void* platform_executable_alloc(size_t size)
@@ -231,9 +231,8 @@ platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* cont
 
 void platform_riscv32_destroy(platform_riscv32_context_t* context)
 {
-    if (context != NULL && atomic_load_explicit(&context->started, memory_order_acquire) &&
-        !atomic_load_explicit(&context->finished, memory_order_acquire) && context->task != NULL) {
-        vTaskDelete(context->task);
+    if (context != NULL && atomic_load_explicit(&context->started, memory_order_acquire) && context->task != NULL) {
+        vTaskDeleteWithCaps(context->task);
     }
     free(context);
 }

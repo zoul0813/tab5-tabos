@@ -2,6 +2,7 @@
 
 #include <tabos/internal/elf_api.h>
 #include <tabos/filesystem.h>
+#include <tabos/network.h>
 #include <tabos/internal/application.h>
 #include <tabos/internal/elf_loader.h>
 #include <tabos/internal/filesystem.h>
@@ -26,6 +27,7 @@ enum {
        event loop for an unbounded period. */
     ELF_INSTRUCTIONS_PER_UPDATE   = 2000000,
     ELF_DESCRIPTOR_CAPACITY       = 16,
+    ELF_SOCKET_CAPACITY           = 16,
     ELF_HEAP_MAX                  = 1024 * 1024,
     ELF_HEAP_GUARD_SIZE           = 32,
     ELF_HEAP_GUARD_VALUE          = 0xa5,
@@ -57,6 +59,11 @@ typedef struct {
         bool open;
 } elf_descriptor_t;
 
+typedef struct {
+        int platform_socket;
+        bool open;
+} elf_socket_t;
+
 struct loader_elf_application {
         tabos_app_descriptor_t descriptor;
         char name[TABOS_FS_NAME_MAX + 1U];
@@ -83,6 +90,7 @@ struct loader_elf_application {
         char exec_argument_data[TABOS_ELF_ARG_BYTES_MAX];
         const char* exec_argv[TABOS_ELF_ARG_MAX + 1U];
         elf_descriptor_t descriptors[ELF_DESCRIPTOR_CAPACITY];
+        elf_socket_t sockets[ELF_SOCKET_CAPACITY];
         char working_directory[TABOS_FS_PATH_MAX];
         uint8_t* heap_allocation;
         uint8_t* heap;
@@ -786,8 +794,7 @@ static int elf_network_resolve(const char* hostname, uint32_t family, tabos_elf_
 static int elf_network_echo(const tabos_elf_network_address_t* address, uint32_t sequence, uint32_t payload_bytes,
                             uint32_t timeout_ms, tabos_elf_network_echo_result_t* result)
 {
-    const tabos_elf_network_address_t* readable_address =
-        platform_executable_data_pointer(address, sizeof(*address));
+    const tabos_elf_network_address_t* readable_address = platform_executable_data_pointer(address, sizeof(*address));
     tabos_elf_network_echo_result_t* writable_result =
         (tabos_elf_network_echo_result_t*) platform_executable_data_pointer(result, sizeof(*result));
     if (readable_address == NULL || writable_result == NULL || sequence > UINT16_MAX || payload_bytes > UINT16_MAX) {
@@ -797,8 +804,8 @@ static int elf_network_echo(const tabos_elf_network_address_t* address, uint32_t
     memcpy(target.text, readable_address->text, sizeof(target.text));
     target.text[sizeof(target.text) - 1U] = '\0';
     network_echo_result_t echoed;
-    const network_operation_result_t operation = network_service_echo(
-        &target, (uint16_t) sequence, (uint16_t) payload_bytes, timeout_ms, &echoed);
+    const network_operation_result_t operation =
+        network_service_echo(&target, (uint16_t) sequence, (uint16_t) payload_bytes, timeout_ms, &echoed);
     if (operation != NETWORK_OPERATION_OK) {
         return network_operation_error(operation);
     }
@@ -806,6 +813,244 @@ static int elf_network_echo(const tabos_elf_network_address_t* address, uint32_t
     writable_result->bytes         = echoed.bytes;
     writable_result->round_trip_ms = echoed.round_trip_ms;
     return 0;
+}
+
+static elf_socket_t* elf_socket(loader_elf_application_t* application, int socket)
+{
+    if (application == NULL || socket < 0 || socket >= ELF_SOCKET_CAPACITY || !application->sockets[socket].open) {
+        return NULL;
+    }
+    return &application->sockets[socket];
+}
+
+static int elf_socket_allocate(loader_elf_application_t* application, int platform_socket)
+{
+    for (int index = 0; index < ELF_SOCKET_CAPACITY; ++index) {
+        if (!application->sockets[index].open) {
+            application->sockets[index] = (elf_socket_t) {.platform_socket = platform_socket, .open = true};
+            return index;
+        }
+    }
+    (void) platform_network_socket_close(platform_socket);
+    return -TABOS_EMFILE;
+}
+
+static int elf_socket_open(uint32_t family, uint32_t type)
+{
+    loader_elf_application_t* application = platform_riscv32_current_user_data();
+    if (application == NULL) {
+        return -TABOS_EIO;
+    }
+    const int platform_socket = platform_network_socket_open(family, type);
+    return platform_socket < 0 ? platform_socket : elf_socket_allocate(application, platform_socket);
+}
+
+static int elf_socket_close(int socket)
+{
+    loader_elf_application_t* application = platform_riscv32_current_user_data();
+    elf_socket_t* owned                   = elf_socket(application, socket);
+    if (owned == NULL) {
+        return -TABOS_EBADF;
+    }
+    const int result = platform_network_socket_close(owned->platform_socket);
+    *owned           = (elf_socket_t) {0};
+    return result;
+}
+
+static bool elf_socket_endpoint(const tabos_elf_socket_endpoint_t* endpoint, platform_network_address_t* address,
+                                uint16_t* port)
+{
+    const tabos_elf_socket_endpoint_t* readable = platform_executable_data_pointer(endpoint, sizeof(*endpoint));
+    if (readable == NULL || address == NULL || port == NULL || readable->port > UINT16_MAX) {
+        return false;
+    }
+    address->family = readable->address.family;
+    memcpy(address->text, readable->address.text, sizeof(address->text));
+    address->text[sizeof(address->text) - 1U] = '\0';
+    *port                                     = (uint16_t) readable->port;
+    return true;
+}
+
+static void elf_socket_write_endpoint(tabos_elf_socket_endpoint_t* endpoint, const platform_network_address_t* address,
+                                      uint16_t port)
+{
+    memset(endpoint, 0, sizeof(*endpoint));
+    endpoint->address.family = address->family;
+    memcpy(endpoint->address.text, address->text, sizeof(endpoint->address.text));
+    endpoint->port = port;
+}
+
+static int elf_socket_bind(int socket, const tabos_elf_socket_endpoint_t* endpoint)
+{
+    elf_socket_t* owned = elf_socket(platform_riscv32_current_user_data(), socket);
+    platform_network_address_t address;
+    uint16_t port;
+    if (owned == NULL) {
+        return -TABOS_EBADF;
+    }
+    if (!elf_socket_endpoint(endpoint, &address, &port)) {
+        return -TABOS_EINVAL;
+    }
+    return platform_network_socket_bind(owned->platform_socket, &address, port);
+}
+
+static int elf_socket_get_local_endpoint(int socket, tabos_elf_socket_endpoint_t* endpoint)
+{
+    elf_socket_t* owned = elf_socket(platform_riscv32_current_user_data(), socket);
+    tabos_elf_socket_endpoint_t* writable =
+        (tabos_elf_socket_endpoint_t*) platform_executable_data_pointer(endpoint, sizeof(*endpoint));
+    if (owned == NULL) {
+        return -TABOS_EBADF;
+    }
+    if (writable == NULL) {
+        return -TABOS_EINVAL;
+    }
+    platform_network_address_t address;
+    uint16_t port;
+    const int result = platform_network_socket_get_local_endpoint(owned->platform_socket, &address, &port);
+    if (result == 0) {
+        elf_socket_write_endpoint(writable, &address, port);
+    }
+    return result;
+}
+
+static int elf_socket_listen(int socket, uint32_t backlog)
+{
+    elf_socket_t* owned = elf_socket(platform_riscv32_current_user_data(), socket);
+    if (owned == NULL) {
+        return -TABOS_EBADF;
+    }
+    return backlog == 0U || backlog > UINT16_MAX ?
+               -TABOS_EINVAL :
+               platform_network_socket_listen(owned->platform_socket, (uint16_t) backlog);
+}
+
+static int elf_socket_accept(int socket, tabos_elf_socket_endpoint_t* peer)
+{
+    loader_elf_application_t* application = platform_riscv32_current_user_data();
+    elf_socket_t* owned                   = elf_socket(application, socket);
+    tabos_elf_socket_endpoint_t* writable =
+        peer != NULL ? (tabos_elf_socket_endpoint_t*) platform_executable_data_pointer(peer, sizeof(*peer)) : NULL;
+    if (owned == NULL) {
+        return -TABOS_EBADF;
+    }
+    if (peer != NULL && writable == NULL) {
+        return -TABOS_EINVAL;
+    }
+    platform_network_address_t address;
+    uint16_t port;
+    const int accepted = platform_network_socket_accept(owned->platform_socket, &address, &port);
+    if (accepted < 0) {
+        return accepted;
+    }
+    const int result = elf_socket_allocate(application, accepted);
+    if (result >= 0 && writable != NULL) {
+        elf_socket_write_endpoint(writable, &address, port);
+    }
+    return result;
+}
+
+static int elf_socket_connect(int socket, const tabos_elf_socket_endpoint_t* endpoint)
+{
+    elf_socket_t* owned = elf_socket(platform_riscv32_current_user_data(), socket);
+    platform_network_address_t address;
+    uint16_t port;
+    if (owned == NULL) {
+        return -TABOS_EBADF;
+    }
+    if (!elf_socket_endpoint(endpoint, &address, &port)) {
+        return -TABOS_EINVAL;
+    }
+    return platform_network_socket_connect(owned->platform_socket, &address, port);
+}
+
+static int elf_socket_set_nonblocking(int socket, uint32_t enabled)
+{
+    elf_socket_t* owned = elf_socket(platform_riscv32_current_user_data(), socket);
+    if (owned == NULL) {
+        return -TABOS_EBADF;
+    }
+    if (enabled > 1U) {
+        return -TABOS_EINVAL;
+    }
+    return platform_network_socket_set_nonblocking(owned->platform_socket, enabled != 0U);
+}
+
+static int elf_socket_shutdown(int socket, uint32_t direction)
+{
+    elf_socket_t* owned = elf_socket(platform_riscv32_current_user_data(), socket);
+    if (owned == NULL) {
+        return -TABOS_EBADF;
+    }
+    if (direction > 2U) {
+        return -TABOS_EINVAL;
+    }
+    return platform_network_socket_shutdown(owned->platform_socket, direction);
+}
+
+static int elf_socket_send(int socket, const void* data, uint32_t size)
+{
+    elf_socket_t* owned  = elf_socket(platform_riscv32_current_user_data(), socket);
+    const void* readable = platform_executable_data_pointer(data, size);
+    if (owned == NULL) {
+        return -TABOS_EBADF;
+    }
+    if (readable == NULL || size == 0U || size > TABOS_NETWORK_IO_MAX) {
+        return -TABOS_EINVAL;
+    }
+    return platform_network_socket_send(owned->platform_socket, readable, size);
+}
+
+static int elf_socket_receive(int socket, void* data, uint32_t capacity)
+{
+    elf_socket_t* owned = elf_socket(platform_riscv32_current_user_data(), socket);
+    void* writable      = (void*) platform_executable_data_pointer(data, capacity);
+    if (owned == NULL) {
+        return -TABOS_EBADF;
+    }
+    if (writable == NULL || capacity == 0U || capacity > TABOS_NETWORK_IO_MAX) {
+        return -TABOS_EINVAL;
+    }
+    return platform_network_socket_receive(owned->platform_socket, writable, capacity);
+}
+
+static int elf_socket_send_to(int socket, const void* data, uint32_t size, const tabos_elf_socket_endpoint_t* endpoint)
+{
+    elf_socket_t* owned  = elf_socket(platform_riscv32_current_user_data(), socket);
+    const void* readable = platform_executable_data_pointer(data, size);
+    platform_network_address_t address;
+    uint16_t port;
+    if (owned == NULL) {
+        return -TABOS_EBADF;
+    }
+    if (readable == NULL || size == 0U || size > TABOS_NETWORK_IO_MAX ||
+        !elf_socket_endpoint(endpoint, &address, &port)) {
+        return -TABOS_EINVAL;
+    }
+    return platform_network_socket_send_to(owned->platform_socket, readable, size, &address, port);
+}
+
+static int elf_socket_receive_from(int socket, void* data, uint32_t capacity, tabos_elf_socket_endpoint_t* peer)
+{
+    elf_socket_t* owned = elf_socket(platform_riscv32_current_user_data(), socket);
+    void* writable_data = (void*) platform_executable_data_pointer(data, capacity);
+    tabos_elf_socket_endpoint_t* writable_peer =
+        peer != NULL ? (tabos_elf_socket_endpoint_t*) platform_executable_data_pointer(peer, sizeof(*peer)) : NULL;
+    if (owned == NULL) {
+        return -TABOS_EBADF;
+    }
+    if (writable_data == NULL || capacity == 0U || capacity > TABOS_NETWORK_IO_MAX ||
+        (peer != NULL && writable_peer == NULL)) {
+        return -TABOS_EINVAL;
+    }
+    platform_network_address_t address;
+    uint16_t port;
+    const int received =
+        platform_network_socket_receive_from(owned->platform_socket, writable_data, capacity, &address, &port);
+    if (received >= 0 && writable_peer != NULL) {
+        elf_socket_write_endpoint(writable_peer, &address, port);
+    }
+    return received;
 }
 
 static int elf_system_info(tabos_elf_system_info_t* info)
@@ -1089,52 +1334,65 @@ static bool elf_entry(tabos_app_context_t* context)
     platform_log(load_message);
 
     const tabos_elf_api_t api = {
-        .abi_version           = TABOS_ELF_API_VERSION,
-        .console_write         = elf_console_write,
-        .request_exit          = elf_request_exit,
-        .console_read          = elf_console_read,
-        .console_clear         = elf_console_clear,
-        .fs_getcwd             = elf_fs_getcwd,
-        .fs_chdir              = elf_fs_chdir,
-        .fs_list               = elf_fs_list,
-        .exec                  = elf_exec,
-        .yield                 = elf_yield,
-        .console_write_raw     = elf_console_write_raw,
-        .fd_open               = elf_fd_open,
-        .fd_close              = elf_fd_close,
-        .fd_read               = elf_fd_read,
-        .fd_write              = elf_fd_write,
-        .fd_seek               = elf_fd_seek,
-        .fs_stat               = elf_fs_stat_path,
-        .fd_stat               = elf_fd_stat,
-        .fs_mkdir              = elf_fs_mkdir_path,
-        .fs_unlink             = elf_fs_unlink_path,
-        .fs_rename             = elf_fs_rename_path,
-        .fd_get_flags          = elf_fd_get_flags,
-        .fd_set_flags          = elf_fd_set_flags,
-        .heap_sbrk             = elf_heap_sbrk,
-        .fs_rmdir              = elf_fs_rmdir_path,
-        .monotonic_ms          = elf_monotonic_ms,
-        .system_info           = elf_system_info,
-        .graphics_open         = elf_graphics_open,
-        .graphics_clear        = elf_graphics_clear,
-        .graphics_fill_rect    = elf_graphics_fill_rect,
-        .graphics_blit         = elf_graphics_blit,
-        .graphics_present      = elf_graphics_present,
-        .graphics_close        = elf_graphics_close,
-        .graphics_capabilities = elf_graphics_capabilities,
-        .graphics_blit_ex      = elf_graphics_blit_ex,
-        .tty_get_mode          = elf_tty_get_mode,
-        .tty_set_mode          = elf_tty_set_mode,
-        .input_poll            = elf_input_poll,
-        .wall_time_get         = elf_wall_time_get,
-        .wall_time_set         = elf_wall_time_set,
-        .system_action         = elf_system_action,
-        .network_status        = elf_network_status,
-        .network_connect_saved = elf_network_connect_saved,
-        .network_disconnect    = elf_network_disconnect,
-        .network_resolve       = elf_network_resolve,
-        .network_echo          = elf_network_echo,
+        .abi_version               = TABOS_ELF_API_VERSION,
+        .console_write             = elf_console_write,
+        .request_exit              = elf_request_exit,
+        .console_read              = elf_console_read,
+        .console_clear             = elf_console_clear,
+        .fs_getcwd                 = elf_fs_getcwd,
+        .fs_chdir                  = elf_fs_chdir,
+        .fs_list                   = elf_fs_list,
+        .exec                      = elf_exec,
+        .yield                     = elf_yield,
+        .console_write_raw         = elf_console_write_raw,
+        .fd_open                   = elf_fd_open,
+        .fd_close                  = elf_fd_close,
+        .fd_read                   = elf_fd_read,
+        .fd_write                  = elf_fd_write,
+        .fd_seek                   = elf_fd_seek,
+        .fs_stat                   = elf_fs_stat_path,
+        .fd_stat                   = elf_fd_stat,
+        .fs_mkdir                  = elf_fs_mkdir_path,
+        .fs_unlink                 = elf_fs_unlink_path,
+        .fs_rename                 = elf_fs_rename_path,
+        .fd_get_flags              = elf_fd_get_flags,
+        .fd_set_flags              = elf_fd_set_flags,
+        .heap_sbrk                 = elf_heap_sbrk,
+        .fs_rmdir                  = elf_fs_rmdir_path,
+        .monotonic_ms              = elf_monotonic_ms,
+        .system_info               = elf_system_info,
+        .graphics_open             = elf_graphics_open,
+        .graphics_clear            = elf_graphics_clear,
+        .graphics_fill_rect        = elf_graphics_fill_rect,
+        .graphics_blit             = elf_graphics_blit,
+        .graphics_present          = elf_graphics_present,
+        .graphics_close            = elf_graphics_close,
+        .graphics_capabilities     = elf_graphics_capabilities,
+        .graphics_blit_ex          = elf_graphics_blit_ex,
+        .tty_get_mode              = elf_tty_get_mode,
+        .tty_set_mode              = elf_tty_set_mode,
+        .input_poll                = elf_input_poll,
+        .wall_time_get             = elf_wall_time_get,
+        .wall_time_set             = elf_wall_time_set,
+        .system_action             = elf_system_action,
+        .network_status            = elf_network_status,
+        .network_connect_saved     = elf_network_connect_saved,
+        .network_disconnect        = elf_network_disconnect,
+        .network_resolve           = elf_network_resolve,
+        .network_echo              = elf_network_echo,
+        .socket_open               = elf_socket_open,
+        .socket_close              = elf_socket_close,
+        .socket_bind               = elf_socket_bind,
+        .socket_listen             = elf_socket_listen,
+        .socket_accept             = elf_socket_accept,
+        .socket_connect            = elf_socket_connect,
+        .socket_set_nonblocking    = elf_socket_set_nonblocking,
+        .socket_shutdown           = elf_socket_shutdown,
+        .socket_send               = elf_socket_send,
+        .socket_receive            = elf_socket_receive,
+        .socket_send_to            = elf_socket_send_to,
+        .socket_receive_from       = elf_socket_receive_from,
+        .socket_get_local_endpoint = elf_socket_get_local_endpoint,
     };
     application->execution = platform_riscv32_create(
         application->image.entry, application->image.memory, application->image.memory_size,
@@ -1233,6 +1491,12 @@ static void elf_release_resources(loader_elf_application_t* application)
         if (application->descriptors[index].open) {
             (void) tabos_fs_close(application->descriptors[index].kernel_descriptor);
             application->descriptors[index] = (elf_descriptor_t) {0};
+        }
+    }
+    for (size_t index = 0U; index < ELF_SOCKET_CAPACITY; ++index) {
+        if (application->sockets[index].open) {
+            (void) platform_network_socket_close(application->sockets[index].platform_socket);
+            application->sockets[index] = (elf_socket_t) {0};
         }
     }
     if (!elf_heap_guards_intact(application)) {

@@ -1,4 +1,5 @@
 #include <tabos/platform/platform.h>
+#include <tabos/filesystem.h>
 
 uint32_t platform_graphics_capabilities(void)
 {
@@ -219,6 +220,115 @@ void platform_network_operations_shutdown(void)
 {
 }
 
+bool platform_network_socket_operations_init(void)
+{
+    return true;
+}
+
+void platform_network_socket_operations_shutdown(void)
+{
+}
+
+int platform_network_socket_open(uint32_t family, uint32_t type)
+{
+    (void) family;
+    (void) type;
+    return -TABOS_ENOTSUP;
+}
+
+int platform_network_socket_close(int socket)
+{
+    (void) socket;
+    return 0;
+}
+
+#define TEST_SOCKET_ENDPOINT_OPERATION(name)                                       \
+    int name(int socket, const platform_network_address_t* address, uint16_t port) \
+    {                                                                              \
+        (void) socket;                                                             \
+        (void) address;                                                            \
+        (void) port;                                                               \
+        return -TABOS_ENOTSUP;                                                     \
+    }
+
+TEST_SOCKET_ENDPOINT_OPERATION(platform_network_socket_bind)
+TEST_SOCKET_ENDPOINT_OPERATION(platform_network_socket_connect)
+
+int platform_network_socket_get_local_endpoint(int socket, platform_network_address_t* address, uint16_t* port)
+{
+    (void) socket;
+    (void) address;
+    (void) port;
+    return -TABOS_ENOTSUP;
+}
+
+int platform_network_socket_listen(int socket, uint16_t backlog)
+{
+    (void) socket;
+    (void) backlog;
+    return -TABOS_ENOTSUP;
+}
+
+int platform_network_socket_accept(int socket, platform_network_address_t* address, uint16_t* port)
+{
+    (void) socket;
+    (void) address;
+    (void) port;
+    return -TABOS_ENOTSUP;
+}
+
+int platform_network_socket_set_nonblocking(int socket, bool enabled)
+{
+    (void) socket;
+    (void) enabled;
+    return -TABOS_ENOTSUP;
+}
+
+int platform_network_socket_shutdown(int socket, uint32_t direction)
+{
+    (void) socket;
+    (void) direction;
+    return -TABOS_ENOTSUP;
+}
+
+int platform_network_socket_send(int socket, const void* data, uint32_t size)
+{
+    (void) socket;
+    (void) data;
+    (void) size;
+    return -TABOS_ENOTSUP;
+}
+
+int platform_network_socket_receive(int socket, void* data, uint32_t capacity)
+{
+    (void) socket;
+    (void) data;
+    (void) capacity;
+    return -TABOS_ENOTSUP;
+}
+
+int platform_network_socket_send_to(int socket, const void* data, uint32_t size,
+                                    const platform_network_address_t* address, uint16_t port)
+{
+    (void) socket;
+    (void) data;
+    (void) size;
+    (void) address;
+    (void) port;
+    return -TABOS_ENOTSUP;
+}
+
+int platform_network_socket_receive_from(int socket, void* data, uint32_t capacity, platform_network_address_t* address,
+                                         uint16_t* port)
+{
+    (void) socket;
+    (void) data;
+    (void) capacity;
+    (void) address;
+    (void) port;
+    return -TABOS_ENOTSUP;
+}
+
 platform_network_operation_result_t platform_network_resolve(const char* hostname, uint32_t family,
                                                              platform_network_address_t* address)
 {
@@ -230,16 +340,15 @@ platform_network_operation_result_t platform_network_resolve(const char* hostnam
     return PLATFORM_NETWORK_OPERATION_OK;
 }
 
-platform_network_operation_result_t platform_network_echo(const platform_network_address_t* address,
-                                                          uint16_t sequence, uint16_t payload_bytes,
-                                                          uint32_t timeout_ms,
+platform_network_operation_result_t platform_network_echo(const platform_network_address_t* address, uint16_t sequence,
+                                                          uint16_t payload_bytes, uint32_t timeout_ms,
                                                           platform_network_echo_result_t* result)
 {
     if (address == NULL || result == NULL || timeout_ms == 0U) {
         return PLATFORM_NETWORK_OPERATION_INVALID;
     }
-    result->sequence = sequence;
-    result->bytes = payload_bytes;
+    result->sequence      = sequence;
+    result->bytes         = payload_bytes;
     result->round_trip_ms = 2U;
     return PLATFORM_NETWORK_OPERATION_OK;
 }

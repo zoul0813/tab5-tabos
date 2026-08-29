@@ -64,10 +64,10 @@ Use official `esp_hosted` and `esp_wifi_remote` over 4-bit SDIO.
   bounded ICMP echo, and bounded BSD-like socket operations.
 - [ ] Support IPv4 and IPv6, TCP and UDP, `socket`, `bind`, `listen`, `accept`,
   `connect`, `send`, `receive`, `shutdown`, options, and close.
-- [ ] Use portable addresses and opaque process-owned handles. Never expose
+- [x] Use portable addresses and opaque process-owned handles. Never expose
   ESP-IDF, lwIP, POSIX handles, or native structures.
-- [ ] Support blocking calls and nonblocking `EAGAIN`.
-- [ ] Implement ICMP echo through portable network API rather than exposing raw
+- [x] Support blocking calls and nonblocking `EAGAIN`.
+- [x] Implement ICMP echo through portable network API rather than exposing raw
   sockets. Return resolved address, sequence, response size, round-trip time,
   timeout, and network errors.
 - [ ] Close sockets and cancel pending work on normal exit, faults, and partial
@@ -101,7 +101,7 @@ Use official `esp_hosted` and `esp_wifi_remote` over 4-bit SDIO.
 - [x] Make explicit disconnect cancel pending connection and retry work and suppress
   further autoconnect until explicit connect or reboot.
 - [x] Simulate TabOS Wi-Fi state without changing workstation Wi-Fi.
-- [ ] Map host sockets to native macOS/Linux sockets.
+- [x] Map host sockets to native macOS/Linux sockets.
 - [x] Add external `netctl` application with:
 
 - [x] `netctl status`

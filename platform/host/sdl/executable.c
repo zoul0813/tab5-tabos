@@ -77,9 +77,22 @@ static const uint32_t HOST_RV32_NETWORK_CONNECT_SAVED = UINT32_C(0xffff00a8);
 static const uint32_t HOST_RV32_NETWORK_DISCONNECT    = UINT32_C(0xffff00ac);
 static const uint32_t HOST_RV32_NETWORK_RESOLVE       = UINT32_C(0xffff00b0);
 static const uint32_t HOST_RV32_NETWORK_ECHO          = UINT32_C(0xffff00b4);
+static const uint32_t HOST_RV32_SOCKET_OPEN           = UINT32_C(0xffff00b8);
+static const uint32_t HOST_RV32_SOCKET_CLOSE          = UINT32_C(0xffff00bc);
+static const uint32_t HOST_RV32_SOCKET_BIND           = UINT32_C(0xffff00c0);
+static const uint32_t HOST_RV32_SOCKET_LISTEN         = UINT32_C(0xffff00c4);
+static const uint32_t HOST_RV32_SOCKET_ACCEPT         = UINT32_C(0xffff00c8);
+static const uint32_t HOST_RV32_SOCKET_CONNECT        = UINT32_C(0xffff00cc);
+static const uint32_t HOST_RV32_SOCKET_NONBLOCKING    = UINT32_C(0xffff00d0);
+static const uint32_t HOST_RV32_SOCKET_SHUTDOWN       = UINT32_C(0xffff00d4);
+static const uint32_t HOST_RV32_SOCKET_SEND           = UINT32_C(0xffff00d8);
+static const uint32_t HOST_RV32_SOCKET_RECEIVE        = UINT32_C(0xffff00dc);
+static const uint32_t HOST_RV32_SOCKET_SEND_TO        = UINT32_C(0xffff00e0);
+static const uint32_t HOST_RV32_SOCKET_RECEIVE_FROM   = UINT32_C(0xffff00e4);
+static const uint32_t HOST_RV32_SOCKET_LOCAL_ENDPOINT = UINT32_C(0xffff00e8);
 
 enum {
-    HOST_RV32_API_SIZE = 184,
+    HOST_RV32_API_SIZE = 236,
 };
 
 struct platform_riscv32_context {
@@ -243,6 +256,19 @@ platform_riscv32_context_t* platform_riscv32_create(const void* entry, const voi
     write_u32(context->memory, api_address + 172U, HOST_RV32_NETWORK_DISCONNECT);
     write_u32(context->memory, api_address + 176U, HOST_RV32_NETWORK_RESOLVE);
     write_u32(context->memory, api_address + 180U, HOST_RV32_NETWORK_ECHO);
+    write_u32(context->memory, api_address + 184U, HOST_RV32_SOCKET_OPEN);
+    write_u32(context->memory, api_address + 188U, HOST_RV32_SOCKET_CLOSE);
+    write_u32(context->memory, api_address + 192U, HOST_RV32_SOCKET_BIND);
+    write_u32(context->memory, api_address + 196U, HOST_RV32_SOCKET_LISTEN);
+    write_u32(context->memory, api_address + 200U, HOST_RV32_SOCKET_ACCEPT);
+    write_u32(context->memory, api_address + 204U, HOST_RV32_SOCKET_CONNECT);
+    write_u32(context->memory, api_address + 208U, HOST_RV32_SOCKET_NONBLOCKING);
+    write_u32(context->memory, api_address + 212U, HOST_RV32_SOCKET_SHUTDOWN);
+    write_u32(context->memory, api_address + 216U, HOST_RV32_SOCKET_SEND);
+    write_u32(context->memory, api_address + 220U, HOST_RV32_SOCKET_RECEIVE);
+    write_u32(context->memory, api_address + 224U, HOST_RV32_SOCKET_SEND_TO);
+    write_u32(context->memory, api_address + 228U, HOST_RV32_SOCKET_RECEIVE_FROM);
+    write_u32(context->memory, api_address + 232U, HOST_RV32_SOCKET_LOCAL_ENDPOINT);
 
     uint32_t argument_data_address = api_address + HOST_RV32_API_SIZE;
     uint32_t argument_data_end     = argument_data_address;
@@ -656,9 +682,102 @@ platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* cont
             if (address == NULL || echo_result == NULL || context->api.network_echo == NULL) {
                 return PLATFORM_RISCV32_FAULT;
             }
-            current_user_data = context->user_data;
+            current_user_data       = context->user_data;
             context->state.regs[10] = (uint32_t) context->api.network_echo(
                 address, context->state.regs[11], context->state.regs[12], context->state.regs[13], echo_result);
+            current_user_data = NULL;
+            context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_SOCKET_OPEN || context->state.pc == HOST_RV32_SOCKET_CLOSE ||
+            context->state.pc == HOST_RV32_SOCKET_LISTEN || context->state.pc == HOST_RV32_SOCKET_NONBLOCKING ||
+            context->state.pc == HOST_RV32_SOCKET_SHUTDOWN) {
+            int (*call)(int, uint32_t) = NULL;
+            if (context->state.pc == HOST_RV32_SOCKET_LISTEN) {
+                call = context->api.socket_listen;
+            } else if (context->state.pc == HOST_RV32_SOCKET_NONBLOCKING) {
+                call = context->api.socket_set_nonblocking;
+            } else if (context->state.pc == HOST_RV32_SOCKET_SHUTDOWN) {
+                call = context->api.socket_shutdown;
+            }
+            current_user_data = context->user_data;
+            if (context->state.pc == HOST_RV32_SOCKET_OPEN) {
+                if (context->api.socket_open == NULL) {
+                    return PLATFORM_RISCV32_FAULT;
+                }
+                context->state.regs[10] =
+                    (uint32_t) context->api.socket_open(context->state.regs[10], context->state.regs[11]);
+            } else if (context->state.pc == HOST_RV32_SOCKET_CLOSE) {
+                if (context->api.socket_close == NULL) {
+                    return PLATFORM_RISCV32_FAULT;
+                }
+                context->state.regs[10] = (uint32_t) context->api.socket_close((int) context->state.regs[10]);
+            } else {
+                if (call == NULL) {
+                    return PLATFORM_RISCV32_FAULT;
+                }
+                context->state.regs[10] = (uint32_t) call((int) context->state.regs[10], context->state.regs[11]);
+            }
+            current_user_data = NULL;
+            context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_SOCKET_BIND || context->state.pc == HOST_RV32_SOCKET_CONNECT ||
+            context->state.pc == HOST_RV32_SOCKET_ACCEPT || context->state.pc == HOST_RV32_SOCKET_LOCAL_ENDPOINT) {
+            tabos_elf_socket_endpoint_t* endpoint = NULL;
+            if (context->state.regs[11] != 0U) {
+                endpoint = guest_buffer(context->memory, context->state.regs[11], sizeof(*endpoint));
+                if (endpoint == NULL) {
+                    return PLATFORM_RISCV32_FAULT;
+                }
+            }
+            current_user_data = context->user_data;
+            if (context->state.pc == HOST_RV32_SOCKET_BIND && context->api.socket_bind != NULL) {
+                context->state.regs[10] = (uint32_t) context->api.socket_bind((int) context->state.regs[10], endpoint);
+            } else if (context->state.pc == HOST_RV32_SOCKET_CONNECT && context->api.socket_connect != NULL) {
+                context->state.regs[10] =
+                    (uint32_t) context->api.socket_connect((int) context->state.regs[10], endpoint);
+            } else if (context->state.pc == HOST_RV32_SOCKET_ACCEPT && context->api.socket_accept != NULL) {
+                context->state.regs[10] =
+                    (uint32_t) context->api.socket_accept((int) context->state.regs[10], endpoint);
+            } else if (context->state.pc == HOST_RV32_SOCKET_LOCAL_ENDPOINT &&
+                       context->api.socket_get_local_endpoint != NULL) {
+                context->state.regs[10] =
+                    (uint32_t) context->api.socket_get_local_endpoint((int) context->state.regs[10], endpoint);
+            } else {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data = NULL;
+            context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_SOCKET_SEND || context->state.pc == HOST_RV32_SOCKET_RECEIVE ||
+            context->state.pc == HOST_RV32_SOCKET_SEND_TO || context->state.pc == HOST_RV32_SOCKET_RECEIVE_FROM) {
+            void* data = guest_buffer(context->memory, context->state.regs[11], context->state.regs[12]);
+            tabos_elf_socket_endpoint_t* endpoint = NULL;
+            if ((context->state.pc == HOST_RV32_SOCKET_SEND_TO || context->state.pc == HOST_RV32_SOCKET_RECEIVE_FROM) &&
+                context->state.regs[13] != 0U) {
+                endpoint = guest_buffer(context->memory, context->state.regs[13], sizeof(*endpoint));
+            }
+            if (data == NULL || ((context->state.pc == HOST_RV32_SOCKET_SEND_TO) && endpoint == NULL)) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data = context->user_data;
+            if (context->state.pc == HOST_RV32_SOCKET_SEND && context->api.socket_send != NULL) {
+                context->state.regs[10] =
+                    (uint32_t) context->api.socket_send((int) context->state.regs[10], data, context->state.regs[12]);
+            } else if (context->state.pc == HOST_RV32_SOCKET_RECEIVE && context->api.socket_receive != NULL) {
+                context->state.regs[10] = (uint32_t) context->api.socket_receive((int) context->state.regs[10], data,
+                                                                                 context->state.regs[12]);
+            } else if (context->state.pc == HOST_RV32_SOCKET_SEND_TO && context->api.socket_send_to != NULL) {
+                context->state.regs[10] = (uint32_t) context->api.socket_send_to((int) context->state.regs[10], data,
+                                                                                 context->state.regs[12], endpoint);
+            } else if (context->state.pc == HOST_RV32_SOCKET_RECEIVE_FROM && context->api.socket_receive_from != NULL) {
+                context->state.regs[10] = (uint32_t) context->api.socket_receive_from(
+                    (int) context->state.regs[10], data, context->state.regs[12], endpoint);
+            } else {
+                return PLATFORM_RISCV32_FAULT;
+            }
             current_user_data = NULL;
             context->state.pc = context->state.regs[1];
             continue;

@@ -458,7 +458,7 @@ but is not a substitute for this execution path.
 - [x] Add the internal Wi-Fi connection service with three-attempt autoconnect.
 - [x] Expose Wi-Fi status, saved connect, and disconnect through the application API and `netctl`.
 - [x] Decide on bounded BSD-like sockets with TabOS-owned types and wait sets.
-- [ ] Implement host socket backend.
+- [x] Implement host socket backend.
 - [ ] Implement Tab5 C6 networking backend.
 - [ ] Add Wi-Fi configuration user experience.
 - [ ] Add deterministic portable tests and hardware connectivity tests.

@@ -68,6 +68,7 @@ int main(int argc, char** argv)
         {               "Nonblocking input",      tester_test_input},
         {        "Nested process execution",    tester_test_process},
         {     "Time and system information",    tester_test_runtime},
+        {              "TCP/UDP networking",    tester_test_network},
         {             "Fullscreen graphics",   tester_test_graphics},
     };
     tester_context_t context = {.argc = argc, .argv = argv};

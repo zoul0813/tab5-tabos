@@ -44,14 +44,14 @@ typedef enum {
 } platform_network_operation_result_t;
 
 typedef struct {
-    uint32_t family;
-    char text[46];
+        uint32_t family;
+        char text[46];
 } platform_network_address_t;
 
 typedef struct {
-    uint32_t sequence;
-    uint32_t bytes;
-    uint32_t round_trip_ms;
+        uint32_t sequence;
+        uint32_t bytes;
+        uint32_t round_trip_ms;
 } platform_network_echo_result_t;
 
 typedef enum {
@@ -109,12 +109,28 @@ bool platform_network_disconnect(void);
 bool platform_network_status(platform_network_status_t* status);
 bool platform_network_operations_init(void);
 void platform_network_operations_shutdown(void);
+bool platform_network_socket_operations_init(void);
+void platform_network_socket_operations_shutdown(void);
 platform_network_operation_result_t platform_network_resolve(const char* hostname, uint32_t family,
                                                              platform_network_address_t* address);
-platform_network_operation_result_t platform_network_echo(const platform_network_address_t* address,
-                                                          uint16_t sequence, uint16_t payload_bytes,
-                                                          uint32_t timeout_ms,
+platform_network_operation_result_t platform_network_echo(const platform_network_address_t* address, uint16_t sequence,
+                                                          uint16_t payload_bytes, uint32_t timeout_ms,
                                                           platform_network_echo_result_t* result);
+int platform_network_socket_open(uint32_t family, uint32_t type);
+int platform_network_socket_close(int socket);
+int platform_network_socket_bind(int socket, const platform_network_address_t* address, uint16_t port);
+int platform_network_socket_get_local_endpoint(int socket, platform_network_address_t* address, uint16_t* port);
+int platform_network_socket_listen(int socket, uint16_t backlog);
+int platform_network_socket_accept(int socket, platform_network_address_t* address, uint16_t* port);
+int platform_network_socket_connect(int socket, const platform_network_address_t* address, uint16_t port);
+int platform_network_socket_set_nonblocking(int socket, bool enabled);
+int platform_network_socket_shutdown(int socket, uint32_t direction);
+int platform_network_socket_send(int socket, const void* data, uint32_t size);
+int platform_network_socket_receive(int socket, void* data, uint32_t capacity);
+int platform_network_socket_send_to(int socket, const void* data, uint32_t size,
+                                    const platform_network_address_t* address, uint16_t port);
+int platform_network_socket_receive_from(int socket, void* data, uint32_t capacity, platform_network_address_t* address,
+                                         uint16_t* port);
 uint32_t platform_graphics_capabilities(void);
 bool platform_graphics_begin(void);
 void platform_graphics_end(void);

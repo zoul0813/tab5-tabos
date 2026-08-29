@@ -55,6 +55,7 @@ set(TABOS_HOST_PLATFORM_SOURCES
     "${TABOS_ROOT}/platform/host/posix/storage_backend.c"
     "${TABOS_ROOT}/platform/posix/storage.c"
     "${TABOS_ROOT}/platform/posix/network.c"
+    "${TABOS_ROOT}/platform/posix/socket.c"
 )
 
 set(TABOS_ESP32P4_PLATFORM_SOURCES
@@ -71,4 +72,5 @@ set(TABOS_ESP32P4_PLATFORM_SOURCES
     "${TABOS_ROOT}/platform/esp32p4/storage_backend.c"
     "${TABOS_ROOT}/platform/posix/storage.c"
     "${TABOS_ROOT}/platform/posix/network.c"
+    "${TABOS_ROOT}/platform/posix/socket.c"
 )

@@ -44,11 +44,35 @@ static int echo_host(const tabos_elf_network_address_t* address, uint32_t sequen
         return -TABOS_EINVAL;
     }
     *result = (tabos_elf_network_echo_result_t) {
-        .sequence = sequence,
-        .bytes = payload_bytes,
+        .sequence      = sequence,
+        .bytes         = payload_bytes,
         .round_trip_ms = 3U,
     };
     return 0;
+}
+
+static int open_socket(uint32_t family, uint32_t type)
+{
+    return family == 4U && type == TABOS_SOCKET_TCP ? 3 : -TABOS_EINVAL;
+}
+
+static int close_socket(int socket)
+{
+    return socket == 3 ? 0 : -TABOS_EBADF;
+}
+
+static int send_socket(int socket, const void* data, uint32_t size)
+{
+    return socket == 3 && data != NULL ? (int) size : -TABOS_EBADF;
+}
+
+static int receive_socket(int socket, void* data, uint32_t capacity)
+{
+    if (socket != 3 || data == NULL || capacity < 2U) {
+        return -TABOS_EINVAL;
+    }
+    memcpy(data, "ok", 2U);
+    return 2;
 }
 
 int main(void)
@@ -64,6 +88,10 @@ int main(void)
         .network_disconnect    = reject_operation,
         .network_resolve       = resolve_host,
         .network_echo          = echo_host,
+        .socket_open           = open_socket,
+        .socket_close          = close_socket,
+        .socket_send           = send_socket,
+        .socket_receive        = receive_socket,
     };
     tabos_runtime_api = &api;
     if (tabos_network_get_status(&status) != 0 || status.state != TABOS_NETWORK_ONLINE ||
@@ -82,6 +110,13 @@ int main(void)
         address.family != TABOS_NETWORK_FAMILY_IPV4 || strcmp(address.text, "127.0.0.1") != 0 ||
         tabos_network_echo(&address, 9U, 56U, 1000U, &echo) != 0 || echo.sequence != 9U || echo.bytes != 56U ||
         echo.round_trip_ms != 3U) {
+        return 1;
+    }
+    char buffer[4]              = {0};
+    const tabos_socket_t socket = tabos_socket_open(TABOS_NETWORK_FAMILY_IPV4, TABOS_SOCKET_TCP);
+    if (socket != 3 || tabos_socket_send(socket, "hi", 2U) != 2 ||
+        tabos_socket_receive(socket, buffer, sizeof(buffer)) != 2 || memcmp(buffer, "ok", 2U) != 0 ||
+        tabos_socket_close(socket) != 0) {
         return 1;
     }
     return 0;

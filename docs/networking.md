@@ -48,8 +48,8 @@ slice and currently reports an unsupported operation.
 policy, attempt count, SSID, IPv4 address, signal strength, and last failure
 when those fields are available. It never reports the password.
 
-Interactive credential entry, scanning, forgetting credentials, and general
-TCP/UDP sockets are not implemented yet.
+Interactive credential entry, scanning, and forgetting credentials are not
+implemented yet.
 
 ## Application API
 
@@ -63,6 +63,22 @@ operations for independently loaded applications:
 
 - `tabos_network_echo()` sends one bounded ICMP echo request to a resolved
   address.
+
+### TCP and UDP sockets
+
+Applications use opaque `tabos_socket_t` handles and portable textual IPv4 or
+IPv6 endpoints. The API supports TCP and UDP sockets, bind, ephemeral local
+ports, listen, accept, connect, send, receive, datagram send/receive, shutdown,
+close, and nonblocking mode.
+
+Socket payload calls are bounded to `TABOS_NETWORK_IO_MAX` bytes. Applications
+must loop when transferring larger streams. A zero return from receive means the
+peer performed an orderly shutdown. Nonblocking operations report `EAGAIN`
+through `errno`.
+
+Sockets belong to the loaded application that opened or accepted them. TabOS
+closes remaining sockets during normal exit and fault cleanup. Public headers do
+not expose POSIX, lwIP, ESP-IDF, or native socket structures.
 
 ## Ping
 

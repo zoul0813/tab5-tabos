@@ -61,7 +61,9 @@ bool network_service_init(void)
         initialized = true;
         return true;
     }
-    if (!platform_network_operations_init()) {
+    if (!platform_network_operations_init() || !platform_network_socket_operations_init()) {
+        platform_network_socket_operations_shutdown();
+        platform_network_operations_shutdown();
         platform_network_shutdown();
         set_failure("network operations unavailable");
         initialized = true;
@@ -126,6 +128,7 @@ void network_service_shutdown(void)
     }
     retry_pending = false;
     (void) platform_network_disconnect();
+    platform_network_socket_operations_shutdown();
     platform_network_operations_shutdown();
     platform_network_shutdown();
     memset(password, 0, sizeof(password));
@@ -207,7 +210,7 @@ network_operation_result_t network_service_echo(const network_address_t* address
         return NETWORK_OPERATION_OFFLINE;
     }
     const platform_network_address_t platform_address = {.family = address->family};
-    platform_network_address_t copied_address = platform_address;
+    platform_network_address_t copied_address         = platform_address;
     (void) snprintf(copied_address.text, sizeof(copied_address.text), "%s", address->text);
     platform_network_echo_result_t platform_result;
     const platform_network_operation_result_t operation =

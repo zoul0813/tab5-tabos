@@ -6,7 +6,7 @@
 
 #include <stdint.h>
 
-#define TABOS_ELF_API_VERSION  8U
+#define TABOS_ELF_API_VERSION  9U
 #define TABOS_ELF_EXEC_PENDING (-2147483647 - 1)
 
 enum {
@@ -67,6 +67,11 @@ typedef struct {
 } tabos_elf_network_echo_result_t;
 
 typedef struct {
+        tabos_elf_network_address_t address;
+        uint32_t port;
+} tabos_elf_socket_endpoint_t;
+
+typedef struct {
         uint32_t abi_version;
         void (*console_write)(const char* text);
         void (*request_exit)(int exit_status);
@@ -114,6 +119,19 @@ typedef struct {
         int (*network_resolve)(const char* hostname, uint32_t family, tabos_elf_network_address_t* address);
         int (*network_echo)(const tabos_elf_network_address_t* address, uint32_t sequence, uint32_t payload_bytes,
                             uint32_t timeout_ms, tabos_elf_network_echo_result_t* result);
+        int (*socket_open)(uint32_t family, uint32_t type);
+        int (*socket_close)(int socket);
+        int (*socket_bind)(int socket, const tabos_elf_socket_endpoint_t* endpoint);
+        int (*socket_listen)(int socket, uint32_t backlog);
+        int (*socket_accept)(int socket, tabos_elf_socket_endpoint_t* peer);
+        int (*socket_connect)(int socket, const tabos_elf_socket_endpoint_t* endpoint);
+        int (*socket_set_nonblocking)(int socket, uint32_t enabled);
+        int (*socket_shutdown)(int socket, uint32_t direction);
+        int (*socket_send)(int socket, const void* data, uint32_t size);
+        int (*socket_receive)(int socket, void* data, uint32_t capacity);
+        int (*socket_send_to)(int socket, const void* data, uint32_t size, const tabos_elf_socket_endpoint_t* endpoint);
+        int (*socket_receive_from)(int socket, void* data, uint32_t capacity, tabos_elf_socket_endpoint_t* peer);
+        int (*socket_get_local_endpoint)(int socket, tabos_elf_socket_endpoint_t* endpoint);
 } tabos_elf_api_t;
 
 typedef int (*tabos_elf_entry_fn)(const tabos_elf_api_t* api, int argc, const char* const* argv);

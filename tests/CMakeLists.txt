@@ -269,6 +269,18 @@ tabos_enable_sanitizers(tabos_rv32_execution)
 
 add_test(NAME component.rv32_execution COMMAND tabos_rv32_execution)
 
+add_executable(tabos_network_socket
+    component/network_socket.c
+    "${TABOS_ROOT}/platform/posix/socket.c"
+)
+target_include_directories(tabos_network_socket PRIVATE
+    "${TABOS_ROOT}/platform/include"
+    "${TABOS_ROOT}/sdk/include"
+)
+tabos_enable_warnings(tabos_network_socket)
+tabos_enable_sanitizers(tabos_network_socket)
+add_test(NAME component.network_socket COMMAND tabos_network_socket)
+
 add_executable(tabos_filesystem
     component/filesystem.c
     fakes/storage_backend.c
