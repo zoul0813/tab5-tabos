@@ -21,6 +21,7 @@ const char* strerror(int error)
         case EIO: return "I/O error";
         case EBADF: return "Bad file descriptor";
         case EAGAIN: return "Resource temporarily unavailable";
+        case ETIMEDOUT: return "Operation timed out";
         case ENOMEM: return "Out of memory";
         case EACCES: return "Permission denied";
         case EEXIST: return "File exists";

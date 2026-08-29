@@ -3,6 +3,7 @@
 #include <tabos/platform/platform.h>
 
 #if defined(ESP_PLATFORM)
+#include <esp_log.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 #include <freertos/semphr.h>
@@ -79,6 +80,9 @@ static int socket_error(void)
     if (errno == ENETDOWN || errno == ENETUNREACH) {
         return -TABOS_ENETDOWN;
     }
+#if defined(ESP_PLATFORM)
+    ESP_LOGE("tabos_socket", "lwIP socket error: errno=%d (%s)", errno, strerror(errno));
+#endif
     return -TABOS_EIO;
 }
 
@@ -314,13 +318,23 @@ void platform_network_socket_operations_shutdown(void)
 
 static int submit_socket_request(const socket_request_t* request, socket_response_t* response)
 {
-    if (!socket_worker_init() || xSemaphoreTake(socket_mutex, portMAX_DELAY) != pdTRUE) {
+    if (!socket_worker_init()) {
+        ESP_LOGE("tabos_socket", "worker initialization failed for operation %u", (unsigned int) request->operation);
         return -TABOS_EIO;
     }
-    const bool complete = xQueueSend(socket_requests, request, portMAX_DELAY) == pdTRUE &&
-                          xQueueReceive(socket_responses, response, portMAX_DELAY) == pdTRUE;
+    if (xSemaphoreTake(socket_mutex, portMAX_DELAY) != pdTRUE) {
+        ESP_LOGE("tabos_socket", "worker mutex failed for operation %u", (unsigned int) request->operation);
+        return -TABOS_EIO;
+    }
+    const bool sent     = xQueueSend(socket_requests, request, portMAX_DELAY) == pdTRUE;
+    const bool received = sent && xQueueReceive(socket_responses, response, portMAX_DELAY) == pdTRUE;
     (void) xSemaphoreGive(socket_mutex);
-    return complete ? response->result : -TABOS_EIO;
+    if (!sent || !received) {
+        ESP_LOGE("tabos_socket", "worker queue failed for operation %u: sent=%u received=%u",
+                 (unsigned int) request->operation, sent ? 1U : 0U, received ? 1U : 0U);
+        return -TABOS_EIO;
+    }
+    return response->result;
 }
 #else
 bool platform_network_socket_operations_init(void)

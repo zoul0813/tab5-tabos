@@ -148,6 +148,19 @@ Use official `esp_hosted` and `esp_wifi_remote` over 4-bit SDIO.
 - [ ] Allow Ctrl+C to stop early, print partial summary, cancel pending echo, and
   restore input state.
 
+### Socket Interoperability Utility
+
+- [x] Add a host Python TCP/UDP echo service and standalone `apps/nettest`
+  application that
+  validates traffic across the physical Wi-Fi network.
+- [x] Validate multi-call TCP transfer, orderly EOF, UDP payload, and UDP reply
+  endpoint.
+- [ ] Diagnose and validate TCP write-half shutdown across the physical C6 path;
+  current ESP/lwIP behavior disconnects the host before all queued bytes arrive.
+- [x] Let Tab5 listen as a one-exchange TCP or UDP echo server for host `nc`
+  interoperability checks.
+- [ ] Run client and listener modes against physical Tab5 and record TCP/UDP proof.
+
 ## Test Plan
 
 - [x] Test missing drive/file, valid parsing, comments, escapes, malformed values,

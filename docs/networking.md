@@ -90,3 +90,64 @@ make -C apps/coreutils ping
 
 It accepts `-4` or `-6`, `-c count`, and `-W timeout-ms`; without options it
 sends four requests with a one-second timeout.
+
+## Host-to-Tab5 Socket Test
+
+The ordinary tester uses loopback sockets. To prove that TCP and UDP packets traverse
+the ESP32-C6 and the local Wi-Fi network, build and install the standalone `nettest`
+diagnostic application:
+
+```sh
+make -C apps/nettest
+```
+
+Run the companion echo service on another machine on the same LAN:
+
+```sh
+python3 tools/network_test_server.py
+```
+
+On a managed macOS host where the application firewall blocks the active Python
+runtime, use the equivalent Node.js server when Node is approved:
+
+```sh
+node tools/network_test_server.mjs
+```
+
+Find that machine's LAN IPv4 address, then run on Tab5:
+
+```sh
+nettest 192.168.1.20
+```
+
+The combined test stops after a TCP failure so an unavailable UDP reply cannot trap
+the shell. Run either protocol independently when diagnosing a failure:
+
+```sh
+nettest --tcp 192.168.1.20
+nettest --udp 192.168.1.20
+```
+
+The default TCP and UDP ports are 39001 and 39002. Override them on both sides with
+`--tcp-port` and `--udp-port` on the Python server and positional port arguments on
+`nettest`. The test resolves the supplied host, verifies a server-first handshake,
+validates a fixed-length 1537-byte TCP stream across multiple bounded API calls, and
+validates a 257-byte UDP datagram plus its reply endpoint.
+
+For reverse-direction manual testing, make Tab5 listen for one exchange:
+
+```sh
+nettest --listen tcp 39001
+nettest --listen udp 39002
+```
+
+Connect from the host with `nc`:
+
+```sh
+nc 192.168.1.50 39001
+nc -u 192.168.1.50 39002
+```
+
+Use the addresses reported by `netctl status` and the host operating system. Host
+firewall rules must permit inbound Python traffic, and the access point must not use
+wireless client isolation.
