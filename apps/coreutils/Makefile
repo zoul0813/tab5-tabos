@@ -1,6 +1,6 @@
 # Small independently loaded command-line utilities.
 
-PROGRAMS := ls mkdir rmdir cp rm mv hexdump date reboot shutdown wc netctl ping
+PROGRAMS := ls mkdir rmdir cp rm mv hexdump date reboot shutdown wc netctl ping battery
 
 ifeq ($(strip $(PROGRAM)),)
 

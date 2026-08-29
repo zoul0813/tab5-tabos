@@ -6,7 +6,7 @@
 
 #include <stdint.h>
 
-#define TABOS_ELF_API_VERSION  9U
+#define TABOS_ELF_API_VERSION  10U
 #define TABOS_ELF_EXEC_PENDING (-2147483647 - 1)
 
 enum {
@@ -54,6 +54,17 @@ typedef struct {
         uint32_t saved_config;
         char last_failure[96];
 } tabos_elf_network_status_t;
+
+typedef struct {
+        uint32_t available;
+        uint32_t charging_enabled;
+        uint32_t fast_charging_enabled;
+        uint32_t voltage_mv;
+        int32_t current_ma;
+        int32_t power_mw;
+        uint32_t percentage;
+        uint32_t charge_state;
+} tabos_elf_battery_status_t;
 
 typedef struct {
         uint32_t family;
@@ -132,6 +143,9 @@ typedef struct {
         int (*socket_send_to)(int socket, const void* data, uint32_t size, const tabos_elf_socket_endpoint_t* endpoint);
         int (*socket_receive_from)(int socket, void* data, uint32_t capacity, tabos_elf_socket_endpoint_t* peer);
         int (*socket_get_local_endpoint)(int socket, tabos_elf_socket_endpoint_t* endpoint);
+        int (*battery_status)(tabos_elf_battery_status_t* status);
+        int (*battery_set_charging)(uint32_t enabled);
+        int (*battery_set_fast_charging)(uint32_t enabled);
 } tabos_elf_api_t;
 
 typedef int (*tabos_elf_entry_fn)(const tabos_elf_api_t* api, int argc, const char* const* argv);

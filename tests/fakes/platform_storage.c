@@ -1,4 +1,25 @@
 #include <tabos/platform/storage.h>
+#include <tabos/platform/platform.h>
+
+bool platform_battery_status(platform_battery_status_t* status)
+{
+    if (status != NULL) {
+        *status = (platform_battery_status_t) {0};
+    }
+    return false;
+}
+
+bool platform_battery_set_charging(bool enabled)
+{
+    (void) enabled;
+    return false;
+}
+
+bool platform_battery_set_fast_charging(bool enabled)
+{
+    (void) enabled;
+    return false;
+}
 
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC diagnostic ignored "-Wunused-parameter"

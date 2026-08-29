@@ -33,6 +33,17 @@ typedef struct {
         char failure[64];
 } platform_network_status_t;
 
+typedef struct {
+        bool available;
+        bool charging_enabled;
+        bool fast_charging_enabled;
+        uint32_t voltage_mv;
+        int32_t current_ma;
+        int32_t power_mw;
+        uint32_t percentage;
+        uint32_t charge_state;
+} platform_battery_status_t;
+
 typedef enum {
     PLATFORM_NETWORK_OPERATION_OK = 0,
     PLATFORM_NETWORK_OPERATION_INVALID,
@@ -107,6 +118,9 @@ void platform_network_shutdown(void);
 bool platform_network_connect(const char* ssid, const char* password);
 bool platform_network_disconnect(void);
 bool platform_network_status(platform_network_status_t* status);
+bool platform_battery_status(platform_battery_status_t* status);
+bool platform_battery_set_charging(bool enabled);
+bool platform_battery_set_fast_charging(bool enabled);
 bool platform_network_operations_init(void);
 void platform_network_operations_shutdown(void);
 bool platform_network_socket_operations_init(void);

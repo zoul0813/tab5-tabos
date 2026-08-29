@@ -2,6 +2,27 @@
 #define _DARWIN_C_SOURCE
 
 #include <tabos/platform/storage_backend.h>
+#include <tabos/platform/platform.h>
+
+bool platform_battery_status(platform_battery_status_t* status)
+{
+    if (status != NULL) {
+        *status = (platform_battery_status_t) {0};
+    }
+    return false;
+}
+
+bool platform_battery_set_charging(bool enabled)
+{
+    (void) enabled;
+    return false;
+}
+
+bool platform_battery_set_fast_charging(bool enabled)
+{
+    (void) enabled;
+    return false;
+}
 
 #include "platform_test.h"
 

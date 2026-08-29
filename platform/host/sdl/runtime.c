@@ -196,6 +196,26 @@ bool platform_network_status(platform_network_status_t* status)
     return true;
 }
 
+bool platform_battery_status(platform_battery_status_t* status)
+{
+    if (status != NULL) {
+        *status = (platform_battery_status_t) {0};
+    }
+    return false;
+}
+
+bool platform_battery_set_charging(bool enabled)
+{
+    (void) enabled;
+    return false;
+}
+
+bool platform_battery_set_fast_charging(bool enabled)
+{
+    (void) enabled;
+    return false;
+}
+
 int platform_run(platform_update_fn update)
 {
     if (is_headless) {

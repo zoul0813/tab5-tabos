@@ -85,8 +85,13 @@ bool platform_init(bool headless)
     atomic_store_explicit(&stop_requested, false, memory_order_release);
     hosted_initialized = false;
     if (!platform_usb_port_disable_host_power()) {
-        ESP_LOGE(TAG, "Could not place USB-A port in safe unpowered state");
-        return false;
+        ESP_LOGW(TAG, "Could not place USB-A port in safe unpowered state; continuing normal boot");
+    }
+    if (!platform_battery_charging_enable()) {
+        ESP_LOGW(TAG, "Battery charging may remain disabled");
+    }
+    if (!platform_battery_monitor_init()) {
+        ESP_LOGW(TAG, "Battery monitor initialization failed");
     }
     (void) tab5_keyboard_init();
     (void) tab5_rtc_init();

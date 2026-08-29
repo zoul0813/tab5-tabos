@@ -92,7 +92,7 @@ static const uint32_t HOST_RV32_SOCKET_RECEIVE_FROM   = UINT32_C(0xffff00e4);
 static const uint32_t HOST_RV32_SOCKET_LOCAL_ENDPOINT = UINT32_C(0xffff00e8);
 
 enum {
-    HOST_RV32_API_SIZE = 236,
+    HOST_RV32_API_SIZE = 248,
 };
 
 struct platform_riscv32_context {

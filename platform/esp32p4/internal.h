@@ -11,6 +11,8 @@ const char* tab5_keyboard_name(void);
 bool tab5_keyboard_present(void);
 bool tab5_keyboard_delete_held(uint32_t window_ms);
 bool platform_usb_port_disable_host_power(void);
+bool platform_battery_charging_enable(void);
+bool platform_battery_monitor_init(void);
 bool tab5_rtc_init(void);
 void tab5_rtc_shutdown(void);
 bool tab5_rtc_present(void);

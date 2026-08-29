@@ -94,10 +94,11 @@ The Tab5 USB-C power/programming port does not carry the mass-storage device.
 TabOS disables USB-A host power in this mode so the connected host safely
 supplies VBUS.
 
-USB-A host power is also disabled during every normal TabOS startup. It is only
-enabled when a USB-host service deliberately takes ownership of the port. This
-makes a restart after eject safe while both the USB-C power/programming cable
-and USB-A data cable are still attached.
+TabOS also attempts to disable USB-A host power during every normal startup, but
+failure does not block ordinary battery or USB-C boot. MSC startup repeats the
+disable operation and fails closed if the board cannot confirm USB-A host power
+is off. USB-A is only enabled when a USB-host service deliberately takes
+ownership of the port.
 
 TabOS does not mount or access `T:` while the host owns it. Eject the removable
 disk through the host operating system before disconnecting it. A safe eject or

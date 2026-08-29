@@ -1078,6 +1078,40 @@ static int elf_system_info(tabos_elf_system_info_t* info)
     return 0;
 }
 
+static int elf_battery_status(tabos_elf_battery_status_t* info)
+{
+    if (info == NULL) {
+        return -TABOS_EINVAL;
+    }
+    tabos_elf_battery_status_t* writable =
+        (tabos_elf_battery_status_t*) platform_executable_data_pointer(info, sizeof(*info));
+    platform_battery_status_t source;
+    if (writable == NULL || !platform_battery_status(&source)) {
+        return -TABOS_EIO;
+    }
+    *writable = (tabos_elf_battery_status_t) {
+        .available = source.available ? 1U : 0U,
+        .charging_enabled = source.charging_enabled ? 1U : 0U,
+        .fast_charging_enabled = source.fast_charging_enabled ? 1U : 0U,
+        .voltage_mv = source.voltage_mv,
+        .current_ma = source.current_ma,
+        .power_mw = source.power_mw,
+        .percentage = source.percentage,
+        .charge_state = source.charge_state,
+    };
+    return 0;
+}
+
+static int elf_battery_set_charging(uint32_t enabled)
+{
+    return platform_battery_set_charging(enabled != 0U) ? 0 : -TABOS_EIO;
+}
+
+static int elf_battery_set_fast_charging(uint32_t enabled)
+{
+    return platform_battery_set_fast_charging(enabled != 0U) ? 0 : -TABOS_EIO;
+}
+
 static int elf_graphics_open(uint32_t* width, uint32_t* height)
 {
     loader_elf_application_t* application = platform_riscv32_current_user_data();
@@ -1393,6 +1427,9 @@ static bool elf_entry(tabos_app_context_t* context)
         .socket_send_to            = elf_socket_send_to,
         .socket_receive_from       = elf_socket_receive_from,
         .socket_get_local_endpoint = elf_socket_get_local_endpoint,
+        .battery_status            = elf_battery_status,
+        .battery_set_charging      = elf_battery_set_charging,
+        .battery_set_fast_charging = elf_battery_set_fast_charging,
     };
     application->execution = platform_riscv32_create(
         application->image.entry, application->image.memory, application->image.memory_size,
