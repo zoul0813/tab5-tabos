@@ -2,6 +2,7 @@
 
 #include <tabos/platform/platform.h>
 
+#include <tabos/battery.h>
 #include <tabos/config/identity.h>
 
 #include <stdio.h>
@@ -198,10 +199,20 @@ bool platform_network_status(platform_network_status_t* status)
 
 bool platform_battery_status(platform_battery_status_t* status)
 {
-    if (status != NULL) {
-        *status = (platform_battery_status_t) {0};
+    if (status == NULL) {
+        return false;
     }
-    return false;
+    *status = (platform_battery_status_t) {
+        .available             = true,
+        .charging_enabled      = true,
+        .fast_charging_enabled = false,
+        .voltage_mv            = 8000U,
+        .current_ma            = -500,
+        .power_mw              = -4000,
+        .percentage            = 80U,
+        .charge_state          = TABOS_BATTERY_STATE_CHARGING,
+    };
+    return true;
 }
 
 bool platform_battery_set_charging(bool enabled)

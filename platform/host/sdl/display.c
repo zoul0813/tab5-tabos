@@ -8,17 +8,19 @@
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 
 static SDL_Renderer* renderer;
 static SDL_Texture* texture;
 static platform_pixel_t* framebuffer_pixels;
+static platform_pixel_t* presented_pixels;
 static Uint64 graphics_present_deadline_ns;
 static bool renderer_vsync;
 
 bool host_capture_screenshot(void)
 {
-    if (framebuffer_pixels == NULL || host_is_headless()) {
+    if (presented_pixels == NULL || host_is_headless()) {
         return false;
     }
     if (!SDL_CreateDirectory("screenshots")) {
@@ -38,9 +40,9 @@ bool host_capture_screenshot(void)
         return false;
     }
 
-    const int pitch      = (int) (TABOS_DISPLAY_WIDTH * sizeof(*framebuffer_pixels));
+    const int pitch      = (int) (TABOS_DISPLAY_WIDTH * sizeof(*presented_pixels));
     SDL_Surface* surface = SDL_CreateSurfaceFrom(TABOS_DISPLAY_WIDTH, TABOS_DISPLAY_HEIGHT, SDL_PIXELFORMAT_RGB565,
-                                                 framebuffer_pixels, pitch);
+                                                 presented_pixels, pitch);
     if (surface == NULL) {
         SDL_Log("Could not create screenshot surface: %s", SDL_GetError());
         return false;
@@ -189,6 +191,12 @@ bool platform_display_init(platform_framebuffer_t* framebuffer)
         SDL_Log("Could not allocate host framebuffer");
         return false;
     }
+    presented_pixels = calloc(pixel_count, sizeof(*presented_pixels));
+    if (presented_pixels == NULL) {
+        SDL_Log("Could not allocate host presented framebuffer");
+        platform_display_shutdown();
+        return false;
+    }
     if (!host_is_headless()) {
         renderer = SDL_CreateRenderer(host_window, NULL);
         if (renderer == NULL) {
@@ -242,6 +250,8 @@ bool platform_display_present(const platform_framebuffer_t* framebuffer)
         SDL_Log("SDL framebuffer presentation failed: %s", SDL_GetError());
         return false;
     }
+    memcpy(presented_pixels, framebuffer->pixels,
+           (size_t) framebuffer->stride_pixels * framebuffer->height * sizeof(*framebuffer->pixels));
     return true;
 }
 
@@ -258,4 +268,6 @@ void platform_display_shutdown(void)
     renderer_vsync = false;
     free(framebuffer_pixels);
     framebuffer_pixels = NULL;
+    free(presented_pixels);
+    presented_pixels = NULL;
 }

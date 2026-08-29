@@ -14,6 +14,7 @@ static int32_t expected_x;
 static int32_t expected_y;
 static uint32_t expected_output_width;
 static uint32_t expected_output_height;
+static uint32_t overlay_flags;
 
 static int graphics_open(uint32_t* width, uint32_t* height)
 {
@@ -56,6 +57,12 @@ static int graphics_blit_ex(const tabos_graphics_blit_options_t* options)
     return upscale_valid ? 0 : -22;
 }
 
+static int graphics_set_overlays(uint32_t flags)
+{
+    overlay_flags = flags;
+    return 0;
+}
+
 static const tabos_elf_api_t api = {
     .abi_version           = TABOS_ELF_API_VERSION,
     .graphics_open         = graphics_open,
@@ -64,6 +71,7 @@ static const tabos_elf_api_t api = {
     .graphics_close        = graphics_close,
     .graphics_capabilities = graphics_capabilities,
     .graphics_blit_ex      = graphics_blit_ex,
+    .graphics_set_overlays = graphics_set_overlays,
 };
 
 const tabos_elf_api_t* tabos_runtime_api = &api;
@@ -80,6 +88,11 @@ int main(void)
     if (tabos_graphics_open(&graphics) != 0 || graphics.scale != 3U || graphics.output_x != 160U ||
         graphics.output_y != 0U || graphics.output_width != 960U || graphics.output_height != 720U ||
         graphics.letterbox_color != 0U || tabos_graphics_set_letterbox_color(&graphics, red) != 0) {
+        return 1;
+    }
+    if (tabos_graphics_set_overlays(&graphics, TABOS_GRAPHICS_OVERLAY_WIFI) != 0 ||
+        overlay_flags != TABOS_GRAPHICS_OVERLAY_WIFI ||
+        tabos_graphics_set_overlays(&graphics, TABOS_GRAPHICS_OVERLAY_ALL << 1U) != -1) {
         return 1;
     }
     expected_width         = 320U;

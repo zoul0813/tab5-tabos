@@ -81,6 +81,7 @@ struct loader_elf_application {
         atomic_bool exec_in_flight;
         atomic_bool exec_status_ready;
         bool graphics_active;
+        uint32_t graphics_overlay_flags;
         elf_graphics_command_t graphics_commands[ELF_GRAPHICS_COMMAND_CAPACITY];
         size_t graphics_command_head;
         size_t graphics_command_count;
@@ -1090,14 +1091,14 @@ static int elf_battery_status(tabos_elf_battery_status_t* info)
         return -TABOS_EIO;
     }
     *writable = (tabos_elf_battery_status_t) {
-        .available = source.available ? 1U : 0U,
-        .charging_enabled = source.charging_enabled ? 1U : 0U,
+        .available             = source.available ? 1U : 0U,
+        .charging_enabled      = source.charging_enabled ? 1U : 0U,
         .fast_charging_enabled = source.fast_charging_enabled ? 1U : 0U,
-        .voltage_mv = source.voltage_mv,
-        .current_ma = source.current_ma,
-        .power_mw = source.power_mw,
-        .percentage = source.percentage,
-        .charge_state = source.charge_state,
+        .voltage_mv            = source.voltage_mv,
+        .current_ma            = source.current_ma,
+        .power_mw              = source.power_mw,
+        .percentage            = source.percentage,
+        .charge_state          = source.charge_state,
     };
     return 0;
 }
@@ -1122,7 +1123,9 @@ static int elf_graphics_open(uint32_t* width, uint32_t* height)
     if (!platform_graphics_begin()) {
         return -TABOS_EIO;
     }
-    application->graphics_active = true;
+    application->graphics_active        = true;
+    application->graphics_overlay_flags = TABOS_GRAPHICS_OVERLAY_ALL;
+    display_overlay_set_flags(application->graphics_overlay_flags);
     console_set_graphics_active(true);
     *width  = (uint32_t) framebuffer->width;
     *height = (uint32_t) framebuffer->height;
@@ -1278,7 +1281,7 @@ static int elf_graphics_present(void)
 {
     loader_elf_application_t* application = platform_riscv32_current_user_data();
     return application != NULL && application->graphics_active && elf_graphics_drain(application) &&
-                   platform_graphics_present(display_framebuffer()) ?
+                   display_graphics_present() ?
                0 :
                -TABOS_EIO;
 }
@@ -1289,12 +1292,26 @@ static int elf_graphics_close(void)
     if (application == NULL || !application->graphics_active) {
         return -TABOS_EINVAL;
     }
-    if (!elf_graphics_drain(application) || !platform_graphics_present(display_framebuffer())) {
+    if (!elf_graphics_drain(application) || !display_graphics_present()) {
         return -TABOS_EIO;
     }
-    application->graphics_active = false;
+    application->graphics_active        = false;
+    application->graphics_overlay_flags = TABOS_GRAPHICS_OVERLAY_ALL;
+    display_overlay_set_flags(TABOS_GRAPHICS_OVERLAY_ALL);
     platform_graphics_end();
     console_set_graphics_active(false);
+    return 0;
+}
+
+static int elf_graphics_set_overlays(uint32_t flags)
+{
+    loader_elf_application_t* application = platform_riscv32_current_user_data();
+    if (application == NULL || !application->graphics_active ||
+        (flags & ~(uint32_t) TABOS_GRAPHICS_OVERLAY_ALL) != 0U) {
+        return -TABOS_EINVAL;
+    }
+    application->graphics_overlay_flags = flags;
+    display_overlay_set_flags(flags);
     return 0;
 }
 
@@ -1430,6 +1447,7 @@ static bool elf_entry(tabos_app_context_t* context)
         .battery_status            = elf_battery_status,
         .battery_set_charging      = elf_battery_set_charging,
         .battery_set_fast_charging = elf_battery_set_fast_charging,
+        .graphics_set_overlays     = elf_graphics_set_overlays,
     };
     application->execution = platform_riscv32_create(
         application->image.entry, application->image.memory, application->image.memory_size,
@@ -1516,8 +1534,10 @@ static void elf_release_resources(loader_elf_application_t* application)
     }
     if (application->graphics_active) {
         (void) elf_graphics_drain(application);
-        (void) platform_graphics_present(display_framebuffer());
-        application->graphics_active = false;
+        (void) display_graphics_present();
+        application->graphics_active        = false;
+        application->graphics_overlay_flags = TABOS_GRAPHICS_OVERLAY_ALL;
+        display_overlay_set_flags(TABOS_GRAPHICS_OVERLAY_ALL);
         platform_graphics_end();
         console_set_graphics_active(false);
     }

@@ -61,6 +61,10 @@ enum {
     TABOS_GRAPHICS_CAP_COLOR_KEY            = 1U << 3,
     TABOS_GRAPHICS_CAP_HARDWARE_ACCELERATED = 1U << 4,
     TABOS_GRAPHICS_CAP_SCALED_CANVAS        = 1U << 5,
+    TABOS_GRAPHICS_OVERLAY_NONE             = 0U,
+    TABOS_GRAPHICS_OVERLAY_BATTERY          = 1U << 0,
+    TABOS_GRAPHICS_OVERLAY_WIFI             = 1U << 1,
+    TABOS_GRAPHICS_OVERLAY_ALL              = TABOS_GRAPHICS_OVERLAY_BATTERY | TABOS_GRAPHICS_OVERLAY_WIFI,
 };
 
 int tabos_graphics_open(tabos_graphics_t* graphics);
@@ -79,6 +83,7 @@ int tabos_graphics_blit(tabos_graphics_t* graphics, int32_t x, int32_t y, uint32
 uint32_t tabos_graphics_capabilities(const tabos_graphics_t* graphics);
 int tabos_graphics_blit_ex(tabos_graphics_t* graphics, const tabos_graphics_blit_options_t* options);
 int tabos_graphics_present(tabos_graphics_t* graphics);
+int tabos_graphics_set_overlays(tabos_graphics_t* graphics, uint32_t flags);
 int tabos_graphics_close(tabos_graphics_t* graphics);
 
 #endif

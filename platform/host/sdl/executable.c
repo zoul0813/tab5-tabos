@@ -90,9 +90,10 @@ static const uint32_t HOST_RV32_SOCKET_RECEIVE        = UINT32_C(0xffff00dc);
 static const uint32_t HOST_RV32_SOCKET_SEND_TO        = UINT32_C(0xffff00e0);
 static const uint32_t HOST_RV32_SOCKET_RECEIVE_FROM   = UINT32_C(0xffff00e4);
 static const uint32_t HOST_RV32_SOCKET_LOCAL_ENDPOINT = UINT32_C(0xffff00e8);
+static const uint32_t HOST_RV32_GRAPHICS_SET_OVERLAYS = UINT32_C(0xffff00ec);
 
 enum {
-    HOST_RV32_API_SIZE = 248,
+    HOST_RV32_API_SIZE = 252,
 };
 
 struct platform_riscv32_context {
@@ -269,6 +270,7 @@ platform_riscv32_context_t* platform_riscv32_create(const void* entry, const voi
     write_u32(context->memory, api_address + 224U, HOST_RV32_SOCKET_SEND_TO);
     write_u32(context->memory, api_address + 228U, HOST_RV32_SOCKET_RECEIVE_FROM);
     write_u32(context->memory, api_address + 232U, HOST_RV32_SOCKET_LOCAL_ENDPOINT);
+    write_u32(context->memory, api_address + 248U, HOST_RV32_GRAPHICS_SET_OVERLAYS);
 
     uint32_t argument_data_address = api_address + HOST_RV32_API_SIZE;
     uint32_t argument_data_end     = argument_data_address;
@@ -858,6 +860,16 @@ platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* cont
                 context->state.regs[13], context->state.regs[14]);
             current_user_data = NULL;
             context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_GRAPHICS_SET_OVERLAYS) {
+            if (context->api.graphics_set_overlays == NULL) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data       = context->user_data;
+            context->state.regs[10] = (uint32_t) context->api.graphics_set_overlays(context->state.regs[10]);
+            current_user_data       = NULL;
+            context->state.pc       = context->state.regs[1];
             continue;
         }
         if (context->state.pc == HOST_RV32_GRAPHICS_BLIT) {

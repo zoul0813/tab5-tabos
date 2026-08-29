@@ -378,6 +378,20 @@ int tabos_graphics_present(tabos_graphics_t* graphics)
     }
     return result(tabos_runtime_api->graphics_present());
 }
+
+int tabos_graphics_set_overlays(tabos_graphics_t* graphics, uint32_t flags)
+{
+    if (!valid(graphics) || (flags & ~(uint32_t) TABOS_GRAPHICS_OVERLAY_ALL) != 0U) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (tabos_runtime_api->graphics_set_overlays == NULL) {
+        errno = ENOSYS;
+        return -1;
+    }
+    return result(tabos_runtime_api->graphics_set_overlays(flags));
+}
+
 int tabos_graphics_close(tabos_graphics_t* graphics)
 {
     if (!valid(graphics)) {

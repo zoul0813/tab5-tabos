@@ -6,7 +6,7 @@
 
 #include <stdint.h>
 
-#define TABOS_ELF_API_VERSION  10U
+#define TABOS_ELF_API_VERSION  11U
 #define TABOS_ELF_EXEC_PENDING (-2147483647 - 1)
 
 enum {
@@ -146,6 +146,7 @@ typedef struct {
         int (*battery_status)(tabos_elf_battery_status_t* status);
         int (*battery_set_charging)(uint32_t enabled);
         int (*battery_set_fast_charging)(uint32_t enabled);
+        int (*graphics_set_overlays)(uint32_t flags);
 } tabos_elf_api_t;
 
 typedef int (*tabos_elf_entry_fn)(const tabos_elf_api_t* api, int argc, const char* const* argv);

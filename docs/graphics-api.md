@@ -44,6 +44,20 @@ full-screen upscale, transparently using Tab5 acceleration when available. Nativ
 continues to hide its physical framebuffer and returns null from
 `tabos_graphics_pixels()`.
 
+TabOS composites battery and WiFi status over both console and graphics output. Battery
+status uses a battery icon and percentage; charging adds a bolt. WiFi bars appear while
+connected and appear grey while connecting. Disconnected WiFi has no icon.
+
+Graphics applications may hide either overlay for their current graphics session:
+
+```c
+tabos_graphics_set_overlays(&graphics, TABOS_GRAPHICS_OVERLAY_WIFI);
+tabos_graphics_set_overlays(&graphics, TABOS_GRAPHICS_OVERLAY_NONE);
+tabos_graphics_set_overlays(&graphics, TABOS_GRAPHICS_OVERLAY_ALL);
+```
+
+Closing or terminating an application restores both overlays.
+
 `tabos_graphics_blit_ex()` adds source and destination rectangles, nearest-neighbor
 scaling, quarter-turn rotation, mirroring, fixed opacity, and an inclusive RGB565
 color-key range. Query portable behavior and active acceleration with
