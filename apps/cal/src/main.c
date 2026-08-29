@@ -3,7 +3,7 @@
 #include <tabos/ansi.h>
 
 
-#define COLOR ANSI_GREEN
+#define COLOR ANSI_REVERSE
 
 static const char *months[] = {
     "January", "February", "March", "April",

@@ -11,6 +11,7 @@ typedef struct {
         char character;
         platform_pixel_t foreground;
         platform_pixel_t background;
+        bool reverse;
 } terminal_cell_t;
 
 typedef struct {
@@ -22,6 +23,7 @@ typedef struct {
         unsigned int scale;
         platform_pixel_t foreground;
         platform_pixel_t background;
+        bool reverse;
         terminal_cell_t* cells;
         bool* dirty_cells;
         size_t* line_lengths;

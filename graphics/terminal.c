@@ -106,6 +106,7 @@ static void put_character(terminal_t* terminal, char character)
         .character  = character,
         .foreground = terminal->foreground,
         .background = terminal->background,
+        .reverse    = terminal->reverse,
     };
     mark_cell(terminal, terminal->current_line, terminal->column);
     const size_t slot = line_slot(terminal, terminal->current_line);
@@ -163,8 +164,9 @@ static platform_pixel_t ansi_color(unsigned int value)
 {
     static const platform_pixel_t colors[] = {
         0x0000, 0xf800, 0x07e0, 0xffe0, 0x001f, 0xf81f, 0x07ff, 0xffff,
+        0x7bef, 0xfcb2, 0x87f0, 0xfff7, 0x867f, 0xfc1f, 0x87ff, 0xffff,
     };
-    return colors[value < 8U ? value : 7U];
+    return colors[value < 16U ? value : 7U];
 }
 
 static void ansi_sgr(terminal_t* terminal, unsigned int value)
@@ -172,10 +174,19 @@ static void ansi_sgr(terminal_t* terminal, unsigned int value)
     if (value == 0U) {
         terminal->foreground = 0xffff;
         terminal->background = 0x0000;
+        terminal->reverse    = false;
     } else if (value >= 30U && value <= 37U) {
         terminal->foreground = ansi_color(value - 30U);
+    } else if (value >= 90U && value <= 97U) {
+        terminal->foreground = ansi_color(value - 90U + 8U);
     } else if (value >= 40U && value <= 47U) {
         terminal->background = ansi_color(value - 40U);
+    } else if (value >= 100U && value <= 107U) {
+        terminal->background = ansi_color(value - 100U + 8U);
+    } else if (value == 7U) {
+        terminal->reverse = true;
+    } else if (value == 27U) {
+        terminal->reverse = false;
     }
 }
 
@@ -235,8 +246,13 @@ static void clear_framebuffer(terminal_t* terminal)
 static void draw_cell(terminal_t* terminal, size_t column, size_t row, const terminal_cell_t* cell, bool cursor)
 {
     const char character                       = cell->character == '\0' ? ' ' : cell->character;
-    const platform_pixel_t foreground          = cell->character == '\0' ? terminal->foreground : cell->foreground;
-    const platform_pixel_t background          = cell->character == '\0' ? terminal->background : cell->background;
+    platform_pixel_t foreground                = cell->character == '\0' ? terminal->foreground : cell->foreground;
+    platform_pixel_t background                = cell->character == '\0' ? terminal->background : cell->background;
+    if (cell->reverse) {
+        const platform_pixel_t swapped = foreground;
+        foreground                     = background;
+        background                     = swapped;
+    }
     const platform_pixel_t rendered_background = cursor ? foreground : background;
     const size_t width                         = cell_width(terminal);
     const size_t height                        = cell_height(terminal);
