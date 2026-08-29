@@ -22,6 +22,7 @@ set(TABOS_CORE_SOURCES
     "${TABOS_ROOT}/time/time.c"
     "${TABOS_ROOT}/time/wall_clock.c"
     "${TABOS_ROOT}/net/config.c"
+    "${TABOS_ROOT}/net/network.c"
     "${TABOS_ROOT}/loader/elf_loader.c"
     "${TABOS_ROOT}/loader/elf_application.c"
 )

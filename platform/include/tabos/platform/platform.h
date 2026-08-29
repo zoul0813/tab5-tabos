@@ -18,6 +18,22 @@ typedef struct platform_riscv32_context platform_riscv32_context_t;
 typedef struct platform_mutex platform_mutex_t;
 
 typedef enum {
+    PLATFORM_NETWORK_OFFLINE = 0,
+    PLATFORM_NETWORK_STARTING,
+    PLATFORM_NETWORK_CONNECTING,
+    PLATFORM_NETWORK_ONLINE,
+    PLATFORM_NETWORK_FAILED,
+} platform_network_state_t;
+
+typedef struct {
+        platform_network_state_t state;
+        char ssid[33];
+        char ipv4[16];
+        int signal_dbm;
+        char failure[64];
+} platform_network_status_t;
+
+typedef enum {
     PLATFORM_SYSTEM_ACTION_NONE = 0,
     PLATFORM_SYSTEM_ACTION_REBOOT,
     PLATFORM_SYSTEM_ACTION_POWER_OFF,
@@ -65,6 +81,11 @@ void platform_log(const char* message);
 uint64_t platform_time_ms(void);
 bool platform_wall_clock_get(int64_t* seconds);
 bool platform_wall_clock_set(int64_t seconds);
+bool platform_network_init(void);
+void platform_network_shutdown(void);
+bool platform_network_connect(const char* ssid, const char* password);
+bool platform_network_disconnect(void);
+bool platform_network_status(platform_network_status_t* status);
 uint32_t platform_graphics_capabilities(void);
 bool platform_graphics_begin(void);
 void platform_graphics_end(void);

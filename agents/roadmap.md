@@ -455,6 +455,7 @@ but is not a substitute for this execution path.
 - [x] Investigate supported ESP32-P4/ESP32-C6 transport in pinned ESP-IDF.
 - [x] Add bounded parsing and loading for version 1 `T:/etc/wifi.conf`.
 - [x] Add atomic configuration updates while preserving unknown future settings.
+- [x] Add the internal Wi-Fi connection service with three-attempt autoconnect.
 - [x] Decide on bounded BSD-like sockets with TabOS-owned types and wait sets.
 - [ ] Implement host socket backend.
 - [ ] Implement Tab5 C6 networking backend.

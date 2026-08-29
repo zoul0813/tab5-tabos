@@ -5,6 +5,7 @@
 #include <ctype.h>
 #include <stdatomic.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static const char NETWORK_CONFIG_PATH[]      = "T:/etc/wifi.conf";
@@ -155,12 +156,17 @@ network_config_result_t network_config_load(network_config_t* config)
         }
         return NETWORK_CONFIG_IO_ERROR;
     }
-    char buffer[NETWORK_CONFIG_FILE_MAX + 1U];
+    char* buffer = malloc(NETWORK_CONFIG_FILE_MAX + 1U);
+    if (buffer == NULL) {
+        (void) tabos_fs_close(file);
+        return NETWORK_CONFIG_IO_ERROR;
+    }
     size_t used = 0U;
-    while (used < sizeof(buffer)) {
-        const tabos_ssize_t count = tabos_fs_read(file, buffer + used, sizeof(buffer) - used);
+    while (used < NETWORK_CONFIG_FILE_MAX + 1U) {
+        const tabos_ssize_t count = tabos_fs_read(file, buffer + used, NETWORK_CONFIG_FILE_MAX + 1U - used);
         if (count < 0) {
             (void) tabos_fs_close(file);
+            free(buffer);
             return NETWORK_CONFIG_IO_ERROR;
         }
         if (count == 0) {
@@ -169,12 +175,16 @@ network_config_result_t network_config_load(network_config_t* config)
         used += (size_t) count;
     }
     if (tabos_fs_close(file) != 0) {
+        free(buffer);
         return NETWORK_CONFIG_IO_ERROR;
     }
     if (used > NETWORK_CONFIG_FILE_MAX) {
+        free(buffer);
         return NETWORK_CONFIG_TOO_LARGE;
     }
-    return network_config_parse(buffer, used, config);
+    const network_config_result_t result = network_config_parse(buffer, used, config);
+    free(buffer);
+    return result;
 }
 
 static bool append_bytes(char* output, size_t capacity, size_t* used, const char* bytes, size_t count)

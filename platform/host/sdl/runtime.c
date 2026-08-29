@@ -11,6 +11,7 @@
 SDL_Window* host_window;
 static bool is_headless;
 static bool quit_requested;
+static platform_network_status_t network_status;
 
 static char* window_state_path(void)
 {
@@ -149,6 +150,48 @@ bool platform_init(bool headless)
         platform_shutdown();
         return false;
     }
+    return true;
+}
+
+bool platform_network_init(void)
+{
+    network_status = (platform_network_status_t) {.state = PLATFORM_NETWORK_OFFLINE};
+    return true;
+}
+
+void platform_network_shutdown(void)
+{
+    network_status = (platform_network_status_t) {0};
+}
+
+bool platform_network_connect(const char* ssid, const char* password)
+{
+    (void) password;
+    if (ssid == NULL || ssid[0] == '\0') {
+        return false;
+    }
+    network_status = (platform_network_status_t) {
+        .state      = PLATFORM_NETWORK_ONLINE,
+        .signal_dbm = -30,
+    };
+    (void) snprintf(network_status.ssid, sizeof(network_status.ssid), "%s", ssid);
+    (void) snprintf(network_status.ipv4, sizeof(network_status.ipv4), "127.0.0.1");
+    return true;
+}
+
+bool platform_network_disconnect(void)
+{
+    network_status.state   = PLATFORM_NETWORK_OFFLINE;
+    network_status.ipv4[0] = '\0';
+    return true;
+}
+
+bool platform_network_status(platform_network_status_t* status)
+{
+    if (status == NULL) {
+        return false;
+    }
+    *status = network_status;
     return true;
 }
 

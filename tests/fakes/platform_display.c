@@ -69,6 +69,8 @@ struct platform_mutex {
 static platform_pixel_t pixels[TABOS_DISPLAY_WIDTH * TABOS_DISPLAY_HEIGHT];
 static uint64_t monotonic_ms;
 static char last_log[256];
+static platform_network_status_t fake_network;
+static unsigned int network_connect_calls;
 
 bool platform_display_init(platform_framebuffer_t* framebuffer)
 {
@@ -165,6 +167,60 @@ bool platform_wall_clock_get(int64_t* seconds)
 bool platform_wall_clock_set(int64_t seconds)
 {
     return seconds >= 0;
+}
+
+bool platform_network_init(void)
+{
+    fake_network          = (platform_network_status_t) {.state = PLATFORM_NETWORK_OFFLINE};
+    network_connect_calls = 0U;
+    return true;
+}
+
+void platform_network_shutdown(void)
+{
+    fake_network = (platform_network_status_t) {0};
+}
+
+bool platform_network_connect(const char* ssid, const char* password)
+{
+    (void) password;
+    if (ssid == NULL || ssid[0] == '\0') {
+        return false;
+    }
+    ++network_connect_calls;
+    fake_network.state = PLATFORM_NETWORK_CONNECTING;
+    (void) snprintf(fake_network.ssid, sizeof(fake_network.ssid), "%s", ssid);
+    return true;
+}
+
+bool platform_network_disconnect(void)
+{
+    fake_network.state = PLATFORM_NETWORK_OFFLINE;
+    return true;
+}
+
+bool platform_network_status(platform_network_status_t* status)
+{
+    if (status == NULL) {
+        return false;
+    }
+    *status = fake_network;
+    return true;
+}
+
+void test_platform_network_set_state(platform_network_state_t state, const char* failure)
+{
+    fake_network.state = state;
+    (void) snprintf(fake_network.failure, sizeof(fake_network.failure), "%s", failure != NULL ? failure : "");
+    if (state == PLATFORM_NETWORK_ONLINE) {
+        (void) snprintf(fake_network.ipv4, sizeof(fake_network.ipv4), "192.0.2.10");
+        fake_network.signal_dbm = -42;
+    }
+}
+
+unsigned int test_platform_network_connect_calls(void)
+{
+    return network_connect_calls;
 }
 
 void* platform_executable_alloc(size_t size)

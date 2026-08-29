@@ -7,6 +7,7 @@
 #include <tabos/internal/display.h>
 #include <tabos/internal/filesystem.h>
 #include <tabos/internal/input.h>
+#include <tabos/internal/network.h>
 #include <tabos/internal/terminal.h>
 #include <tabos/internal/wall_clock.h>
 
@@ -35,6 +36,7 @@ static char external_memory_detail[80];
 static char flash_detail[48];
 static char storage_detail[512];
 static char clock_detail[80];
+static char network_detail[160];
 static atomic_int requested_system_action;
 
 static void format_size(char* buffer, size_t buffer_size, uint64_t bytes)
@@ -158,6 +160,12 @@ bool kernel_runtime_start(void)
         return false;
     }
 
+    if (!network_service_init()) {
+        filesystem_shutdown();
+        return false;
+    }
+    network_service_update();
+
     if (!display_init()) {
         return false;
     }
@@ -213,6 +221,21 @@ bool kernel_runtime_start(void)
         }
     }
     (void) add_storage_report();
+    network_status_t network_status;
+    if (network_service_status(&network_status)) {
+        if (network_status.state == NETWORK_STATE_ONLINE) {
+            (void) snprintf(network_detail, sizeof(network_detail), "%s; %s; IPv4 %s",
+                            network_state_name(network_status.state), network_status.ssid, network_status.ipv4);
+        } else if (network_status.last_failure[0] != '\0') {
+            (void) snprintf(network_detail, sizeof(network_detail), "%s; %s", network_state_name(network_status.state),
+                            network_status.last_failure);
+        } else {
+            (void) snprintf(network_detail, sizeof(network_detail), "%s", network_state_name(network_status.state));
+        }
+        (void) kernel_boot_report_add(&boot_report, "Network", network_detail,
+                                      network_status.state == NETWORK_STATE_ONLINE ? KERNEL_BOOT_STATUS_OK :
+                                                                                     KERNEL_BOOT_STATUS_INFO);
+    }
     (void) kernel_boot_report_add(&boot_report, "Kernel", "Runtime initialized", KERNEL_BOOT_STATUS_OK);
 
     kernel_boot_report_write_serial(&boot_report);
@@ -259,6 +282,7 @@ void kernel_runtime_update(void)
     }
     input_update();
     console_update();
+    network_service_update();
     kernel_application_system_update();
 }
 
@@ -273,6 +297,7 @@ void kernel_runtime_shutdown(void)
         boot_report     = (kernel_boot_report_t) {0};
     }
 
+    network_service_shutdown();
     filesystem_shutdown();
     runtime_initialized = false;
     input_shutdown();
