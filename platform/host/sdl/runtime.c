@@ -153,8 +153,9 @@ bool platform_init(bool headless)
     return true;
 }
 
-bool platform_network_init(void)
+bool platform_network_init(const char* hostname)
 {
+    (void) hostname;
     network_status = (platform_network_status_t) {.state = PLATFORM_NETWORK_OFFLINE};
     return true;
 }

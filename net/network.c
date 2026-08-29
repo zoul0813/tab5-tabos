@@ -48,17 +48,20 @@ bool network_service_init(void)
     if (initialized) {
         return true;
     }
-    current          = (network_status_t) {.state = NETWORK_STATE_STARTING};
-    retry_pending    = false;
-    retry_suppressed = false;
-    if (!platform_network_init()) {
+    current                 = (network_status_t) {.state = NETWORK_STATE_STARTING};
+    retry_pending           = false;
+    retry_suppressed        = false;
+    network_config_t config = {
+        .name = NETWORK_CONFIG_DEFAULT_NAME,
+    };
+    const network_config_result_t result = network_config_load(&config);
+    (void) snprintf(current.hostname, sizeof(current.hostname), "%s", config.name);
+    if (!platform_network_init(config.name)) {
         set_failure("network backend unavailable");
         initialized = true;
         return true;
     }
     current.state = NETWORK_STATE_OFFLINE;
-    network_config_t config;
-    const network_config_result_t result = network_config_load(&config);
     if (result == NETWORK_CONFIG_OK) {
         current.config_available = true;
         current.auto_connect     = config.auto_connect;

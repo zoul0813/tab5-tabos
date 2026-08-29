@@ -81,7 +81,7 @@ void platform_log(const char* message);
 uint64_t platform_time_ms(void);
 bool platform_wall_clock_get(int64_t* seconds);
 bool platform_wall_clock_set(int64_t seconds);
-bool platform_network_init(void);
+bool platform_network_init(const char* hostname);
 void platform_network_shutdown(void);
 bool platform_network_connect(const char* ssid, const char* password);
 bool platform_network_disconnect(void);

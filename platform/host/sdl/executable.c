@@ -72,9 +72,12 @@ static const uint32_t HOST_RV32_INPUT_POLL            = UINT32_C(0xffff0094);
 static const uint32_t HOST_RV32_WALL_TIME_GET         = UINT32_C(0xffff0098);
 static const uint32_t HOST_RV32_WALL_TIME_SET         = UINT32_C(0xffff009c);
 static const uint32_t HOST_RV32_SYSTEM_ACTION         = UINT32_C(0xffff00a0);
+static const uint32_t HOST_RV32_NETWORK_STATUS        = UINT32_C(0xffff00a4);
+static const uint32_t HOST_RV32_NETWORK_CONNECT_SAVED = UINT32_C(0xffff00a8);
+static const uint32_t HOST_RV32_NETWORK_DISCONNECT    = UINT32_C(0xffff00ac);
 
 enum {
-    HOST_RV32_API_SIZE = 164,
+    HOST_RV32_API_SIZE = 176,
 };
 
 struct platform_riscv32_context {
@@ -233,6 +236,9 @@ platform_riscv32_context_t* platform_riscv32_create(const void* entry, const voi
     write_u32(context->memory, api_address + 152U, HOST_RV32_WALL_TIME_GET);
     write_u32(context->memory, api_address + 156U, HOST_RV32_WALL_TIME_SET);
     write_u32(context->memory, api_address + 160U, HOST_RV32_SYSTEM_ACTION);
+    write_u32(context->memory, api_address + 164U, HOST_RV32_NETWORK_STATUS);
+    write_u32(context->memory, api_address + 168U, HOST_RV32_NETWORK_CONNECT_SAVED);
+    write_u32(context->memory, api_address + 172U, HOST_RV32_NETWORK_DISCONNECT);
 
     uint32_t argument_data_address = api_address + HOST_RV32_API_SIZE;
     uint32_t argument_data_end     = argument_data_address;
@@ -588,6 +594,38 @@ platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* cont
             }
             current_user_data       = context->user_data;
             context->state.regs[10] = (uint32_t) context->api.system_action(context->state.regs[10]);
+            current_user_data       = NULL;
+            context->state.pc       = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_NETWORK_STATUS) {
+            tabos_elf_network_status_t* status =
+                guest_buffer(context->memory, context->state.regs[10], sizeof(*status));
+            if (status == NULL || context->api.network_status == NULL) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data       = context->user_data;
+            context->state.regs[10] = (uint32_t) context->api.network_status(status);
+            current_user_data       = NULL;
+            context->state.pc       = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_NETWORK_CONNECT_SAVED) {
+            if (context->api.network_connect_saved == NULL) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data       = context->user_data;
+            context->state.regs[10] = (uint32_t) context->api.network_connect_saved();
+            current_user_data       = NULL;
+            context->state.pc       = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_NETWORK_DISCONNECT) {
+            if (context->api.network_disconnect == NULL) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data       = context->user_data;
+            context->state.regs[10] = (uint32_t) context->api.network_disconnect();
             current_user_data       = NULL;
             context->state.pc       = context->state.regs[1];
             continue;

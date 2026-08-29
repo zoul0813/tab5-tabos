@@ -6,7 +6,7 @@
 
 #include <stdint.h>
 
-#define TABOS_ELF_API_VERSION  6U
+#define TABOS_ELF_API_VERSION  7U
 #define TABOS_ELF_EXEC_PENDING (-2147483647 - 1)
 
 enum {
@@ -42,6 +42,18 @@ typedef struct {
         uint32_t seconds_low;
         int32_t seconds_high;
 } tabos_elf_wall_time_t;
+
+typedef struct {
+        uint32_t state;
+        char hostname[33];
+        char ssid[33];
+        char ipv4[16];
+        int32_t signal_dbm;
+        uint32_t attempts;
+        uint32_t auto_connect;
+        uint32_t saved_config;
+        char last_failure[96];
+} tabos_elf_network_status_t;
 
 typedef struct {
         uint32_t abi_version;
@@ -85,6 +97,9 @@ typedef struct {
         int (*wall_time_get)(tabos_elf_wall_time_t* time);
         int (*wall_time_set)(const tabos_elf_wall_time_t* time);
         int (*system_action)(uint32_t action);
+        int (*network_status)(tabos_elf_network_status_t* status);
+        int (*network_connect_saved)(void);
+        int (*network_disconnect)(void);
 } tabos_elf_api_t;
 
 typedef int (*tabos_elf_entry_fn)(const tabos_elf_api_t* api, int argc, const char* const* argv);

@@ -16,6 +16,7 @@ typedef enum {
 
 typedef struct {
         network_state_t state;
+        char hostname[33];
         char ssid[33];
         char ipv4[16];
         int signal_dbm;

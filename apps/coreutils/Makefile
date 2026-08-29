@@ -1,6 +1,6 @@
 # Small independently loaded command-line utilities.
 
-PROGRAMS := ls mkdir rmdir cp rm mv hexdump date reboot shutdown wc
+PROGRAMS := ls mkdir rmdir cp rm mv hexdump date reboot shutdown wc netctl
 
 ifeq ($(strip $(PROGRAM)),)
 

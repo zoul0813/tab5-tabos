@@ -9,6 +9,8 @@
 #include <tabos/internal/console.h>
 #include <tabos/internal/raster.h>
 #include <tabos/internal/runtime.h>
+#include <tabos/internal/network.h>
+#include <tabos/internal/network_config.h>
 #include <tabos/platform/platform.h>
 #include <tabos/config/display.h>
 #include <tabos/tty.h>
@@ -702,6 +704,48 @@ static int elf_system_action(uint32_t action)
     return kernel_runtime_request_system_action(platform_action) ? 0 : -TABOS_EBUSY;
 }
 
+static int elf_network_status(tabos_elf_network_status_t* status)
+{
+    tabos_elf_network_status_t* writable_status =
+        (tabos_elf_network_status_t*) platform_executable_data_pointer(status, sizeof(*status));
+    network_status_t source;
+    if (writable_status == NULL) {
+        return -TABOS_EINVAL;
+    }
+    if (!network_service_status(&source)) {
+        return -TABOS_EIO;
+    }
+    memset(writable_status, 0, sizeof(*writable_status));
+    writable_status->state        = (uint32_t) source.state;
+    writable_status->signal_dbm   = source.signal_dbm;
+    writable_status->attempts     = source.attempts;
+    writable_status->auto_connect = source.auto_connect ? 1U : 0U;
+    writable_status->saved_config = source.config_available ? 1U : 0U;
+    (void) snprintf(writable_status->hostname, sizeof(writable_status->hostname), "%s", source.hostname);
+    (void) snprintf(writable_status->ssid, sizeof(writable_status->ssid), "%s", source.ssid);
+    (void) snprintf(writable_status->ipv4, sizeof(writable_status->ipv4), "%s", source.ipv4);
+    (void) snprintf(writable_status->last_failure, sizeof(writable_status->last_failure), "%s", source.last_failure);
+    return 0;
+}
+
+static int elf_network_connect_saved(void)
+{
+    network_config_t config;
+    const network_config_result_t result = network_config_load(&config);
+    if (result == NETWORK_CONFIG_NOT_FOUND) {
+        return -TABOS_ENOENT;
+    }
+    if (result != NETWORK_CONFIG_OK) {
+        return -TABOS_EIO;
+    }
+    return network_service_connect(config.ssid, config.password, config.auto_connect) ? 0 : -TABOS_EIO;
+}
+
+static int elf_network_disconnect(void)
+{
+    return network_service_disconnect() ? 0 : -TABOS_EIO;
+}
+
 static int elf_system_info(tabos_elf_system_info_t* info)
 {
     if (info == NULL) {
@@ -1024,6 +1068,9 @@ static bool elf_entry(tabos_app_context_t* context)
         .wall_time_get         = elf_wall_time_get,
         .wall_time_set         = elf_wall_time_set,
         .system_action         = elf_system_action,
+        .network_status        = elf_network_status,
+        .network_connect_saved = elf_network_connect_saved,
+        .network_disconnect    = elf_network_disconnect,
     };
     application->execution = platform_riscv32_create(
         application->image.entry, application->image.memory, application->image.memory_size,

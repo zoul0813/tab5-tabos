@@ -7,12 +7,16 @@
 enum {
     NETWORK_CONFIG_SSID_MAX     = 32,
     NETWORK_CONFIG_PASSWORD_MAX = 64,
+    NETWORK_CONFIG_NAME_MAX     = 32,
     NETWORK_CONFIG_FILE_MAX     = 4096,
 };
+
+#define NETWORK_CONFIG_DEFAULT_NAME "TabOS"
 
 typedef struct {
         char ssid[NETWORK_CONFIG_SSID_MAX + 1U];
         char password[NETWORK_CONFIG_PASSWORD_MAX + 1U];
+        char name[NETWORK_CONFIG_NAME_MAX + 1U];
         bool auto_connect;
 } network_config_t;
 

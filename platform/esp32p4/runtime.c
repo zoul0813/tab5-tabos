@@ -35,6 +35,7 @@ static SemaphoreHandle_t wifi_status_mutex;
 static bool wifi_connect_pending;
 static char wifi_ssid[33];
 static char wifi_password[65];
+static char wifi_hostname[33];
 static char wifi_ipv4[16];
 static char wifi_failure[64];
 
@@ -102,9 +103,16 @@ static bool wifi_driver_init(void)
     if (loop_result != ESP_OK && loop_result != ESP_ERR_INVALID_STATE) {
         return false;
     }
-    if (esp_netif_create_default_wifi_sta() == NULL) {
+
+    esp_netif_t* netif = esp_netif_create_default_wifi_sta();
+    if (netif == NULL) {
         return false;
     }
+
+    if (esp_netif_set_hostname(netif, wifi_hostname) != ESP_OK) {
+        return false;
+    }
+
     const wifi_init_config_t init = WIFI_INIT_CONFIG_DEFAULT();
     if (esp_wifi_init(&init) != ESP_OK ||
         esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, network_event, NULL) != ESP_OK ||
@@ -168,9 +176,9 @@ static void wifi_start(void* argument)
     vTaskDelete(NULL);
 }
 
-bool platform_network_init(void)
+bool platform_network_init(const char* hostname)
 {
-    if (!hosted_initialized) {
+    if (!hosted_initialized || hostname == NULL || hostname[0] == '\0' || strlen(hostname) > 32U) {
         return false;
     }
     wifi_status_mutex = xSemaphoreCreateMutex();
@@ -178,6 +186,7 @@ bool platform_network_init(void)
         return false;
     }
     wifi_connect_pending = false;
+    (void) snprintf(wifi_hostname, sizeof(wifi_hostname), "%s", hostname);
     atomic_store_explicit(&wifi_state, PLATFORM_NETWORK_STARTING, memory_order_release);
     atomic_store_explicit(&wifi_starting, true, memory_order_release);
     if (xTaskCreate(wifi_start, "tabos_wifi_start", 4096U, NULL, 5U, &wifi_start_task) != pdPASS) {

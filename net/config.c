@@ -68,6 +68,21 @@ static bool parse_boolean(const char* value, bool* parsed)
     return false;
 }
 
+static bool valid_hostname(const char* hostname)
+{
+    const size_t length = strlen(hostname);
+    if (length == 0U || length > NETWORK_CONFIG_NAME_MAX || hostname[0] == '-' || hostname[length - 1U] == '-') {
+        return false;
+    }
+    for (size_t index = 0U; index < length; ++index) {
+        const unsigned char character = (unsigned char) hostname[index];
+        if (isalnum(character) == 0 && character != '-') {
+            return false;
+        }
+    }
+    return true;
+}
+
 network_config_result_t network_config_parse(const char* text, size_t length, network_config_t* config)
 {
     if (text == NULL || config == NULL || length > NETWORK_CONFIG_FILE_MAX) {
@@ -77,11 +92,14 @@ network_config_result_t network_config_parse(const char* text, size_t length, ne
     memcpy(buffer, text, length);
     buffer[length] = '\0';
 
-    network_config_t parsed = {.auto_connect = true};
-    bool version_seen       = false;
-    bool wifi_section       = false;
-    bool ssid_seen          = false;
-    char* cursor            = buffer;
+    network_config_t parsed = {
+        .name         = NETWORK_CONFIG_DEFAULT_NAME,
+        .auto_connect = true,
+    };
+    bool version_seen = false;
+    bool wifi_section = false;
+    bool ssid_seen    = false;
+    char* cursor      = buffer;
     while (*cursor != '\0') {
         char* line = cursor;
         char* end  = strchr(cursor, '\n');
@@ -127,6 +145,10 @@ network_config_result_t network_config_parse(const char* text, size_t length, ne
             ssid_seen = true;
         } else if (wifi_section && strcmp(key, "password") == 0) {
             if (!parse_quoted(value, parsed.password, sizeof(parsed.password))) {
+                return NETWORK_CONFIG_INVALID;
+            }
+        } else if (wifi_section && strcmp(key, "name") == 0) {
+            if (!parse_quoted(value, parsed.name, sizeof(parsed.name)) || !valid_hostname(parsed.name)) {
                 return NETWORK_CONFIG_INVALID;
             }
         } else if (wifi_section && strcmp(key, "auto_connect") == 0 && !parse_boolean(value, &parsed.auto_connect)) {
@@ -231,7 +253,8 @@ static bool is_owned_line(const char* line, size_t length, bool wifi_section)
     if (!wifi_section) {
         return strcmp(key, "version") == 0;
     }
-    return strcmp(key, "ssid") == 0 || strcmp(key, "password") == 0 || strcmp(key, "auto_connect") == 0;
+    return strcmp(key, "ssid") == 0 || strcmp(key, "password") == 0 || strcmp(key, "name") == 0 ||
+           strcmp(key, "auto_connect") == 0;
 }
 
 network_config_result_t network_config_format_update(const char* existing, size_t existing_length,
@@ -241,10 +264,11 @@ network_config_result_t network_config_format_update(const char* existing, size_
     if ((existing == NULL && existing_length != 0U) || config == NULL || output == NULL || output_length == NULL ||
         config->ssid[0] == '\0' || strnlen(config->ssid, sizeof(config->ssid)) > NETWORK_CONFIG_SSID_MAX ||
         strnlen(config->password, sizeof(config->password)) > NETWORK_CONFIG_PASSWORD_MAX ||
-        existing_length > NETWORK_CONFIG_FILE_MAX) {
+        (config->name[0] != '\0' && !valid_hostname(config->name)) || existing_length > NETWORK_CONFIG_FILE_MAX) {
         return NETWORK_CONFIG_INVALID;
     }
-    size_t used = 0U;
+    const char* name = config->name[0] != '\0' ? config->name : NETWORK_CONFIG_DEFAULT_NAME;
+    size_t used      = 0U;
     if (!append_bytes(output, output_capacity, &used, "version=1\n", 10U)) {
         return NETWORK_CONFIG_TOO_LARGE;
     }
@@ -280,7 +304,9 @@ network_config_result_t network_config_format_update(const char* existing, size_
     if (!append_bytes(output, output_capacity, &used, "\n[wifi]\nssid=", 13U) ||
         !append_quoted(output, output_capacity, &used, config->ssid) ||
         !append_bytes(output, output_capacity, &used, "password=", 9U) ||
-        !append_quoted(output, output_capacity, &used, config->password)) {
+        !append_quoted(output, output_capacity, &used, config->password) ||
+        !append_bytes(output, output_capacity, &used, "name=", 5U) ||
+        !append_quoted(output, output_capacity, &used, name)) {
         return NETWORK_CONFIG_TOO_LARGE;
     }
     const char* auto_connect = config->auto_connect ? "auto_connect=true\n" : "auto_connect=false\n";

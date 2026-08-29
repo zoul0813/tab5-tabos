@@ -27,6 +27,7 @@ int main(void)
     expect(network_config_parse(valid, sizeof(valid) - 1U, &config) == NETWORK_CONFIG_OK, "valid config parses");
     expect(strcmp(config.ssid, "cave wifi") == 0, "SSID parsed");
     expect(strcmp(config.password, "rock\"and\\roll") == 0, "password escapes parsed");
+    expect(strcmp(config.name, NETWORK_CONFIG_DEFAULT_NAME) == 0, "hostname defaults to TabOS");
     expect(!config.auto_connect, "autoconnect false parsed");
 
     static const char open_network[] = "version=1\n[wifi]\nssid=\"open\"\npassword=\"\"\n";
@@ -34,6 +35,11 @@ int main(void)
            "open network parses");
     expect(config.password[0] == '\0', "open network has empty password");
     expect(config.auto_connect, "autoconnect defaults true");
+
+    static const char named_network[] = "version=1\n[wifi]\nssid=\"named\"\npassword=\"\"\nname=\"Cave-Terminal\"\n";
+    expect(network_config_parse(named_network, sizeof(named_network) - 1U, &config) == NETWORK_CONFIG_OK,
+           "configured hostname parses");
+    expect(strcmp(config.name, "Cave-Terminal") == 0, "configured hostname retained");
 
     static const char bad_version[] = "version=2\n[wifi]\nssid=\"x\"\n";
     expect(network_config_parse(bad_version, sizeof(bad_version) - 1U, &config) == NETWORK_CONFIG_INVALID,
@@ -44,12 +50,16 @@ int main(void)
     static const char bad_escape[] = "version=1\n[wifi]\nssid=\"bad\\n\"\n";
     expect(network_config_parse(bad_escape, sizeof(bad_escape) - 1U, &config) == NETWORK_CONFIG_INVALID,
            "unknown escape rejected");
+    static const char bad_hostname[] = "version=1\n[wifi]\nssid=\"x\"\nname=\"bad name\"\n";
+    expect(network_config_parse(bad_hostname, sizeof(bad_hostname) - 1U, &config) == NETWORK_CONFIG_INVALID,
+           "invalid DHCP hostname rejected");
     expect(network_config_parse(valid, NETWORK_CONFIG_FILE_MAX + 1U, &config) == NETWORK_CONFIG_TOO_LARGE,
            "oversized config rejected before copy");
 
     config = (network_config_t) {
         .ssid         = "new \\\"wifi",
         .password     = "new\\\\secret",
+        .name         = "Kitchen-TabOS",
         .auto_connect = true,
     };
     char updated[NETWORK_CONFIG_FILE_MAX + 1U];
@@ -63,6 +73,7 @@ int main(void)
     expect(network_config_parse(updated, updated_length, &reparsed) == NETWORK_CONFIG_OK, "updated config reparses");
     expect(strcmp(reparsed.ssid, config.ssid) == 0, "updated SSID round trips");
     expect(strcmp(reparsed.password, config.password) == 0, "updated password round trips");
+    expect(strcmp(reparsed.name, config.name) == 0, "updated hostname round trips");
     expect(reparsed.auto_connect, "updated autoconnect round trips");
     return failures == 0 ? 0 : 1;
 }

@@ -17,6 +17,7 @@ This directory contains user and contributor documentation for TabOS.
 - [Reboot and Shutdown](power.md): orderly restart, power-off commands, and application API.
 - [Filesystem and Storage](filesystem.md): POSIX-style file API, host root, and Tab5 microSD behavior.
 - [Shell](shell.md): build, install, start, and use filesystem-backed PID 0 shell.
+- [Networking](networking.md): saved Wi-Fi configuration, network status, and connection control.
 
 ## Documentation Policy
 

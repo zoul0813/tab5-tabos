@@ -20,8 +20,11 @@ int main(void)
 {
     expect(filesystem_init(), "filesystem initializes");
     expect(network_service_init(), "network service initializes");
+    expect(strcmp(test_platform_network_hostname(), "TabOS") == 0, "hostname defaults to TabOS");
     network_status_t status;
-    expect(network_service_status(&status) && status.state == NETWORK_STATE_OFFLINE, "starts offline without config");
+    expect(network_service_status(&status) && status.state == NETWORK_STATE_OFFLINE &&
+               strcmp(status.hostname, "TabOS") == 0,
+           "starts offline with default hostname");
 
     expect(network_service_connect("test-network", "secret", false), "explicit connect starts");
     expect(test_platform_network_connect_calls() == 1U, "first attempt issued");

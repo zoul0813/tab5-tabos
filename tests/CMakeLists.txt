@@ -52,6 +52,15 @@ tabos_enable_warnings(tabos_sdk_reboot)
 tabos_enable_sanitizers(tabos_sdk_reboot)
 add_test(NAME unit.sdk_reboot COMMAND tabos_sdk_reboot)
 
+add_executable(tabos_sdk_network
+    unit/sdk_network.c
+    "${TABOS_ROOT}/sdk/lib/network.c"
+)
+target_include_directories(tabos_sdk_network PRIVATE "${TABOS_ROOT}/sdk/include")
+tabos_enable_warnings(tabos_sdk_network)
+tabos_enable_sanitizers(tabos_sdk_network)
+add_test(NAME unit.sdk_network COMMAND tabos_sdk_network)
+
 add_executable(tabos_starfall_game
     unit/starfall_game.c
     "${TABOS_ROOT}/apps/starfall/src/game.c"

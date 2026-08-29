@@ -6,6 +6,7 @@
 #include <tabos/filesystem.h>
 #include <tabos/graphics.h>
 #include <tabos/input.h>
+#include <tabos/network.h>
 #include <tabos/process.h>
 #include <tabos/runtime_time.h>
 #include <tabos/system.h>

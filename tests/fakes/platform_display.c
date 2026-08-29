@@ -71,6 +71,7 @@ static uint64_t monotonic_ms;
 static char last_log[256];
 static platform_network_status_t fake_network;
 static unsigned int network_connect_calls;
+static char network_hostname[33];
 
 bool platform_display_init(platform_framebuffer_t* framebuffer)
 {
@@ -169,10 +170,11 @@ bool platform_wall_clock_set(int64_t seconds)
     return seconds >= 0;
 }
 
-bool platform_network_init(void)
+bool platform_network_init(const char* hostname)
 {
     fake_network          = (platform_network_status_t) {.state = PLATFORM_NETWORK_OFFLINE};
     network_connect_calls = 0U;
+    (void) snprintf(network_hostname, sizeof(network_hostname), "%s", hostname != NULL ? hostname : "");
     return true;
 }
 
@@ -221,6 +223,11 @@ void test_platform_network_set_state(platform_network_state_t state, const char*
 unsigned int test_platform_network_connect_calls(void)
 {
     return network_connect_calls;
+}
+
+const char* test_platform_network_hostname(void)
+{
+    return network_hostname;
 }
 
 void* platform_executable_alloc(size_t size)
