@@ -75,8 +75,25 @@ static void test_udp(tester_context_t* context)
     tester_expect(context, tabos_socket_close(client) == 0 && tabos_socket_close(server) == 0, "UDP sockets close");
 }
 
+static void test_stale_handle(tester_context_t* context)
+{
+    const tabos_socket_t stale = tabos_socket_open(TABOS_NETWORK_FAMILY_IPV4, TABOS_SOCKET_UDP);
+    tester_expect(context, stale >= 0 && tabos_socket_close(stale) == 0, "socket closes before slot reuse");
+
+    const tabos_socket_t replacement = tabos_socket_open(TABOS_NETWORK_FAMILY_IPV4, TABOS_SOCKET_UDP);
+    errno                            = 0;
+    const int stale_result           = tabos_socket_close(stale);
+    tester_expect(context,
+                  replacement >= 0 && replacement != stale && stale_result < 0 && errno == EBADF,
+                  "stale socket handle cannot close replacement");
+    if (replacement >= 0) {
+        tester_expect(context, tabos_socket_close(replacement) == 0, "replacement socket closes");
+    }
+}
+
 void tester_test_network(tester_context_t* context)
 {
     test_tcp(context);
     test_udp(context);
+    test_stale_handle(context);
 }

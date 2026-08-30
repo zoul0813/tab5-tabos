@@ -78,7 +78,9 @@ through `errno`.
 
 Sockets belong to the loaded application that opened or accepted them. TabOS
 closes remaining sockets during normal exit and fault cleanup. Public headers do
-not expose POSIX, lwIP, ESP-IDF, or native socket structures.
+not expose POSIX, lwIP, ESP-IDF, or native socket structures. Handles carry a
+generation tag, so a handle retained after close cannot operate on a later
+socket that reuses the same per-process slot.
 
 ## Ping
 

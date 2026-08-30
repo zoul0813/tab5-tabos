@@ -1,6 +1,7 @@
 #include <tester/test.h>
 
 #include <tabos/process.h>
+#include <tabos/network.h>
 
 #include <fcntl.h>
 #include <stdio.h>
@@ -10,6 +11,7 @@
 
 enum {
     PROCESS_LEAK_DESCRIPTOR_COUNT = 8,
+    PROCESS_LEAK_SOCKET_COUNT     = 4,
 };
 
 static int run_resource_failure_fixture(void)
@@ -24,6 +26,11 @@ static int run_resource_failure_fixture(void)
         const int descriptor = open("T:/tabos-process-resource.tmp", O_CREAT | O_RDWR, 0644);
         if (descriptor < 0) {
             return 75;
+        }
+    }
+    for (unsigned int index = 0U; index < PROCESS_LEAK_SOCKET_COUNT; ++index) {
+        if (tabos_socket_open(TABOS_NETWORK_FAMILY_IPV4, TABOS_SOCKET_UDP) < 0) {
+            return 76;
         }
     }
     return 73;

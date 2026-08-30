@@ -28,11 +28,17 @@ enum {
     ELF_INSTRUCTIONS_PER_UPDATE   = 2000000,
     ELF_DESCRIPTOR_CAPACITY       = 16,
     ELF_SOCKET_CAPACITY           = 16,
+    ELF_SOCKET_INDEX_BITS         = 4,
+    ELF_SOCKET_INDEX_MASK         = ELF_SOCKET_CAPACITY - 1,
+    ELF_SOCKET_GENERATION_MAX     = INT32_MAX >> ELF_SOCKET_INDEX_BITS,
     ELF_HEAP_MAX                  = 1024 * 1024,
     ELF_HEAP_GUARD_SIZE           = 32,
     ELF_HEAP_GUARD_VALUE          = 0xa5,
     ELF_GRAPHICS_COMMAND_CAPACITY = 64,
 };
+
+_Static_assert((ELF_SOCKET_CAPACITY & (ELF_SOCKET_CAPACITY - 1)) == 0,
+               "ELF socket capacity must be a power of two");
 
 typedef enum {
     ELF_GRAPHICS_FILL,
@@ -61,6 +67,7 @@ typedef struct {
 
 typedef struct {
         int platform_socket;
+        uint32_t generation;
         bool open;
 } elf_socket_t;
 
@@ -818,18 +825,33 @@ static int elf_network_echo(const tabos_elf_network_address_t* address, uint32_t
 
 static elf_socket_t* elf_socket(loader_elf_application_t* application, int socket)
 {
-    if (application == NULL || socket < 0 || socket >= ELF_SOCKET_CAPACITY || !application->sockets[socket].open) {
+    if (application == NULL || socket <= 0) {
         return NULL;
     }
-    return &application->sockets[socket];
+    const uint32_t handle     = (uint32_t) socket;
+    const uint32_t index      = handle & ELF_SOCKET_INDEX_MASK;
+    const uint32_t generation = handle >> ELF_SOCKET_INDEX_BITS;
+    elf_socket_t* owned       = &application->sockets[index];
+    if (!owned->open || generation == 0U || owned->generation != generation) {
+        return NULL;
+    }
+    return owned;
 }
 
 static int elf_socket_allocate(loader_elf_application_t* application, int platform_socket)
 {
     for (int index = 0; index < ELF_SOCKET_CAPACITY; ++index) {
         if (!application->sockets[index].open) {
-            application->sockets[index] = (elf_socket_t) {.platform_socket = platform_socket, .open = true};
-            return index;
+            uint32_t generation = application->sockets[index].generation + 1U;
+            if (generation == 0U || generation > ELF_SOCKET_GENERATION_MAX) {
+                generation = 1U;
+            }
+            application->sockets[index] = (elf_socket_t) {
+                .platform_socket = platform_socket,
+                .generation      = generation,
+                .open            = true,
+            };
+            return (int) ((generation << ELF_SOCKET_INDEX_BITS) | (uint32_t) index);
         }
     }
     (void) platform_network_socket_close(platform_socket);
@@ -853,8 +875,9 @@ static int elf_socket_close(int socket)
     if (owned == NULL) {
         return -TABOS_EBADF;
     }
+    const uint32_t generation = owned->generation;
     const int result = platform_network_socket_close(owned->platform_socket);
-    *owned           = (elf_socket_t) {0};
+    *owned           = (elf_socket_t) {.generation = generation};
     return result;
 }
 

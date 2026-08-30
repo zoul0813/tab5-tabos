@@ -70,8 +70,10 @@ Use official `esp_hosted` and `esp_wifi_remote` over 4-bit SDIO.
 - [x] Implement ICMP echo through portable network API rather than exposing raw
   sockets. Return resolved address, sequence, response size, round-trip time,
   timeout, and network errors.
-- [ ] Close sockets and cancel pending work on normal exit, faults, and partial
-  startup failures.
+- [x] Close process-owned sockets during application cleanup, including failed
+  child exits and partially initialized socket ownership.
+- [x] Reject stale socket handles after a per-process slot is reused.
+- [ ] Cancel pending blocking socket work before forced process teardown.
 - [ ] Defer TLS/HTTPS, static addressing, custom DNS, mDNS, SoftAP, routing, and
   Bluetooth.
 
