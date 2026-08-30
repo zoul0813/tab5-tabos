@@ -154,6 +154,10 @@ typedef struct {
         int (*battery_set_fast_charging)(uint32_t enabled);
         int (*graphics_set_overlays)(uint32_t flags);
         int (*socket_wait)(tabos_elf_wait_item_t* items, uint32_t count, uint32_t timeout_ms);
+        int (*tls_connect)(const char* hostname, uint32_t port);
+        int (*tls_close)(int connection);
+        int (*tls_send)(int connection, const void* data, uint32_t size);
+        int (*tls_receive)(int connection, void* data, uint32_t capacity);
 } tabos_elf_api_t;
 
 typedef int (*tabos_elf_entry_fn)(const tabos_elf_api_t* api, int argc, const char* const* argv);
