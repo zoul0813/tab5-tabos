@@ -41,10 +41,13 @@ DOS-style semicolon-separated PATH entries. Absolute drive paths and relative
 paths containing `/` (including `./` and `../`) bypass PATH lookup. The shell
 does not append `.bin` to command names.
 
-### Application ABI v1 [DECIDED]
+### Pre-release application ABI [DECIDED]
 
 Applications consume public SDK headers only; the ELF transport table is private to CRT
-and SDK runtime sources. ABI v1 uses newlib for C17 allocation and stdio, provides the
+and SDK runtime sources. The current version value is 1, but the ABI is not released or
+frozen. Incompatible changes are allowed while TabOS is being defined, and bundled
+applications are rebuilt with the system. No compatibility shims are required for
+unreleased binaries. The current runtime uses newlib for C17 allocation and stdio, provides the
 documented filesystem subset, monotonic time/cooperative sleep, foreground process
 launch/wait, and portable system information. TabOS does not promise full POSIX compatibility.
 
@@ -1278,8 +1281,9 @@ are internal. File-local `static` helpers need no project/layer prefix when name
 within file. Avoid leading-underscore and double-underscore project identifiers.
 
 Existing generic `tab_*` and internal-only `tabos_*` names were migrated to this
-convention. Preserve public `tabos_*` ABI names and keep future internal symbols in
-owning layer/subsystem namespace.
+convention. Keep the `tabos_*` prefix for public APIs and keep future internal symbols
+in the owning layer/subsystem namespace. Individual pre-release public symbols may still
+change when the API design changes.
 
 When implementing or modifying TabOS, Codex should follow these rules:
 

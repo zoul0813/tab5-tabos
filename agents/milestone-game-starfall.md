@@ -176,7 +176,7 @@ future work.
 
 ## Tab5 Acceptance
 
-- [ ] Copy the rebuilt ABI-compatible Starfall binary to `T:/bin/starfall`.
+- [ ] Copy the Starfall binary rebuilt with the current system SDK to `T:/bin/starfall`.
 - [ ] Confirm gameplay speed and layout match the host simulation.
 - [ ] Confirm held A/S movement and held K firing work on the physical keyboard.
 - [ ] Confirm simultaneous movement and firing work without delayed input.

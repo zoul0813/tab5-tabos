@@ -1,6 +1,7 @@
 # TabOS Application SDK
 
-TabOS ABI v1 applications are independently compiled RV32 C17 executables. Applications
+TabOS applications are independently compiled RV32 C17 executables. The current
+pre-release ABI version value is 1. Applications
 include public headers under `sdk/include/` and do not access the private ELF API table,
 ESP-IDF, FreeRTOS, or SDL.
 
@@ -37,5 +38,6 @@ extensionless executable and installs it under `.local/rootfs/T/bin/`. Run
 `./apps/build.sh` to build default applications. Optional applications such as DOOM
 require their documented opt-in flag.
 
-ABI v1 preserves this public SDK contract. Compatible runtime calls may be appended;
-incompatible changes require a new application ABI version.
+TabOS has not released or frozen its application ABI. SDK and transport changes may be
+incompatible during development, and all bundled applications must be rebuilt with the
+matching system build.

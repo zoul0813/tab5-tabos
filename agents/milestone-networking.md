@@ -99,9 +99,9 @@ explicitly deferred beyond this milestone.
   flags.
 - [x] Use wait sets instead of exposing `select()` or native polling.
 - [x] Cancel waits before process socket cleanup; stale handles fail safely.
-- [ ] Add networking capability metadata and feature query.
-- [x] Preserve Application ABI v1. Append private ELF transport calls compatibly so
-  old binaries continue working.
+- [x] Require no per-application networking capability declaration; available services
+  may be used by any application.
+- [x] Extend the pre-release private ELF transport and rebuild bundled applications.
 
 The full device registry and unrelated hardware capabilities are explicitly
 deferred beyond this milestone.
@@ -221,8 +221,8 @@ user-mode/PMP execution boundary; native application faults are currently device
 - [ ] Test `netctl status` redaction and all reported fields.
 - [ ] Test `ping` IPv4/IPv6 success, timeout, unknown host, disconnect, early
   interruption, summary, and exit status behavior.
-- [x] Keep old ABI-v1 fixtures unchanged. Add architecture checks rejecting native
-  networking headers above platform boundary.
+- [x] Rebuild ABI fixtures after transport changes. Add architecture checks rejecting
+  native networking headers above platform boundary.
 - [x] Run macOS and Linux Debug and Release tests and Tab5 Debug and Release
   cross-builds.
 - [x] Validate physical saved autoconnect, DHCP, DNS/ICMP, TCP/UDP listener traffic,

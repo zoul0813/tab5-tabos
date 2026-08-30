@@ -64,8 +64,7 @@
 - [x] Make filesystem ELF resource teardown idempotent across partial startup,
   normal exit, requested exit, and platform-detected faults.
 - [x] Add heap boundary guards and cleanup diagnostics.
-- [x] Validate ELF resource metadata and enforce bounded per-process heap and stack
-  requests while retaining safe legacy defaults.
+- [x] Enforce bounded default per-process heap and stack limits.
 - [x] Extend the maintained tester with leaked-resource and nested-failure cases.
 - [x] Preserve host invalid-memory fault containment and PID 0 panic behavior.
 - [x] Document that native Tab5 application faults remain device-fatal until a
@@ -377,7 +376,8 @@ but is not a substitute for this execution path.
 - [x] Load independent hello application from Tab5 microSD.
 - [ ] Define application file naming and discovery rules.
 - [x] Define extensionless application names, default `T:/bin` PATH, and relative-path command syntax.
-- [x] Add application metadata validation for ABI and requested heap/stack limits.
+- [ ] Add optional application metadata for requested heap/stack limits when a concrete
+  large-application requirement justifies it.
 - [ ] Enumerate installed applications without hardcoded registry entries.
 - [ ] Add minimal launcher diagnostic that lists and starts applications.
 - [ ] Keep launcher diagnostic separate from shell.
@@ -385,9 +385,11 @@ but is not a substitute for this execution path.
 
 ## Future Milestones
 
-### SDK and Stable Application ABI
+### SDK and Pre-Release Application ABI
 
-- [x] Freeze first supported application ABI version after filesystem-backed loader validation.
+- [ ] Freeze and version the first supported application ABI only when TabOS is ready
+  to support independently distributed third-party binaries.
+- [x] Rebuild all bundled applications with ABI changes during pre-release development.
 - [x] Publish public application headers independent from ESP-IDF and FreeRTOS.
 - [x] Provide compiler, linker, strip, and packaging workflow for external applications.
 - [ ] Optionally provide host-native application build mode for sanitizer-heavy source tests;

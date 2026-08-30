@@ -39,7 +39,7 @@ recoverable-fault boundary, so true native crash containment remains deferred.
   less-privileged mode with a per-process PMP policy and a recoverable trap
   path. Existing ESP-IDF PMP configuration used to split instruction/data RAM
   is not process isolation.
-- [DECIDED] Application heaps remain bounded arenas for ABI v1. Bounds failure
+- [DECIDED] Application heaps remain bounded arenas in the current pre-release ABI. Bounds failure
   returns allocation failure. Guard regions detect simple underflow/overflow at
   teardown, but guard detection is diagnostic and not a security boundary.
 
@@ -49,8 +49,7 @@ recoverable-fault boundary, so true native crash containment remains deferred.
   nested-parent ownership.
 - [x] Consolidate filesystem ELF resource release into one idempotent path.
 - [x] Add heap boundary guards and teardown diagnostics.
-- [x] Validate ELF resource metadata and enforce bounded per-process heap and stack
-  requests, while retaining safe defaults for legacy applications.
+- [x] Enforce bounded default per-process heap and stack limits.
 - [x] Test child nonzero status, leaked descriptor cleanup, repeated reload, and
   nested parent restoration with the maintained tester application.
 - [x] Test malformed/invalid guest accesses remain process faults on the host
