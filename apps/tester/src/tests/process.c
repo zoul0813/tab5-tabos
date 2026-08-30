@@ -36,7 +36,7 @@ void tester_test_process(tester_context_t* context)
         }
     }
     tester_expect(context, failures_returned,
-                  "failed children return status after leaking owned files, heap, and sockets");
+                  "failed children return status after leaking owned files, heap, sockets, and subscriptions");
 
     const int descriptor = open("T:/tabos-process-resource.tmp", O_RDWR);
     tester_expect(context, descriptor >= 3, "child descriptor resources are reclaimed after failure");

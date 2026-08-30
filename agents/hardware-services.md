@@ -96,15 +96,16 @@ documentation pass.
 
 ### User tooling and validation
 
-- [ ] Add `devices` to `apps/coreutils`.
-- [ ] Print ID, logical name, class, state, driver, features, and last error without native details.
+- [x] Add `devices` to `apps/coreutils`.
+- [x] Print ID, logical name, class, state, driver, features, and last error without native details.
 - [x] Unit-test capacity, duplicate names, deterministic lookup, state transitions,
   tombstones, stale IDs, removal, and registry reinitialization.
 - [x] Unit-test lifecycle-event order, overflow, subscriptions, and owner cleanup.
 - [x] Add deterministic host virtual devices.
-- [ ] Add maintained tester coverage for enumeration and lifecycle events.
-- [ ] Validate detected device listing on physical Tab5.
-- [x] Update device API documentation; boot-diagnostic and utility documentation remains tied to pending work.
+- [x] Add maintained tester coverage for enumeration, copied lookup, lifecycle-subscription behavior,
+  stale handles, and process-owned subscription cleanup.
+- [x] Validate `devices` output and maintained device-registry tester coverage on physical Tab5.
+- [x] Update boot diagnostics, device API, and utility documentation.
 
 ## Phase 2: Generic Wait Sources
 

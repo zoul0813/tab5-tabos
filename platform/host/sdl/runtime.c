@@ -284,13 +284,13 @@ bool platform_get_diagnostics(platform_diagnostics_t* diagnostics)
                    .keyboard_driver    = "SDL3",
                    .keyboard_present   = true,
                    .keyboard_detected  = true,
-                   .rtc_name           = "Host system clock",
+                   .rtc_name           = "host-clock",
                    .rtc_present        = true,
                    .rtc_detected       = true,
-                   .battery_name       = "Host battery",
+                   .battery_name       = "host-power",
                    .battery_present    = true,
                    .battery_detected   = true,
-                   .network_name       = "Host network",
+                   .network_name       = "host-network",
                    .network_present    = true,
     };
     return true;

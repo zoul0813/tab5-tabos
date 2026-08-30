@@ -9,6 +9,7 @@ SOURCES := $(CURDIR)/src/main.c \
            $(CURDIR)/src/tests/input.c \
            $(CURDIR)/src/tests/process.c \
            $(CURDIR)/src/tests/runtime.c \
+           $(CURDIR)/src/tests/device.c \
            $(CURDIR)/src/tests/network.c \
            $(CURDIR)/src/tests/graphics.c
 

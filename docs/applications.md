@@ -58,6 +58,10 @@ program. Build one with `make -C apps/coreutils ls` or `make -C apps/coreutils m
 Sources live in `apps/coreutils/src/<name>/main.c`; each output installs directly under
 `T:/bin/`.
 
+`devices` lists registry entries using public copied metadata: unpadded decimal boot-local ID,
+logical name, class, state, symbolic features, driver name, and nonzero last error. It does not
+expose native platform handles or implementation details.
+
 Networking utilities are grouped under `apps/netutils/`. Build one with
 `make -C apps/netutils netctl`, `make -C apps/netutils ping`, or
 `make -C apps/netutils nettest`. Sources live in

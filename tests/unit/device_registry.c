@@ -1,7 +1,7 @@
 #include <tabos/internal/device_registry.h>
+#include <tabos/filesystem.h>
 
 #include <stdio.h>
-#include <errno.h>
 #include <string.h>
 
 static device_registry_registration_t registration(const char* name, tabos_device_class_t device_class)
@@ -140,8 +140,8 @@ static int test_lifecycle_events(void)
     tabos_device_event_t event;
     if (id == TABOS_DEVICE_ID_INVALID || device_registry_read_event(&owner_a, first, &event) != 0 ||
         event.type != TABOS_DEVICE_EVENT_ADDED || event.flags != 0U || event.device.id != id ||
-        device_registry_read_event(&owner_a, first, &event) != -EAGAIN ||
-        device_registry_read_event(&owner_b, first, &event) != -EBADF) {
+        device_registry_read_event(&owner_a, first, &event) != -TABOS_EAGAIN ||
+        device_registry_read_event(&owner_b, first, &event) != -TABOS_EBADF) {
         return 1;
     }
     if (!device_registry_set_state(id, TABOS_DEVICE_OFFLINE, -5) ||
@@ -173,11 +173,11 @@ static int test_lifecycle_events(void)
         return 1;
     }
     if (!device_registry_unsubscribe(&owner_a, first) ||
-        device_registry_read_event(&owner_a, first, &event) != -EBADF) {
+        device_registry_read_event(&owner_a, first, &event) != -TABOS_EBADF) {
         return 1;
     }
     device_registry_unsubscribe_owner(&owner_b);
-    return device_registry_read_event(&owner_b, second, &event) == -EBADF ? 0 : 1;
+    return device_registry_read_event(&owner_b, second, &event) == -TABOS_EBADF ? 0 : 1;
 }
 
 int main(void)

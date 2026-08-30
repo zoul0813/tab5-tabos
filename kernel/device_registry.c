@@ -1,8 +1,8 @@
 #include <tabos/internal/device_registry.h>
 
+#include <tabos/filesystem.h>
 #include <tabos/platform/platform.h>
 
-#include <errno.h>
 #include <string.h>
 
 enum {
@@ -396,17 +396,17 @@ void device_registry_unsubscribe_owner(const void* owner)
 int device_registry_read_event(const void* owner, tabos_device_subscription_t handle, tabos_device_event_t* event)
 {
     if (registry_mutex == NULL || event == NULL) {
-        return -EINVAL;
+        return -TABOS_EINVAL;
     }
     platform_mutex_lock(registry_mutex);
     device_subscription_t* subscription = owned_subscription(owner, handle);
     if (subscription == NULL) {
         platform_mutex_unlock(registry_mutex);
-        return -EBADF;
+        return -TABOS_EBADF;
     }
     if (subscription->count == 0U) {
         platform_mutex_unlock(registry_mutex);
-        return -EAGAIN;
+        return -TABOS_EAGAIN;
     }
     *event             = subscription->events[subscription->head];
     subscription->head = (subscription->head + 1U) % DEVICE_EVENT_QUEUE_CAPACITY;

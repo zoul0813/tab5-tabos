@@ -2,6 +2,7 @@
 
 #include <tabos/process.h>
 #include <tabos/network.h>
+#include <tabos/device.h>
 
 #include <fcntl.h>
 #include <stdio.h>
@@ -10,8 +11,9 @@
 #include <unistd.h>
 
 enum {
-    PROCESS_LEAK_DESCRIPTOR_COUNT = 8,
-    PROCESS_LEAK_SOCKET_COUNT     = 4,
+    PROCESS_LEAK_DESCRIPTOR_COUNT   = 8,
+    PROCESS_LEAK_SOCKET_COUNT       = 4,
+    PROCESS_LEAK_SUBSCRIPTION_COUNT = 4,
 };
 
 static int run_resource_failure_fixture(void)
@@ -31,6 +33,11 @@ static int run_resource_failure_fixture(void)
     for (unsigned int index = 0U; index < PROCESS_LEAK_SOCKET_COUNT; ++index) {
         if (tabos_socket_open(TABOS_NETWORK_FAMILY_IPV4, TABOS_SOCKET_UDP) < 0) {
             return 76;
+        }
+    }
+    for (unsigned int index = 0U; index < PROCESS_LEAK_SUBSCRIPTION_COUNT; ++index) {
+        if (tabos_device_subscribe() == TABOS_DEVICE_SUBSCRIPTION_INVALID) {
+            return 77;
         }
     }
     return 73;
@@ -75,6 +82,7 @@ int main(int argc, char** argv)
         {               "Nonblocking input",      tester_test_input},
         {        "Nested process execution",    tester_test_process},
         {     "Time and system information",    tester_test_runtime},
+        {          "Device registry access",     tester_test_device},
         {              "TCP/UDP networking",    tester_test_network},
         {             "Fullscreen graphics",   tester_test_graphics},
     };
