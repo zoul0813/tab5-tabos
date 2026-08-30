@@ -18,7 +18,8 @@ Use official `esp_hosted` and `esp_wifi_remote` over 4-bit SDIO.
   GPIO15.
 - [x] Add ESP-IDF 5.4.4-compatible `esp_hosted` and `esp_wifi_remote`.
 - [x] Query C6 firmware/version, join AP, and obtain DHCP address.
-- [ ] Prove DNS, TCP, and UDP.
+- [x] Prove DNS and ICMP with physical `ping`, TCP with the Tab5 listener and host
+  `nc`, and UDP with the Tab5 listener and host datagram exchange.
 - [x] Use compatible factory C6 firmware. Never auto-flash or invent custom
   transport. Record exact blocker if official stack and factory firmware
   mismatch.
@@ -38,7 +39,7 @@ Use official `esp_hosted` and `esp_wifi_remote` over 4-bit SDIO.
   auto_connect=true
   ```
 
-- [ ] Reserve future `[ipv4]`, `[ipv6]`, and `[dns]` sections for static addresses,
+- [x] Reserve future `[ipv4]`, `[ipv6]`, and `[dns]` sections for static addresses,
   gateways, DNS servers, and related policy.
 - [x] Accept blank lines, comments, quoted escaped values, reordered keys, and
   unknown future keys and sections.
@@ -50,8 +51,8 @@ Use official `esp_hosted` and `esp_wifi_remote` over 4-bit SDIO.
 - [x] Default `auto_connect` to `true` when key is omitted. `false` loads saved
   credentials but requires manual saved connection.
 - [x] Permit an empty password for open networks.
-- [ ] Serialize configuration reads and writes so concurrent processes cannot
-  corrupt `wifi.conf`.
+- [ ] Serialize configuration mutations before adding `netctl` commands that
+  write `wifi.conf`; current saved-connect/status operations only read it.
 - [x] If `T:` is removed after configuration loads, retain credentials in memory
   for current session but report that persistent configuration is unavailable.
 - [x] Never place password in argv, shell history, boot report, serial logs, or
@@ -60,10 +61,13 @@ Use official `esp_hosted` and `esp_wifi_remote` over 4-bit SDIO.
 ### Portable Network Service
 
 - [x] Add public `<tabos/network.h>` exposing Wi-Fi status and saved connect/disconnect.
-- [ ] Extend public `<tabos/network.h>` with scan, interactive connect, DNS,
-  bounded ICMP echo, and bounded BSD-like socket operations.
-- [ ] Support IPv4 and IPv6, TCP and UDP, `socket`, `bind`, `listen`, `accept`,
-  `connect`, `send`, `receive`, `shutdown`, options, and close.
+- [x] Extend public `<tabos/network.h>` with DNS, bounded ICMP echo, and bounded
+  BSD-like socket operations.
+- [ ] Add portable scan and volatile interactive-connect APIs.
+- [x] Support IPv4 and IPv6, TCP and UDP, `socket`, `bind`, `listen`, `accept`,
+  `connect`, `send`, `receive`, `shutdown`, nonblocking mode, and close.
+Additional socket options are deferred until a concrete portable option set is
+required.
 - [x] Use portable addresses and opaque process-owned handles. Never expose
   ESP-IDF, lwIP, POSIX handles, or native structures.
 - [x] Support blocking calls and nonblocking `EAGAIN`.
@@ -75,8 +79,8 @@ Use official `esp_hosted` and `esp_wifi_remote` over 4-bit SDIO.
 - [x] Reject stale socket handles after a per-process slot is reused.
 - [x] Interrupt pending blocking socket work and serialize worker teardown before
   releasing process-owned sockets.
-- [ ] Defer TLS/HTTPS, static addressing, custom DNS, mDNS, SoftAP, routing, and
-  Bluetooth.
+TLS/HTTPS, static addressing, custom DNS, mDNS, SoftAP, routing, and Bluetooth
+are explicitly deferred beyond this milestone.
 
 ### Reusable Wait Foundation
 
@@ -86,9 +90,11 @@ Use official `esp_hosted` and `esp_wifi_remote` over 4-bit SDIO.
 - [ ] Use wait sets instead of exposing `select()` or native polling.
 - [ ] Cancel waits before process socket cleanup; stale handles fail safely.
 - [ ] Add networking capability metadata and feature query.
-- [ ] Preserve Application ABI v1. Append private ELF transport calls compatibly so
+- [x] Preserve Application ABI v1. Append private ELF transport calls compatibly so
   old binaries continue working.
-- [ ] Defer full device registry and unrelated hardware capabilities.
+
+The full device registry and unrelated hardware capabilities are explicitly
+deferred beyond this milestone.
 
 ### Backends and Shell Behavior
 
@@ -105,28 +111,20 @@ Use official `esp_hosted` and `esp_wifi_remote` over 4-bit SDIO.
   further autoconnect until explicit connect or reboot.
 - [x] Simulate TabOS Wi-Fi state without changing workstation Wi-Fi.
 - [x] Map host sockets to native macOS/Linux sockets.
-- [x] Add external `netctl` application with:
-
-- [x] `netctl status`
-- [ ] `netctl scan`
-- [ ] `netctl connect`
-- [x] `netctl connect` (saved profile)
-- [ ] `netctl connect --prompt`
-- [x] `netctl disconnect`
-  - `netctl forget`
-  - `netctl autoconnect on|off`
-
-- [ ] Make `netctl connect` prompt for SSID and hidden password. After successful
-  connection, ask whether credentials should be saved.
-- [ ] Never overwrite saved working credentials after failed connection.
-- [ ] Make `forget` remove SSID and password while preserving other config sections.
-- [ ] Restore terminal mode on success, error, interruption, and process cleanup.
-- [ ] Make `netctl status` show transport/firmware state, connection state, SSID,
-  signal strength, IPv4 and IPv6 addresses, prefix/netmask, gateway, DNS servers,
-  autoconnect state, saved-config availability, and last failure. Never show or
-  imply password content.
-- [ ] Bound scan results, order them by signal strength, and show SSID, security,
-  channel, and signal strength without exposing backend-specific records.
+- [x] Add external `netctl` application.
+- [x] Add `netctl status`, saved-profile `netctl connect`, and
+  `netctl disconnect`.
+- [ ] Add bounded, signal-ordered `netctl scan` output with SSID, security,
+  channel, and signal strength.
+- [ ] Add `netctl connect --prompt` with hidden-password input, optional save only
+  after success, and terminal restoration on every exit path.
+- [ ] Add `netctl forget` and `netctl autoconnect on|off`; preserve unknown config
+  content and never replace working credentials after a failed connection.
+- [x] Make `netctl status` show connection state, SSID, signal strength, IPv4,
+  hostname, attempt count, autoconnect state, saved-config availability, and
+  last failure without exposing password content.
+- [ ] Extend status data with transport/firmware state, IPv6 addresses,
+  prefix/netmask, gateway, and DNS servers.
 - [x] Show C6 initialization, saved-config availability, autoconnect result, link
   state, and addresses in boot report. Never show credentials.
 
@@ -162,40 +160,50 @@ Use official `esp_hosted` and `esp_wifi_remote` over 4-bit SDIO.
   current ESP/lwIP behavior disconnects the host before all queued bytes arrive.
 - [x] Let Tab5 listen as a one-exchange TCP or UDP echo server for host `nc`
   interoperability checks.
-- [ ] Run client and listener modes against physical Tab5 and record TCP/UDP proof.
+- [x] Run TCP and UDP listener modes on physical Tab5 against host `nc`.
+- [ ] Run `nettest` client mode against an inbound-capable host; the managed Mac
+  firewall blocks this validation path.
 
 ## Test Plan
 
 - [x] Test missing drive/file, valid parsing, comments, escapes, malformed values,
   unknown-key preservation, version rejection, atomic replacement failure,
   `auto_connect` behavior, forget, and redaction.
-- [ ] Test address conversion and DNS results.
+- [x] Test IPv4/IPv6 endpoint conversion through host TCP/UDP component coverage.
+- [ ] Add deterministic DNS result and error tests.
 - [x] Add maintained tester coverage for socket-table exhaustion, accepted-socket
   allocation failure, and stale handles.
 - [x] Run socket-capacity and accepted-socket failure coverage on physical Tab5.
-- [ ] Test blocking/nonblocking behavior, wait readiness/timeouts/cancellation,
-  reconnect, the three-attempt autoconnect limit, explicit retry cancellation,
-  connection state transitions, and error mapping.
-- [ ] Test host IPv4/IPv6 loopback TCP, UDP, listen/accept, DNS, partial I/O, peer
-  shutdown, disconnect during wait, and reconnect.
-- [ ] Prove process exit and fault close sockets, cancel waits, restore TTY mode,
-  preserve parent resources, and leave foreground stack intact.
-- [ ] Extend independently built RV32 tester to exercise DNS, TCP, UDP, nonblocking
-  sockets, ICMP echo, wait sets, and cleanup.
-- [ ] Test `netctl status` redaction and fields plus `ping` IPv4/IPv6 success,
-  timeout, unknown host, disconnect, early interruption, summary, and exit
-  status behavior.
+- [x] Test blocking/nonblocking socket behavior, stale handles, cancellation of a
+  blocked receive, socket error mapping, and three-attempt autoconnect state.
+- [ ] Test wait readiness/timeouts/cancellation, reconnect, explicit retry
+  cancellation, disconnect transitions, and remaining error paths.
+- [x] Test host IPv4/IPv6 loopback TCP and UDP, including listen/accept and peer
+  shutdown; test bounded multi-call stream transfer in `nettest`.
+- [ ] Add host DNS, disconnect-during-wait, and reconnect tests.
+- [x] Prove normal and failed child exit closes sockets, preserves parent
+  resources, and leaves the foreground stack intact.
+Recoverable application-fault cleanup remains deferred until Tab5 gains a
+user-mode/PMP execution boundary; native application faults are currently device-fatal.
+- [x] Extend the independently built RV32 tester with TCP, UDP, nonblocking,
+  capacity, stale-handle, and cleanup coverage.
+- [ ] Extend the RV32 tester with DNS, ICMP echo, and wait-set coverage.
+- [ ] Test `netctl status` redaction and all reported fields.
+- [ ] Test `ping` IPv4/IPv6 success, timeout, unknown host, disconnect, early
+  interruption, summary, and exit status behavior.
 - [x] Keep old ABI-v1 fixtures unchanged. Add architecture checks rejecting native
   networking headers above platform boundary.
 - [x] Run macOS and Linux Debug and Release tests and Tab5 Debug and Release
   cross-builds.
-- [x] Validate physical saved autoconnect, DHCP, and display/runtime progress; validate physical scan, interactive connection, and protocol coverage remains pending.
+- [x] Validate physical saved autoconnect, DHCP, DNS/ICMP, TCP/UDP listener traffic,
+  socket capacity, cleanup, and display/runtime progress.
+- [ ] Validate physical scan, interactive connection, IPv6, and `nettest` client mode.
 
 ## Assumptions
 
 - [x] Version 1 supports one saved Wi-Fi network profile.
 - [x] Station mode only.
-- [ ] DNS, TCP, and UDP define basic networking.
+- [x] DNS, TCP, and UDP define basic networking and have physical proof.
 - [x] Saved credentials are optional.
 - [x] `auto_connect` defaults enabled.
 - [x] Autoconnect stops after three failed attempts.
