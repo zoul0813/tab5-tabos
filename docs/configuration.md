@@ -47,3 +47,7 @@ It is independent of TabOS project configuration:
 eval "$(./tools/tabos activate-idf)"
 idf.py -C targets/tab5 -B build/tab5-debug menuconfig
 ```
+
+Tab5 defaults select ESP-IDF's 1.5 MiB single-factory-app partition layout on the
+device's 16 MiB flash. TabOS does not currently reserve OTA application partitions;
+future internal `A:` filesystem partitioning remains separate work.
