@@ -45,6 +45,7 @@ typedef struct {
 
 enum {
     TABOS_NETWORK_IO_MAX = 1024,
+    TABOS_SOCKET_MAX     = 8,
 };
 
 typedef int32_t tabos_socket_t;

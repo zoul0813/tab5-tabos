@@ -27,8 +27,8 @@ enum {
        event loop for an unbounded period. */
     ELF_INSTRUCTIONS_PER_UPDATE   = 2000000,
     ELF_DESCRIPTOR_CAPACITY       = 16,
-    ELF_SOCKET_CAPACITY           = 16,
-    ELF_SOCKET_INDEX_BITS         = 4,
+    ELF_SOCKET_CAPACITY           = TABOS_SOCKET_MAX,
+    ELF_SOCKET_INDEX_BITS         = 3,
     ELF_SOCKET_INDEX_MASK         = ELF_SOCKET_CAPACITY - 1,
     ELF_SOCKET_GENERATION_MAX     = INT32_MAX >> ELF_SOCKET_INDEX_BITS,
     ELF_HEAP_MAX                  = 1024 * 1024,
@@ -37,7 +37,7 @@ enum {
     ELF_GRAPHICS_COMMAND_CAPACITY = 64,
 };
 
-_Static_assert((ELF_SOCKET_CAPACITY & (ELF_SOCKET_CAPACITY - 1)) == 0, "ELF socket capacity must be a power of two");
+_Static_assert((1U << ELF_SOCKET_INDEX_BITS) == ELF_SOCKET_CAPACITY, "ELF socket index bits must match capacity");
 
 typedef enum {
     ELF_GRAPHICS_FILL,

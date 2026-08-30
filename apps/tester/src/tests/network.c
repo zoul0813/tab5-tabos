@@ -83,11 +83,107 @@ static void test_stale_handle(tester_context_t* context)
     const tabos_socket_t replacement = tabos_socket_open(TABOS_NETWORK_FAMILY_IPV4, TABOS_SOCKET_UDP);
     errno                            = 0;
     const int stale_result           = tabos_socket_close(stale);
-    tester_expect(context,
-                  replacement >= 0 && replacement != stale && stale_result < 0 && errno == EBADF,
+    tester_expect(context, replacement >= 0 && replacement != stale && stale_result < 0 && errno == EBADF,
                   "stale socket handle cannot close replacement");
     if (replacement >= 0) {
         tester_expect(context, tabos_socket_close(replacement) == 0, "replacement socket closes");
+    }
+}
+
+static void close_sockets(tabos_socket_t* sockets, unsigned int count)
+{
+    for (unsigned int index = 0U; index < count; ++index) {
+        if (sockets[index] >= 0) {
+            (void) tabos_socket_close(sockets[index]);
+            sockets[index] = -1;
+        }
+    }
+}
+
+static void test_socket_capacity(tester_context_t* context)
+{
+    tabos_socket_t sockets[TABOS_SOCKET_MAX];
+    for (unsigned int index = 0U; index < TABOS_SOCKET_MAX; ++index) {
+        sockets[index] = tabos_socket_open(TABOS_NETWORK_FAMILY_IPV4, TABOS_SOCKET_UDP);
+    }
+
+    bool capacity_opened = true;
+    for (unsigned int index = 0U; index < TABOS_SOCKET_MAX; ++index) {
+        if (sockets[index] < 0) {
+            capacity_opened = false;
+        }
+    }
+    tester_expect(context, capacity_opened, "per-process socket capacity opens");
+
+    errno                       = 0;
+    const tabos_socket_t excess = tabos_socket_open(TABOS_NETWORK_FAMILY_IPV4, TABOS_SOCKET_UDP);
+    tester_expect(context, excess < 0 && errno == EMFILE, "socket table exhaustion returns EMFILE");
+    if (excess >= 0) {
+        (void) tabos_socket_close(excess);
+    }
+
+    const tabos_socket_t stale = sockets[0];
+    if (stale >= 0) {
+        (void) tabos_socket_close(stale);
+        sockets[0] = -1;
+    }
+    const tabos_socket_t replacement = tabos_socket_open(TABOS_NETWORK_FAMILY_IPV4, TABOS_SOCKET_UDP);
+    errno                            = 0;
+    const int stale_result           = tabos_socket_close(stale);
+    tester_expect(context, replacement >= 0 && replacement != stale && stale_result < 0 && errno == EBADF,
+                  "one freed socket slot is reusable without reviving stale handle");
+    if (replacement >= 0) {
+        (void) tabos_socket_close(replacement);
+    }
+    close_sockets(sockets, TABOS_SOCKET_MAX);
+}
+
+static void test_full_table_accept(tester_context_t* context)
+{
+    tabos_socket_endpoint_t endpoint = loopback_endpoint();
+    const tabos_socket_t server      = tabos_socket_open(TABOS_NETWORK_FAMILY_IPV4, TABOS_SOCKET_TCP);
+    const bool server_ready          = server >= 0 && tabos_socket_bind(server, &endpoint) == 0 &&
+                              tabos_socket_get_local_endpoint(server, &endpoint) == 0 && endpoint.port != 0U &&
+                              tabos_socket_listen(server, 1U) == 0;
+    tester_expect(context, server_ready, "full-table accept server starts");
+
+    tabos_socket_t fillers[TABOS_SOCKET_MAX - 2U];
+    for (unsigned int index = 0U; index < TABOS_SOCKET_MAX - 2U; ++index) {
+        fillers[index] = tabos_socket_open(TABOS_NETWORK_FAMILY_IPV4, TABOS_SOCKET_UDP);
+    }
+    bool fillers_opened = true;
+    for (unsigned int index = 0U; index < TABOS_SOCKET_MAX - 2U; ++index) {
+        if (fillers[index] < 0) {
+            fillers_opened = false;
+        }
+    }
+    tester_expect(context, fillers_opened, "accept test fills reserved socket slots");
+
+    bool accepted_sockets_released = server_ready && fillers_opened;
+    for (unsigned int attempt = 0U; attempt < 4U && accepted_sockets_released; ++attempt) {
+        const tabos_socket_t client = tabos_socket_open(TABOS_NETWORK_FAMILY_IPV4, TABOS_SOCKET_TCP);
+        if (client < 0 || tabos_socket_connect(client, &endpoint) != 0) {
+            accepted_sockets_released = false;
+        } else {
+            errno                         = 0;
+            const tabos_socket_t accepted = tabos_socket_accept(server, NULL);
+            if (accepted >= 0 || errno != EMFILE) {
+                accepted_sockets_released = false;
+            }
+            if (accepted >= 0) {
+                (void) tabos_socket_close(accepted);
+            }
+        }
+        if (client >= 0) {
+            (void) tabos_socket_close(client);
+        }
+    }
+    tester_expect(context, accepted_sockets_released,
+                  "full-table accept returns EMFILE and releases native accepted sockets");
+
+    close_sockets(fillers, TABOS_SOCKET_MAX - 2U);
+    if (server >= 0) {
+        (void) tabos_socket_close(server);
     }
 }
 
@@ -96,4 +192,6 @@ void tester_test_network(tester_context_t* context)
     test_tcp(context);
     test_udp(context);
     test_stale_handle(context);
+    test_socket_capacity(context);
+    test_full_table_accept(context);
 }

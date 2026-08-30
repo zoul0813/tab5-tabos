@@ -169,8 +169,11 @@ Use official `esp_hosted` and `esp_wifi_remote` over 4-bit SDIO.
 - [x] Test missing drive/file, valid parsing, comments, escapes, malformed values,
   unknown-key preservation, version rejection, atomic replacement failure,
   `auto_connect` behavior, forget, and redaction.
-- [ ] Test address conversion, DNS results, table exhaustion, stale handles,
-  blocking/nonblocking behavior, wait readiness/timeouts/cancellation,
+- [ ] Test address conversion and DNS results.
+- [x] Add maintained tester coverage for socket-table exhaustion, accepted-socket
+  allocation failure, and stale handles.
+- [x] Run socket-capacity and accepted-socket failure coverage on physical Tab5.
+- [ ] Test blocking/nonblocking behavior, wait readiness/timeouts/cancellation,
   reconnect, the three-attempt autoconnect limit, explicit retry cancellation,
   connection state transitions, and error mapping.
 - [ ] Test host IPv4/IPv6 loopback TCP, UDP, listen/accept, DNS, partial I/O, peer

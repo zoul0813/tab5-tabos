@@ -69,7 +69,9 @@ operations for independently loaded applications:
 Applications use opaque `tabos_socket_t` handles and portable textual IPv4 or
 IPv6 endpoints. The API supports TCP and UDP sockets, bind, ephemeral local
 ports, listen, accept, connect, send, receive, datagram send/receive, shutdown,
-close, and nonblocking mode.
+close, and nonblocking mode. Each process may own up to `TABOS_SOCKET_MAX`
+sockets. Opening or accepting another socket reports `EMFILE`; a failed accept
+closes the native accepted socket before returning.
 
 Socket payload calls are bounded to `TABOS_NETWORK_IO_MAX` bytes. Applications
 must loop when transferring larger streams. A zero return from receive means the
