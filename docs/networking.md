@@ -100,6 +100,40 @@ polls immediately, a finite timeout uses milliseconds, and
 the operation. The return value is the number of ready items, zero for timeout,
 or `-1` with `errno` set.
 
+### TLS client connections
+
+`<tabos/tls.h>` provides certificate-verified client TLS connections. A TLS
+connection is process-owned, uses the system CA store on host builds and the
+ESP-IDF certificate bundle on Tab5, verifies both the certificate chain and the
+requested hostname, and is cleaned up when its application exits. It supports
+up to four bounded connections.
+
+`tabos_tls_connect()`, `tabos_tls_send()`, `tabos_tls_receive()`, and
+`tabos_tls_close()` use the same `errno` convention as sockets. Send and receive
+calls are limited to 1024 bytes; applications must loop for larger transfers.
+There is deliberately no insecure or certificate-bypass mode.
+
+## HTTPS retrieval
+
+`httpsget` is the first TLS client utility. It performs an HTTP/1.1 GET over a
+certificate-verified TLS connection and writes the complete HTTP response to
+standard output:
+
+```sh
+make -C apps/netutils httpsget
+httpsget https://example.com/
+httpsget -c 8 https://example.com/
+```
+
+Only `https://host[/path]` URLs are currently accepted. Custom ports, user
+credentials, redirects, chunk decoding, proxies, and IPv6 URL literals are
+deferred until a broader HTTP client interface is needed.
+
+Use `-c 1` through `-c 16` to repeat a request and verify TLS connection cleanup.
+For physical TLS validation, a known-good URL must succeed, while an expired or
+hostname-mismatched certificate (for example `https://expired.badssl.com/`) must
+fail. Disconnecting Wi-Fi must also return an error without resetting TabOS.
+
 ## Ping
 
 The `ping` core utility uses only these public APIs. Build and install it with:

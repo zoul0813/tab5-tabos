@@ -87,6 +87,7 @@ set(TABOS_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
 include("${TABOS_ROOT}/cmake/TabOSSources.cmake")
 
 find_package(SDL3 REQUIRED CONFIG COMPONENTS SDL3)
+find_package(OpenSSL REQUIRED)
 
 include(FetchContent)
 FetchContent_Declare(
@@ -139,7 +140,7 @@ target_include_directories(tabos_platform_host
         "${TABOS_GENERATED_INCLUDE_DIR}"
         "${mini_rv32ima_SOURCE_DIR}/mini-rv32ima"
 )
-target_link_libraries(tabos_platform_host PRIVATE tabos_core SDL3::SDL3)
+target_link_libraries(tabos_platform_host PRIVATE tabos_core SDL3::SDL3 OpenSSL::SSL OpenSSL::Crypto)
 target_compile_definitions(tabos_platform_host PRIVATE TABOS_TARGET_HOST=1)
 
 if(TABOS_TARGET STREQUAL "macos")

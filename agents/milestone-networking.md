@@ -23,6 +23,8 @@ Use official `esp_hosted` and `esp_wifi_remote` over 4-bit SDIO.
 - [x] Use compatible factory C6 firmware. Never auto-flash or invent custom
   transport. Record exact blocker if official stack and factory firmware
   mismatch.
+- [x] Prove certificate-verified HTTPS on physical Tab5, including repeated TLS
+  connect/close, expired-certificate rejection, and hostname-mismatch rejection.
 
 ### Persistent Network Configuration
 
@@ -79,8 +81,16 @@ required.
 - [x] Reject stale socket handles after a per-process slot is reused.
 - [x] Interrupt pending blocking socket work and serialize worker teardown before
   releasing process-owned sockets.
-TLS/HTTPS, static addressing, custom DNS, mDNS, SoftAP, routing, and Bluetooth
-are explicitly deferred beyond this milestone.
+- [x] Add process-owned certificate-verified TLS client connections backed by the
+  ESP-IDF certificate bundle on Tab5 and the host CA store on macOS/Linux.
+- [x] Run all TLS operations in a native platform worker on Tab5, avoiding guest
+  task TLS/lwIP access.
+- [x] Add `httpsget` under `apps/netutils` for verified `https://host[/path]`
+  requests.
+- [x] Increase the Tab5 single-app partition to 1500 KiB for the ESP-IDF TLS
+  stack and certificate bundle.
+Static addressing, custom DNS, mDNS, SoftAP, routing, and Bluetooth are
+explicitly deferred beyond this milestone.
 
 ### Reusable Wait Foundation
 
@@ -158,6 +168,16 @@ deferred beyond this milestone.
 - [x] Validate `ntpdate` against a physical Tab5 Wi-Fi connection.
 - [ ] Confirm the RTC retains `ntpdate` UTC time after restart.
 
+### TLS and HTTPS Utility
+
+- [x] Add public `<tabos/tls.h>` for process-owned, certificate-verified TLS
+  client connections.
+- [x] Verify certificate chains and requested hostnames using the host CA store or
+  Tab5 ESP-IDF certificate bundle; provide no insecure bypass.
+- [x] Add `httpsget`, including bounded repeat mode for connection-reuse checks.
+- [x] Validate successful HTTPS, repeated close/reopen, expired certificates, and
+  hostname mismatch rejection on physical Tab5.
+
 ### Socket Interoperability Utility
 
 - [x] Add a host Python TCP/UDP echo service and `apps/netutils` `nettest`
@@ -208,6 +228,10 @@ user-mode/PMP execution boundary; native application faults are currently device
 - [x] Validate physical saved autoconnect, DHCP, DNS/ICMP, TCP/UDP listener traffic,
   socket capacity, cleanup, and display/runtime progress.
 - [x] Validate zero-time and finite socket waits with the RV32 tester on physical Tab5.
+- [x] Test the public TLS SDK bridge and application build on host; cross-build TLS
+  support for Tab5 Debug.
+- [x] Validate physical Tab5 HTTPS success, repeated TLS lifecycle, expired
+  certificate rejection, and hostname-mismatch rejection without reset.
 - [ ] Validate physical scan, interactive connection, IPv6, and `nettest` client mode.
 
 ## Assumptions

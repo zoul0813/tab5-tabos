@@ -93,9 +93,13 @@ static const uint32_t HOST_RV32_SOCKET_RECEIVE_FROM   = UINT32_C(0xffff00e4);
 static const uint32_t HOST_RV32_SOCKET_LOCAL_ENDPOINT = UINT32_C(0xffff00e8);
 static const uint32_t HOST_RV32_GRAPHICS_SET_OVERLAYS = UINT32_C(0xffff00ec);
 static const uint32_t HOST_RV32_SOCKET_WAIT           = UINT32_C(0xffff00f0);
+static const uint32_t HOST_RV32_TLS_CONNECT           = UINT32_C(0xffff00f4);
+static const uint32_t HOST_RV32_TLS_CLOSE             = UINT32_C(0xffff00f8);
+static const uint32_t HOST_RV32_TLS_SEND              = UINT32_C(0xffff00fc);
+static const uint32_t HOST_RV32_TLS_RECEIVE           = UINT32_C(0xffff0100);
 
 enum {
-    HOST_RV32_API_SIZE = 256,
+    HOST_RV32_API_SIZE = 272,
 };
 
 struct platform_riscv32_context {
@@ -274,6 +278,10 @@ platform_riscv32_context_t* platform_riscv32_create(const void* entry, const voi
     write_u32(context->memory, api_address + 232U, HOST_RV32_SOCKET_LOCAL_ENDPOINT);
     write_u32(context->memory, api_address + 248U, HOST_RV32_GRAPHICS_SET_OVERLAYS);
     write_u32(context->memory, api_address + 252U, HOST_RV32_SOCKET_WAIT);
+    write_u32(context->memory, api_address + 256U, HOST_RV32_TLS_CONNECT);
+    write_u32(context->memory, api_address + 260U, HOST_RV32_TLS_CLOSE);
+    write_u32(context->memory, api_address + 264U, HOST_RV32_TLS_SEND);
+    write_u32(context->memory, api_address + 268U, HOST_RV32_TLS_RECEIVE);
 
     uint32_t argument_data_address = api_address + HOST_RV32_API_SIZE;
     uint32_t argument_data_end     = argument_data_address;
@@ -801,6 +809,34 @@ platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* cont
             context->state.regs[10] = (uint32_t) context->api.socket_wait(items, item_count, context->state.regs[12]);
             current_user_data       = NULL;
             context->state.pc       = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_TLS_CONNECT || context->state.pc == HOST_RV32_TLS_CLOSE ||
+            context->state.pc == HOST_RV32_TLS_SEND || context->state.pc == HOST_RV32_TLS_RECEIVE) {
+            current_user_data = context->user_data;
+            if (context->state.pc == HOST_RV32_TLS_CONNECT) {
+                const char* hostname = guest_string(context->memory, context->state.regs[10]);
+                if (hostname == NULL || context->api.tls_connect == NULL) {
+                    return PLATFORM_RISCV32_FAULT;
+                }
+                context->state.regs[10] = (uint32_t) context->api.tls_connect(hostname, context->state.regs[11]);
+            } else if (context->state.pc == HOST_RV32_TLS_CLOSE) {
+                if (context->api.tls_close == NULL) {
+                    return PLATFORM_RISCV32_FAULT;
+                }
+                context->state.regs[10] = (uint32_t) context->api.tls_close((int) context->state.regs[10]);
+            } else {
+                void* data = guest_buffer(context->memory, context->state.regs[11], context->state.regs[12]);
+                int (*call)(int, void*, uint32_t) = context->state.pc == HOST_RV32_TLS_SEND
+                                                        ? (int (*)(int, void*, uint32_t)) context->api.tls_send
+                                                        : context->api.tls_receive;
+                if (data == NULL || call == NULL) {
+                    return PLATFORM_RISCV32_FAULT;
+                }
+                context->state.regs[10] = (uint32_t) call((int) context->state.regs[10], data, context->state.regs[12]);
+            }
+            current_user_data = NULL;
+            context->state.pc = context->state.regs[1];
             continue;
         }
         if (context->state.pc == HOST_RV32_HEAP_SBRK) {

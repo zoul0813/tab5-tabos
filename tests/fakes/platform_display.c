@@ -357,6 +357,44 @@ int platform_network_socket_wait(platform_network_wait_item_t* items, uint32_t c
     return -TABOS_ENOTSUP;
 }
 
+int platform_tls_connect(const char* hostname, uint16_t port)
+{
+    (void) hostname;
+    (void) port;
+    return -TABOS_ENOTSUP;
+}
+
+int platform_tls_close(int connection)
+{
+    (void) connection;
+    return -TABOS_ENOTSUP;
+}
+
+int platform_tls_send(int connection, const void* data, uint32_t size)
+{
+    (void) connection;
+    (void) data;
+    (void) size;
+    return -TABOS_ENOTSUP;
+}
+
+int platform_tls_receive(int connection, void* data, uint32_t capacity)
+{
+    (void) connection;
+    (void) data;
+    (void) capacity;
+    return -TABOS_ENOTSUP;
+}
+
+bool platform_tls_operations_init(void)
+{
+    return true;
+}
+
+void platform_tls_operations_shutdown(void)
+{
+}
+
 platform_network_operation_result_t platform_network_resolve(const char* hostname, uint32_t family,
                                                              platform_network_address_t* address)
 {

@@ -3,6 +3,7 @@
 #include <tabos/internal/elf_api.h>
 #include <tabos/filesystem.h>
 #include <tabos/network.h>
+#include <tabos/tls.h>
 #include <tabos/wait.h>
 #include <tabos/internal/application.h>
 #include <tabos/internal/elf_loader.h>
@@ -32,6 +33,10 @@ enum {
     ELF_SOCKET_INDEX_BITS         = 3,
     ELF_SOCKET_INDEX_MASK         = ELF_SOCKET_CAPACITY - 1,
     ELF_SOCKET_GENERATION_MAX     = INT32_MAX >> ELF_SOCKET_INDEX_BITS,
+    ELF_TLS_CAPACITY              = TABOS_TLS_MAX,
+    ELF_TLS_INDEX_BITS            = 2,
+    ELF_TLS_INDEX_MASK            = ELF_TLS_CAPACITY - 1,
+    ELF_TLS_GENERATION_MAX        = INT32_MAX >> ELF_TLS_INDEX_BITS,
     ELF_HEAP_MAX                  = 1024 * 1024,
     ELF_HEAP_GUARD_SIZE           = 32,
     ELF_HEAP_GUARD_VALUE          = 0xa5,
@@ -39,6 +44,7 @@ enum {
 };
 
 _Static_assert((1U << ELF_SOCKET_INDEX_BITS) == ELF_SOCKET_CAPACITY, "ELF socket index bits must match capacity");
+_Static_assert((1U << ELF_TLS_INDEX_BITS) == ELF_TLS_CAPACITY, "ELF TLS index bits must match capacity");
 
 typedef enum {
     ELF_GRAPHICS_FILL,
@@ -71,6 +77,12 @@ typedef struct {
         bool open;
 } elf_socket_t;
 
+typedef struct {
+        int platform_connection;
+        uint32_t generation;
+        bool open;
+} elf_tls_t;
+
 struct loader_elf_application {
         tabos_app_descriptor_t descriptor;
         char name[TABOS_FS_NAME_MAX + 1U];
@@ -99,6 +111,7 @@ struct loader_elf_application {
         const char* exec_argv[TABOS_ELF_ARG_MAX + 1U];
         elf_descriptor_t descriptors[ELF_DESCRIPTOR_CAPACITY];
         elf_socket_t sockets[ELF_SOCKET_CAPACITY];
+        elf_tls_t tls[ELF_TLS_CAPACITY];
         char working_directory[TABOS_FS_PATH_MAX];
         uint8_t* heap_allocation;
         uint8_t* heap;
@@ -1110,6 +1123,91 @@ static int elf_socket_wait(tabos_elf_wait_item_t* items, uint32_t count, uint32_
     return result;
 }
 
+static elf_tls_t* elf_tls(loader_elf_application_t* application, int connection)
+{
+    if (application == NULL || connection <= 0) {
+        return NULL;
+    }
+    const uint32_t handle     = (uint32_t) connection;
+    const uint32_t index      = handle & ELF_TLS_INDEX_MASK;
+    const uint32_t generation = handle >> ELF_TLS_INDEX_BITS;
+    elf_tls_t* owned          = &application->tls[index];
+    if (!owned->open || generation == 0U || owned->generation != generation) {
+        return NULL;
+    }
+    return owned;
+}
+
+static int elf_tls_allocate(loader_elf_application_t* application, int platform_connection)
+{
+    for (int index = 0; index < ELF_TLS_CAPACITY; ++index) {
+        if (!application->tls[index].open) {
+            uint32_t generation = application->tls[index].generation + 1U;
+            if (generation == 0U || generation > ELF_TLS_GENERATION_MAX) {
+                generation = 1U;
+            }
+            application->tls[index] = (elf_tls_t) {
+                .platform_connection = platform_connection,
+                .generation          = generation,
+                .open                = true,
+            };
+            return (int) ((generation << ELF_TLS_INDEX_BITS) | (uint32_t) index);
+        }
+    }
+    (void) platform_tls_close(platform_connection);
+    return -TABOS_EMFILE;
+}
+
+static int elf_tls_connect(const char* hostname, uint32_t port)
+{
+    loader_elf_application_t* application = platform_riscv32_current_user_data();
+    const char* readable = platform_executable_data_pointer(hostname, 254U);
+    if (application == NULL || readable == NULL || port == 0U || port > UINT16_MAX ||
+        strnlen(readable, 254U) == 254U) {
+        return -TABOS_EINVAL;
+    }
+    const int platform_connection = platform_tls_connect(readable, (uint16_t) port);
+    return platform_connection < 0 ? platform_connection : elf_tls_allocate(application, platform_connection);
+}
+
+static int elf_tls_close(int connection)
+{
+    elf_tls_t* owned = elf_tls(platform_riscv32_current_user_data(), connection);
+    if (owned == NULL) {
+        return -TABOS_EBADF;
+    }
+    const uint32_t generation = owned->generation;
+    const int result = platform_tls_close(owned->platform_connection);
+    *owned = (elf_tls_t) {.generation = generation};
+    return result;
+}
+
+static int elf_tls_send(int connection, const void* data, uint32_t size)
+{
+    elf_tls_t* owned = elf_tls(platform_riscv32_current_user_data(), connection);
+    const void* readable = platform_executable_data_pointer(data, size);
+    if (owned == NULL) {
+        return -TABOS_EBADF;
+    }
+    if (readable == NULL || size == 0U || size > TABOS_NETWORK_IO_MAX) {
+        return -TABOS_EINVAL;
+    }
+    return platform_tls_send(owned->platform_connection, readable, size);
+}
+
+static int elf_tls_receive(int connection, void* data, uint32_t capacity)
+{
+    elf_tls_t* owned = elf_tls(platform_riscv32_current_user_data(), connection);
+    void* writable = (void*) platform_executable_data_pointer(data, capacity);
+    if (owned == NULL) {
+        return -TABOS_EBADF;
+    }
+    if (writable == NULL || capacity == 0U || capacity > TABOS_NETWORK_IO_MAX) {
+        return -TABOS_EINVAL;
+    }
+    return platform_tls_receive(owned->platform_connection, writable, capacity);
+}
+
 static int elf_system_info(tabos_elf_system_info_t* info)
 {
     if (info == NULL) {
@@ -1505,6 +1603,10 @@ static bool elf_entry(tabos_app_context_t* context)
         .battery_set_fast_charging = elf_battery_set_fast_charging,
         .graphics_set_overlays     = elf_graphics_set_overlays,
         .socket_wait               = elf_socket_wait,
+        .tls_connect               = elf_tls_connect,
+        .tls_close                 = elf_tls_close,
+        .tls_send                  = elf_tls_send,
+        .tls_receive               = elf_tls_receive,
     };
     application->execution = platform_riscv32_create(
         application->image.entry, application->image.memory, application->image.memory_size,
@@ -1611,6 +1713,12 @@ static void elf_release_resources(loader_elf_application_t* application)
         if (application->sockets[index].open) {
             platform_network_socket_dispose(application->sockets[index].platform_socket);
             application->sockets[index] = (elf_socket_t) {0};
+        }
+    }
+    for (size_t index = 0U; index < ELF_TLS_CAPACITY; ++index) {
+        if (application->tls[index].open) {
+            (void) platform_tls_close(application->tls[index].platform_connection);
+            application->tls[index] = (elf_tls_t) {0};
         }
     }
     platform_riscv32_destroy(application->execution);

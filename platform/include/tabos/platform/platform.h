@@ -131,6 +131,8 @@ bool platform_network_operations_init(void);
 void platform_network_operations_shutdown(void);
 bool platform_network_socket_operations_init(void);
 void platform_network_socket_operations_shutdown(void);
+bool platform_tls_operations_init(void);
+void platform_tls_operations_shutdown(void);
 void platform_network_socket_interrupt(int socket);
 bool platform_network_socket_operations_suspend(void);
 void platform_network_socket_operations_resume(void);
@@ -156,6 +158,10 @@ int platform_network_socket_send_to(int socket, const void* data, uint32_t size,
 int platform_network_socket_receive_from(int socket, void* data, uint32_t capacity, platform_network_address_t* address,
                                          uint16_t* port);
 int platform_network_socket_wait(platform_network_wait_item_t* items, uint32_t count, uint32_t timeout_ms);
+int platform_tls_connect(const char* hostname, uint16_t port);
+int platform_tls_close(int connection);
+int platform_tls_send(int connection, const void* data, uint32_t size);
+int platform_tls_receive(int connection, void* data, uint32_t capacity);
 uint32_t platform_graphics_capabilities(void);
 bool platform_graphics_begin(void);
 void platform_graphics_end(void);
