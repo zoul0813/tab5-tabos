@@ -98,6 +98,11 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(mini_rv32ima)
 
 add_library(tabos_core STATIC ${TABOS_CORE_SOURCES})
+
+if(TABOS_TARGET STREQUAL "linux")
+    target_compile_definitions(tabos_core PRIVATE _POSIX_C_SOURCE=200809L)
+endif()
+
 target_include_directories(tabos_core
     PUBLIC "${TABOS_ROOT}/sdk/include"
     PRIVATE
