@@ -106,6 +106,18 @@ tabos_enable_warnings(tabos_doom_input)
 tabos_enable_sanitizers(tabos_doom_input)
 add_test(NAME unit.doom_input COMMAND tabos_doom_input)
 
+add_executable(tabos_doom_storage
+    unit/doom_storage.c
+    "${TABOS_ROOT}/apps/doom/src/doom_tabos_storage.c"
+)
+target_include_directories(tabos_doom_storage PRIVATE
+    "${TABOS_ROOT}/apps/doom/include"
+    "${TABOS_ROOT}/sdk/include"
+)
+tabos_enable_warnings(tabos_doom_storage)
+tabos_enable_sanitizers(tabos_doom_storage)
+add_test(NAME unit.doom_storage COMMAND tabos_doom_storage)
+
 add_executable(tabos_display_diagnostic unit/display_diagnostic.c ${TABOS_TEST_PLATFORM_FAKES})
 target_include_directories(tabos_display_diagnostic PRIVATE
     "${TABOS_ROOT}/graphics/include"

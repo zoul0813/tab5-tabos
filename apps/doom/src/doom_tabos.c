@@ -1,4 +1,5 @@
 #include "doom_tabos_input.h"
+#include "doom_tabos_storage.h"
 #include "doom_tabos_video.h"
 
 #include <stdio.h>
@@ -12,11 +13,13 @@
 #include "i_system.h"
 
 static doom_tabos_input_t input;
+static doom_tabos_launch_t launch;
 static doom_tabos_video_t video;
 
 static void cleanup(void)
 {
     (void) doom_tabos_video_close(&video);
+    doom_tabos_storage_release(&launch);
 }
 
 static void fail(const char* operation)
@@ -28,7 +31,22 @@ static void fail(const char* operation)
 
 int main(int argc, char** argv)
 {
-    doomgeneric_Create(argc, argv);
+    const doom_tabos_storage_status_t storage_status = doom_tabos_storage_prepare(argc, argv, &launch);
+    if (storage_status != DOOM_TABOS_STORAGE_OK) {
+        if (storage_status == DOOM_TABOS_STORAGE_DIRECTORY_FAILED) {
+            fprintf(stderr, "doom: cannot use %s\n", DOOM_TABOS_GAME_DIRECTORY);
+        } else if (storage_status == DOOM_TABOS_STORAGE_IWAD_NOT_FOUND) {
+            fprintf(stderr, "doom: no usable IWAD found in %s\n", DOOM_TABOS_GAME_DIRECTORY);
+            fprintf(stderr, "install doom1.wad, doom.wad, doom2.wad, freedoom1.wad, or freedoom2.wad there\n");
+            fprintf(stderr, "or use -iwad <path>\n");
+        } else {
+            fprintf(stderr, "doom: startup failed\n");
+        }
+        doom_tabos_storage_release(&launch);
+        return EXIT_FAILURE;
+    }
+
+    doomgeneric_Create(launch.argc, launch.argv);
 
     for (;;) {
         doomgeneric_Tick();

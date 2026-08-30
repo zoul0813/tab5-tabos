@@ -88,12 +88,12 @@ metadata instead of DOOM-specific kernel behavior.
 ### WAD, Config, and Saves
 
 - Do not commit or download WAD files.
-- Create and use `T:/games/doom` as the application working directory; the parent
+- Create and use `T:/data/doom` as the application working directory; the parent
   shell cwd remains unchanged.
 - Without `-iwad`, search in order: `doom1.wad`, `doom.wad`, `doom2.wad`,
   `freedoom1.wad`, `freedoom2.wad`.
 - Accept explicit drive-qualified `-iwad` paths.
-- Store configuration, screenshots, demos, and savegames under `T:/games/doom`.
+- Store configuration, screenshots, demos, and savegames under `T:/data/doom`.
 - Print concise installation instructions and exit nonzero when no usable IWAD exists.
 - Document that users must supply shareware, Freedoom, or legally owned commercial data.
 
@@ -293,14 +293,22 @@ relocation targets. Physical control validation remains Phase 10 work.
 
 ### Phase 8: WAD, Configuration, and Saves
 
-- [ ] Set DOOM working directory to `T:/games/doom` without changing parent shell cwd.
-- [ ] Create directory when missing, with clean failure handling.
-- [ ] Implement default IWAD search order.
-- [ ] Support explicit drive-qualified `-iwad` paths.
-- [ ] Store config, screenshots, demos, and saves under `T:/games/doom`.
-- [ ] Print concise no-IWAD installation guidance and return nonzero.
-- [ ] Never commit or download WAD data.
-- [ ] Unit-test working-directory behavior and WAD search order.
+- [x] Set DOOM working directory to `T:/data/doom` without changing parent shell cwd.
+- [x] Create directory when missing, with clean failure handling.
+- [x] Implement default IWAD search order.
+- [x] Support explicit drive-qualified `-iwad` paths.
+- [x] Store config, screenshots, demos, and saves under `T:/data/doom`.
+- [x] Print concise no-IWAD installation guidance and return nonzero.
+- [x] Never commit or download WAD data.
+- [x] Unit-test working-directory behavior and WAD search order.
+
+Phase 8 host validation: macOS Debug tests pass 34/34. Storage adapter tests cover
+process-local `T:/data/doom` setup, existing and failed directory creation, required
+IWAD precedence, explicit drive-qualified paths, argument construction, missing and
+unreadable IWADs, and allocation cleanup. The rebuilt RV32I artifact is 722,792 bytes
+(`text` 421,636, `data` 60,084, `bss` 241,072), retains the 8 MiB heap and 64 KiB stack
+metadata, and has no undefined symbols. No WAD data was fetched or added. End-to-end
+host and Tab5 storage validation remains Phase 10 work.
 
 ### Phase 9: Build and Installation Workflow
 
