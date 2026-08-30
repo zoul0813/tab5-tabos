@@ -276,13 +276,20 @@ restoration, and repeat launch remain to validate after Phase 7 controls.
 
 ### Phase 7: Controls
 
-- [ ] Implement required movement, turning, fire, use, run, weapon, and menu mappings.
-- [ ] Ignore repeat key-down events.
-- [ ] Track modifier transitions across key-down and key-up events.
-- [ ] Synthesize Control and Shift state for Tab5 keyboard behavior.
-- [ ] Implement bounded 32-event adapter queue.
-- [ ] Reset synthesized state and release keys on queue overflow.
-- [ ] Unit-test mappings, modifiers, repeats, overflow, and stuck-key recovery.
+- [x] Implement required movement, turning, fire, use, run, weapon, and menu mappings.
+- [x] Ignore repeat key-down events.
+- [x] Track modifier transitions across key-down and key-up events.
+- [x] Synthesize Control and Shift state for Tab5 keyboard behavior.
+- [x] Implement bounded 32-event adapter queue.
+- [x] Reset synthesized state and release keys on queue overflow.
+- [x] Unit-test mappings, modifiers, repeats, overflow, and stuck-key recovery.
+
+Phase 7 host validation: macOS Debug tests pass 33/33. Adapter tests cover movement,
+strafing, turning, fire/use aliases, weapon/menu keys, repeat suppression, modifier
+transitions, always-run toggle, 32-event overflow, synthesized release, and clean input
+after recovery. Rebuilt RV32I artifact is 721,040 bytes (`text` 419,900, `data` 60,084,
+`bss` 241,056), retains the 8 MiB heap and 64 KiB stack metadata, and has no undefined
+relocation targets. Physical control validation remains Phase 10 work.
 
 ### Phase 8: WAD, Configuration, and Saves
 

@@ -21,5 +21,7 @@ No WAD files are supplied, committed, or downloaded. When runtime support lands,
 will supply shareware, Freedoom, or legally owned commercial game data themselves.
 
 Current runtime support converts DOOM's 320x200 RGB framebuffer to RGB565 and presents
-it as a centered 960x720 4:3 image. Keyboard control mapping and automatic WAD/config
-directory handling remain milestone work.
+it as a centered 960x720 4:3 image. Keyboard controls are W/S movement, A/D strafing,
+arrow turning, J or Control fire, E or Space use, Shift run, R always-run toggle, number
+weapon selection, and standard menu keys. Automatic WAD/config directory handling
+remains milestone work.

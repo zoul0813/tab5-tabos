@@ -1,3 +1,4 @@
+#include "doom_tabos_input.h"
 #include "doom_tabos_video.h"
 
 #include <stdio.h>
@@ -10,6 +11,7 @@
 #include "doomgeneric.h"
 #include "i_system.h"
 
+static doom_tabos_input_t input;
 static doom_tabos_video_t video;
 
 static void cleanup(void)
@@ -35,6 +37,7 @@ int main(int argc, char** argv)
 
 void DG_Init(void)
 {
+    doom_tabos_input_init(&input);
     I_AtExit(cleanup, 1);
     if (doom_tabos_video_open(&video) != 0) {
         fail("graphics open");
@@ -66,15 +69,15 @@ int DG_GetKey(int* pressed, unsigned char* key)
         return 0;
     }
 
+    if (doom_tabos_input_pop(&input, pressed, key)) {
+        return 1;
+    }
+
     tabos_input_event_t event;
     while (tabos_input_poll(&event)) {
-        if ((event.type == TABOS_INPUT_KEY_DOWN || event.type == TABOS_INPUT_KEY_UP) && event.key <= UINT8_MAX) {
-            *pressed = event.type == TABOS_INPUT_KEY_DOWN ? 1 : 0;
-            *key     = (unsigned char) event.key;
-            return 1;
-        }
+        doom_tabos_input_feed(&input, &event);
     }
-    return 0;
+    return doom_tabos_input_pop(&input, pressed, key) ? 1 : 0;
 }
 
 void DG_SetWindowTitle(const char* title)

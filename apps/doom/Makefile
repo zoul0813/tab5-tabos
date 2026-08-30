@@ -30,7 +30,7 @@ DOOM_UPSTREAM_SOURCES := \
     w_wad.c z_zone.c w_file_stdc.c i_input.c i_video.c doomgeneric.c
 DOOM_UPSTREAM_OBJECTS := $(addprefix $(DOOM_OBJECT_DIR)/upstream/,$(DOOM_UPSTREAM_SOURCES:.c=.o))
 DOOM_UPSTREAM_SOURCE_PATHS := $(addprefix $(DOOM_UPSTREAM_DIR)/,$(DOOM_UPSTREAM_SOURCES))
-DOOM_ADAPTER_SOURCES := $(APP_DIR)/src/doom_tabos.c $(APP_DIR)/src/doom_tabos_video.c
+DOOM_ADAPTER_SOURCES := $(APP_DIR)/src/doom_tabos.c $(APP_DIR)/src/doom_tabos_input.c $(APP_DIR)/src/doom_tabos_video.c
 DOOM_ADAPTER_OBJECTS := $(patsubst $(APP_DIR)/src/%.c,$(DOOM_OBJECT_DIR)/adapter/%.o,$(DOOM_ADAPTER_SOURCES))
 DOOM_PATCHES := $(wildcard $(APP_DIR)/patches/*.patch)
 

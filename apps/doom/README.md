@@ -4,10 +4,13 @@ Optional TabOS port of [ozkl/doomgeneric](https://github.com/ozkl/doomgeneric), 
 to commit `dcb7a8dbc7a16ce3dda29382ac9aae9d77d21284`. It is GPL-2.0-only; upstream
 source is checked out under ignored `apps/doom/doomgeneric/` and is never vendored here.
 
-Phase 6 provides TabOS graphics and timing integration. DOOM renders its 320x200 RGB
+TabOS provides graphics, timing, and keyboard integration. DOOM renders its 320x200 RGB
 framebuffer as RGB565, then scales it to a centered 960x720 4:3 image with black side
-bars. Control mapping, automatic WAD discovery, and save-directory setup remain later
-milestone phases; this is not a normal TabOS release artifact.
+bars. Controls use W/S to move, A/D to strafe, arrows to turn, J or Control to fire,
+E or Space to use, Shift to run, R to toggle always-run, number keys for weapons, and
+standard Escape/Enter/arrow/Y/N/F-key menu controls. Automatic WAD discovery and
+save-directory setup remain later milestone phases; this is not a normal TabOS release
+artifact.
 
 ## Build
 
