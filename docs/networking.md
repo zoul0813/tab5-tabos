@@ -28,7 +28,7 @@ defaults to `TabOS` when omitted.
 Build and install `netctl` with:
 
 ```sh
-make -C apps/coreutils netctl
+make -C apps/netutils netctl
 ```
 
 Supported commands are:
@@ -105,7 +105,7 @@ or `-1` with `errno` set.
 The `ping` core utility uses only these public APIs. Build and install it with:
 
 ```sh
-make -C apps/coreutils ping
+make -C apps/netutils ping
 ```
 
 It accepts `-4` or `-6`, `-c count`, and `-W timeout-ms`; without options it
@@ -114,11 +114,11 @@ sends four requests with a one-second timeout.
 ## Host-to-Tab5 Socket Test
 
 The ordinary tester uses loopback sockets. To prove that TCP and UDP packets traverse
-the ESP32-C6 and the local Wi-Fi network, build and install the standalone `nettest`
-diagnostic application:
+the ESP32-C6 and the local Wi-Fi network, build and install the `nettest`
+diagnostic utility:
 
 ```sh
-make -C apps/nettest
+make -C apps/netutils nettest
 ```
 
 Run the companion echo service on another machine on the same LAN:

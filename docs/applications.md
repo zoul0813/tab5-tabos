@@ -40,6 +40,12 @@ program. Build one with `make -C apps/coreutils ls` or `make -C apps/coreutils m
 Sources live in `apps/coreutils/src/<name>/main.c`; each output installs directly under
 `T:/bin/`.
 
+Networking utilities are grouped under `apps/netutils/`. Build one with
+`make -C apps/netutils netctl`, `make -C apps/netutils ping`, or
+`make -C apps/netutils nettest`. Sources live in
+`apps/netutils/src/<name>/main.c`; each output also installs directly under
+`T:/bin/`.
+
 Applications may include `<sys/reboot.h>` and call `reboot(RB_AUTOBOOT)` or
 `reboot(RB_POWER_OFF)`. A successful request does not return. TabOS stops applications,
 closes and unmounts storage, and shuts down platform services before applying the action.

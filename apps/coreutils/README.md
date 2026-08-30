@@ -17,7 +17,6 @@ make -C apps/coreutils mkdir
 make -C apps/coreutils date
 make -C apps/coreutils reboot
 make -C apps/coreutils shutdown
-make -C apps/coreutils netctl
 make -C apps/coreutils battery
 ```
 

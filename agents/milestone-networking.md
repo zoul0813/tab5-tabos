@@ -130,7 +130,7 @@ deferred beyond this milestone.
 
 ### Ping Utility
 
-- [x] Add `ping` under `apps/coreutils` as general external utility using public DNS
+- [x] Add `ping` under `apps/netutils` as general external utility using public DNS
   and ICMP echo APIs only.
 - [x] Support:
 
@@ -151,7 +151,7 @@ deferred beyond this milestone.
 
 ### Socket Interoperability Utility
 
-- [x] Add a host Python TCP/UDP echo service and standalone `apps/nettest`
+- [x] Add a host Python TCP/UDP echo service and `apps/netutils` `nettest`
   application that
   validates traffic across the physical Wi-Fi network.
 - [x] Validate multi-call TCP transfer, orderly EOF, UDP payload, and UDP reply

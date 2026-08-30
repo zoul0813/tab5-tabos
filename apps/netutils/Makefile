@@ -1,6 +1,6 @@
-# Small independently loaded command-line utilities.
+# Network utilities are independently loaded command-line programs.
 
-PROGRAMS := ls mkdir rmdir cp rm mv hexdump date reboot shutdown wc battery
+PROGRAMS := netctl ping nettest
 
 ifeq ($(strip $(PROGRAM)),)
 
@@ -26,7 +26,7 @@ else
 APP_NAME := $(PROGRAM)
 APP_DIR := $(CURDIR)
 PROJECT_ROOT := $(abspath $(CURDIR)/../..)
-BUILD_DIR := $(PROJECT_ROOT)/build/apps/coreutils/$(PROGRAM)
+BUILD_DIR := $(PROJECT_ROOT)/build/apps/netutils/$(PROGRAM)
 OUTPUT := $(BUILD_DIR)/$(PROGRAM)
 UNSTRIPPED := $(BUILD_DIR)/$(PROGRAM).elf
 INSTALL_PATH := $(PROJECT_ROOT)/.local/rootfs/T/bin/$(PROGRAM)
