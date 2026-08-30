@@ -48,7 +48,7 @@ $(UNSTRIPPED): $(SOURCES) $(TABOS_RUNTIME_SOURCES) $(SDK_ROOT)/linker/app-riscv3
 	$(CC) $(TABOS_CPPFLAGS) $(TABOS_CFLAGS) $(TABOS_LDFLAGS) -o $@ $(TABOS_RUNTIME_SOURCES) $(SOURCES)
 
 $(OUTPUT): $(UNSTRIPPED)
-	$(STRIP) --strip-debug $< -o $@
+	$(STRIP) --strip-unneeded $< -o $@
 	$(SIZE) $@
 
 install: $(OUTPUT)
