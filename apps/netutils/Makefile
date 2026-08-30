@@ -1,6 +1,6 @@
 # Network utilities are independently loaded command-line programs.
 
-PROGRAMS := netctl ping nettest ntpdate httpsget fetch
+PROGRAMS := netctl ping nettest ntpdate httpsget fetch irc
 
 ifeq ($(strip $(PROGRAM)),)
 

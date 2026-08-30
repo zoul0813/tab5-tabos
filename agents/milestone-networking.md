@@ -255,7 +255,7 @@ basic networking layer.
 - [x] `fetch`: download an HTTP/HTTPS URL to a `T:` file.
 - [ ] `netcat`: TCP/UDP client and listener diagnostic utility.
 - [ ] `telnet`: interactive plain-TCP terminal client.
-- [ ] `irc`: lightweight IRC client with optional TLS.
+- [x] `irc`: lightweight IRC client with optional TLS.
 - [ ] `mqtt`: MQTT client for automation and IoT services.
 - [ ] `weather`: small HTTPS weather API client.
 - [ ] `rss`: fetch and display RSS/Atom feeds.

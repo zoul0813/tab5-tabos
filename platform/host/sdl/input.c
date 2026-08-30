@@ -206,5 +206,6 @@ void host_input_update(bool wait)
 
 void platform_input_wait(void)
 {
+    host_input_update(false);
     SDL_Delay(1);
 }
