@@ -244,3 +244,35 @@ user-mode/PMP execution boundary; native application faults are currently device
 - [x] Autoconnect stops after three failed attempts.
 - [x] Static IP and DNS fields remain reserved and uninterpreted.
 - [x] Generic device registry remains deferred.
+
+## Future Network Tools and Applications
+
+These are application-level follow-on work, not requirements for completing the
+basic networking layer.
+
+### Utilities
+
+- [x] `fetch`: download an HTTP/HTTPS URL to a `T:` file.
+- [ ] `netcat`: TCP/UDP client and listener diagnostic utility.
+- [ ] `telnet`: interactive plain-TCP terminal client.
+- [ ] `irc`: lightweight IRC client with optional TLS.
+- [ ] `mqtt`: MQTT client for automation and IoT services.
+- [ ] `weather`: small HTTPS weather API client.
+- [ ] `rss`: fetch and display RSS/Atom feeds.
+- [ ] `gopher`: text-oriented Gopher client.
+- [ ] `whois`: TCP port 43 lookup client.
+- [ ] `finger`: TCP port 79 lookup client.
+- [ ] `wakeonlan`: UDP Wake-on-LAN packet sender.
+- [ ] Expand `httpsget` into a reusable downloader when a concrete application
+  needs HTTP redirects, chunked transfer decoding, or file output.
+
+### Applications
+
+- [ ] Package or system-update downloader.
+- [ ] GitHub release checker and downloader.
+- [ ] LAN clipboard or file-send client for a defined peer protocol.
+- [ ] Home-dashboard client.
+- [ ] Remote-terminal client for a defined protocol.
+- [ ] Internet-radio client when audio playback is available.
+- [ ] Multiplayer or game-lobby client.
+- [ ] Chat client for a defined server protocol.

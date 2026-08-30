@@ -134,6 +134,15 @@ For physical TLS validation, a known-good URL must succeed, while an expired or
 hostname-mismatched certificate (for example `https://expired.badssl.com/`) must
 fail. Disconnecting Wi-Fi must also return an error without resetting TabOS.
 
+`fetch` downloads an HTTPS response body to a file. Its destination is optional;
+the last URL path component is used in the current directory, or `download` when
+the URL does not provide a usable filename:
+
+```sh
+fetch https://example.com/files/readme.txt
+fetch https://example.com/ T:/example.html
+```
+
 ## Ping
 
 The `ping` core utility uses only these public APIs. Build and install it with:
