@@ -1,12 +1,16 @@
 #include <tabos/internal/runtime.h>
 #include <tabos/internal/input.h>
+#include <tabos/internal/device_registry.h>
 
 #include <tabos/application.h>
+#include <tabos/device.h>
 #include <tabos/terminal.h>
 
 #include <tabos/config/console.h>
 #include <tabos/config/filesystem.h>
 #include <tabos/config/loader.h>
+
+#include "../fakes/platform_test.h"
 
 #include <string.h>
 
@@ -49,6 +53,24 @@ int main(void)
         return 1;
     }
 #endif
+
+    tabos_device_info_t device;
+    if (device_registry_count() != 5U || !device_registry_find(TABOS_DEVICE_NAME_DISPLAY, &device) ||
+        device.device_class != TABOS_DEVICE_CLASS_DISPLAY || device.state != TABOS_DEVICE_READY ||
+        !device_registry_find(TABOS_DEVICE_NAME_KEYBOARD, &device) ||
+        device.device_class != TABOS_DEVICE_CLASS_KEYBOARD || !device_registry_find(TABOS_DEVICE_NAME_RTC, &device) ||
+        device.device_class != TABOS_DEVICE_CLASS_RTC || !device_registry_find(TABOS_DEVICE_NAME_BATTERY, &device) ||
+        device.device_class != TABOS_DEVICE_CLASS_BATTERY || !device_registry_find(TABOS_DEVICE_NAME_WIFI, &device) ||
+        device.device_class != TABOS_DEVICE_CLASS_NETWORK || device.state != TABOS_DEVICE_OFFLINE) {
+        return 1;
+    }
+
+    test_platform_network_set_state(PLATFORM_NETWORK_ONLINE, NULL);
+    kernel_runtime_update();
+    if (!device_registry_find(TABOS_DEVICE_NAME_WIFI, &device) || device.state != TABOS_DEVICE_READY ||
+        device.last_error != 0) {
+        return 1;
+    }
 
 #if TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP
     const tabos_app_descriptor_t* active = tabos_app_active();

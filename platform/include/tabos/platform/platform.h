@@ -102,9 +102,20 @@ typedef struct {
         bool external_memory_present;
         uint64_t flash_capacity_bytes;
         const char* keyboard_name;
+        const char* keyboard_driver;
         bool keyboard_present;
+        bool keyboard_detected;
+        int keyboard_error;
         const char* rtc_name;
         bool rtc_present;
+        bool rtc_detected;
+        int rtc_error;
+        const char* battery_name;
+        bool battery_present;
+        bool battery_detected;
+        int battery_error;
+        const char* network_name;
+        bool network_present;
 } platform_diagnostics_t;
 
 bool platform_init(bool headless);

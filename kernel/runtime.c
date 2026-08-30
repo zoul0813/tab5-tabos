@@ -7,6 +7,7 @@
 #include <tabos/internal/display.h>
 #include <tabos/internal/device_registry.h>
 #include <tabos/internal/filesystem.h>
+#include <tabos/internal/hardware_devices.h>
 #include <tabos/internal/input.h>
 #include <tabos/internal/network.h>
 #include <tabos/internal/terminal.h>
@@ -39,6 +40,17 @@ static char storage_detail[512];
 static char clock_detail[80];
 static char network_detail[160];
 static atomic_int requested_system_action;
+
+static kernel_boot_status_t device_boot_status(tabos_device_state_t state)
+{
+    if (state == TABOS_DEVICE_READY) {
+        return KERNEL_BOOT_STATUS_OK;
+    }
+    if (state == TABOS_DEVICE_FAULT) {
+        return KERNEL_BOOT_STATUS_WARNING;
+    }
+    return KERNEL_BOOT_STATUS_INFO;
+}
 
 static void format_size(char* buffer, size_t buffer_size, uint64_t bytes)
 {
@@ -174,11 +186,22 @@ bool kernel_runtime_start(void)
         return false;
     }
 
+    if (!hardware_devices_init()) {
+        display_shutdown();
+        network_service_shutdown();
+        filesystem_shutdown();
+        return false;
+    }
+
     platform_diagnostics_t diagnostics;
 
     kernel_boot_report_init(&boot_report, TABOS_SYSTEM_NAME, TABOS_RUNTIME_VERSION);
     (void) kernel_boot_report_add(&boot_report, "Target", platform_name(), KERNEL_BOOT_STATUS_OK);
-    (void) kernel_boot_report_add(&boot_report, "Display", platform_display_name(), KERNEL_BOOT_STATUS_OK);
+    tabos_device_info_t registered_device;
+    if (device_registry_find(TABOS_DEVICE_NAME_DISPLAY, &registered_device)) {
+        (void) kernel_boot_report_add(&boot_report, "Display", registered_device.driver,
+                                      device_boot_status(registered_device.state));
+    }
     (void) kernel_boot_report_add(&boot_report, "Framebuffer", "1280x720 RGB565", KERNEL_BOOT_STATUS_OK);
 
     if (platform_get_diagnostics(&diagnostics)) {
@@ -205,22 +228,27 @@ bool kernel_runtime_start(void)
             format_size(flash_detail, sizeof(flash_detail), diagnostics.flash_capacity_bytes);
             (void) kernel_boot_report_add(&boot_report, "Flash", flash_detail, KERNEL_BOOT_STATUS_INFO);
         }
-        if (diagnostics.keyboard_name != NULL) {
+        if (diagnostics.keyboard_name != NULL && device_registry_find(TABOS_DEVICE_NAME_KEYBOARD, &registered_device)) {
             (void) kernel_boot_report_add(&boot_report, "Keyboard", diagnostics.keyboard_name,
-                                          diagnostics.keyboard_present ? KERNEL_BOOT_STATUS_OK :
-                                                                         KERNEL_BOOT_STATUS_WARNING);
+                                          device_boot_status(registered_device.state));
+        } else if (diagnostics.keyboard_name != NULL) {
+            (void) kernel_boot_report_add(&boot_report, "Keyboard", diagnostics.keyboard_name,
+                                          KERNEL_BOOT_STATUS_WARNING);
         }
         if (diagnostics.rtc_name != NULL) {
             int64_t epoch_seconds = 0;
             tabos_datetime_t datetime;
-            if (diagnostics.rtc_present && platform_wall_clock_get(&epoch_seconds) &&
-                wall_clock_epoch_to_datetime(epoch_seconds, &datetime)) {
+            const bool rtc_registered = device_registry_find(TABOS_DEVICE_NAME_RTC, &registered_device);
+            if (rtc_registered && registered_device.state == TABOS_DEVICE_READY &&
+                platform_wall_clock_get(&epoch_seconds) && wall_clock_epoch_to_datetime(epoch_seconds, &datetime)) {
                 (void) snprintf(clock_detail, sizeof(clock_detail), "%s; %04" PRId32 "-%02u-%02u %02u:%02u:%02u UTC",
                                 diagnostics.rtc_name, datetime.year, datetime.month, datetime.day, datetime.hour,
                                 datetime.minute, datetime.second);
                 (void) kernel_boot_report_add(&boot_report, "RTC", clock_detail, KERNEL_BOOT_STATUS_OK);
             } else {
-                (void) kernel_boot_report_add(&boot_report, "RTC", diagnostics.rtc_name, KERNEL_BOOT_STATUS_WARNING);
+                (void) kernel_boot_report_add(&boot_report, "RTC", diagnostics.rtc_name,
+                                              rtc_registered ? device_boot_status(registered_device.state) :
+                                                               KERNEL_BOOT_STATUS_WARNING);
             }
         }
     }
@@ -236,20 +264,23 @@ bool kernel_runtime_start(void)
         } else {
             (void) snprintf(network_detail, sizeof(network_detail), "%s", network_state_name(network_status.state));
         }
-        (void) kernel_boot_report_add(&boot_report, "Network", network_detail,
-                                      network_status.state == NETWORK_STATE_ONLINE ? KERNEL_BOOT_STATUS_OK :
-                                                                                     KERNEL_BOOT_STATUS_INFO);
+        const kernel_boot_status_t status = device_registry_find(TABOS_DEVICE_NAME_WIFI, &registered_device) ?
+                                                device_boot_status(registered_device.state) :
+                                                KERNEL_BOOT_STATUS_INFO;
+        (void) kernel_boot_report_add(&boot_report, "Network", network_detail, status);
     }
     (void) kernel_boot_report_add(&boot_report, "Kernel", "Runtime initialized", KERNEL_BOOT_STATUS_OK);
 
     kernel_boot_report_write_serial(&boot_report);
     if (!render_boot_report()) {
+        hardware_devices_shutdown();
         display_shutdown();
         return false;
     }
 
     if (!console_init(&terminal)) {
         terminal_shutdown(&terminal);
+        hardware_devices_shutdown();
         display_shutdown();
         return false;
     }
@@ -258,6 +289,7 @@ bool kernel_runtime_start(void)
         kernel_application_system_shutdown();
         console_shutdown();
         terminal_shutdown(&terminal);
+        hardware_devices_shutdown();
         display_shutdown();
         return false;
     }
@@ -273,6 +305,7 @@ bool kernel_runtime_start(void)
         console_shutdown();
         terminal_shutdown(&terminal);
         runtime_started = false;
+        hardware_devices_shutdown();
         display_shutdown();
         return false;
     }
@@ -287,6 +320,7 @@ void kernel_runtime_update(void)
     input_update();
     console_update();
     network_service_update();
+    hardware_devices_update();
     kernel_application_system_update();
 }
 
@@ -296,6 +330,7 @@ void kernel_runtime_shutdown(void)
         kernel_application_system_shutdown();
         console_shutdown();
         terminal_shutdown(&terminal);
+        hardware_devices_shutdown();
         display_shutdown();
         runtime_started = false;
         boot_report     = (kernel_boot_report_t) {0};

@@ -72,8 +72,11 @@ and last error. Application access is not gated by a capability mask.
 The public API supplies copied count/index/ID/name lookup and process-owned lifecycle
 subscriptions. Each subscription retains 32 events, drops the oldest event on overflow,
 reports overflow on the next successful read, and is discarded during process cleanup.
-Generic wait integration and existing-driver registration are subsequent hardware-service
-phases.
+Generic wait integration remains a subsequent hardware-service phase. Portable runtime
+integration registers initialized `display0`, `keyboard0`, `storage0`, `rtc0`, `battery0`,
+and `wifi0` entries from platform diagnostics while keeping typed drivers below the platform
+boundary. Host builds expose deterministic virtual counterparts. Wi-Fi registry state follows
+network-service offline, fault, and ready transitions.
 
 ### Reboot and power-off [DECIDED]
 

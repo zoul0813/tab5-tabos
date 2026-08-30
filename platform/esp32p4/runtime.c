@@ -349,21 +349,33 @@ bool platform_get_diagnostics(platform_diagnostics_t* diagnostics)
     }
     uint32_t flash_capacity = 0U;
     (void) esp_flash_get_size(NULL, &flash_capacity);
-    *diagnostics = (platform_diagnostics_t) {
-        .device_name                 = "ESP32-P4",
-        .cpu_cores                   = 2U,
-        .cpu_frequency_mhz           = CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ,
-        .memory_total_bytes          = heap_caps_get_total_size(MALLOC_CAP_INTERNAL),
-        .memory_free_bytes           = heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
-        .memory_free_known           = true,
-        .external_memory_total_bytes = heap_caps_get_total_size(MALLOC_CAP_SPIRAM),
-        .external_memory_free_bytes  = heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
-        .external_memory_present     = true,
-        .flash_capacity_bytes        = flash_capacity,
-        .keyboard_name               = tab5_keyboard_name(),
-        .keyboard_present            = tab5_keyboard_present(),
-        .rtc_name                    = "RX8130",
-        .rtc_present                 = tab5_rtc_present(),
+    const bool battery_present = platform_battery_monitor_init();
+    *diagnostics               = (platform_diagnostics_t) {
+                      .device_name                 = "ESP32-P4",
+                      .cpu_cores                   = 2U,
+                      .cpu_frequency_mhz           = CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ,
+                      .memory_total_bytes          = heap_caps_get_total_size(MALLOC_CAP_INTERNAL),
+                      .memory_free_bytes           = heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+                      .memory_free_known           = true,
+                      .external_memory_total_bytes = heap_caps_get_total_size(MALLOC_CAP_SPIRAM),
+                      .external_memory_free_bytes  = heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
+                      .external_memory_present     = true,
+                      .flash_capacity_bytes        = flash_capacity,
+                      .keyboard_name               = tab5_keyboard_name(),
+                      .keyboard_driver             = "Tab5 Keyboard",
+                      .keyboard_present            = tab5_keyboard_present(),
+                      .keyboard_detected           = tab5_keyboard_detected(),
+                      .keyboard_error              = tab5_keyboard_error(),
+                      .rtc_name                    = "RX8130",
+                      .rtc_present                 = tab5_rtc_present(),
+                      .rtc_detected                = tab5_rtc_detected(),
+                      .rtc_error                   = tab5_rtc_error(),
+                      .battery_name                = "INA226",
+                      .battery_present             = battery_present,
+                      .battery_detected            = platform_battery_monitor_detected(),
+                      .battery_error               = platform_battery_monitor_error(),
+                      .network_name                = "ESP32-C6",
+                      .network_present             = hosted_initialized,
     };
     return true;
 }

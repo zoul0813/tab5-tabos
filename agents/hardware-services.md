@@ -81,17 +81,18 @@ documentation pass.
 
 ### Existing driver migration
 
-- [ ] Register the active display as `display0` after controller detection and initialization.
-- [ ] Register the built-in keyboard as `keyboard0` only when detected.
-- [ ] Register mounted microSD storage as `storage0`; transition/remove it on future live-removal support.
-- [ ] Register the RX8130CE as `rtc0` after successful detection.
-- [ ] Register INA226/charger support as `battery0` after successful initialization.
-- [ ] Register ESP32-C6 networking as `wifi0` after hosted transport initialization.
-- [ ] Preserve each existing platform driver and typed public API; registry integration wraps driver
+- [x] Register the active display as `display0` after controller detection and initialization.
+- [x] Register the built-in keyboard as `keyboard0` only when detected.
+- [x] Register mounted microSD storage as `storage0`; transition/remove it on future live-removal support.
+- [x] Register the RX8130CE as `rtc0` after successful detection.
+- [x] Register INA226/charger support as `battery0` after successful initialization.
+- [x] Register ESP32-C6 networking as `wifi0` after hosted transport initialization.
+- [x] Preserve each existing platform driver and typed public API; registry integration wraps driver
   lifecycle and discovery rather than moving ESP-IDF code above the platform boundary.
-- [ ] Route driver initialization failures into device state/error reporting where the hardware was detected.
-- [ ] Replace ad-hoc boot-report device records with registry data where practical.
-- [ ] Keep boot-critical diagnostics available before registry initialization.
+- [x] Route detected driver initialization failures and ESP32-C6 connection recovery into device
+  fault/ready state reporting.
+- [x] Replace ad-hoc boot-report device state/presence decisions with registry data where practical.
+- [x] Keep boot-critical platform diagnostics available before registry-backed report generation.
 
 ### User tooling and validation
 
@@ -100,10 +101,10 @@ documentation pass.
 - [x] Unit-test capacity, duplicate names, deterministic lookup, state transitions,
   tombstones, stale IDs, removal, and registry reinitialization.
 - [x] Unit-test lifecycle-event order, overflow, subscriptions, and owner cleanup.
-- [ ] Add deterministic host virtual devices.
+- [x] Add deterministic host virtual devices.
 - [ ] Add maintained tester coverage for enumeration and lifecycle events.
 - [ ] Validate detected device listing on physical Tab5.
-- [ ] Update boot diagnostics, device API, and utility documentation.
+- [x] Update device API documentation; boot-diagnostic and utility documentation remains tied to pending work.
 
 ## Phase 2: Generic Wait Sources
 

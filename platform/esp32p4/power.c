@@ -9,10 +9,14 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
+#include <errno.h>
+
 static const char* const TAG = "tabos_power";
 static i2c_master_dev_handle_t battery_monitor;
 static bool battery_charging_enabled = true;
 static bool battery_fast_charging_enabled;
+static bool battery_monitor_detected;
+static int battery_monitor_error;
 
 static bool battery_register(uint8_t reg, uint16_t value)
 {
@@ -35,15 +39,31 @@ bool platform_battery_monitor_init(void)
     if (battery_monitor != NULL) {
         return true;
     }
+    battery_monitor_detected         = false;
+    battery_monitor_error            = 0;
     const i2c_device_config_t config = {.device_address = 0x41, .scl_speed_hz = 400000};
     if (i2c_master_bus_add_device(bsp_i2c_get_handle(), &config, &battery_monitor) != ESP_OK) {
         return false;
     }
+    battery_monitor_detected = true;
     if (!battery_register(0x00, 0x4527U) || !battery_register(0x05, 1024U)) {
+        battery_monitor_error = EIO;
+        (void) i2c_master_bus_rm_device(battery_monitor);
+        battery_monitor = NULL;
         return false;
     }
     vTaskDelay(pdMS_TO_TICKS(20U));
     return true;
+}
+
+bool platform_battery_monitor_detected(void)
+{
+    return battery_monitor_detected;
+}
+
+int platform_battery_monitor_error(void)
+{
+    return battery_monitor_error;
 }
 
 bool platform_battery_set_charging(bool enabled)
@@ -78,7 +98,7 @@ bool platform_battery_status(platform_battery_status_t* status)
     }
     const int32_t voltage_mv = (int32_t) voltage_raw * 125 / 100;
     const int32_t current_ma = (int16_t) current_raw;
-    int32_t percentage = (voltage_mv - 6000) * 100 / 2400;
+    int32_t percentage       = (voltage_mv - 6000) * 100 / 2400;
     if (percentage < 0) {
         percentage = 0;
     } else if (percentage > 100) {
@@ -93,14 +113,14 @@ bool platform_battery_status(platform_battery_status_t* status)
         charge_state = 3U;
     }
     *status = (platform_battery_status_t) {
-        .available = true,
-        .charging_enabled = battery_charging_enabled,
+        .available             = true,
+        .charging_enabled      = battery_charging_enabled,
         .fast_charging_enabled = battery_fast_charging_enabled,
-        .voltage_mv = (uint32_t) voltage_mv,
-        .current_ma = current_ma,
-        .power_mw = voltage_mv * current_ma / 1000,
-        .percentage = (uint32_t) percentage,
-        .charge_state = charge_state,
+        .voltage_mv            = (uint32_t) voltage_mv,
+        .current_ma            = current_ma,
+        .power_mw              = voltage_mv * current_ma / 1000,
+        .percentage            = (uint32_t) percentage,
+        .charge_state          = charge_state,
     };
     return true;
 }

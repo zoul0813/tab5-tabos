@@ -9,6 +9,7 @@
 #include <driver/i2c_master.h>
 #include <esp_log.h>
 
+#include <errno.h>
 #include <string.h>
 
 enum {
@@ -23,6 +24,8 @@ enum {
 static const char* const TAG = TABOS_PLATFORM_LOG_TAG;
 static i2c_master_dev_handle_t rtc_device;
 static bool rtc_available;
+static bool rtc_detected;
+static int rtc_error;
 
 static uint8_t bcd_decode(uint8_t value)
 {
@@ -61,10 +64,13 @@ bool tab5_rtc_init(void)
     if (rtc_device != NULL) {
         return rtc_available;
     }
+    rtc_detected = false;
+    rtc_error    = 0;
     if (bsp_i2c_init() != ESP_OK || i2c_master_probe(bsp_i2c_get_handle(), RX8130_ADDRESS, 100) != ESP_OK) {
         ESP_LOGW(TAG, "RX8130 RTC not detected");
         return false;
     }
+    rtc_detected                     = true;
     const i2c_device_config_t config = {
         .dev_addr_length = I2C_ADDR_BIT_LEN_7,
         .device_address  = RX8130_ADDRESS,
@@ -72,6 +78,7 @@ bool tab5_rtc_init(void)
     };
     if (i2c_master_bus_add_device(bsp_i2c_get_handle(), &config, &rtc_device) != ESP_OK) {
         ESP_LOGW(TAG, "Could not attach RX8130 RTC driver");
+        rtc_error = EIO;
         return false;
     }
     uint8_t control1       = 0U;
@@ -90,6 +97,7 @@ bool tab5_rtc_init(void)
         (void) i2c_master_bus_rm_device(rtc_device);
         rtc_device = NULL;
         ESP_LOGW(TAG, "RX8130 RTC did not respond");
+        rtc_error = EIO;
         return false;
     }
     if ((flags & 0x80U) != 0U) {
@@ -111,6 +119,16 @@ void tab5_rtc_shutdown(void)
 bool tab5_rtc_present(void)
 {
     return rtc_available;
+}
+
+bool tab5_rtc_detected(void)
+{
+    return rtc_detected;
+}
+
+int tab5_rtc_error(void)
+{
+    return rtc_error;
 }
 
 bool platform_wall_clock_get(int64_t* seconds)

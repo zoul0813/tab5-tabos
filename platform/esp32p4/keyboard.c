@@ -10,6 +10,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <errno.h>
 
 #define KEYBOARD_I2C_ADDRESS          0x6d
 #define KEYBOARD_I2C_FREQUENCY_HZ     400000
@@ -67,6 +68,8 @@ static const char* const TAG = TABOS_PLATFORM_LOG_TAG;
 static i2c_master_bus_handle_t keyboard_bus;
 static i2c_master_dev_handle_t keyboard_device;
 static bool keyboard_present;
+static bool keyboard_detected;
+static int keyboard_error;
 static bool pressed_keys[KEYBOARD_KEY_COUNT];
 static uint8_t pressed_usages[KEYBOARD_KEY_COUNT];
 static uint8_t pressed_modifiers[KEYBOARD_KEY_COUNT];
@@ -259,6 +262,8 @@ void tab5_keyboard_shutdown(void)
 
 bool tab5_keyboard_init(void)
 {
+    keyboard_detected = false;
+    keyboard_error    = 0;
     (void) snprintf(keyboard_name, sizeof(keyboard_name), "Tab5 keyboard not detected");
     const i2c_master_bus_config_t bus_config = {
         .i2c_port                     = I2C_NUM_0,
@@ -278,6 +283,7 @@ bool tab5_keyboard_init(void)
         ESP_LOGW(TAG, "Tab5 Keyboard not detected at I2C address 0x%02x", KEYBOARD_I2C_ADDRESS);
         return false;
     }
+    keyboard_detected                       = true;
     const i2c_device_config_t device_config = {
         .dev_addr_length = I2C_ADDR_BIT_LEN_7,
         .device_address  = KEYBOARD_I2C_ADDRESS,
@@ -286,12 +292,14 @@ bool tab5_keyboard_init(void)
     result = i2c_master_bus_add_device(keyboard_bus, &device_config, &keyboard_device);
     if (result != ESP_OK) {
         ESP_LOGW(TAG, "Could not attach Tab5 Keyboard I2C device: %s", esp_err_to_name(result));
+        keyboard_error = EIO;
         return false;
     }
     uint8_t firmware_version = 0U;
     if (keyboard_read(KEYBOARD_REG_FIRMWARE_VERSION, &firmware_version, sizeof(firmware_version)) != ESP_OK ||
         keyboard_write(KEYBOARD_REG_MODE, KEYBOARD_MODE_NORMAL) != ESP_OK) {
         ESP_LOGW(TAG, "Could not configure Tab5 Keyboard");
+        keyboard_error = EIO;
         tab5_keyboard_shutdown();
         return false;
     }
@@ -299,6 +307,7 @@ bool tab5_keyboard_init(void)
     if (keyboard_write(KEYBOARD_REG_EVENT_COUNT, 0U) != ESP_OK ||
         keyboard_write(KEYBOARD_REG_INTERRUPT_CONFIG, 0U) != ESP_OK) {
         ESP_LOGW(TAG, "Could not configure Tab5 Keyboard");
+        keyboard_error = EIO;
         tab5_keyboard_shutdown();
         return false;
     }
@@ -337,6 +346,16 @@ const char* tab5_keyboard_name(void)
 bool tab5_keyboard_present(void)
 {
     return keyboard_present;
+}
+
+bool tab5_keyboard_detected(void)
+{
+    return keyboard_detected;
+}
+
+int tab5_keyboard_error(void)
+{
+    return keyboard_error;
 }
 
 bool tab5_keyboard_delete_held(uint32_t window_ms)

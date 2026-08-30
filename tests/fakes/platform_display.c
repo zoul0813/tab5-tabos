@@ -131,9 +131,17 @@ bool platform_get_diagnostics(platform_diagnostics_t* diagnostics)
         .memory_free_bytes  = 512U,
         .memory_free_known  = true,
         .keyboard_name      = "TEST KEYBOARD",
+        .keyboard_driver    = "TEST KEYBOARD",
         .keyboard_present   = true,
+        .keyboard_detected  = true,
         .rtc_name           = "TEST RTC",
         .rtc_present        = true,
+        .rtc_detected       = true,
+        .battery_name       = "TEST BATTERY",
+        .battery_present    = true,
+        .battery_detected   = true,
+        .network_name       = "TEST NETWORK",
+        .network_present    = true,
     };
     return true;
 }

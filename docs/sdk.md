@@ -25,6 +25,12 @@ iteration, and nonblocking flags. TabOS does not claim full POSIX compatibility.
 and copied-information types used by the hardware-service registry. Device IDs are opaque;
 applications must not decode or persist them across reboot.
 
+Current built-in logical names are `display0`, `keyboard0`, `storage0`, `rtc0`,
+`battery0`, and `wifi0`. TabOS registers only devices detected during startup. Host builds
+publish deterministic virtual equivalents. Feature flags describe framebuffer, input,
+removable storage, wall-clock, battery telemetry/control, and Wi-Fi support; flags are
+informational and do not restrict application access.
+
 `tabos_device_count()`, `tabos_device_at()`, `tabos_device_get()`, and
 `tabos_device_find()` enumerate present devices and return copied metadata. Indexed lookup
 is a snapshot operation: applications must tolerate devices changing between count and

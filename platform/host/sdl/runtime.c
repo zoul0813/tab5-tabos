@@ -281,9 +281,17 @@ bool platform_get_diagnostics(platform_diagnostics_t* diagnostics)
                    .cpu_cores          = cpu_cores > 0 ? (unsigned int) cpu_cores : 0U,
                    .memory_total_bytes = ram_mebibytes > 0 ? (uint64_t) (unsigned int) ram_mebibytes * 1024U * 1024U : 0U,
                    .keyboard_name      = "SDL3 keyboard",
+                   .keyboard_driver    = "SDL3",
                    .keyboard_present   = true,
+                   .keyboard_detected  = true,
                    .rtc_name           = "Host system clock",
                    .rtc_present        = true,
+                   .rtc_detected       = true,
+                   .battery_name       = "Host battery",
+                   .battery_present    = true,
+                   .battery_detected   = true,
+                   .network_name       = "Host network",
+                   .network_present    = true,
     };
     return true;
 }

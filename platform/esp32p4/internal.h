@@ -5,6 +5,8 @@
 #include <stdint.h>
 
 bool tab5_keyboard_init(void);
+bool tab5_keyboard_detected(void);
+int tab5_keyboard_error(void);
 void tab5_keyboard_poll(void);
 void tab5_keyboard_shutdown(void);
 const char* tab5_keyboard_name(void);
@@ -13,7 +15,11 @@ bool tab5_keyboard_delete_held(uint32_t window_ms);
 bool platform_usb_port_disable_host_power(void);
 bool platform_battery_charging_enable(void);
 bool platform_battery_monitor_init(void);
+bool platform_battery_monitor_detected(void);
+int platform_battery_monitor_error(void);
 bool tab5_rtc_init(void);
+bool tab5_rtc_detected(void);
+int tab5_rtc_error(void);
 void tab5_rtc_shutdown(void);
 bool tab5_rtc_present(void);
 
