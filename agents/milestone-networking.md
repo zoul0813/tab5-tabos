@@ -84,11 +84,11 @@ are explicitly deferred beyond this milestone.
 
 ### Reusable Wait Foundation
 
-- [ ] Add `<tabos/wait.h>` with process-owned sources, zero-time poll, finite
+- [x] Add `<tabos/wait.h>` with process-owned sources, zero-time poll, finite
   monotonic timeout, infinite wait, and readable, writable, error, and hangup
   flags.
-- [ ] Use wait sets instead of exposing `select()` or native polling.
-- [ ] Cancel waits before process socket cleanup; stale handles fail safely.
+- [x] Use wait sets instead of exposing `select()` or native polling.
+- [x] Cancel waits before process socket cleanup; stale handles fail safely.
 - [ ] Add networking capability metadata and feature query.
 - [x] Preserve Application ABI v1. Append private ELF transport calls compatibly so
   old binaries continue working.
@@ -176,8 +176,9 @@ deferred beyond this milestone.
 - [x] Run socket-capacity and accepted-socket failure coverage on physical Tab5.
 - [x] Test blocking/nonblocking socket behavior, stale handles, cancellation of a
   blocked receive, socket error mapping, and three-attempt autoconnect state.
-- [ ] Test wait readiness/timeouts/cancellation, reconnect, explicit retry
-  cancellation, disconnect transitions, and remaining error paths.
+- [x] Test zero-time and finite wait readiness plus cancellation of an infinite wait.
+- [ ] Test reconnect, explicit retry cancellation, disconnect transitions, and
+  remaining error paths.
 - [x] Test host IPv4/IPv6 loopback TCP and UDP, including listen/accept and peer
   shutdown; test bounded multi-call stream transfer in `nettest`.
 - [ ] Add host DNS, disconnect-during-wait, and reconnect tests.
@@ -187,7 +188,8 @@ Recoverable application-fault cleanup remains deferred until Tab5 gains a
 user-mode/PMP execution boundary; native application faults are currently device-fatal.
 - [x] Extend the independently built RV32 tester with TCP, UDP, nonblocking,
   capacity, stale-handle, and cleanup coverage.
-- [ ] Extend the RV32 tester with DNS, ICMP echo, and wait-set coverage.
+- [x] Extend the RV32 tester with zero-time and finite wait-set coverage.
+- [ ] Extend the RV32 tester with DNS, ICMP echo, and infinite-wait cleanup coverage.
 - [ ] Test `netctl status` redaction and all reported fields.
 - [ ] Test `ping` IPv4/IPv6 success, timeout, unknown host, disconnect, early
   interruption, summary, and exit status behavior.
@@ -197,6 +199,7 @@ user-mode/PMP execution boundary; native application faults are currently device
   cross-builds.
 - [x] Validate physical saved autoconnect, DHCP, DNS/ICMP, TCP/UDP listener traffic,
   socket capacity, cleanup, and display/runtime progress.
+- [ ] Validate zero-time and finite socket waits with the RV32 tester on physical Tab5.
 - [ ] Validate physical scan, interactive connection, IPv6, and `nettest` client mode.
 
 ## Assumptions

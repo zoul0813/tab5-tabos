@@ -60,6 +60,12 @@ typedef struct {
 } platform_network_address_t;
 
 typedef struct {
+        int socket;
+        uint32_t events;
+        uint32_t returned_events;
+} platform_network_wait_item_t;
+
+typedef struct {
         uint32_t sequence;
         uint32_t bytes;
         uint32_t round_trip_ms;
@@ -149,6 +155,7 @@ int platform_network_socket_send_to(int socket, const void* data, uint32_t size,
                                     const platform_network_address_t* address, uint16_t port);
 int platform_network_socket_receive_from(int socket, void* data, uint32_t capacity, platform_network_address_t* address,
                                          uint16_t* port);
+int platform_network_socket_wait(platform_network_wait_item_t* items, uint32_t count, uint32_t timeout_ms);
 uint32_t platform_graphics_capabilities(void);
 bool platform_graphics_begin(void);
 void platform_graphics_end(void);

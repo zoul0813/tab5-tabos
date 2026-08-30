@@ -31,6 +31,7 @@ TABOS_RUNTIME_SOURCES := $(SDK_ROOT)/crt/crt0.c $(SDK_ROOT)/libc/syscalls.c \
                          $(SDK_ROOT)/lib/graphics.c \
                          $(SDK_ROOT)/lib/input.c \
                          $(SDK_ROOT)/lib/network.c \
+                         $(SDK_ROOT)/lib/wait.c \
                          $(SDK_ROOT)/lib/battery.c \
                          $(SDK_ROOT)/lib/clock.c \
                          $(SDK_ROOT)/lib/reboot.c \

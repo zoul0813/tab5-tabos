@@ -1,8 +1,10 @@
 #include <tabos/network.h>
 #include <tabos/filesystem.h>
 #include <tabos/platform/platform.h>
+#include <tabos/wait.h>
 
 #include <arpa/inet.h>
+#include <limits.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdatomic.h>
@@ -16,6 +18,7 @@ static int failures;
 typedef struct {
         int socket;
         atomic_bool started;
+        bool wait;
         int result;
 } blocking_receive_t;
 
@@ -85,13 +88,21 @@ static platform_network_address_t portable_address(int family)
 static void* blocking_receive(void* argument)
 {
     blocking_receive_t* receive = argument;
-    char byte;
     atomic_store_explicit(&receive->started, true, memory_order_release);
-    receive->result = platform_network_socket_receive(receive->socket, &byte, sizeof(byte));
+    if (receive->wait) {
+        platform_network_wait_item_t item = {
+            .socket = receive->socket,
+            .events = TABOS_WAIT_READABLE,
+        };
+        receive->result = platform_network_socket_wait(&item, 1U, TABOS_WAIT_TIMEOUT_INFINITE);
+    } else {
+        char byte;
+        receive->result = platform_network_socket_receive(receive->socket, &byte, sizeof(byte));
+    }
     return NULL;
 }
 
-static void test_interrupted_receive(void)
+static void test_interrupted_operation(bool wait)
 {
     const uint16_t port                       = reserve_port(AF_INET, SOCK_STREAM);
     const platform_network_address_t loopback = portable_address(AF_INET);
@@ -111,7 +122,7 @@ static void test_interrupted_receive(void)
     const int accepted = platform_network_socket_accept(server, &peer, &peer_port);
     expect(accepted >= 0, "accept interrupted receive client");
 
-    blocking_receive_t receive = {.socket = accepted};
+    blocking_receive_t receive = {.socket = accepted, .wait = wait, .result = INT_MIN};
     pthread_t thread;
     const bool thread_created = pthread_create(&thread, NULL, blocking_receive, &receive) == 0;
     expect(thread_created, "start blocking socket operation");
@@ -129,7 +140,8 @@ static void test_interrupted_receive(void)
         if (suspended) {
             platform_network_socket_operations_resume();
         }
-        expect(pthread_join(thread, NULL) == 0 && receive.result <= 0, "interrupted receive returns");
+        expect(pthread_join(thread, NULL) == 0 && receive.result != INT_MIN,
+               wait ? "interrupted infinite wait returns" : "interrupted receive returns");
     } else if (accepted >= 0) {
         (void) platform_network_socket_close(accepted);
     }
@@ -167,17 +179,26 @@ static void test_tcp(int family)
                platform_network_socket_set_nonblocking(accepted, false) == 0,
            "TCP nonblocking receive returns EAGAIN");
 
-    static const char outbound[] = "from-tabos";
+    static const char outbound[]           = "from-tabos";
+    platform_network_wait_item_t wait_item = {
+        .socket = accepted,
+        .events = TABOS_WAIT_READABLE,
+    };
+    expect(platform_network_socket_wait(&wait_item, 1U, 0U) == 0 && wait_item.returned_events == 0U,
+           "zero-time socket wait times out");
     expect(platform_network_socket_send(accepted, outbound, sizeof(outbound)) == (int) sizeof(outbound) &&
                recv(client, buffer, sizeof(buffer), 0) == (ssize_t) sizeof(outbound) &&
                memcmp(buffer, outbound, sizeof(outbound)) == 0,
            "TCP send");
     static const char inbound[] = "to-tabos";
     memset(buffer, 0, sizeof(buffer));
-    expect(send(client, inbound, sizeof(inbound), 0) == (ssize_t) sizeof(inbound) &&
+    const bool inbound_sent   = send(client, inbound, sizeof(inbound), 0) == (ssize_t) sizeof(inbound);
+    wait_item.returned_events = 0U;
+    const int ready           = platform_network_socket_wait(&wait_item, 1U, 1000U);
+    expect(inbound_sent && ready == 1 && (wait_item.returned_events & TABOS_WAIT_READABLE) != 0U &&
                platform_network_socket_receive(accepted, buffer, sizeof(buffer)) == (int) sizeof(inbound) &&
                memcmp(buffer, inbound, sizeof(inbound)) == 0,
-           "TCP receive");
+           "finite socket wait reports readable TCP data");
     expect(platform_network_socket_close(accepted) == 0 && platform_network_socket_close(server) == 0,
            "close TCP sockets");
     (void) close(client);
@@ -222,6 +243,7 @@ int main(void)
     test_udp(AF_INET);
     test_tcp(AF_INET6);
     test_udp(AF_INET6);
-    test_interrupted_receive();
+    test_interrupted_operation(false);
+    test_interrupted_operation(true);
     return failures == 0 ? 0 : 1;
 }

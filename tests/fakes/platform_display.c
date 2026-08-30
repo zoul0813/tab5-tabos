@@ -348,6 +348,14 @@ int platform_network_socket_receive_from(int socket, void* data, uint32_t capaci
     return -TABOS_ENOTSUP;
 }
 
+int platform_network_socket_wait(platform_network_wait_item_t* items, uint32_t count, uint32_t timeout_ms)
+{
+    (void) items;
+    (void) count;
+    (void) timeout_ms;
+    return -TABOS_ENOTSUP;
+}
+
 platform_network_operation_result_t platform_network_resolve(const char* hostname, uint32_t family,
                                                              platform_network_address_t* address)
 {

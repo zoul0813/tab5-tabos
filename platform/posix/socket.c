@@ -1,5 +1,6 @@
 #include <tabos/filesystem.h>
 #include <tabos/network.h>
+#include <tabos/wait.h>
 #include <tabos/platform/platform.h>
 
 #if defined(ESP_PLATFORM)
@@ -18,7 +19,17 @@
 #endif
 
 #include <errno.h>
+#include <limits.h>
+#if !defined(ESP_PLATFORM)
+#include <poll.h>
+#endif
+#include <stdatomic.h>
 #include <string.h>
+
+#if !defined(ESP_PLATFORM)
+static int socket_cancel_pipe[2] = {-1, -1};
+static atomic_bool socket_wait_active;
+#endif
 
 typedef enum {
     SOCKET_OPERATION_OPEN,
@@ -34,6 +45,7 @@ typedef enum {
     SOCKET_OPERATION_RECEIVE,
     SOCKET_OPERATION_SEND_TO,
     SOCKET_OPERATION_RECEIVE_FROM,
+    SOCKET_OPERATION_WAIT,
 } socket_operation_t;
 
 typedef struct {
@@ -48,6 +60,9 @@ typedef struct {
         uint32_t size;
         bool enabled;
         uint8_t data[TABOS_NETWORK_IO_MAX];
+        platform_network_wait_item_t wait_items[TABOS_SOCKET_MAX];
+        uint32_t wait_count;
+        uint32_t timeout_ms;
 } socket_request_t;
 
 typedef struct {
@@ -55,7 +70,38 @@ typedef struct {
         platform_network_address_t address;
         uint16_t port;
         uint8_t data[TABOS_NETWORK_IO_MAX];
+        platform_network_wait_item_t wait_items[TABOS_SOCKET_MAX];
 } socket_response_t;
+
+static short native_wait_events(uint32_t events)
+{
+    short native = 0;
+    if ((events & TABOS_WAIT_READABLE) != 0U) {
+        native |= POLLIN;
+    }
+    if ((events & TABOS_WAIT_WRITABLE) != 0U) {
+        native |= POLLOUT;
+    }
+    return native;
+}
+
+static uint32_t portable_wait_events(short events)
+{
+    uint32_t portable = 0U;
+    if ((events & POLLIN) != 0) {
+        portable |= TABOS_WAIT_READABLE;
+    }
+    if ((events & POLLOUT) != 0) {
+        portable |= TABOS_WAIT_WRITABLE;
+    }
+    if ((events & (POLLERR | POLLNVAL)) != 0) {
+        portable |= TABOS_WAIT_ERROR;
+    }
+    if ((events & POLLHUP) != 0) {
+        portable |= TABOS_WAIT_HANGUP;
+    }
+    return portable;
+}
 
 static int socket_error(void)
 {
@@ -144,6 +190,51 @@ static bool portable_endpoint(const struct sockaddr_storage* storage, platform_n
 static void execute_socket_request(const socket_request_t* request, socket_response_t* response)
 {
     memset(response, 0, sizeof(*response));
+    if (request->operation == SOCKET_OPERATION_WAIT) {
+        struct pollfd descriptors[TABOS_SOCKET_MAX + 1U];
+        for (uint32_t index = 0U; index < request->wait_count; ++index) {
+            descriptors[index] = (struct pollfd) {
+                .fd     = request->wait_items[index].socket,
+                .events = native_wait_events(request->wait_items[index].events),
+            };
+        }
+        int timeout = -1;
+        if (request->timeout_ms != UINT32_MAX) {
+            timeout = request->timeout_ms > (uint32_t) INT_MAX ? INT_MAX : (int) request->timeout_ms;
+        }
+        uint32_t descriptor_count = request->wait_count;
+#if !defined(ESP_PLATFORM)
+        if (socket_cancel_pipe[0] >= 0) {
+            descriptors[descriptor_count] = (struct pollfd) {.fd = socket_cancel_pipe[0], .events = POLLIN};
+            ++descriptor_count;
+        }
+#endif
+#if !defined(ESP_PLATFORM)
+        atomic_store_explicit(&socket_wait_active, true, memory_order_release);
+#endif
+        const int result = poll(descriptors, descriptor_count, timeout);
+#if !defined(ESP_PLATFORM)
+        atomic_store_explicit(&socket_wait_active, false, memory_order_release);
+#endif
+        if (result < 0) {
+            response->result = socket_error();
+            return;
+        }
+#if !defined(ESP_PLATFORM)
+        if (descriptor_count > request->wait_count && (descriptors[request->wait_count].revents & POLLIN) != 0) {
+            uint8_t pending[16];
+            while (read(socket_cancel_pipe[0], pending, sizeof(pending)) > 0) {}
+            response->result = -TABOS_EBADF;
+            return;
+        }
+#endif
+        for (uint32_t index = 0U; index < request->wait_count; ++index) {
+            response->wait_items[index]                 = request->wait_items[index];
+            response->wait_items[index].returned_events = portable_wait_events(descriptors[index].revents);
+        }
+        response->result = result;
+        return;
+    }
     if (request->operation == SOCKET_OPERATION_OPEN) {
         const int family = request->family == 4U ? AF_INET : request->family == 6U ? AF_INET6 : -1;
         const int type   = request->type == TABOS_SOCKET_TCP ? SOCK_STREAM :
@@ -364,15 +455,37 @@ static int submit_socket_request(const socket_request_t* request, socket_respons
 #else
 bool platform_network_socket_operations_init(void)
 {
+    if (socket_cancel_pipe[0] >= 0) {
+        return true;
+    }
+    if (pipe(socket_cancel_pipe) != 0) {
+        socket_cancel_pipe[0] = -1;
+        socket_cancel_pipe[1] = -1;
+        return false;
+    }
+    (void) fcntl(socket_cancel_pipe[0], F_SETFL, O_NONBLOCK);
+    (void) fcntl(socket_cancel_pipe[1], F_SETFL, O_NONBLOCK);
     return true;
 }
 
 void platform_network_socket_operations_shutdown(void)
 {
+    if (socket_cancel_pipe[0] >= 0) {
+        (void) close(socket_cancel_pipe[0]);
+        socket_cancel_pipe[0] = -1;
+    }
+    if (socket_cancel_pipe[1] >= 0) {
+        (void) close(socket_cancel_pipe[1]);
+        socket_cancel_pipe[1] = -1;
+    }
 }
 
 void platform_network_socket_interrupt(int socket)
 {
+    if (socket_cancel_pipe[1] >= 0 && atomic_load_explicit(&socket_wait_active, memory_order_acquire)) {
+        const uint8_t signal = 1U;
+        (void) write(socket_cancel_pipe[1], &signal, sizeof(signal));
+    }
     (void) shutdown(socket, SHUT_RDWR);
 }
 
@@ -392,6 +505,9 @@ void platform_network_socket_dispose(int socket)
 
 static int submit_socket_request(const socket_request_t* request, socket_response_t* response)
 {
+    if (!platform_network_socket_operations_init()) {
+        return -TABOS_EIO;
+    }
     execute_socket_request(request, response);
     return response->result;
 }
@@ -544,4 +660,23 @@ int platform_network_socket_receive_from(int socket, void* data, uint32_t capaci
         }
     }
     return received;
+}
+
+int platform_network_socket_wait(platform_network_wait_item_t* items, uint32_t count, uint32_t timeout_ms)
+{
+    if (items == NULL || count == 0U || count > TABOS_SOCKET_MAX) {
+        return -TABOS_EINVAL;
+    }
+    socket_request_t request = {
+        .operation  = SOCKET_OPERATION_WAIT,
+        .wait_count = count,
+        .timeout_ms = timeout_ms,
+    };
+    memcpy(request.wait_items, items, count * sizeof(*items));
+    socket_response_t response;
+    const int result = submit_socket_request(&request, &response);
+    if (result >= 0) {
+        memcpy(items, response.wait_items, count * sizeof(*items));
+    }
+    return result;
 }

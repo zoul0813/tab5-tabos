@@ -1,6 +1,7 @@
 #include <tester/test.h>
 
 #include <tabos/network.h>
+#include <tabos/wait.h>
 
 #include <errno.h>
 #include <string.h>
@@ -37,11 +38,16 @@ static void test_tcp(tester_context_t* context)
                       tabos_socket_set_nonblocking(accepted, false) == 0,
                   "TCP nonblocking receive returns EAGAIN");
     static const char message[] = "tabos-tcp";
+    tabos_wait_item_t wait_item = {.socket = accepted, .events = TABOS_WAIT_READABLE};
+    tester_expect(context, tabos_wait_set(&wait_item, 1U, 0U) == 0 && wait_item.returned_events == 0U,
+                  "zero-time wait reports no unread TCP data");
+    const bool sent = tabos_socket_send(client, message, sizeof(message)) == (int) sizeof(message);
+    const int ready = tabos_wait_set(&wait_item, 1U, 1000U);
     tester_expect(context,
-                  tabos_socket_send(client, message, sizeof(message)) == (int) sizeof(message) &&
+                  sent && ready == 1 && (wait_item.returned_events & TABOS_WAIT_READABLE) != 0U &&
                       tabos_socket_receive(accepted, buffer, sizeof(buffer)) == (int) sizeof(message) &&
                       memcmp(buffer, message, sizeof(message)) == 0,
-                  "TCP transfers bytes");
+                  "finite wait reports readable TCP data");
     tester_expect(context,
                   tabos_socket_close(accepted) == 0 && tabos_socket_close(client) == 0 &&
                       tabos_socket_close(server) == 0,

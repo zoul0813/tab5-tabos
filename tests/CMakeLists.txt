@@ -55,6 +55,7 @@ add_test(NAME unit.sdk_reboot COMMAND tabos_sdk_reboot)
 add_executable(tabos_sdk_network
     unit/sdk_network.c
     "${TABOS_ROOT}/sdk/lib/network.c"
+    "${TABOS_ROOT}/sdk/lib/wait.c"
 )
 target_include_directories(tabos_sdk_network PRIVATE "${TABOS_ROOT}/sdk/include")
 tabos_enable_warnings(tabos_sdk_network)

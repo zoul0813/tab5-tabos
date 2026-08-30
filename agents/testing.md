@@ -568,6 +568,8 @@ Do not allow host-only behavior to accidentally define the TabOS filesystem API.
 Native macOS/Linux builds may use host sockets behind the TabOS networking abstraction.
 Socket component coverage also interrupts a blocked receive and waits for the
 operation to return before disposing the descriptor, matching process-cleanup order.
+It covers immediate timeout, finite readable readiness, and interruption of an
+infinite socket wait using the same cleanup sequence.
 
 Conceptually:
 

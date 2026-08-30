@@ -83,6 +83,12 @@ typedef struct {
 } tabos_elf_socket_endpoint_t;
 
 typedef struct {
+        int32_t socket;
+        uint32_t events;
+        uint32_t returned_events;
+} tabos_elf_wait_item_t;
+
+typedef struct {
         uint32_t abi_version;
         void (*console_write)(const char* text);
         void (*request_exit)(int exit_status);
@@ -147,6 +153,7 @@ typedef struct {
         int (*battery_set_charging)(uint32_t enabled);
         int (*battery_set_fast_charging)(uint32_t enabled);
         int (*graphics_set_overlays)(uint32_t flags);
+        int (*socket_wait)(tabos_elf_wait_item_t* items, uint32_t count, uint32_t timeout_ms);
 } tabos_elf_api_t;
 
 typedef int (*tabos_elf_entry_fn)(const tabos_elf_api_t* api, int argc, const char* const* argv);

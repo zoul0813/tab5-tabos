@@ -3,6 +3,7 @@
 #include <tabos/internal/elf_api.h>
 #include <tabos/filesystem.h>
 #include <tabos/network.h>
+#include <tabos/wait.h>
 #include <tabos/internal/application.h>
 #include <tabos/internal/elf_loader.h>
 #include <tabos/internal/filesystem.h>
@@ -1076,6 +1077,39 @@ static int elf_socket_receive_from(int socket, void* data, uint32_t capacity, ta
     return received;
 }
 
+static int elf_socket_wait(tabos_elf_wait_item_t* items, uint32_t count, uint32_t timeout_ms)
+{
+    loader_elf_application_t* application = platform_riscv32_current_user_data();
+    tabos_elf_wait_item_t* writable =
+        (tabos_elf_wait_item_t*) platform_executable_data_pointer(items, count * sizeof(*items));
+    if (application == NULL || writable == NULL || count == 0U || count > TABOS_WAIT_MAX) {
+        return -TABOS_EINVAL;
+    }
+    const uint32_t valid_events = TABOS_WAIT_READABLE | TABOS_WAIT_WRITABLE | TABOS_WAIT_ERROR | TABOS_WAIT_HANGUP;
+    platform_network_wait_item_t platform_items[TABOS_WAIT_MAX];
+    for (uint32_t index = 0U; index < count; ++index) {
+        elf_socket_t* owned = elf_socket(application, writable[index].socket);
+        if (owned == NULL) {
+            return -TABOS_EBADF;
+        }
+        if (writable[index].events == 0U || (writable[index].events & ~valid_events) != 0U) {
+            return -TABOS_EINVAL;
+        }
+        writable[index].returned_events = 0U;
+        platform_items[index]           = (platform_network_wait_item_t) {
+                      .socket = owned->platform_socket,
+                      .events = writable[index].events,
+        };
+    }
+    const int result = platform_network_socket_wait(platform_items, count, timeout_ms);
+    if (result >= 0) {
+        for (uint32_t index = 0U; index < count; ++index) {
+            writable[index].returned_events = platform_items[index].returned_events;
+        }
+    }
+    return result;
+}
+
 static int elf_system_info(tabos_elf_system_info_t* info)
 {
     if (info == NULL) {
@@ -1470,6 +1504,7 @@ static bool elf_entry(tabos_app_context_t* context)
         .battery_set_charging      = elf_battery_set_charging,
         .battery_set_fast_charging = elf_battery_set_fast_charging,
         .graphics_set_overlays     = elf_graphics_set_overlays,
+        .socket_wait               = elf_socket_wait,
     };
     application->execution = platform_riscv32_create(
         application->image.entry, application->image.memory, application->image.memory_size,
