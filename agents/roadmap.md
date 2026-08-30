@@ -503,6 +503,8 @@ but is not a substitute for this execution path.
 - [ ] Add synthetic input injection for integration tests.
 - [ ] Add controlled filesystem fixtures.
 - [x] Run actual RV32 binaries on host through a resumable RV32IMA interpreter.
+- [x] Batch host RV32 instructions while preserving bounded scheduling, API-gate
+  dispatch, exact fault reporting, and resumable execution.
 - [ ] Add source-level application debugging workflow.
 - [ ] Decide first-class C++ support timing.
 

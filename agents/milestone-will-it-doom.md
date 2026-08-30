@@ -332,3 +332,28 @@ host and Tab5 storage validation remains Phase 10 work.
 - [ ] Check watchdog, keyboard, timers, display, and filesystem responsiveness.
 - [ ] Record peak heap, guest RAM, PSRAM, conversion time, present time, and FPS.
 - [ ] Update milestone status and user-facing application/build documentation.
+
+Host interpreter batching validation (2026-08-30): `platform_riscv32_step()` now
+runs ordinary guest instructions in one MiniRV32IMA batch up to the existing
+2,000,000-instruction cooperative slice. The interpreter post-execution hook stops
+before the contiguous `0xffff0000` through `0xffff0100` API-gate range, after which
+the existing wrapper dispatches calls, explicit yield, return, and faults. Cycle-counter
+deltas retain instruction-budget accounting, and fault logs use the interpreter's exact
+trap PC.
+
+On the 10-core Apple Silicon macOS Release host, the same 722,792-byte RV32I DOOM
+artifact and installed Freedoom WAD were launched with the SDL dummy renderer for an
+unattended comparison. An LLDB call counter at `platform_graphics_present()` measured
+233 presentations in five seconds (46.6/s) with the former single-instruction loop and
+422 in five seconds (84.4/s) after batching, a 1.81x increase in this title/demo workload.
+A five-second post-fix CPU sample attributed 690 of 878 main-thread samples (78.6%) to
+RV32 execution, 21 (2.4%) to graphics presentation/scaling/upload, and 164 (18.7%) to
+the host run-loop delay. The measured presentation rate exceeds DOOM's 35 Hz target
+while the bounded host loop continues to regain control between slices.
+
+Automated validation covers a multi-instruction batch, exact small-budget resume,
+API-gate boundary dispatch, explicit yield/resume, return, illegal instruction, invalid
+guest memory, and runaway-loop budget exhaustion. macOS Debug passed all 34 tests and
+macOS Release built successfully. Interactive gameplay/input response plus isolated
+guest RGB conversion and present-time measurements remain part of the broader Phase 10
+manual validation; no graphics path or user-visible behavior changed in this fix.

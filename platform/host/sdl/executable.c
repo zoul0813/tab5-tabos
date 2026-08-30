@@ -1,6 +1,7 @@
 #include <tabos/platform/platform.h>
 #include <tabos/wait.h>
 
+#include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,8 +14,17 @@ enum {
 
 static _Thread_local uint32_t host_rv32_active_ram_size;
 
+#define HOST_RV32_API_GATE_FIRST  UINT32_C(0xffff0000)
+#define HOST_RV32_API_GATE_LAST   UINT32_C(0xffff0100)
 #define MINI_RV32_RAM_SIZE        host_rv32_active_ram_size
 #define MINIRV32_RAM_IMAGE_OFFSET 0U
+#define MINIRV32_POSTEXEC(pc, ir, trap)                                                                      \
+    do {                                                                                                     \
+        const uint32_t host_rv32_next_pc = (pc) + 4U;                                                        \
+        if (host_rv32_next_pc >= HOST_RV32_API_GATE_FIRST && host_rv32_next_pc <= HOST_RV32_API_GATE_LAST) { \
+            icount = count - 1;                                                                              \
+        }                                                                                                    \
+    } while (0)
 #define MINIRV32_IMPLEMENTATION
 #if defined(__clang__)
 #pragma clang diagnostic push
@@ -1035,14 +1045,24 @@ platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* cont
             context->state.pc = context->state.regs[1];
             return PLATFORM_RISCV32_YIELDED;
         }
-        const uint32_t instruction_pc = context->state.pc;
-        (void) MiniRV32IMAStep(&context->state, context->memory, 0U, 0U, 1);
+        const uint64_t cycle_before         = ((uint64_t) context->state.cycleh << 32U) | context->state.cyclel;
+        const unsigned int remaining_budget = instruction_budget - count;
+        int batch_budget                    = INT_MAX;
+        if (remaining_budget <= (unsigned int) INT_MAX) {
+            batch_budget = (int) remaining_budget;
+        }
+        (void) MiniRV32IMAStep(&context->state, context->memory, 0U, 0U, batch_budget);
+        const uint64_t cycle_after = ((uint64_t) context->state.cycleh << 32U) | context->state.cyclel;
+        const uint64_t executed    = cycle_after - cycle_before;
         if (context->state.mcause != 0U) {
             char message[96];
-            (void) snprintf(message, sizeof(message), "RV32 fault at PC 0x%08x, cause 0x%08x", instruction_pc,
+            (void) snprintf(message, sizeof(message), "RV32 fault at PC 0x%08x, cause 0x%08x", context->state.mepc,
                             context->state.mcause);
             platform_log(message);
             return PLATFORM_RISCV32_FAULT;
+        }
+        if (executed > 0U) {
+            count += (unsigned int) executed - 1U;
         }
     }
     return PLATFORM_RISCV32_YIELDED;

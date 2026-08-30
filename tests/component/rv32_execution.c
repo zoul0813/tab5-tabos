@@ -15,6 +15,7 @@ static bool requested_exit;
 static int requested_status = -1;
 static uint32_t tty_mode;
 static bool input_event_available;
+static unsigned int yield_count;
 static int raw_returned_status;
 
 static void test_console_write(const char* text)
@@ -77,6 +78,11 @@ static int test_input_poll(tabos_input_event_t* event)
     return 1;
 }
 
+static void test_yield(void)
+{
+    ++yield_count;
+}
+
 static platform_riscv32_result_t execute_raw_with_limits(const uint32_t* instructions, size_t size, unsigned int budget,
                                                          size_t heap_bytes, size_t stack_bytes)
 {
@@ -88,6 +94,7 @@ static platform_riscv32_result_t execute_raw_with_limits(const uint32_t* instruc
         .tty_get_mode      = test_tty_get_mode,
         .tty_set_mode      = test_tty_set_mode,
         .input_poll        = test_input_poll,
+        .yield             = test_yield,
     };
     int returned_status = -1;
     platform_riscv32_context_t* context =
@@ -121,6 +128,7 @@ int main(void)
         .tty_get_mode      = test_tty_get_mode,
         .tty_set_mode      = test_tty_set_mode,
         .input_poll        = test_input_poll,
+        .yield             = test_yield,
     };
     const char* const arguments[]       = {"hello", "one", "two words"};
     int returned_status                 = -1;
@@ -160,6 +168,22 @@ int main(void)
         UINT32_C(0x00000013), /* nop */
         UINT32_C(0x00008067), /* ret */
     };
+    static const uint32_t batched_program[] = {
+        UINT32_C(0x00000513), /* addi a0, zero, 0 */
+        UINT32_C(0x00150513), /* addi a0, a0, 1 */
+        UINT32_C(0x00150513), /* addi a0, a0, 1 */
+        UINT32_C(0x00150513), /* addi a0, a0, 1 */
+        UINT32_C(0x00008067), /* ret */
+    };
+    static const uint32_t yield_program[] = {
+        UINT32_C(0x00008393), /* addi t2, ra, 0: preserve caller return address */
+        UINT32_C(0x00050293), /* addi t0, a0, 0: retain API table pointer */
+        UINT32_C(0x0242a283), /* lw t0, 36(t0): yield table entry */
+        UINT32_C(0x000280e7), /* jalr ra, t0, 0 */
+        UINT32_C(0x00038093), /* addi ra, t2, 0: restore caller return address */
+        UINT32_C(0x00700513), /* addi a0, zero, 7 */
+        UINT32_C(0x00008067), /* ret */
+    };
     static const uint32_t input_poll_program[] = {
         UINT32_C(0x00008393), /* addi t2, ra, 0: preserve caller return address */
         UINT32_C(0x00050293), /* addi t0, a0, 0: retain API table pointer */
@@ -187,6 +211,24 @@ int main(void)
                          platform_riscv32_step(resumable, 2U, &resumable_status) == PLATFORM_RISCV32_RETURNED;
     platform_riscv32_destroy(resumable);
 
+    const bool batched = execute_raw(batched_program, sizeof(batched_program), 8U) == PLATFORM_RISCV32_RETURNED &&
+                         raw_returned_status == 3;
+
+    platform_riscv32_context_t* yielding = platform_riscv32_create(yield_program, yield_program, sizeof(yield_program),
+                                                                   0U, 256U * 1024U, 16U * 1024U, &api, 0U, NULL, NULL);
+    int yield_status                     = -1;
+    yield_count                          = 0U;
+    const bool stopped_at_api_boundary =
+        yielding != NULL && platform_riscv32_step(yielding, 4U, &yield_status) == PLATFORM_RISCV32_YIELDED &&
+        yield_count == 0U;
+    const bool yielded_at_api = yielding != NULL &&
+                                platform_riscv32_step(yielding, 1U, &yield_status) == PLATFORM_RISCV32_YIELDED &&
+                                yield_count == 1U;
+    const bool resumed_after_yield = yielding != NULL &&
+                                     platform_riscv32_step(yielding, 8U, &yield_status) == PLATFORM_RISCV32_RETURNED &&
+                                     yield_status == 7;
+    platform_riscv32_destroy(yielding);
+
     platform_riscv32_context_t* capped =
         platform_riscv32_create(resumable_program, resumable_program, sizeof(resumable_program), 0U,
                                 24U * 1024U * 1024U, 16U * 1024U, &api, 0U, NULL, NULL);
@@ -194,8 +236,8 @@ int main(void)
     platform_riscv32_destroy(capped);
 
     const bool illegal_fault =
-        execute_raw(illegal_instruction, sizeof(illegal_instruction), 1U) == PLATFORM_RISCV32_FAULT;
-    const bool invalid_fault   = execute_raw(invalid_load, sizeof(invalid_load), 2U) == PLATFORM_RISCV32_FAULT;
+        execute_raw(illegal_instruction, sizeof(illegal_instruction), 100U) == PLATFORM_RISCV32_FAULT;
+    const bool invalid_fault   = execute_raw(invalid_load, sizeof(invalid_load), 100U) == PLATFORM_RISCV32_FAULT;
     const bool large_heap_runs = execute_raw_with_limits(large_heap_load, sizeof(large_heap_load), 4U,
                                                          3U * 1024U * 1024U, 16U * 1024U) == PLATFORM_RISCV32_RETURNED;
     const bool runaway_yields  = execute_raw(runaway_loop, sizeof(runaway_loop), 1000U) == PLATFORM_RISCV32_YIELDED;
@@ -205,13 +247,15 @@ int main(void)
     const bool input_event_correct = raw_returned_status == (int) TABOS_KEY_Q;
     const bool invalid_input_pointer_fault =
         execute_raw(invalid_input_pointer_program, sizeof(invalid_input_pointer_program), 8U) == PLATFORM_RISCV32_FAULT;
-    if (!resumed || !cap_rejected || !illegal_fault || !invalid_fault || !large_heap_runs || !runaway_yields ||
-        !input_event_delivered || !input_event_correct || !invalid_input_pointer_fault || input_event_available) {
+    if (!resumed || !batched || !stopped_at_api_boundary || !yielded_at_api || !resumed_after_yield || !cap_rejected ||
+        !illegal_fault || !invalid_fault || !large_heap_runs || !runaway_yields || !input_event_delivered ||
+        !input_event_correct || !invalid_input_pointer_fault || input_event_available) {
         fprintf(stderr,
-                "resumed=%d cap=%d illegal=%d invalid=%d large=%d runaway=%d input=%d input_data=%d input_pointer=%d "
-                "pending=%d\n",
-                resumed, cap_rejected, illegal_fault, invalid_fault, large_heap_runs, runaway_yields,
-                input_event_delivered, input_event_correct, invalid_input_pointer_fault, input_event_available);
+                "resumed=%d batched=%d boundary=%d yield=%d yield_resume=%d cap=%d illegal=%d invalid=%d large=%d "
+                "runaway=%d input=%d input_data=%d input_pointer=%d pending=%d\n",
+                resumed, batched, stopped_at_api_boundary, yielded_at_api, resumed_after_yield, cap_rejected,
+                illegal_fault, invalid_fault, large_heap_runs, runaway_yields, input_event_delivered,
+                input_event_correct, invalid_input_pointer_fault, input_event_available);
         return 1;
     }
     return 0;
