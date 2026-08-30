@@ -28,6 +28,7 @@
 - [x] Add private ELF transport and host interpreter support.
 - [x] Extend unit tests and maintained tester coverage.
 - [x] Add UTC `date` utility for reading and setting wall-clock time.
+- [x] Add text `cal` application using the current UTC wall clock.
 - [x] Add standalone 640x360 graphical UTC `clock` application.
 - [ ] Validate RX8130 read/write behavior on physical Tab5 hardware.
 
@@ -63,10 +64,13 @@
 - [x] Make filesystem ELF resource teardown idempotent across partial startup,
   normal exit, requested exit, and platform-detected faults.
 - [x] Add heap boundary guards and cleanup diagnostics.
+- [x] Validate ELF resource metadata and enforce bounded per-process heap and stack
+  requests while retaining safe legacy defaults.
 - [x] Extend the maintained tester with leaked-resource and nested-failure cases.
 - [x] Preserve host invalid-memory fault containment and PID 0 panic behavior.
 - [x] Document that native Tab5 application faults remain device-fatal until a
   user-mode/PMP execution boundary and recoverable trap path are implemented.
+- [ ] Design and implement the Tab5 user-mode/PMP boundary and recoverable native-fault path.
 
 - [x] Replace generated C glyph tables with directly embedded raw bitmap font data.
 - [x] Support compile-time fixed-width font width, height, cell size, and 1-256 glyphs.
@@ -236,7 +240,8 @@
 - [ ] Decide whether final executable remains ELF or becomes converted TabOS format.
 - [x] Define initial static relocation model; defer dynamic/imported symbol binding.
 - [ ] Define final application ABI and versioning policy.
-- [ ] Define failure containment and application memory ownership.
+- [x] Define application memory ownership, deterministic cleanup, and host fault containment.
+- [ ] Define Tab5 native crash containment after protection capabilities are validated.
 
 ## Next Milestone: Filesystem and Storage Foundation
 
@@ -372,7 +377,7 @@ but is not a substitute for this execution path.
 - [x] Load independent hello application from Tab5 microSD.
 - [ ] Define application file naming and discovery rules.
 - [x] Define extensionless application names, default `T:/bin` PATH, and relative-path command syntax.
-- [ ] Add application metadata validation.
+- [x] Add application metadata validation for ABI and requested heap/stack limits.
 - [ ] Enumerate installed applications without hardcoded registry entries.
 - [ ] Add minimal launcher diagnostic that lists and starts applications.
 - [ ] Keep launcher diagnostic separate from shell.
@@ -399,9 +404,11 @@ but is not a substitute for this execution path.
 - [x] Decide initial process-to-FreeRTOS-task mapping.
 - [x] Replace cooperative single-application runtime with nested foreground process stack.
 - [x] Add process identifiers and public process metadata.
-- [ ] Add application crash/fault containment where hardware permits.
-- [ ] Define application memory ownership and cleanup guarantees.
-- [ ] Add process nesting, service concurrency, ownership, and cleanup tests.
+- [x] Add host application fault containment; document Tab5 native-fault limitation.
+- [x] Define application memory ownership and cleanup guarantees.
+- [x] Add nested-process, resource-ownership, and cleanup tests.
+- [ ] Add a Tab5 recoverable native-fault boundary where hardware permits.
+- [ ] Extend service-concurrency validation during long-running native applications.
 - [ ] Measure SMP, memory pressure, and application failure behavior on Tab5.
 
 ### Shell Application
@@ -459,9 +466,11 @@ but is not a substitute for this execution path.
 - [x] Expose Wi-Fi status, saved connect, and disconnect through the application API and `netctl`.
 - [x] Decide on bounded BSD-like sockets with TabOS-owned types and wait sets.
 - [x] Implement host socket backend.
-- [ ] Implement Tab5 C6 networking backend.
-- [ ] Add Wi-Fi configuration user experience.
-- [ ] Add deterministic portable tests and hardware connectivity tests.
+- [x] Implement Tab5 ESP32-C6 Wi-Fi, DNS, ICMP, TCP/UDP, and wait-set backends.
+- [x] Add certificate-verified TLS client connections and HTTPS utilities.
+- [x] Add deterministic portable tests plus physical Wi-Fi, DNS, ICMP, socket, NTP,
+  and TLS validation.
+- [ ] Add Wi-Fi scan, forget, and interactive configuration workflows.
 
 ### Audio
 
@@ -474,12 +483,12 @@ but is not a substitute for this execution path.
 
 ### Remaining Hardware and System Services
 
-- [ ] Add RTC and wall-clock service.
-- [ ] Add power, battery, sleep, and wake services.
+- [x] Add RTC and wall-clock service; physical RX8130CE validation remains separately tracked.
+- [x] Add battery telemetry and charge control; sleep and wake remain future work.
 - [ ] Add USB host/OTG service beyond keyboard support.
 - [ ] Add camera service when application needs justify it.
 - [ ] Add supported sensor APIs.
-- [ ] Add device enumeration/system information model.
+- [x] Add initial device/system information API.
 
 ### IPC and Advanced I/O
 

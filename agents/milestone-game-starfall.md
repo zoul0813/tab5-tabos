@@ -7,6 +7,14 @@ TabOS can support real games through its public graphics, raw-input, time, and
 filesystem APIs. Starfall must behave consistently on the macOS/Linux hosts and
 physical Tab5 hardware.
 
+## Status
+
+The Starfall application is implemented: its game, rendering, input, and storage
+modules are present and the extensionless binary is installed as `T:/bin/starfall`.
+On 2026-08-30, the macOS `unit.starfall_game` test and `apps/build.sh` both passed.
+The remaining work is broader automated coverage plus host and physical-Tab5
+acceptance validation.
+
 ## Decisions
 
 - [x] Name the game **Starfall**.
@@ -138,7 +146,7 @@ future work.
 
 ## Automated Tests
 
-- [x] Add host-native deterministic tests for movement bounds, firing, damage,
+- [x] Add an initial host-native deterministic test for movement, firing, damage,
   invulnerability, pause, game over, and restart.
 - [ ] Test raw key-down/key-up state, simultaneous movement/fire, repeat filtering for
   toggles, and held K firing cadence.
@@ -150,7 +158,8 @@ future work.
 - [ ] Test high-score parsing, corruption fallback, update rules, directory creation,
   temporary-file replacement, and nonfatal storage failures.
 - [x] Build all applications with `apps/build.sh`.
-- [x] Run the complete macOS test suite.
+- [x] Run `unit.starfall_game` on macOS.
+- [ ] Run the complete macOS test suite after Starfall-specific coverage is expanded.
 - [ ] Build Linux debug and release targets.
 - [x] Build Tab5 debug firmware.
 - [ ] Build Tab5 release firmware.

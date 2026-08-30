@@ -7,6 +7,13 @@ normal return, requested exit, launch failure, and loader-detected execution
 faults. Preserve the nested foreground process model: a failed child returns a
 nonzero status and its parent resumes; a failed PID 0 enters kernel panic.
 
+## Status
+
+Deterministic process ownership and cleanup are implemented. Host RV32 guest faults
+are contained as child-process failures; `unit.application_lifecycle` passed on macOS
+on 2026-08-30. Native Tab5 execution still has no hardware memory-protection or
+recoverable-fault boundary, so true native crash containment remains deferred.
+
 ## Decisions
 
 - [DECIDED] Each filesystem ELF process owns its loaded image and executable
@@ -42,6 +49,8 @@ nonzero status and its parent resumes; a failed PID 0 enters kernel panic.
   nested-parent ownership.
 - [x] Consolidate filesystem ELF resource release into one idempotent path.
 - [x] Add heap boundary guards and teardown diagnostics.
+- [x] Validate ELF resource metadata and enforce bounded per-process heap and stack
+  requests, while retaining safe defaults for legacy applications.
 - [x] Test child nonzero status, leaked descriptor cleanup, repeated reload, and
   nested parent restoration with the maintained tester application.
 - [x] Test malformed/invalid guest accesses remain process faults on the host

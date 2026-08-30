@@ -6,6 +6,12 @@ Provide one portable UTC wall clock across host targets and Tab5, backed by the
 Tab5 RX8130CE RTC. Expose calendar and Unix-epoch access to applications while
 preserving the existing monotonic clock for elapsed-time measurement.
 
+## Status
+
+The wall-clock service, `cal`, and graphical `clock` applications are implemented.
+On 2026-08-30, `apps/build.sh` produced and installed both as `T:/bin/cal` and
+`T:/bin/clock`. The remaining milestone work is physical RX8130CE validation on Tab5.
+
 ## Decisions
 
 - [DECIDED] Wall-clock values use signed Unix seconds since
@@ -27,8 +33,9 @@ preserving the existing monotonic clock for elapsed-time measurement.
   address `0x32`. Missing or invalid RTC data is nonfatal and reported as an
   unavailable wall clock.
 - [DECIDED] Initial scope excludes timezone databases, locale formatting,
-  alarms, periodic RTC interrupts, network time synchronization, and automatic
-  host-to-RTC synchronization.
+  alarms, periodic RTC interrupts, and automatic host-to-RTC synchronization.
+  Network synchronization is provided separately by the `ntpdate` networking
+  utility, rather than by the RTC service.
 
 ## Checklist
 
@@ -39,6 +46,9 @@ preserving the existing monotonic clock for elapsed-time measurement.
 - [x] Add wall-clock calls to the private ELF transport and host interpreter.
 - [x] Add public SDK calendar functions and libc time hooks.
 - [x] Add unit, host, and maintained tester coverage.
+- [x] Add `cal`, a text calendar application using the current UTC wall clock.
+- [x] Add `clock`, a standalone graphical UTC wall-clock application.
+- [x] Build and install both applications through `apps/build.sh`.
 - [x] Document API, UTC semantics, limitations, and hardware validation steps.
 - [ ] Validate RX8130CE detection, calendar read, and unchanged-value write on
   physical Tab5 hardware.
