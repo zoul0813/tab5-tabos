@@ -1,5 +1,6 @@
 #include <tabos/internal/elf_loader.h>
 
+#include <tabos/application.h>
 #include <tabos/filesystem.h>
 #include <tabos/platform/platform.h>
 
@@ -17,6 +18,7 @@ enum {
     ELF_PROGRAM_DYNAMIC         = 2,
     ELF_PROGRAM_EXECUTE         = 1,
     ELF_SECTION_SYMBOL_TABLE    = 2,
+    ELF_SECTION_NOTE            = 7,
     ELF_SECTION_RELA            = 4,
     ELF_SECTION_REL             = 9,
     ELF_RELOCATION_NONE         = 0,
@@ -37,6 +39,10 @@ enum {
     ELF_SECTION_ALLOCATED       = 2,
     ELF_SYMBOL_UNDEFINED        = 0,
     ELF_SYMBOL_ABSOLUTE         = 0xfff1,
+    ELF_NOTE_HEADER_SIZE        = 12,
+    ELF_NOTE_TYPE_TABOS         = 1,
+    ELF_NOTE_NAME_SIZE          = 6,
+    ELF_NOTE_DESC_PADDED_SIZE   = 32,
     ELF_MAX_IMAGE_SIZE          = 1024 * 1024,
     ELF_MAX_FILE_SIZE           = 2 * 1024 * 1024,
 };
@@ -74,6 +80,97 @@ static bool table_valid(uint32_t offset, uint16_t count, uint16_t entry_size, si
 {
     return count == 0U || (entry_size != 0U && count <= SIZE_MAX / entry_size &&
                            range_valid(offset, (size_t) count * entry_size, total));
+}
+
+static bool aligned_four(uint32_t value, size_t* result)
+{
+    if (result == NULL || (size_t) value > SIZE_MAX - 3U) {
+        return false;
+    }
+    *result = ((size_t) value + 3U) & ~((size_t) 3U);
+    return true;
+}
+
+static bool metadata_name_matches(const uint8_t* name, uint32_t size)
+{
+    static const uint8_t expected[] = {'T', 'A', 'B', 'O', 'S', '\0'};
+    return size == ELF_NOTE_NAME_SIZE && memcmp(name, expected, sizeof(expected)) == 0;
+}
+
+static loader_elf_result_t inspect_metadata(const uint8_t* data, size_t size, loader_elf_info_t* info)
+{
+    const uint32_t section_offset     = read_u32(data + 32U);
+    const uint16_t section_entry_size = read_u16(data + 46U);
+    const uint16_t section_count      = read_u16(data + 48U);
+    bool found                        = false;
+
+    info->application_abi_version = 1U;
+    info->requested_heap_bytes    = LOADER_ELF_DEFAULT_HEAP_BYTES;
+    info->requested_stack_bytes   = LOADER_ELF_DEFAULT_STACK_BYTES;
+    info->capabilities            = TABOS_APP_CAPABILITY_CONSOLE;
+    info->metadata_present        = false;
+
+    for (uint16_t section_index = 0U; section_index < section_count; ++section_index) {
+        const uint8_t* section = data + section_offset + ((size_t) section_index * section_entry_size);
+        if (read_u32(section + 4U) != ELF_SECTION_NOTE) {
+            continue;
+        }
+        const uint32_t note_offset = read_u32(section + 16U);
+        const uint32_t note_size   = read_u32(section + 20U);
+        if (!range_valid(note_offset, note_size, size)) {
+            return LOADER_ELF_TRUNCATED;
+        }
+        size_t cursor = 0U;
+        while (cursor < note_size) {
+            if (note_size - cursor < ELF_NOTE_HEADER_SIZE) {
+                return LOADER_ELF_TRUNCATED;
+            }
+            const uint8_t* note      = data + note_offset + cursor;
+            const uint32_t name_size = read_u32(note);
+            const uint32_t desc_size = read_u32(note + 4U);
+            const uint32_t note_type = read_u32(note + 8U);
+            size_t name_padded;
+            size_t desc_padded;
+            if (!aligned_four(name_size, &name_padded) || !aligned_four(desc_size, &desc_padded)) {
+                return LOADER_ELF_TRUNCATED;
+            }
+            const size_t payload_size = name_padded + desc_padded;
+            if (payload_size < name_padded || payload_size > (size_t) note_size - cursor - ELF_NOTE_HEADER_SIZE) {
+                return LOADER_ELF_TRUNCATED;
+            }
+            const uint8_t* name = note + ELF_NOTE_HEADER_SIZE;
+            if (metadata_name_matches(name, name_size)) {
+                if (found || note_type != ELF_NOTE_TYPE_TABOS || desc_size != ELF_NOTE_DESC_PADDED_SIZE) {
+                    return LOADER_ELF_UNSUPPORTED_FORMAT;
+                }
+                const uint8_t* descriptor = name + name_padded;
+                if (read_u32(descriptor) != LOADER_ELF_METADATA_VERSION ||
+                    read_u32(descriptor + 4U) != LOADER_ELF_METADATA_DESCRIPTOR_SIZE ||
+                    read_u32(descriptor + 8U) != 1U || read_u32(descriptor + 24U) != 0U ||
+                    read_u32(descriptor + 28U) != 0U) {
+                    return LOADER_ELF_UNSUPPORTED_FORMAT;
+                }
+                const uint32_t heap_bytes     = read_u32(descriptor + 12U);
+                const uint32_t stack_bytes    = read_u32(descriptor + 16U);
+                const uint32_t capabilities   = read_u32(descriptor + 20U);
+                const uint32_t supported_caps = TABOS_APP_CAPABILITY_CONSOLE;
+                if (heap_bytes < LOADER_ELF_MIN_HEAP_BYTES || heap_bytes > LOADER_ELF_MAX_HEAP_BYTES ||
+                    (heap_bytes % 4096U) != 0U || stack_bytes < LOADER_ELF_MIN_STACK_BYTES ||
+                    stack_bytes > LOADER_ELF_MAX_STACK_BYTES || (stack_bytes % 16U) != 0U ||
+                    (capabilities & ~supported_caps) != 0U) {
+                    return LOADER_ELF_UNSUPPORTED_FORMAT;
+                }
+                info->application_abi_version = read_u32(descriptor + 8U);
+                info->requested_heap_bytes    = heap_bytes;
+                info->requested_stack_bytes   = stack_bytes;
+                info->capabilities            = capabilities;
+                info->metadata_present        = true;
+                found                         = true;
+            }
+            cursor += ELF_NOTE_HEADER_SIZE + payload_size;
+        }
+    }
+    return LOADER_ELF_OK;
 }
 
 static loader_elf_result_t inspect_sections(const uint8_t* data, size_t size)
@@ -244,6 +341,10 @@ loader_elf_result_t loader_elf_inspect(const uint8_t* data, size_t size, loader_
     if (section_result != LOADER_ELF_OK) {
         return section_result;
     }
+    const loader_elf_result_t metadata_result = inspect_metadata(data, size, info);
+    if (metadata_result != LOADER_ELF_OK) {
+        return metadata_result;
+    }
 
     uint32_t minimum      = UINT32_MAX;
     uint32_t maximum      = 0U;
@@ -293,11 +394,16 @@ loader_elf_result_t loader_elf_inspect(const uint8_t* data, size_t size, loader_
         return LOADER_ELF_IMAGE_TOO_LARGE;
     }
     *info = (loader_elf_info_t) {
-        .entry_address      = entry,
-        .minimum_address    = minimum,
-        .maximum_address    = maximum,
-        .image_size         = image_size,
-        .load_segment_count = info->load_segment_count,
+        .entry_address           = entry,
+        .minimum_address         = minimum,
+        .maximum_address         = maximum,
+        .image_size              = image_size,
+        .load_segment_count      = info->load_segment_count,
+        .application_abi_version = info->application_abi_version,
+        .requested_heap_bytes    = info->requested_heap_bytes,
+        .requested_stack_bytes   = info->requested_stack_bytes,
+        .capabilities            = info->capabilities,
+        .metadata_present        = info->metadata_present,
     };
     return LOADER_ELF_OK;
 }

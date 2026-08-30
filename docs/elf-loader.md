@@ -31,6 +31,29 @@ RVC output requires host-interpreter support before it can become the shared def
 Host execution uses reserved guest call gates to bridge the TabOS API table; it does not
 provide Linux system calls.
 
+### Optional TabOS Metadata
+
+Applications may include one ELF `SHT_NOTE` record named `TABOS`, type `1`, with a
+32-byte little-endian descriptor:
+
+```text
+offset  size  field
+0       4     metadata version (1)
+4       4     descriptor size (32)
+8       4     Application ABI version (1)
+12      4     requested heap bytes
+16      4     requested stack bytes
+20      4     requested capability bits
+24      8     reserved (must be zero)
+```
+
+The loader validates metadata before process creation. Heap requests must range from
+256 KiB through 16 MiB and align to 4 KiB. Stack requests must range from 16 KiB
+through 256 KiB and align to 16 bytes. Current supported capability is console.
+Missing metadata uses legacy defaults of 256 KiB heap and 16 KiB stack. Resource
+allocation from these values is completed by the process-memory work that follows
+this parser.
+
 Host execution is resumable. Each application update executes at most 10,000 guest
 instructions, then yields to normal TabOS input, display, timer, and application work.
 Guest registers and memory persist into next update. This is scheduling quantum, not

@@ -23,12 +23,28 @@ typedef enum {
     LOADER_ELF_FILE_READ_FAILED,
 } loader_elf_result_t;
 
+enum {
+    LOADER_ELF_METADATA_VERSION         = 1U,
+    LOADER_ELF_METADATA_DESCRIPTOR_SIZE = 32U,
+    LOADER_ELF_DEFAULT_HEAP_BYTES       = 256U * 1024U,
+    LOADER_ELF_DEFAULT_STACK_BYTES      = 16U * 1024U,
+    LOADER_ELF_MIN_HEAP_BYTES           = 256U * 1024U,
+    LOADER_ELF_MAX_HEAP_BYTES           = 16U * 1024U * 1024U,
+    LOADER_ELF_MIN_STACK_BYTES          = 16U * 1024U,
+    LOADER_ELF_MAX_STACK_BYTES          = 256U * 1024U,
+};
+
 typedef struct {
         uint32_t entry_address;
         uint32_t minimum_address;
         uint32_t maximum_address;
         size_t image_size;
         size_t load_segment_count;
+        uint32_t application_abi_version;
+        size_t requested_heap_bytes;
+        size_t requested_stack_bytes;
+        uint32_t capabilities;
+        bool metadata_present;
 } loader_elf_info_t;
 
 typedef struct {

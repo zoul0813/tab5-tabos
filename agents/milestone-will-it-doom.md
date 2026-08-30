@@ -141,3 +141,134 @@ metadata instead of DOOM-specific kernel behavior.
 - Generic ELF metadata and raw input APIs are permanent platform improvements; no
   executable-name special cases are allowed.
 - Application ABI remains v1.
+
+## Execution Task List
+
+Track implementation and validation here. Mark a task `[x]` only after its required
+tests or hardware check pass.
+
+### Phase 0: Baseline
+
+- [x] Confirm clean `feature/will-it-doom` worktree and record starting commit.
+- [x] Run host configure, build, and test workflow.
+- [x] Confirm existing ELF fixtures and core utilities still build.
+- [x] Record baseline host test result and application image sizes.
+
+Phase 0 baseline: commit `927d19302e0c0848a9fd4b29e8aabaf9a1ebad00`; macOS Debug
+host test passed 30/30; `hello` image is 148 KiB; coreutils images range from
+148 KiB (`cp`, `mkdir`, `mv`, `rm`) to 168 KiB (`wc`) after `--strip-unneeded`.
+
+### Phase 1: ELF Application Metadata
+
+- [x] Define `.note.tabos` name, type, version, descriptor layout, and endianness.
+- [x] Add metadata constants and shared validation helpers.
+- [x] Parse note sections before process creation.
+- [x] Accept legacy ELF files with 256 KiB heap and 16 KiB stack defaults.
+- [x] Reject missing required fields, wrong note type, unsupported version, and bad size.
+- [x] Reject duplicate notes and nonzero reserved fields.
+- [x] Validate heap range and 4 KiB alignment.
+- [x] Validate stack range and 16-byte alignment.
+- [x] Validate capability bits and reject unsupported capabilities.
+- [x] Add tests for valid metadata, defaults, malformed notes, duplicates, alignment,
+  limits, unsupported versions, and reserved fields.
+- [ ] Pass validated heap, stack, and capabilities through loader/process creation.
+
+### Phase 2: Process Memory Limits
+
+- [ ] Replace host interpreter fixed 2 MiB guest RAM with calculated per-process allocation.
+- [ ] Include image, heap, stack, API table, arguments, and guard space in calculation.
+- [ ] Enforce 24 MiB host guest-RAM cap.
+- [ ] Keep Tab5 heap lazy and process-owned.
+- [ ] Allocate requested Tab5 task stack from PSRAM.
+- [ ] Reclaim guest memory, stack, heap, and metadata on every exit/fault path.
+- [ ] Test allocation failure and cleanup after partial process creation.
+
+### Phase 3: Raw Input Transport
+
+- [ ] Append fixed-layout input call to private ELF API transport without breaking prefix.
+- [ ] Add SDK `tabos_input_poll()` runtime stub.
+- [ ] Transport key-down, key-up, key code, text, modifiers, and repeat state.
+- [ ] Restrict event consumption to foreground process.
+- [ ] Validate guest pointers in host interpreter and native Tab5 paths.
+- [ ] Define empty-queue and malformed-request behavior.
+- [ ] Add tests for event order, key-up, text, modifiers, repeats, ownership, and pointers.
+- [ ] Verify existing ABI-v1 fixtures launch unchanged.
+
+### Phase 4: SDK and Application Build Metadata
+
+- [ ] Add `TABOS_APP_HEAP_BYTES` and `TABOS_APP_STACK_BYTES` to SDK Make rules.
+- [ ] Emit `.note.tabos` automatically from application builds.
+- [ ] Keep defaults identical for applications that set no metadata variables.
+- [ ] Add metadata inspection/debugging command or documented inspection procedure.
+- [ ] Build and launch an existing application with explicit non-default limits.
+
+### Phase 5: Pinned DOOM Source
+
+- [ ] Add `apps/doom/` build structure and Make targets: `fetch`, `build`, `install`, `clean`.
+- [ ] Fetch only `ozkl/doomgeneric` commit `dcb7a8dbc7a16ce3dda29382ac9aae9d77d21284`.
+- [ ] Support `DOOMGENERIC_SOURCE_DIR` for offline/pre-fetched source.
+- [ ] Verify fetched commit hash before compiling.
+- [ ] Add explicit source allowlist; exclude SDL, X11, Windows, and Emscripten files.
+- [ ] Store compatibility patches and TabOS adapter in repository.
+- [ ] Record GPLv2 provenance and patch list.
+- [ ] Compile RV32I without compressed instructions.
+- [ ] Link required newlib and `libm` support.
+- [ ] Keep upstream warnings isolated from project-owned warning policy.
+
+### Phase 6: DOOM Runtime Adapter
+
+- [ ] Implement `DG_Init`, `DG_DrawFrame`, `DG_SleepMs`, `DG_GetTicksMs`, `DG_GetKey`,
+  and `DG_SetWindowTitle`.
+- [ ] Configure 320x200 32-bit DOOM framebuffer.
+- [ ] Add reusable 320x200 RGB565 conversion buffer.
+- [ ] Convert RGB frames and blit scaled 960x720 at `(160, 0)`.
+- [ ] Verify 4:3 geometry and 160-pixel side bars.
+- [ ] Use TabOS VSYNC pacing with native 35 Hz timing.
+- [ ] Return nonzero on graphics, conversion, or presentation failure.
+- [ ] Patch normal quit to `exit(0)` and error paths to `exit(nonzero)`.
+- [ ] Verify terminal, graphics ownership, and process cleanup after exit.
+- [ ] Unit-test RGB conversion, geometry, and frame failure paths.
+
+### Phase 7: Controls
+
+- [ ] Implement required movement, turning, fire, use, run, weapon, and menu mappings.
+- [ ] Ignore repeat key-down events.
+- [ ] Track modifier transitions across key-down and key-up events.
+- [ ] Synthesize Control and Shift state for Tab5 keyboard behavior.
+- [ ] Implement bounded 32-event adapter queue.
+- [ ] Reset synthesized state and release keys on queue overflow.
+- [ ] Unit-test mappings, modifiers, repeats, overflow, and stuck-key recovery.
+
+### Phase 8: WAD, Configuration, and Saves
+
+- [ ] Set DOOM working directory to `T:/games/doom` without changing parent shell cwd.
+- [ ] Create directory when missing, with clean failure handling.
+- [ ] Implement default IWAD search order.
+- [ ] Support explicit drive-qualified `-iwad` paths.
+- [ ] Store config, screenshots, demos, and saves under `T:/games/doom`.
+- [ ] Print concise no-IWAD installation guidance and return nonzero.
+- [ ] Never commit or download WAD data.
+- [ ] Unit-test working-directory behavior and WAD search order.
+
+### Phase 9: Build and Installation Workflow
+
+- [ ] Keep DOOM excluded from default application build.
+- [ ] Add `apps/build.sh --with-doom` fetch/build/install path.
+- [ ] Copy extensionless executable to `T:/bin/doom`.
+- [ ] Make `--msc --with-doom` copy existing DOOM binary when available.
+- [ ] Add CI fetch and compile validation without publishing WAD or DOOM binary.
+- [ ] Record final executable size and metadata values.
+
+### Phase 10: Validation and Hardware
+
+- [ ] Run no-WAD host test: clear error, nonzero status, terminal restoration, prompt recovery.
+- [ ] Run host title/menu/gameplay test with user-supplied WAD.
+- [ ] Test save/load, quit, and repeat launch on host.
+- [ ] Run same artifact through host interpreter and native Tab5 execution.
+- [ ] Build pinned artifact on macOS and Linux CI.
+- [ ] Cross-build Tab5 Debug and Release.
+- [ ] Validate stable 35 Hz gameplay and correct 4:3 output on physical Tab5.
+- [ ] Validate all controls, menu prompts, save/load, quit, and second launch on Tab5.
+- [ ] Check watchdog, keyboard, timers, display, and filesystem responsiveness.
+- [ ] Record peak heap, guest RAM, PSRAM, conversion time, present time, and FPS.
+- [ ] Update milestone status and user-facing application/build documentation.
