@@ -82,6 +82,18 @@ tabos_enable_warnings(tabos_starfall_game)
 tabos_enable_sanitizers(tabos_starfall_game)
 add_test(NAME unit.starfall_game COMMAND tabos_starfall_game)
 
+add_executable(tabos_doom_video
+    unit/doom_video.c
+    "${TABOS_ROOT}/apps/doom/src/doom_tabos_video.c"
+)
+target_include_directories(tabos_doom_video PRIVATE
+    "${TABOS_ROOT}/apps/doom/include"
+    "${TABOS_ROOT}/sdk/include"
+)
+tabos_enable_warnings(tabos_doom_video)
+tabos_enable_sanitizers(tabos_doom_video)
+add_test(NAME unit.doom_video COMMAND tabos_doom_video)
+
 add_executable(tabos_display_diagnostic unit/display_diagnostic.c ${TABOS_TEST_PLATFORM_FAKES})
 target_include_directories(tabos_display_diagnostic PRIVATE
     "${TABOS_ROOT}/graphics/include"

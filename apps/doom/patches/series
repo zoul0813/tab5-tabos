@@ -1,2 +1,2 @@
 # Compatibility patches apply only to build/apps/doom/source.
-# Phase 5 has no upstream source changes. Phase 6 adds the quit-path patch here.
+0001-exit-with-defined-status.patch - make normal quit and error status explicit

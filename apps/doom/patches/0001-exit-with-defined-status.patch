@@ -1,0 +1,32 @@
+diff --git a/doomgeneric/i_system.c b/doomgeneric/i_system.c
+index 42baf7c..a6c3f17 100644
+--- a/doomgeneric/i_system.c
++++ b/doomgeneric/i_system.c
+@@ -263,3 +263,3 @@ void I_Quit (void)
+-    exit(0);
+ #endif
++    exit(EXIT_SUCCESS);
+ }
+@@ -366,9 +366,7 @@ void I_Error (char *error, ...)
+     if (already_quitting)
+     {
+         fprintf(stderr, "Warning: recursive call to I_Error detected.\n");
+-#if ORIGCODE
+-        exit(-1);
+-#endif
++        exit(EXIT_FAILURE);
+     }
+     else
+     {
+@@ -453,3 +451,3 @@ void I_Error (char *error, ...)
+         printf("%s\n", msgbuf);
+-        exit(-1);
++        exit(EXIT_FAILURE);
+     }
+@@ -467,5 +465,3 @@ void I_Error (char *error, ...)
+-    exit(-1);
+-#else
+-    exit(-1);
+ #endif
++    exit(EXIT_FAILURE);
+ }

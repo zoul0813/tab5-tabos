@@ -30,14 +30,14 @@ DOOM_UPSTREAM_SOURCES := \
     w_wad.c z_zone.c w_file_stdc.c i_input.c i_video.c doomgeneric.c
 DOOM_UPSTREAM_OBJECTS := $(addprefix $(DOOM_OBJECT_DIR)/upstream/,$(DOOM_UPSTREAM_SOURCES:.c=.o))
 DOOM_UPSTREAM_SOURCE_PATHS := $(addprefix $(DOOM_UPSTREAM_DIR)/,$(DOOM_UPSTREAM_SOURCES))
-DOOM_ADAPTER_SOURCE := $(APP_DIR)/src/doom_tabos.c
-DOOM_ADAPTER_OBJECT := $(DOOM_OBJECT_DIR)/adapter/doom_tabos.o
+DOOM_ADAPTER_SOURCES := $(APP_DIR)/src/doom_tabos.c $(APP_DIR)/src/doom_tabos_video.c
+DOOM_ADAPTER_OBJECTS := $(patsubst $(APP_DIR)/src/%.c,$(DOOM_OBJECT_DIR)/adapter/%.o,$(DOOM_ADAPTER_SOURCES))
 DOOM_PATCHES := $(wildcard $(APP_DIR)/patches/*.patch)
 
 DOOM_UPSTREAM_CFLAGS := -D_POSIX_C_SOURCE=200809L
 DOOM_UPSTREAM_CFLAGS += -DDOOMGENERIC_RESX=320 -DDOOMGENERIC_RESY=200
 DOOM_UPSTREAM_CFLAGS += -DDOOMGENERIC_DISABLE_TEXTMODE
-DOOM_ADAPTER_CFLAGS := -Wall -Wextra -Werror
+DOOM_ADAPTER_CFLAGS := -Wall -Wextra -Werror -I$(APP_DIR)/include
 
 .PHONY: fetch verify-source prepare-source build clean install
 .NOTPARALLEL:
@@ -46,7 +46,7 @@ all: install
 
 fetch: $(DOOM_UPSTREAM_DIR)
 
-$(DOOM_UPSTREAM_DIR):
+$(DOOM_UPSTREAM_DIR): $(DOOM_PATCHES)
 	@mkdir -p $(BUILD_DIR)
 	@if [ -n "$(DOOMGENERIC_SOURCE_DIR)" ]; then \
 		if [ ! -d "$(DOOMGENERIC_SOURCE_DIR)/doomgeneric" ]; then \
@@ -87,13 +87,13 @@ $(DOOM_OBJECT_DIR)/upstream/%.o: $(DOOM_UPSTREAM_DIR)/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(TABOS_CPPFLAGS) $(TABOS_CFLAGS) $(DOOM_UPSTREAM_CFLAGS) -w -I$(DOOM_UPSTREAM_DIR) -c $< -o $@
 
-$(DOOM_ADAPTER_OBJECT): $(DOOM_ADAPTER_SOURCE) $(DOOM_UPSTREAM_DIR)/doomgeneric.h
+$(DOOM_ADAPTER_OBJECTS): $(DOOM_OBJECT_DIR)/adapter/%.o: $(APP_DIR)/src/%.c $(DOOM_UPSTREAM_DIR)/doomgeneric.h
 	@mkdir -p $(dir $@)
 	$(CC) $(TABOS_CPPFLAGS) $(TABOS_CFLAGS) $(DOOM_ADAPTER_CFLAGS) $(DOOM_UPSTREAM_CFLAGS) -I$(DOOM_UPSTREAM_DIR) -c $< -o $@
 
-$(UNSTRIPPED): verify-source $(DOOM_UPSTREAM_OBJECTS) $(DOOM_ADAPTER_OBJECT) $(TABOS_RUNTIME_SOURCES) $(SDK_ROOT)/linker/app-riscv32.ld $(TABOS_APPLICATION_MAKEFILE)
+$(UNSTRIPPED): verify-source $(DOOM_UPSTREAM_OBJECTS) $(DOOM_ADAPTER_OBJECTS) $(TABOS_RUNTIME_SOURCES) $(SDK_ROOT)/linker/app-riscv32.ld $(TABOS_APPLICATION_MAKEFILE)
 	@mkdir -p $(dir $@)
-	$(CC) $(TABOS_CPPFLAGS) $(TABOS_CFLAGS) $(TABOS_LDFLAGS) -o $@ $(TABOS_RUNTIME_SOURCES) $(DOOM_UPSTREAM_OBJECTS) $(DOOM_ADAPTER_OBJECT) -lm
+	$(CC) $(TABOS_CPPFLAGS) $(TABOS_CFLAGS) $(TABOS_LDFLAGS) -o $@ $(TABOS_RUNTIME_SOURCES) $(DOOM_UPSTREAM_OBJECTS) $(DOOM_ADAPTER_OBJECTS) -lm
 
 clean:
 	rm -rf $(BUILD_DIR)

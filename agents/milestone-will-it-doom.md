@@ -249,17 +249,30 @@ quit behavior remain Phase 6 work.
 
 ### Phase 6: DOOM Runtime Adapter
 
-- [ ] Implement `DG_Init`, `DG_DrawFrame`, `DG_SleepMs`, `DG_GetTicksMs`, `DG_GetKey`,
+- [x] Implement `DG_Init`, `DG_DrawFrame`, `DG_SleepMs`, `DG_GetTicksMs`, `DG_GetKey`,
   and `DG_SetWindowTitle`.
-- [ ] Configure 320x200 32-bit DOOM framebuffer.
-- [ ] Add reusable 320x200 RGB565 conversion buffer.
-- [ ] Convert RGB frames and blit scaled 960x720 at `(160, 0)`.
-- [ ] Verify 4:3 geometry and 160-pixel side bars.
-- [ ] Use TabOS VSYNC pacing with native 35 Hz timing.
-- [ ] Return nonzero on graphics, conversion, or presentation failure.
-- [ ] Patch normal quit to `exit(0)` and error paths to `exit(nonzero)`.
+- [x] Configure 320x200 32-bit DOOM framebuffer.
+- [x] Add reusable 320x200 RGB565 conversion buffer.
+- [x] Convert RGB frames and blit scaled 960x720 at `(160, 0)`.
+- [x] Verify 4:3 geometry and 160-pixel side bars.
+- [x] Use TabOS VSYNC pacing with native 35 Hz timing.
+- [x] Return nonzero on graphics, conversion, or presentation failure.
+- [x] Patch normal quit to `exit(0)` and error paths to `exit(nonzero)`.
 - [ ] Verify terminal, graphics ownership, and process cleanup after exit.
-- [ ] Unit-test RGB conversion, geometry, and frame failure paths.
+- [x] Unit-test RGB conversion, geometry, and frame failure paths.
+
+Phase 6 build validation: macOS Debug host tests passed 31/31, including sanitized
+RGB conversion, 4:3 geometry, and clear/blit/present failure coverage. The pinned RV32I
+artifact builds with the explicit quit-status patch and is 718,888 bytes (`text` 418,604,
+`data` 60,084, `bss` 240,200). Tab5 relocation inspection found that libc `atexit()`
+introduced an unsupported weak undefined `__on_exit_args` target; cleanup now uses
+DOOM's internal `I_AtExit()` list, and the rebuilt artifact has no undefined relocation
+targets. Exit cleanup remains to validate.
+
+Physical Tab5 validation: rebuilt DOOM loads successfully after removing the weak
+undefined relocation, displays the Freedoom Phase 2 splash and teaser/intro, and runs
+smoothly. Host interpreter rendering remains much slower. Normal quit, terminal
+restoration, and repeat launch remain to validate after Phase 7 controls.
 
 ### Phase 7: Controls
 

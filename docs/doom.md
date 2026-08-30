@@ -19,3 +19,7 @@ a disposable build copy under `build/`.
 
 No WAD files are supplied, committed, or downloaded. When runtime support lands, users
 will supply shareware, Freedoom, or legally owned commercial game data themselves.
+
+Current runtime support converts DOOM's 320x200 RGB framebuffer to RGB565 and presents
+it as a centered 960x720 4:3 image. Keyboard control mapping and automatic WAD/config
+directory handling remain milestone work.
