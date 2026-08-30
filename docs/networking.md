@@ -151,8 +151,11 @@ nettest --udp 192.168.1.20
 The default TCP and UDP ports are 39001 and 39002. Override them on both sides with
 `--tcp-port` and `--udp-port` on the Python server and positional port arguments on
 `nettest`. The test resolves the supplied host, verifies a server-first handshake,
-validates a fixed-length 1537-byte TCP stream across multiple bounded API calls, and
-validates a 257-byte UDP datagram plus its reply endpoint.
+validates a fixed-length 1537-byte TCP stream across multiple bounded API calls,
+performs an orderly TCP write-half shutdown before receiving the echoed stream,
+and validates a 257-byte UDP datagram plus its reply endpoint. A TCP pass proves
+the host received every queued byte and the Tab5 kept its read half open after
+closing its write half.
 
 For reverse-direction manual testing, make Tab5 listen for one exchange:
 

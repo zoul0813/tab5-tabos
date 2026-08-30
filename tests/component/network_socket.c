@@ -190,6 +190,9 @@ static void test_tcp(int family)
                recv(client, buffer, sizeof(buffer), 0) == (ssize_t) sizeof(outbound) &&
                memcmp(buffer, outbound, sizeof(outbound)) == 0,
            "TCP send");
+    expect(platform_network_socket_shutdown(accepted, TABOS_SOCKET_SHUTDOWN_WRITE) == 0 &&
+               recv(client, buffer, sizeof(buffer), 0) == 0,
+           "TCP write shutdown preserves delivered data and reports EOF");
     static const char inbound[] = "to-tabos";
     memset(buffer, 0, sizeof(buffer));
     const bool inbound_sent   = send(client, inbound, sizeof(inbound), 0) == (ssize_t) sizeof(inbound);

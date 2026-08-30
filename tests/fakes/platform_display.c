@@ -62,6 +62,7 @@ void platform_raster_diagnostics(void)
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 struct platform_mutex {
         unsigned int unused;
@@ -362,6 +363,9 @@ platform_network_operation_result_t platform_network_resolve(const char* hostnam
     if (hostname == NULL || address == NULL) {
         return PLATFORM_NETWORK_OPERATION_INVALID;
     }
+    if (strcmp(hostname, "missing.test") == 0) {
+        return PLATFORM_NETWORK_OPERATION_NOT_FOUND;
+    }
     address->family = family == 6U ? 6U : 4U;
     (void) snprintf(address->text, sizeof(address->text), "%s", address->family == 6U ? "::1" : "127.0.0.1");
     return PLATFORM_NETWORK_OPERATION_OK;
@@ -373,6 +377,9 @@ platform_network_operation_result_t platform_network_echo(const platform_network
 {
     if (address == NULL || result == NULL || timeout_ms == 0U) {
         return PLATFORM_NETWORK_OPERATION_INVALID;
+    }
+    if (strcmp(address->text, "198.51.100.1") == 0) {
+        return PLATFORM_NETWORK_OPERATION_TIMEOUT;
     }
     result->sequence      = sequence;
     result->bytes         = payload_bytes;

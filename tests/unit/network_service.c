@@ -57,10 +57,16 @@ int main(void)
     expect(network_service_resolve("localhost", 4U, &address) == NETWORK_OPERATION_OK &&
                address.family == 4U && strcmp(address.text, "127.0.0.1") == 0,
            "online resolver delegates to platform");
+    expect(network_service_resolve("missing.test", 4U, &address) == NETWORK_OPERATION_NOT_FOUND,
+           "resolver preserves deterministic not-found result");
     network_echo_result_t echo;
     expect(network_service_echo(&address, 7U, 56U, 1000U, &echo) == NETWORK_OPERATION_OK &&
                echo.sequence == 7U && echo.bytes == 56U && echo.round_trip_ms == 2U,
            "online echo delegates to platform");
+    address = (network_address_t) {.family = 4U};
+    (void) snprintf(address.text, sizeof(address.text), "%s", "198.51.100.1");
+    expect(network_service_echo(&address, 8U, 56U, 1000U, &echo) == NETWORK_OPERATION_TIMEOUT,
+           "echo preserves deterministic timeout result");
     expect(network_service_disconnect(), "explicit disconnect succeeds");
     expect(network_service_resolve("localhost", 4U, &address) == NETWORK_OPERATION_OFFLINE,
            "resolver rejects offline operation");
@@ -70,6 +76,12 @@ int main(void)
     network_service_update();
     expect(network_service_status(&status) && status.state == NETWORK_STATE_OFFLINE,
            "disconnect suppresses late failure and retry");
+    expect(network_service_connect("test-network", "secret", false), "explicit reconnect after disconnect starts");
+    test_platform_network_set_state(PLATFORM_NETWORK_ONLINE, NULL);
+    network_service_update();
+    expect(test_platform_network_connect_calls() == 5U && network_service_status(&status) &&
+               status.state == NETWORK_STATE_ONLINE,
+           "reconnect after disconnect restores online state");
 
     network_service_shutdown();
     filesystem_shutdown();

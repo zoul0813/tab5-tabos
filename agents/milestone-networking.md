@@ -156,13 +156,12 @@ deferred beyond this milestone.
   validates traffic across the physical Wi-Fi network.
 - [x] Validate multi-call TCP transfer, orderly EOF, UDP payload, and UDP reply
   endpoint.
-- [ ] Diagnose and validate TCP write-half shutdown across the physical C6 path;
-  current ESP/lwIP behavior disconnects the host before all queued bytes arrive.
+- [x] Validate TCP write-half shutdown across the physical C6 path; the host
+  receives all queued bytes before EOF and the Tab5 receives the echoed stream.
 - [x] Let Tab5 listen as a one-exchange TCP or UDP echo server for host `nc`
   interoperability checks.
 - [x] Run TCP and UDP listener modes on physical Tab5 against host `nc`.
-- [ ] Run `nettest` client mode against an inbound-capable host; the managed Mac
-  firewall blocks this validation path.
+- [x] Run `nettest` client mode against an inbound-capable host.
 
 ## Test Plan
 
@@ -170,14 +169,14 @@ deferred beyond this milestone.
   unknown-key preservation, version rejection, atomic replacement failure,
   `auto_connect` behavior, forget, and redaction.
 - [x] Test IPv4/IPv6 endpoint conversion through host TCP/UDP component coverage.
-- [ ] Add deterministic DNS result and error tests.
+- [x] Add deterministic DNS result and error tests.
 - [x] Add maintained tester coverage for socket-table exhaustion, accepted-socket
   allocation failure, and stale handles.
 - [x] Run socket-capacity and accepted-socket failure coverage on physical Tab5.
 - [x] Test blocking/nonblocking socket behavior, stale handles, cancellation of a
   blocked receive, socket error mapping, and three-attempt autoconnect state.
 - [x] Test zero-time and finite wait readiness plus cancellation of an infinite wait.
-- [ ] Test reconnect, explicit retry cancellation, disconnect transitions, and
+- [x] Test reconnect, explicit retry cancellation, disconnect transitions, and
   remaining error paths.
 - [x] Test host IPv4/IPv6 loopback TCP and UDP, including listen/accept and peer
   shutdown; test bounded multi-call stream transfer in `nettest`.
@@ -199,7 +198,7 @@ user-mode/PMP execution boundary; native application faults are currently device
   cross-builds.
 - [x] Validate physical saved autoconnect, DHCP, DNS/ICMP, TCP/UDP listener traffic,
   socket capacity, cleanup, and display/runtime progress.
-- [ ] Validate zero-time and finite socket waits with the RV32 tester on physical Tab5.
+- [x] Validate zero-time and finite socket waits with the RV32 tester on physical Tab5.
 - [ ] Validate physical scan, interactive connection, IPv6, and `nettest` client mode.
 
 ## Assumptions

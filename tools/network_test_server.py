@@ -10,6 +10,10 @@ TCP_PAYLOAD_SIZE = 1537
 TCP_HANDSHAKE = b"TN01"
 
 
+def expected_tcp_payload() -> bytes:
+    return bytes((index * 37 + 11) & 0xFF for index in range(TCP_PAYLOAD_SIZE))
+
+
 def tcp_server(bind: str, port: int, ready: threading.Event, stopped: threading.Event) -> None:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
         server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -26,6 +30,7 @@ def tcp_server(bind: str, port: int, ready: threading.Event, stopped: threading.
             with connection:
                 print(f"TCP accepted {peer[0]}:{peer[1]}", flush=True)
                 total = 0
+                payload = bytearray()
                 try:
                     connection.sendall(TCP_HANDSHAKE)
                     print("TCP handshake sent", flush=True)
@@ -33,9 +38,14 @@ def tcp_server(bind: str, port: int, ready: threading.Event, stopped: threading.
                         data = connection.recv(TCP_PAYLOAD_SIZE - total)
                         if not data:
                             raise ConnectionError(f"peer closed after {total} of {TCP_PAYLOAD_SIZE} bytes")
-                        connection.sendall(data)
+                        payload.extend(data)
                         total += len(data)
                         print(f"TCP received {len(data)} bytes ({total}/{TCP_PAYLOAD_SIZE})", flush=True)
+                    if connection.recv(1):
+                        raise ConnectionError("peer sent data after write shutdown")
+                    if payload != expected_tcp_payload():
+                        raise ConnectionError("received payload differs from expected test pattern")
+                    connection.sendall(payload)
                 except OSError as error:
                     print(f"[FAIL] TCP {peer[0]}:{peer[1]}: {error}", flush=True)
                     continue

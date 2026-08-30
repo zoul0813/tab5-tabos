@@ -43,6 +43,17 @@ static void fill_payload(unsigned char* payload, size_t size, unsigned int seed)
     }
 }
 
+static void report_tcp_mismatch(const unsigned char* expected, const unsigned char* actual, size_t size)
+{
+    for (size_t index = 0U; index < size; ++index) {
+        if (expected[index] != actual[index]) {
+            fprintf(stderr, "nettest: TCP echo mismatch at byte %zu: expected %u, received %u\n", index,
+                    (unsigned int) expected[index], (unsigned int) actual[index]);
+            return;
+        }
+    }
+}
+
 static int send_all(tabos_socket_t socket, const unsigned char* data, size_t size)
 {
     size_t sent = 0U;
@@ -113,12 +124,14 @@ static int run_tcp_client(const tabos_network_address_t* address, uint16_t port)
             fprintf(stderr, "nettest: TCP blocking mode: %s (errno %d)\n", strerror(errno), errno);
         } else if (send_all(socket, sent, sizeof(sent)) != 0) {
             fprintf(stderr, "nettest: TCP send: %s\n", strerror(errno));
+        } else if (tabos_socket_shutdown(socket, TABOS_SOCKET_SHUTDOWN_WRITE) != 0) {
+            fprintf(stderr, "nettest: TCP write shutdown: %s\n", strerror(errno));
         } else if (tabos_socket_set_nonblocking(socket, true) != 0) {
             fprintf(stderr, "nettest: TCP nonblocking mode: %s (errno %d)\n", strerror(errno), errno);
         } else if (receive_exact(socket, received, sizeof(received)) != 0) {
             fprintf(stderr, "nettest: TCP receive: %s (errno %d)\n", strerror(errno), errno);
         } else if (memcmp(sent, received, sizeof(sent)) != 0) {
-            fprintf(stderr, "nettest: TCP echo data mismatch\n");
+            report_tcp_mismatch(sent, received, sizeof(sent));
         } else {
             printf("[PASS] TCP: %u bytes echoed by %s:%u\n", TCP_PAYLOAD_SIZE, address->text, port);
             result = 0;
