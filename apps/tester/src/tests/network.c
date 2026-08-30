@@ -38,11 +38,14 @@ static void test_tcp(tester_context_t* context)
                       tabos_socket_set_nonblocking(accepted, false) == 0,
                   "TCP nonblocking receive returns EAGAIN");
     static const char message[] = "tabos-tcp";
-    tabos_wait_item_t wait_item = {.socket = accepted, .events = TABOS_WAIT_READABLE};
-    tester_expect(context, tabos_wait_set(&wait_item, 1U, 0U) == 0 && wait_item.returned_events == 0U,
+    tabos_wait_item_t wait_item = {
+        .source = tabos_socket_wait_source(accepted),
+        .events = TABOS_WAIT_READABLE,
+    };
+    tester_expect(context, tabos_wait(&wait_item, 1U, 0U) == 0 && wait_item.returned_events == 0U,
                   "zero-time wait reports no unread TCP data");
     const bool sent = tabos_socket_send(client, message, sizeof(message)) == (int) sizeof(message);
-    const int ready = tabos_wait_set(&wait_item, 1U, 1000U);
+    const int ready = tabos_wait(&wait_item, 1U, 1000U);
     tester_expect(context,
                   sent && ready == 1 && (wait_item.returned_events & TABOS_WAIT_READABLE) != 0U &&
                       tabos_socket_receive(accepted, buffer, sizeof(buffer)) == (int) sizeof(message) &&
@@ -83,14 +86,27 @@ static void test_udp(tester_context_t* context)
 
 static void test_stale_handle(tester_context_t* context)
 {
-    const tabos_socket_t stale = tabos_socket_open(TABOS_NETWORK_FAMILY_IPV4, TABOS_SOCKET_UDP);
-    tester_expect(context, stale >= 0 && tabos_socket_close(stale) == 0, "socket closes before slot reuse");
+    const tabos_socket_t stale             = tabos_socket_open(TABOS_NETWORK_FAMILY_IPV4, TABOS_SOCKET_UDP);
+    const tabos_wait_source_t stale_source = tabos_socket_wait_source(stale);
+    tester_expect(context, stale >= 0 && stale_source != TABOS_WAIT_SOURCE_INVALID && tabos_socket_close(stale) == 0,
+                  "socket and wait source close before slot reuse");
 
-    const tabos_socket_t replacement = tabos_socket_open(TABOS_NETWORK_FAMILY_IPV4, TABOS_SOCKET_UDP);
-    errno                            = 0;
-    const int stale_result           = tabos_socket_close(stale);
-    tester_expect(context, replacement >= 0 && replacement != stale && stale_result < 0 && errno == EBADF,
-                  "stale socket handle cannot close replacement");
+    tabos_wait_item_t stale_item = {
+        .source = stale_source,
+        .events = TABOS_WAIT_READABLE,
+    };
+    errno                       = 0;
+    const int stale_wait_result = tabos_wait(&stale_item, 1U, 0U);
+    tester_expect(context, stale_wait_result < 0 && errno == EBADF, "closed socket invalidates its wait source");
+
+    const tabos_socket_t replacement             = tabos_socket_open(TABOS_NETWORK_FAMILY_IPV4, TABOS_SOCKET_UDP);
+    const tabos_wait_source_t replacement_source = tabos_socket_wait_source(replacement);
+    errno                                        = 0;
+    const int stale_result                       = tabos_socket_close(stale);
+    tester_expect(context,
+                  replacement >= 0 && replacement != stale && replacement_source != stale_source && stale_result < 0 &&
+                      errno == EBADF,
+                  "stale socket and wait-source handles cannot identify replacements");
     if (replacement >= 0) {
         tester_expect(context, tabos_socket_close(replacement) == 0, "replacement socket closes");
     }

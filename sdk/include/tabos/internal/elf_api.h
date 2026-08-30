@@ -7,7 +7,7 @@
 
 #include <stdint.h>
 
-#define TABOS_ELF_API_VERSION  12U
+#define TABOS_ELF_API_VERSION  13U
 #define TABOS_ELF_EXEC_PENDING (-2147483647 - 1)
 
 enum {
@@ -84,7 +84,10 @@ typedef struct {
 } tabos_elf_socket_endpoint_t;
 
 typedef struct {
-        int32_t socket;
+        union {
+                int32_t source;
+                int32_t socket;
+        };
         uint32_t events;
         uint32_t returned_events;
 } tabos_elf_wait_item_t;
@@ -166,6 +169,8 @@ typedef struct {
         int (*device_subscribe)(void);
         int (*device_subscription_close)(int subscription);
         int (*device_event_read)(int subscription, tabos_device_event_t* event);
+        int (*socket_wait_source)(int socket);
+        int (*wait)(tabos_elf_wait_item_t* items, uint32_t count, uint32_t timeout_ms);
 } tabos_elf_api_t;
 
 typedef int (*tabos_elf_entry_fn)(const tabos_elf_api_t* api, int argc, const char* const* argv);

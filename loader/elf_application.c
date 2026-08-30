@@ -28,23 +28,29 @@ enum {
     /* The P4 backend runs ELF code natively and ignores this interpreter budget.
        Keep host slices large enough for framebuffer workloads without starving its
        event loop for an unbounded period. */
-    ELF_INSTRUCTIONS_PER_UPDATE   = 2000000,
-    ELF_DESCRIPTOR_CAPACITY       = 16,
-    ELF_SOCKET_CAPACITY           = TABOS_SOCKET_MAX,
-    ELF_SOCKET_INDEX_BITS         = 3,
-    ELF_SOCKET_INDEX_MASK         = ELF_SOCKET_CAPACITY - 1,
-    ELF_SOCKET_GENERATION_MAX     = INT32_MAX >> ELF_SOCKET_INDEX_BITS,
-    ELF_TLS_CAPACITY              = TABOS_TLS_MAX,
-    ELF_TLS_INDEX_BITS            = 2,
-    ELF_TLS_INDEX_MASK            = ELF_TLS_CAPACITY - 1,
-    ELF_TLS_GENERATION_MAX        = INT32_MAX >> ELF_TLS_INDEX_BITS,
-    ELF_HEAP_GUARD_SIZE           = 32,
-    ELF_HEAP_GUARD_VALUE          = 0xa5,
-    ELF_GRAPHICS_COMMAND_CAPACITY = 64,
+    ELF_INSTRUCTIONS_PER_UPDATE    = 2000000,
+    ELF_DESCRIPTOR_CAPACITY        = 16,
+    ELF_SOCKET_CAPACITY            = TABOS_SOCKET_MAX,
+    ELF_SOCKET_INDEX_BITS          = 3,
+    ELF_SOCKET_INDEX_MASK          = ELF_SOCKET_CAPACITY - 1,
+    ELF_SOCKET_GENERATION_MAX      = INT32_MAX >> ELF_SOCKET_INDEX_BITS,
+    ELF_TLS_CAPACITY               = TABOS_TLS_MAX,
+    ELF_TLS_INDEX_BITS             = 2,
+    ELF_TLS_INDEX_MASK             = ELF_TLS_CAPACITY - 1,
+    ELF_TLS_GENERATION_MAX         = INT32_MAX >> ELF_TLS_INDEX_BITS,
+    ELF_WAIT_SOURCE_CAPACITY       = TABOS_WAIT_MAX,
+    ELF_WAIT_SOURCE_INDEX_BITS     = 4,
+    ELF_WAIT_SOURCE_INDEX_MASK     = ELF_WAIT_SOURCE_CAPACITY - 1,
+    ELF_WAIT_SOURCE_GENERATION_MAX = INT32_MAX >> ELF_WAIT_SOURCE_INDEX_BITS,
+    ELF_HEAP_GUARD_SIZE            = 32,
+    ELF_HEAP_GUARD_VALUE           = 0xa5,
+    ELF_GRAPHICS_COMMAND_CAPACITY  = 64,
 };
 
 _Static_assert((1U << ELF_SOCKET_INDEX_BITS) == ELF_SOCKET_CAPACITY, "ELF socket index bits must match capacity");
 _Static_assert((1U << ELF_TLS_INDEX_BITS) == ELF_TLS_CAPACITY, "ELF TLS index bits must match capacity");
+_Static_assert((1U << ELF_WAIT_SOURCE_INDEX_BITS) == ELF_WAIT_SOURCE_CAPACITY,
+               "ELF wait-source index bits must match capacity");
 
 typedef enum {
     ELF_GRAPHICS_FILL,
@@ -73,9 +79,21 @@ typedef struct {
 
 typedef struct {
         int platform_socket;
+        tabos_wait_source_t wait_source;
         uint32_t generation;
         bool open;
 } elf_socket_t;
+
+typedef enum {
+    ELF_WAIT_SOURCE_SOCKET,
+} elf_wait_source_type_t;
+
+typedef struct {
+        uintptr_t parent;
+        uint32_t generation;
+        elf_wait_source_type_t type;
+        bool open;
+} elf_wait_source_t;
 
 typedef struct {
         int platform_connection;
@@ -111,6 +129,9 @@ struct loader_elf_application {
         const char* exec_argv[TABOS_ELF_ARG_MAX + 1U];
         elf_descriptor_t descriptors[ELF_DESCRIPTOR_CAPACITY];
         elf_socket_t sockets[ELF_SOCKET_CAPACITY];
+        elf_wait_source_t wait_sources[ELF_WAIT_SOURCE_CAPACITY];
+        atomic_bool wait_active;
+        atomic_bool wait_cancel_requested;
         elf_tls_t tls[ELF_TLS_CAPACITY];
         char working_directory[TABOS_FS_PATH_MAX];
         uint8_t* heap_allocation;
@@ -122,6 +143,8 @@ struct loader_elf_application {
         uint8_t input_pending_offset;
         uint8_t input_pending_length;
 };
+
+static atomic_uint next_wait_source_generation = 1U;
 
 static bool elf_handle_tty_navigation(loader_elf_application_t* application, const tabos_input_event_t* event)
 {
@@ -853,6 +876,54 @@ static elf_socket_t* elf_socket(loader_elf_application_t* application, int socke
     return owned;
 }
 
+static elf_wait_source_t* elf_wait_source(loader_elf_application_t* application, tabos_wait_source_t source)
+{
+    if (application == NULL || source < 0) {
+        return NULL;
+    }
+    const uint32_t handle     = (uint32_t) source;
+    const uint32_t index      = handle & ELF_WAIT_SOURCE_INDEX_MASK;
+    const uint32_t generation = handle >> ELF_WAIT_SOURCE_INDEX_BITS;
+    elf_wait_source_t* owned  = &application->wait_sources[index];
+    if (!owned->open || generation == 0U || owned->generation != generation) {
+        return NULL;
+    }
+    return owned;
+}
+
+static tabos_wait_source_t elf_wait_source_allocate(loader_elf_application_t* application, elf_wait_source_type_t type,
+                                                    uintptr_t parent)
+{
+    for (uint32_t index = 0U; index < ELF_WAIT_SOURCE_CAPACITY; ++index) {
+        if (application->wait_sources[index].open) {
+            continue;
+        }
+        uint32_t generation = atomic_fetch_add_explicit(&next_wait_source_generation, 1U, memory_order_relaxed);
+        if (generation == 0U || generation > ELF_WAIT_SOURCE_GENERATION_MAX) {
+            generation = 1U;
+            atomic_store_explicit(&next_wait_source_generation, 2U, memory_order_relaxed);
+        }
+        application->wait_sources[index] = (elf_wait_source_t) {
+            .parent     = parent,
+            .generation = generation,
+            .type       = type,
+            .open       = true,
+        };
+        return (tabos_wait_source_t) ((generation << ELF_WAIT_SOURCE_INDEX_BITS) | index);
+    }
+    return TABOS_WAIT_SOURCE_INVALID;
+}
+
+static void elf_wait_source_invalidate(loader_elf_application_t* application, tabos_wait_source_t source)
+{
+    elf_wait_source_t* owned = elf_wait_source(application, source);
+    if (owned == NULL) {
+        return;
+    }
+    const uint32_t generation = owned->generation;
+    *owned                    = (elf_wait_source_t) {.generation = generation};
+}
+
 static int elf_socket_allocate(loader_elf_application_t* application, int platform_socket)
 {
     for (int index = 0; index < ELF_SOCKET_CAPACITY; ++index) {
@@ -861,12 +932,20 @@ static int elf_socket_allocate(loader_elf_application_t* application, int platfo
             if (generation == 0U || generation > ELF_SOCKET_GENERATION_MAX) {
                 generation = 1U;
             }
+            const int socket = (int) ((generation << ELF_SOCKET_INDEX_BITS) | (uint32_t) index);
+            const tabos_wait_source_t source =
+                elf_wait_source_allocate(application, ELF_WAIT_SOURCE_SOCKET, (uintptr_t) socket);
+            if (source == TABOS_WAIT_SOURCE_INVALID) {
+                (void) platform_network_socket_close(platform_socket);
+                return -TABOS_ENFILE;
+            }
             application->sockets[index] = (elf_socket_t) {
                 .platform_socket = platform_socket,
+                .wait_source     = source,
                 .generation      = generation,
                 .open            = true,
             };
-            return (int) ((generation << ELF_SOCKET_INDEX_BITS) | (uint32_t) index);
+            return socket;
         }
     }
     (void) platform_network_socket_close(platform_socket);
@@ -890,10 +969,17 @@ static int elf_socket_close(int socket)
     if (owned == NULL) {
         return -TABOS_EBADF;
     }
+    elf_wait_source_invalidate(application, owned->wait_source);
     const uint32_t generation = owned->generation;
     const int result          = platform_network_socket_close(owned->platform_socket);
     *owned                    = (elf_socket_t) {.generation = generation};
     return result;
+}
+
+static int elf_socket_wait_source(int socket)
+{
+    elf_socket_t* owned = elf_socket(platform_riscv32_current_user_data(), socket);
+    return owned != NULL ? owned->wait_source : -TABOS_EBADF;
 }
 
 static bool elf_socket_endpoint(const tabos_elf_socket_endpoint_t* endpoint, platform_network_address_t* address,
@@ -1117,6 +1203,56 @@ static int elf_socket_wait(tabos_elf_wait_item_t* items, uint32_t count, uint32_
         };
     }
     const int result = platform_network_socket_wait(platform_items, count, timeout_ms);
+    if (result >= 0) {
+        for (uint32_t index = 0U; index < count; ++index) {
+            writable[index].returned_events = platform_items[index].returned_events;
+        }
+    }
+    return result;
+}
+
+static int elf_wait(tabos_elf_wait_item_t* items, uint32_t count, uint32_t timeout_ms)
+{
+    loader_elf_application_t* application = platform_riscv32_current_user_data();
+    tabos_elf_wait_item_t* writable =
+        (tabos_elf_wait_item_t*) platform_executable_data_pointer(items, count * sizeof(*items));
+    if (application == NULL || writable == NULL || count == 0U || count > TABOS_WAIT_MAX) {
+        return -TABOS_EINVAL;
+    }
+    const uint32_t valid_events =
+        TABOS_WAIT_READABLE | TABOS_WAIT_WRITABLE | TABOS_WAIT_STATE_CHANGED | TABOS_WAIT_ERROR | TABOS_WAIT_HANGUP;
+    platform_network_wait_item_t platform_items[TABOS_WAIT_MAX];
+    for (uint32_t index = 0U; index < count; ++index) {
+        elf_wait_source_t* source = elf_wait_source(application, writable[index].source);
+        if (source == NULL) {
+            return -TABOS_EBADF;
+        }
+        if (writable[index].events == 0U || (writable[index].events & ~valid_events) != 0U) {
+            return -TABOS_EINVAL;
+        }
+        if (source->type != ELF_WAIT_SOURCE_SOCKET || (writable[index].events & TABOS_WAIT_STATE_CHANGED) != 0U) {
+            return -TABOS_EINVAL;
+        }
+        elf_socket_t* socket = elf_socket(application, (int) source->parent);
+        if (socket == NULL || socket->wait_source != writable[index].source) {
+            return -TABOS_EBADF;
+        }
+        writable[index].returned_events = 0U;
+        platform_items[index]           = (platform_network_wait_item_t) {
+                      .socket = socket->platform_socket,
+                      .events = writable[index].events,
+        };
+    }
+    atomic_store_explicit(&application->wait_active, true, memory_order_release);
+    if (atomic_load_explicit(&application->wait_cancel_requested, memory_order_acquire)) {
+        atomic_store_explicit(&application->wait_active, false, memory_order_release);
+        return -TABOS_ECANCELED;
+    }
+    const int result = platform_network_socket_wait(platform_items, count, timeout_ms);
+    atomic_store_explicit(&application->wait_active, false, memory_order_release);
+    if (atomic_load_explicit(&application->wait_cancel_requested, memory_order_acquire)) {
+        return -TABOS_ECANCELED;
+    }
     if (result >= 0) {
         for (uint32_t index = 0U; index < count; ++index) {
             writable[index].returned_events = platform_items[index].returned_events;
@@ -1671,6 +1807,8 @@ static bool elf_entry(tabos_app_context_t* context)
         .device_subscribe          = elf_device_subscribe,
         .device_subscription_close = elf_device_subscription_close,
         .device_event_read         = elf_device_event_read,
+        .socket_wait_source        = elf_socket_wait_source,
+        .wait                      = elf_wait,
     };
     application->execution = platform_riscv32_create(
         application->image.entry, application->image.memory, application->image.memory_size,
@@ -1752,11 +1890,30 @@ static bool elf_heap_guards_intact(const loader_elf_application_t* application)
     return true;
 }
 
+static void elf_cancel_wait(loader_elf_application_t* application)
+{
+    atomic_store_explicit(&application->wait_cancel_requested, true, memory_order_release);
+    if (!atomic_load_explicit(&application->wait_active, memory_order_acquire)) {
+        return;
+    }
+    for (size_t index = 0U; index < ELF_WAIT_SOURCE_CAPACITY; ++index) {
+        const elf_wait_source_t* source = &application->wait_sources[index];
+        if (!source->open || source->type != ELF_WAIT_SOURCE_SOCKET) {
+            continue;
+        }
+        elf_socket_t* socket = elf_socket(application, (int) source->parent);
+        if (socket != NULL) {
+            platform_network_socket_interrupt(socket->platform_socket);
+        }
+    }
+}
+
 static void elf_release_resources(loader_elf_application_t* application)
 {
     if (application == NULL) {
         return;
     }
+    elf_cancel_wait(application);
     device_registry_unsubscribe_owner(application);
     if (application->graphics_active) {
         (void) elf_graphics_drain(application);
@@ -1779,6 +1936,7 @@ static void elf_release_resources(loader_elf_application_t* application)
     for (size_t index = 0U; index < ELF_SOCKET_CAPACITY; ++index) {
         if (application->sockets[index].open) {
             platform_network_socket_dispose(application->sockets[index].platform_socket);
+            elf_wait_source_invalidate(application, application->sockets[index].wait_source);
             application->sockets[index] = (elf_socket_t) {0};
         }
     }

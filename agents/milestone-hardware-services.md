@@ -26,9 +26,12 @@ ESP-IDF, FreeRTOS, SDL, controller, bus, or native-handle interfaces.
   copied lookup, and state transitions are implemented and tested.
 - [x] Public copied enumeration and process-owned lifecycle subscriptions are implemented,
   including bounded overflow reporting, cleanup, and ELF forwarding.
-- [ ] Existing display, keyboard, storage, Wi-Fi, RTC, and battery drivers still need
-  registration and lifecycle reporting through the common device registry.
-- [ ] Generic non-socket wait sources are not implemented.
+- [x] Existing display, keyboard, storage, Wi-Fi, RTC, and battery drivers register and
+  report lifecycle state through the common device registry.
+- [x] Generic wait-source API, socket adapter, process ownership, stale-handle rejection,
+  and teardown cancellation are implemented.
+- [ ] Device subscriptions and future asynchronous hardware services still need generic
+  wait-source adapters.
 
 ## Agreed Phase Order
 

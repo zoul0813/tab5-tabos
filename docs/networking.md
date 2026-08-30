@@ -90,15 +90,22 @@ waits for the active backend operation to return, and disposes every owned socke
 This keeps a terminated process from leaving a blocked worker or response for the
 next application.
 
-### Waiting for socket readiness
+### Waiting for readiness
 
-`<tabos/wait.h>` provides `tabos_wait_set()` for waiting on as many as
-`TABOS_WAIT_MAX` process-owned sockets. Each item requests readable, writable,
-error, or hangup events and receives the events that occurred. A zero timeout
-polls immediately, a finite timeout uses milliseconds, and
+`<tabos/wait.h>` provides generic, opaque `tabos_wait_source_t` handles. Convert a
+socket with `tabos_socket_wait_source()`, place the resulting source in a
+`tabos_wait_item_t`, and call `tabos_wait()` with as many as `TABOS_WAIT_MAX`
+items. Wait sources are process-owned and generation-tagged. Closing a socket
+invalidates its source; stale or foreign sources fail with `EBADF`.
+
+Wait items may request readable, writable, state-changed, error, or hangup events.
+Sockets support readable, writable, error, and hangup. The state-changed event is
+reserved for device and service sources added through the same API. A zero timeout
+polls immediately, a finite timeout uses monotonic milliseconds, and
 `TABOS_WAIT_TIMEOUT_INFINITE` waits until an event or process cleanup interrupts
 the operation. The return value is the number of ready items, zero for timeout,
-or `-1` with `errno` set.
+or `-1` with `errno` set. Process teardown cancels an active wait before closing
+its parent resources.
 
 ### TLS client connections
 

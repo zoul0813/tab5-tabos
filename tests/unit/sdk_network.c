@@ -78,11 +78,16 @@ static int receive_socket(int socket, void* data, uint32_t capacity)
 
 static int wait_socket(tabos_elf_wait_item_t* items, uint32_t count, uint32_t timeout_ms)
 {
-    if (items == NULL || count != 1U || items[0].socket != 3 || timeout_ms != 25U) {
+    if (items == NULL || count != 1U || items[0].source != 19 || timeout_ms != 25U) {
         return -TABOS_EINVAL;
     }
     items[0].returned_events = TABOS_WAIT_READABLE;
     return 1;
+}
+
+static int socket_wait_source(int socket)
+{
+    return socket == 3 ? 19 : -TABOS_EBADF;
 }
 
 int main(void)
@@ -103,6 +108,8 @@ int main(void)
         .socket_send           = send_socket,
         .socket_receive        = receive_socket,
         .socket_wait           = wait_socket,
+        .socket_wait_source    = socket_wait_source,
+        .wait                  = wait_socket,
     };
     tabos_runtime_api = &api;
     if (tabos_network_get_status(&status) != 0 || status.state != TABOS_NETWORK_ONLINE ||
@@ -125,11 +132,14 @@ int main(void)
     }
     char buffer[4]              = {0};
     const tabos_socket_t socket = tabos_socket_open(TABOS_NETWORK_FAMILY_IPV4, TABOS_SOCKET_TCP);
-    tabos_wait_item_t wait_item = {.socket = socket, .events = TABOS_WAIT_READABLE};
+    tabos_wait_item_t wait_item = {
+        .source = tabos_socket_wait_source(socket),
+        .events = TABOS_WAIT_READABLE,
+    };
     if (socket != 3 || tabos_socket_send(socket, "hi", 2U) != 2 ||
         tabos_socket_receive(socket, buffer, sizeof(buffer)) != 2 || memcmp(buffer, "ok", 2U) != 0 ||
-        tabos_wait_set(&wait_item, 1U, 25U) != 1 || wait_item.returned_events != TABOS_WAIT_READABLE ||
-        tabos_socket_close(socket) != 0) {
+        wait_item.source != 19 || tabos_wait(&wait_item, 1U, 25U) != 1 ||
+        wait_item.returned_events != TABOS_WAIT_READABLE || tabos_socket_close(socket) != 0) {
         return 1;
     }
     return 0;

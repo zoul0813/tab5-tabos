@@ -8,14 +8,14 @@
 #include <string.h>
 
 enum {
-    NTP_PORT                 = 123U,
-    NTP_PACKET_BYTES         = 48U,
-    NTP_TRANSMIT_SECONDS     = 40U,
-    NTP_UNIX_EPOCH_OFFSET    = 2208988800U,
-    NTP_RESPONSE_TIMEOUT_MS  = 5000U,
-    NTP_MODE_SERVER          = 4U,
+    NTP_PORT                   = 123U,
+    NTP_PACKET_BYTES           = 48U,
+    NTP_TRANSMIT_SECONDS       = 40U,
+    NTP_UNIX_EPOCH_OFFSET      = 2208988800U,
+    NTP_RESPONSE_TIMEOUT_MS    = 5000U,
+    NTP_MODE_SERVER            = 4U,
     NTP_STRATUM_UNSYNCHRONIZED = 0U,
-    NTP_STRATUM_INVALID      = 16U,
+    NTP_STRATUM_INVALID        = 16U,
 };
 
 static void usage(FILE* stream)
@@ -89,16 +89,19 @@ int main(int argc, char** argv)
         return 1;
     }
     const tabos_socket_endpoint_t endpoint = {.address = address, .port = NTP_PORT};
-    uint8_t request[NTP_PACKET_BYTES] = {0};
-    request[0]                        = 0x23U;
+    uint8_t request[NTP_PACKET_BYTES]      = {0};
+    request[0]                             = 0x23U;
     uint8_t response[NTP_PACKET_BYTES];
     tabos_socket_endpoint_t peer;
     int result = 1;
     if (tabos_socket_send_to(socket, request, sizeof(request), &endpoint) != (int) sizeof(request)) {
         fprintf(stderr, "ntpdate: send: %s\n", strerror(errno));
     } else {
-        tabos_wait_item_t wait_item = {.socket = socket, .events = TABOS_WAIT_READABLE};
-        const int ready             = tabos_wait_set(&wait_item, 1U, NTP_RESPONSE_TIMEOUT_MS);
+        tabos_wait_item_t wait_item = {
+            .source = tabos_socket_wait_source(socket),
+            .events = TABOS_WAIT_READABLE,
+        };
+        const int ready = tabos_wait(&wait_item, 1U, NTP_RESPONSE_TIMEOUT_MS);
         if (ready == 0) {
             fprintf(stderr, "ntpdate: timed out waiting for %s\n", server);
         } else if (ready < 0) {
@@ -114,13 +117,12 @@ int main(int argc, char** argv)
                 fprintf(stderr, "ntpdate: invalid response from %s\n", server);
                 errno = EINVAL;
             } else {
-                const int64_t seconds = (int64_t) read_u32_be(response + NTP_TRANSMIT_SECONDS) -
-                                        (int64_t) NTP_UNIX_EPOCH_OFFSET;
+                const int64_t seconds =
+                    (int64_t) read_u32_be(response + NTP_TRANSMIT_SECONDS) - (int64_t) NTP_UNIX_EPOCH_OFFSET;
                 if (tabos_clock_set_epoch(seconds) != 0) {
                     fprintf(stderr, "ntpdate: set clock: %s\n", strerror(errno));
                 } else {
-                    printf("ntpdate: set UTC clock to %lld from %s (%s)\n", (long long) seconds, server,
-                           address.text);
+                    printf("ntpdate: set UTC clock to %lld from %s (%s)\n", (long long) seconds, server, address.text);
                     result = 0;
                 }
             }

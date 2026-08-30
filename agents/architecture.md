@@ -72,11 +72,22 @@ and last error. Application access is not gated by a capability mask.
 The public API supplies copied count/index/ID/name lookup and process-owned lifecycle
 subscriptions. Each subscription retains 32 events, drops the oldest event on overflow,
 reports overflow on the next successful read, and is discarded during process cleanup.
-Generic wait integration remains a subsequent hardware-service phase. Portable runtime
-integration registers initialized `display0`, `keyboard0`, `storage0`, `rtc0`, `battery0`,
-and `wifi0` entries from platform diagnostics while keeping typed drivers below the platform
-boundary. Host builds expose deterministic virtual counterparts. Wi-Fi registry state follows
-network-service offline, fault, and ready transitions.
+Portable runtime integration registers initialized `display0`, `keyboard0`, `storage0`,
+`rtc0`, `battery0`, and `wifi0` entries from platform diagnostics while keeping typed
+drivers below the platform boundary. Host builds expose deterministic virtual counterparts.
+Wi-Fi registry state follows network-service offline, fault, and ready transitions.
+
+### Generic wait sources [DECIDED]
+
+Asynchronous application waits use opaque, generation-tagged `tabos_wait_source_t`
+handles owned by the calling process. A source records its parent service handle and is
+invalidated before that parent closes. Stale and foreign-process sources return `EBADF`.
+The generic event vocabulary is readable, writable, state-changed, error, and hangup;
+each source adapter accepts only meaningful bits. `tabos_wait()` supports zero-time polls,
+finite monotonic millisecond deadlines, and infinite waits. Process teardown marks waits
+cancelled and wakes native workers before disposing parent resources, so a later process
+cannot receive stale completions. Sockets expose sources through
+`tabos_socket_wait_source()`; other service adapters join this API incrementally.
 
 ### Reboot and power-off [DECIDED]
 

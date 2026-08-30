@@ -117,9 +117,11 @@ static const uint32_t HOST_RV32_DEVICE_FIND           = UINT32_C(0xffff0110);
 static const uint32_t HOST_RV32_DEVICE_SUBSCRIBE      = UINT32_C(0xffff0114);
 static const uint32_t HOST_RV32_DEVICE_CLOSE          = UINT32_C(0xffff0118);
 static const uint32_t HOST_RV32_DEVICE_EVENT_READ     = UINT32_C(0xffff011c);
+static const uint32_t HOST_RV32_SOCKET_WAIT_SOURCE    = UINT32_C(0xffff0120);
+static const uint32_t HOST_RV32_WAIT                  = UINT32_C(0xffff0124);
 
 enum {
-    HOST_RV32_API_SIZE = 300,
+    HOST_RV32_API_SIZE = 308,
 };
 
 struct platform_riscv32_context {
@@ -348,6 +350,8 @@ platform_riscv32_context_t* platform_riscv32_create(const void* entry, const voi
     write_u32(context->memory, guest_api_address + 288U, HOST_RV32_DEVICE_SUBSCRIBE);
     write_u32(context->memory, guest_api_address + 292U, HOST_RV32_DEVICE_CLOSE);
     write_u32(context->memory, guest_api_address + 296U, HOST_RV32_DEVICE_EVENT_READ);
+    write_u32(context->memory, guest_api_address + 300U, HOST_RV32_SOCKET_WAIT_SOURCE);
+    write_u32(context->memory, guest_api_address + 304U, HOST_RV32_WAIT);
 
     size_t next_argument = argument_data_address;
     for (size_t index = 0U; index < argc; ++index) {
@@ -855,6 +859,22 @@ platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* cont
             context->state.pc       = context->state.regs[1];
             continue;
         }
+        if (context->state.pc == HOST_RV32_WAIT) {
+            const uint32_t item_count = context->state.regs[11];
+            if (item_count == 0U || item_count > TABOS_WAIT_MAX) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            tabos_elf_wait_item_t* items =
+                guest_buffer(context->memory, context->state.regs[10], item_count * sizeof(*items));
+            if (items == NULL || context->api.wait == NULL) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data       = context->user_data;
+            context->state.regs[10] = (uint32_t) context->api.wait(items, item_count, context->state.regs[12]);
+            current_user_data       = NULL;
+            context->state.pc       = context->state.regs[1];
+            continue;
+        }
         if (context->state.pc == HOST_RV32_TLS_CONNECT || context->state.pc == HOST_RV32_TLS_CLOSE ||
             context->state.pc == HOST_RV32_TLS_SEND || context->state.pc == HOST_RV32_TLS_RECEIVE) {
             current_user_data = context->user_data;
@@ -884,7 +904,7 @@ platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* cont
             continue;
         }
         if (context->state.pc == HOST_RV32_DEVICE_COUNT || context->state.pc == HOST_RV32_DEVICE_SUBSCRIBE ||
-            context->state.pc == HOST_RV32_DEVICE_CLOSE) {
+            context->state.pc == HOST_RV32_DEVICE_CLOSE || context->state.pc == HOST_RV32_SOCKET_WAIT_SOURCE) {
             current_user_data = context->user_data;
             if (context->state.pc == HOST_RV32_DEVICE_COUNT && context->api.device_count != NULL) {
                 context->state.regs[10] = context->api.device_count();
@@ -893,6 +913,8 @@ platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* cont
             } else if (context->state.pc == HOST_RV32_DEVICE_CLOSE && context->api.device_subscription_close != NULL) {
                 context->state.regs[10] =
                     (uint32_t) context->api.device_subscription_close((int) context->state.regs[10]);
+            } else if (context->state.pc == HOST_RV32_SOCKET_WAIT_SOURCE && context->api.socket_wait_source != NULL) {
+                context->state.regs[10] = (uint32_t) context->api.socket_wait_source((int) context->state.regs[10]);
             } else {
                 current_user_data = NULL;
                 return PLATFORM_RISCV32_FAULT;

@@ -10,11 +10,17 @@
 #include <string.h>
 #include <unistd.h>
 
-enum { IRC_PORT = 6667, LINE_MAX = 480, RECEIVE_MAX = 512, MEMBER_MAX = 64, NICK_MAX = 32 };
+enum {
+    IRC_PORT    = 6667,
+    LINE_MAX    = 480,
+    RECEIVE_MAX = 512,
+    MEMBER_MAX  = 64,
+    NICK_MAX    = 32
+};
 
 typedef struct {
-    char nickname[NICK_MAX + 1];
-    char status;
+        char nickname[NICK_MAX + 1];
+        char status;
 } member_t;
 
 static member_t members[MEMBER_MAX];
@@ -97,7 +103,7 @@ static bool display_privmsg(char* message)
         return false;
     }
     char* separator = strstr(message, " PRIVMSG ");
-    char* body = separator == NULL ? NULL : strstr(separator + 9, " :");
+    char* body      = separator == NULL ? NULL : strstr(separator + 9, " :");
     if (separator == NULL || body == NULL) {
         return false;
     }
@@ -105,9 +111,9 @@ static bool display_privmsg(char* message)
     if (bang == NULL || bang > separator) {
         return false;
     }
-    *bang = '\0';
-    body += 2;
-    char* ending = strpbrk(body, "\r\n");
+    *bang         = '\0';
+    body         += 2;
+    char* ending  = strpbrk(body, "\r\n");
     if (ending != NULL) {
         *ending = '\0';
     }
@@ -132,11 +138,13 @@ int main(int argc, char** argv)
         fprintf(stderr, "irc: resolve: %s\n", strerror(errno));
         return 1;
     }
-    const tabos_socket_t socket = tabos_socket_open(address.family, TABOS_SOCKET_TCP);
+    const tabos_socket_t socket            = tabos_socket_open(address.family, TABOS_SOCKET_TCP);
     const tabos_socket_endpoint_t endpoint = {.address = address, .port = IRC_PORT};
     if (socket < 0 || tabos_socket_connect(socket, &endpoint) != 0 || tabos_socket_set_nonblocking(socket, true) != 0) {
         fprintf(stderr, "irc: connect: %s\n", strerror(errno));
-        if (socket >= 0) { (void) tabos_socket_close(socket); }
+        if (socket >= 0) {
+            (void) tabos_socket_close(socket);
+        }
         return 1;
     }
     char line[LINE_MAX + 3];
@@ -146,21 +154,27 @@ int main(int argc, char** argv)
         (void) tabos_socket_close(socket);
         return 1;
     }
-    char channel[LINE_MAX + 1] = {0};
+    char channel[LINE_MAX + 1]  = {0};
     const char* initial_channel = argc == 4 ? argv[3] : NULL;
-    bool registered = false;
-    const int stdin_flags = fcntl(STDIN_FILENO, F_GETFL);
+    bool registered             = false;
+    const int stdin_flags       = fcntl(STDIN_FILENO, F_GETFL);
     (void) fcntl(STDIN_FILENO, F_SETFL, stdin_flags | O_NONBLOCK);
     puts("IRC connected. /join #channel, /msg target text, /quit; plain text sends to current channel.");
     draw_prompt("");
-    size_t used = 0U;
+    size_t used  = 0U;
     bool running = true;
     while (running) {
-        tabos_wait_item_t item = {.socket = socket, .events = TABOS_WAIT_READABLE};
-        if (tabos_wait_set(&item, 1U, 0U) > 0 && (item.returned_events & TABOS_WAIT_READABLE) != 0U) {
+        tabos_wait_item_t item = {
+            .source = tabos_socket_wait_source(socket),
+            .events = TABOS_WAIT_READABLE,
+        };
+        if (tabos_wait(&item, 1U, 0U) > 0 && (item.returned_events & TABOS_WAIT_READABLE) != 0U) {
             char received[RECEIVE_MAX + 1];
             const int count = tabos_socket_receive(socket, received, RECEIVE_MAX);
-            if (count <= 0) { running = false; break; }
+            if (count <= 0) {
+                running = false;
+                break;
+            }
             received[count] = '\0';
             fputs("\r\033[2K", stdout);
             char names_copy[RECEIVE_MAX + 1];
@@ -192,7 +206,10 @@ int main(int argc, char** argv)
             if (character == '\n' || character == '\r') {
                 line[used] = '\0';
                 putchar('\n');
-                if (strcmp(line, "/quit") == 0) { running = false; break; }
+                if (strcmp(line, "/quit") == 0) {
+                    running = false;
+                    break;
+                }
                 if (strncmp(line, "/join ", 6U) == 0) {
                     if (!registered) {
                         puts("Waiting for IRC registration.");
@@ -204,7 +221,7 @@ int main(int argc, char** argv)
                     (void) snprintf(line, sizeof(line), "JOIN %s\r\n", channel);
                 } else if (strncmp(line, "/msg ", 5U) == 0) {
                     char* target = line + 5;
-                    char* text = strchr(target, ' ');
+                    char* text   = strchr(target, ' ');
                     if (text == NULL) {
                         puts("Usage: /msg target text");
                         used = 0U;
@@ -244,7 +261,12 @@ int main(int argc, char** argv)
                     used = 0U;
                     draw_prompt("");
                     continue;
-                } else { puts("Join a channel first."); used = 0U; draw_prompt(""); continue; }
+                } else {
+                    puts("Join a channel first.");
+                    used = 0U;
+                    draw_prompt("");
+                    continue;
+                }
                 (void) send_line(socket, line);
                 used = 0U;
                 draw_prompt("");

@@ -111,25 +111,25 @@ documentation pass.
 
 ### API and ownership
 
-- [ ] Replace socket-specific wait items with opaque generation-tagged `tabos_wait_source_t` values.
-- [ ] Replace `tabos_wait_set()` with `tabos_wait(items, count, timeout_ms)`.
-- [ ] Define readable, writable, state-changed, error, and hangup event bits.
-- [ ] Preserve zero-time polling, finite monotonic timeout, and infinite wait.
-- [ ] Associate every wait source with its owning process and parent service handle.
-- [ ] Invalidate a source when its parent socket, subscription, stream, or device handle closes.
-- [ ] Reject foreign-process and stale sources with `EBADF`.
-- [ ] Cancel process waits before closing owned resources during cleanup.
-- [ ] Ensure cancellation wakes native platform workers and does not leave stale responses.
+- [x] Replace socket-specific wait items with opaque generation-tagged `tabos_wait_source_t` values.
+- [x] Replace `tabos_wait_set()` with `tabos_wait(items, count, timeout_ms)`.
+- [x] Define readable, writable, state-changed, error, and hangup event bits.
+- [x] Preserve zero-time polling, finite monotonic timeout, and infinite wait.
+- [x] Associate every wait source with its owning process and parent service handle.
+- [x] Invalidate a source when its parent socket, subscription, stream, or device handle closes.
+- [x] Reject foreign-process and stale sources with `EBADF`.
+- [x] Cancel process waits before closing owned resources during cleanup.
+- [x] Ensure cancellation wakes native platform workers and does not leave stale responses.
 
 ### Source adapters and migration
 
-- [ ] Add socket-to-wait-source conversion.
+- [x] Add socket-to-wait-source conversion.
 - [ ] Add device-subscription wait sources.
 - [ ] Add reusable internal hooks for future sensor, audio, pointer, camera, and expansion sources.
 - [ ] Replace old private transport slots and update the host interpreter.
-- [ ] Migrate networking service tests and SDK tests.
-- [ ] Migrate `nettest`, `ntpdate`, IRC, tester, and every other application using socket waits.
-- [ ] Remove the old public socket-only wait API and compatibility code.
+- [x] Migrate networking service tests and SDK tests.
+- [x] Migrate `nettest`, `ntpdate`, IRC, tester, and every other application using socket waits.
+- [x] Remove the old public socket-only wait API and compatibility code.
 
 ### Phase 2 validation
 
