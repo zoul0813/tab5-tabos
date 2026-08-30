@@ -9,6 +9,7 @@
 #include <tabos/internal/elf_loader.h>
 #include <tabos/internal/filesystem.h>
 #include <tabos/internal/display.h>
+#include <tabos/internal/device_registry.h>
 #include <tabos/internal/console.h>
 #include <tabos/internal/raster.h>
 #include <tabos/internal/runtime.h>
@@ -1162,9 +1163,8 @@ static int elf_tls_allocate(loader_elf_application_t* application, int platform_
 static int elf_tls_connect(const char* hostname, uint32_t port)
 {
     loader_elf_application_t* application = platform_riscv32_current_user_data();
-    const char* readable = platform_executable_data_pointer(hostname, 254U);
-    if (application == NULL || readable == NULL || port == 0U || port > UINT16_MAX ||
-        strnlen(readable, 254U) == 254U) {
+    const char* readable                  = platform_executable_data_pointer(hostname, 254U);
+    if (application == NULL || readable == NULL || port == 0U || port > UINT16_MAX || strnlen(readable, 254U) == 254U) {
         return -TABOS_EINVAL;
     }
     const int platform_connection = platform_tls_connect(readable, (uint16_t) port);
@@ -1178,14 +1178,14 @@ static int elf_tls_close(int connection)
         return -TABOS_EBADF;
     }
     const uint32_t generation = owned->generation;
-    const int result = platform_tls_close(owned->platform_connection);
-    *owned = (elf_tls_t) {.generation = generation};
+    const int result          = platform_tls_close(owned->platform_connection);
+    *owned                    = (elf_tls_t) {.generation = generation};
     return result;
 }
 
 static int elf_tls_send(int connection, const void* data, uint32_t size)
 {
-    elf_tls_t* owned = elf_tls(platform_riscv32_current_user_data(), connection);
+    elf_tls_t* owned     = elf_tls(platform_riscv32_current_user_data(), connection);
     const void* readable = platform_executable_data_pointer(data, size);
     if (owned == NULL) {
         return -TABOS_EBADF;
@@ -1199,7 +1199,7 @@ static int elf_tls_send(int connection, const void* data, uint32_t size)
 static int elf_tls_receive(int connection, void* data, uint32_t capacity)
 {
     elf_tls_t* owned = elf_tls(platform_riscv32_current_user_data(), connection);
-    void* writable = (void*) platform_executable_data_pointer(data, capacity);
+    void* writable   = (void*) platform_executable_data_pointer(data, capacity);
     if (owned == NULL) {
         return -TABOS_EBADF;
     }
@@ -1232,6 +1232,61 @@ static int elf_system_info(tabos_elf_system_info_t* info)
     info->external_memory_total_low  = (uint32_t) diagnostics.external_memory_total_bytes;
     info->external_memory_total_high = (uint32_t) (diagnostics.external_memory_total_bytes >> 32U);
     return 0;
+}
+
+static uint32_t elf_device_count(void)
+{
+    return (uint32_t) device_registry_count();
+}
+
+static int elf_device_at(uint32_t index, tabos_device_info_t* info)
+{
+    tabos_device_info_t* writable = (tabos_device_info_t*) platform_executable_data_pointer(info, sizeof(*info));
+    if (writable == NULL) {
+        return -TABOS_EINVAL;
+    }
+    return device_registry_at(index, writable) ? 0 : -TABOS_ENOENT;
+}
+
+static int elf_device_get(tabos_device_id_t id, tabos_device_info_t* info)
+{
+    tabos_device_info_t* writable = (tabos_device_info_t*) platform_executable_data_pointer(info, sizeof(*info));
+    if (writable == NULL) {
+        return -TABOS_EINVAL;
+    }
+    return device_registry_get(id, writable) ? 0 : -TABOS_ENOENT;
+}
+
+static int elf_device_find(const char* name, tabos_device_info_t* info)
+{
+    loader_elf_application_t* application = platform_riscv32_current_user_data();
+    const char* readable                  = platform_executable_data_pointer(name, TABOS_DEVICE_NAME_MAX + 1U);
+    tabos_device_info_t* writable = (tabos_device_info_t*) platform_executable_data_pointer(info, sizeof(*info));
+    if (application == NULL || readable == NULL || writable == NULL ||
+        memchr(readable, '\0', TABOS_DEVICE_NAME_MAX + 1U) == NULL) {
+        return -TABOS_EINVAL;
+    }
+    return device_registry_find(readable, writable) ? 0 : -TABOS_ENOENT;
+}
+
+static int elf_device_subscribe(void)
+{
+    loader_elf_application_t* application          = platform_riscv32_current_user_data();
+    const tabos_device_subscription_t subscription = device_registry_subscribe(application);
+    return subscription == TABOS_DEVICE_SUBSCRIPTION_INVALID ? -TABOS_ENFILE : subscription;
+}
+
+static int elf_device_subscription_close(int subscription)
+{
+    loader_elf_application_t* application = platform_riscv32_current_user_data();
+    return device_registry_unsubscribe(application, subscription) ? 0 : -TABOS_EBADF;
+}
+
+static int elf_device_event_read(int subscription, tabos_device_event_t* event)
+{
+    loader_elf_application_t* application = platform_riscv32_current_user_data();
+    tabos_device_event_t* writable = (tabos_device_event_t*) platform_executable_data_pointer(event, sizeof(*event));
+    return writable != NULL ? device_registry_read_event(application, subscription, writable) : -TABOS_EINVAL;
 }
 
 static int elf_battery_status(tabos_elf_battery_status_t* info)
@@ -1609,6 +1664,13 @@ static bool elf_entry(tabos_app_context_t* context)
         .tls_close                 = elf_tls_close,
         .tls_send                  = elf_tls_send,
         .tls_receive               = elf_tls_receive,
+        .device_count              = elf_device_count,
+        .device_at                 = elf_device_at,
+        .device_get                = elf_device_get,
+        .device_find               = elf_device_find,
+        .device_subscribe          = elf_device_subscribe,
+        .device_subscription_close = elf_device_subscription_close,
+        .device_event_read         = elf_device_event_read,
     };
     application->execution = platform_riscv32_create(
         application->image.entry, application->image.memory, application->image.memory_size,
@@ -1695,6 +1757,7 @@ static void elf_release_resources(loader_elf_application_t* application)
     if (application == NULL) {
         return;
     }
+    device_registry_unsubscribe_owner(application);
     if (application->graphics_active) {
         (void) elf_graphics_drain(application);
         (void) display_graphics_present();

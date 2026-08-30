@@ -23,8 +23,19 @@ iteration, and nonblocking flags. TabOS does not claim full POSIX compatibility.
 
 `<tabos/device.h>` defines the pre-release portable device ID, class, state, feature,
 and copied-information types used by the hardware-service registry. Device IDs are opaque;
-applications must not decode or persist them across reboot. Public enumeration and device
-lifecycle subscriptions are not exposed yet.
+applications must not decode or persist them across reboot.
+
+`tabos_device_count()`, `tabos_device_at()`, `tabos_device_get()`, and
+`tabos_device_find()` enumerate present devices and return copied metadata. Indexed lookup
+is a snapshot operation: applications must tolerate devices changing between count and
+lookup calls.
+
+`tabos_device_subscribe()` creates a process-owned lifecycle subscription.
+`tabos_device_event_read()` nonblockingly returns added, removed, ready, offline, and fault
+events; it fails with `EAGAIN` when no event is queued. Each subscription retains 32 events.
+On overflow, TabOS drops the oldest event and sets `TABOS_DEVICE_EVENT_OVERFLOW` on the next
+event read. Close subscriptions with `tabos_device_subscription_close()`; TabOS also closes
+them automatically when the owning process exits.
 
 ## Reboot and Power-Off
 

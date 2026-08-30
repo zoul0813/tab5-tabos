@@ -69,9 +69,11 @@ boot. Only detected devices are registered. Active entries carry a fixed-size lo
 name, driver name, device class, ready/offline/fault state, informational feature flags,
 and last error. Application access is not gated by a capability mask.
 
-The initial model supplies internal registration, removal, state transition, and copied
-lookup operations. Public enumeration, lifecycle subscriptions, generic wait integration,
-and driver registration are subsequent hardware-service phases.
+The public API supplies copied count/index/ID/name lookup and process-owned lifecycle
+subscriptions. Each subscription retains 32 events, drops the oldest event on overflow,
+reports overflow on the next successful read, and is discarded during process cleanup.
+Generic wait integration and existing-driver registration are subsequent hardware-service
+phases.
 
 ### Reboot and power-off [DECIDED]
 

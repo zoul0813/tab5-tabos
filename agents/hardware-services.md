@@ -71,13 +71,13 @@ documentation pass.
 
 ### Public device API
 
-- [ ] Add `<tabos/device.h>` with device count, indexed lookup, ID lookup, and logical-name lookup.
-- [ ] Return copied, fixed-size device information; never expose internal pointers or native handles.
-- [ ] Add lifecycle events for added, removed, ready, offline, and fault transitions.
-- [ ] Give each process-owned subscription a bounded 32-event queue.
-- [ ] Drop the oldest event on overflow and report an overflow flag with the next successful read.
-- [ ] Close subscriptions and discard queued events during process cleanup.
-- [ ] Add private ELF transport calls and host-interpreter forwarding.
+- [x] Add `<tabos/device.h>` with device count, indexed lookup, ID lookup, and logical-name lookup.
+- [x] Return copied, fixed-size device information; never expose internal pointers or native handles.
+- [x] Add lifecycle events for added, removed, ready, offline, and fault transitions.
+- [x] Give each process-owned subscription a bounded 32-event queue.
+- [x] Drop the oldest event on overflow and report an overflow flag with the next successful read.
+- [x] Close subscriptions and discard queued events during process cleanup.
+- [x] Add private ELF transport calls and host-interpreter forwarding.
 
 ### Existing driver migration
 
@@ -99,7 +99,7 @@ documentation pass.
 - [ ] Print ID, logical name, class, state, driver, features, and last error without native details.
 - [x] Unit-test capacity, duplicate names, deterministic lookup, state transitions,
   tombstones, stale IDs, removal, and registry reinitialization.
-- [ ] Unit-test lifecycle-event order, overflow, subscriptions, and process cleanup.
+- [x] Unit-test lifecycle-event order, overflow, subscriptions, and owner cleanup.
 - [ ] Add deterministic host virtual devices.
 - [ ] Add maintained tester coverage for enumeration and lifecycle events.
 - [ ] Validate detected device listing on physical Tab5.

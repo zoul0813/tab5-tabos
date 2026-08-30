@@ -3,10 +3,11 @@
 
 #include <tabos/graphics.h>
 #include <tabos/input.h>
+#include <tabos/device.h>
 
 #include <stdint.h>
 
-#define TABOS_ELF_API_VERSION  11U
+#define TABOS_ELF_API_VERSION  12U
 #define TABOS_ELF_EXEC_PENDING (-2147483647 - 1)
 
 enum {
@@ -158,6 +159,13 @@ typedef struct {
         int (*tls_close)(int connection);
         int (*tls_send)(int connection, const void* data, uint32_t size);
         int (*tls_receive)(int connection, void* data, uint32_t capacity);
+        uint32_t (*device_count)(void);
+        int (*device_at)(uint32_t index, tabos_device_info_t* info);
+        int (*device_get)(tabos_device_id_t id, tabos_device_info_t* info);
+        int (*device_find)(const char* name, tabos_device_info_t* info);
+        int (*device_subscribe)(void);
+        int (*device_subscription_close)(int subscription);
+        int (*device_event_read)(int subscription, tabos_device_event_t* event);
 } tabos_elf_api_t;
 
 typedef int (*tabos_elf_entry_fn)(const tabos_elf_api_t* api, int argc, const char* const* argv);

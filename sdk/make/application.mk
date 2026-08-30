@@ -47,6 +47,7 @@ TABOS_RUNTIME_SOURCES := $(SDK_ROOT)/crt/crt0.c $(SDK_ROOT)/crt/metadata.S $(SDK
                          $(SDK_ROOT)/lib/clock.c \
                          $(SDK_ROOT)/lib/reboot.c \
                          $(SDK_ROOT)/lib/runtime.c \
+                         $(SDK_ROOT)/lib/device.c \
                          $(SDK_ROOT)/lib/posix_filesystem.c
 
 .PHONY: all build clean install size metadata

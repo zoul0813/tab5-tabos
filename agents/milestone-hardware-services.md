@@ -24,10 +24,11 @@ ESP-IDF, FreeRTOS, SDL, controller, bus, or native-handle interfaces.
   failed process exit.
 - [x] The fixed-capacity device registry model, generation-tagged IDs, tombstones,
   copied lookup, and state transitions are implemented and tested.
+- [x] Public copied enumeration and process-owned lifecycle subscriptions are implemented,
+  including bounded overflow reporting, cleanup, and ELF forwarding.
 - [ ] Existing display, keyboard, storage, Wi-Fi, RTC, and battery drivers still need
   registration and lifecycle reporting through the common device registry.
-- [ ] Public device enumeration, lifecycle subscriptions, and generic non-socket wait
-  sources are not implemented.
+- [ ] Generic non-socket wait sources are not implemented.
 
 ## Agreed Phase Order
 

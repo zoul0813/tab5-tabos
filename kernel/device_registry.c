@@ -2,6 +2,7 @@
 
 #include <tabos/platform/platform.h>
 
+#include <errno.h>
 #include <string.h>
 
 enum {
@@ -16,11 +17,79 @@ typedef struct {
         bool present;
 } device_registry_entry_t;
 
+typedef struct {
+        const void* owner;
+        tabos_device_event_t events[DEVICE_EVENT_QUEUE_CAPACITY];
+        uint32_t generation;
+        size_t head;
+        size_t count;
+        bool used;
+        bool overflow;
+} device_subscription_t;
+
 static device_registry_entry_t entries[DEVICE_REGISTRY_CAPACITY];
+static device_subscription_t subscriptions[DEVICE_SUBSCRIPTION_CAPACITY];
 static platform_mutex_t* registry_mutex;
 static uint32_t registry_generation;
 static uint32_t next_generation = 1U;
 static size_t active_count;
+
+enum {
+    DEVICE_SUBSCRIPTION_INDEX_BITS     = 4,
+    DEVICE_SUBSCRIPTION_INDEX_MASK     = (1U << DEVICE_SUBSCRIPTION_INDEX_BITS) - 1U,
+    DEVICE_SUBSCRIPTION_GENERATION_MAX = INT32_MAX >> DEVICE_SUBSCRIPTION_INDEX_BITS,
+};
+
+_Static_assert((1U << DEVICE_SUBSCRIPTION_INDEX_BITS) == DEVICE_SUBSCRIPTION_CAPACITY,
+               "subscription index bits must match capacity");
+
+static void publish_event(tabos_device_event_type_t type, const tabos_device_info_t* info)
+{
+    const tabos_device_event_t event = {.type = type, .device = *info};
+    for (size_t index = 0U; index < DEVICE_SUBSCRIPTION_CAPACITY; ++index) {
+        device_subscription_t* subscription = &subscriptions[index];
+        if (!subscription->used) {
+            continue;
+        }
+        if (subscription->count == DEVICE_EVENT_QUEUE_CAPACITY) {
+            subscription->head = (subscription->head + 1U) % DEVICE_EVENT_QUEUE_CAPACITY;
+            --subscription->count;
+            subscription->overflow = true;
+        }
+        const size_t tail          = (subscription->head + subscription->count) % DEVICE_EVENT_QUEUE_CAPACITY;
+        subscription->events[tail] = event;
+        ++subscription->count;
+    }
+}
+
+static tabos_device_event_type_t state_event(tabos_device_state_t state)
+{
+    if (state == TABOS_DEVICE_READY) {
+        return TABOS_DEVICE_EVENT_READY;
+    }
+    if (state == TABOS_DEVICE_OFFLINE) {
+        return TABOS_DEVICE_EVENT_OFFLINE;
+    }
+    return TABOS_DEVICE_EVENT_FAULT;
+}
+
+static tabos_device_subscription_t subscription_handle(size_t index, uint32_t generation)
+{
+    return (tabos_device_subscription_t) ((generation << DEVICE_SUBSCRIPTION_INDEX_BITS) | (uint32_t) index);
+}
+
+static device_subscription_t* owned_subscription(const void* owner, tabos_device_subscription_t handle)
+{
+    if (owner == NULL || handle < 0) {
+        return NULL;
+    }
+    const uint32_t value                = (uint32_t) handle;
+    const size_t index                  = value & DEVICE_SUBSCRIPTION_INDEX_MASK;
+    const uint32_t generation           = value >> DEVICE_SUBSCRIPTION_INDEX_BITS;
+    device_subscription_t* subscription = &subscriptions[index];
+    return subscription->used && subscription->owner == owner && subscription->generation == generation ? subscription :
+                                                                                                          NULL;
+}
 
 static bool valid_class(tabos_device_class_t device_class)
 {
@@ -92,6 +161,7 @@ bool device_registry_init(void)
         return false;
     }
     memset(entries, 0, sizeof(entries));
+    memset(subscriptions, 0, sizeof(subscriptions));
     active_count        = 0U;
     registry_generation = next_generation;
     ++next_generation;
@@ -109,6 +179,7 @@ void device_registry_shutdown(void)
     platform_mutex_t* mutex = registry_mutex;
     platform_mutex_lock(mutex);
     memset(entries, 0, sizeof(entries));
+    memset(subscriptions, 0, sizeof(subscriptions));
     active_count        = 0U;
     registry_generation = 0U;
     registry_mutex      = NULL;
@@ -153,6 +224,7 @@ tabos_device_id_t device_registry_register(const device_registry_registration_t*
     (void) memcpy(entry->info.name, registration->name, strlen(registration->name) + 1U);
     (void) memcpy(entry->info.driver, registration->driver, strlen(registration->driver) + 1U);
     ++active_count;
+    publish_event(TABOS_DEVICE_EVENT_ADDED, &entry->info);
     const tabos_device_id_t id = entry->info.id;
     platform_mutex_unlock(registry_mutex);
     return id;
@@ -169,6 +241,7 @@ bool device_registry_remove(tabos_device_id_t id)
         platform_mutex_unlock(registry_mutex);
         return false;
     }
+    publish_event(TABOS_DEVICE_EVENT_REMOVED, &entry->info);
     entry->present = false;
     --active_count;
     platform_mutex_unlock(registry_mutex);
@@ -186,8 +259,13 @@ bool device_registry_set_state(tabos_device_id_t id, tabos_device_state_t state,
         platform_mutex_unlock(registry_mutex);
         return false;
     }
+    if (entry->info.state == state && entry->info.last_error == last_error) {
+        platform_mutex_unlock(registry_mutex);
+        return true;
+    }
     entry->info.state      = state;
     entry->info.last_error = last_error;
+    publish_event(state_event(state), &entry->info);
     platform_mutex_unlock(registry_mutex);
     return true;
 }
@@ -256,4 +334,87 @@ bool device_registry_find(const char* name, tabos_device_info_t* info)
     }
     platform_mutex_unlock(registry_mutex);
     return false;
+}
+
+tabos_device_subscription_t device_registry_subscribe(const void* owner)
+{
+    if (registry_mutex == NULL || owner == NULL) {
+        return TABOS_DEVICE_SUBSCRIPTION_INVALID;
+    }
+    platform_mutex_lock(registry_mutex);
+    for (size_t index = 0U; index < DEVICE_SUBSCRIPTION_CAPACITY; ++index) {
+        device_subscription_t* subscription = &subscriptions[index];
+        if (subscription->used) {
+            continue;
+        }
+        uint32_t generation = subscription->generation + 1U;
+        if (generation == 0U || generation > DEVICE_SUBSCRIPTION_GENERATION_MAX) {
+            generation = 1U;
+        }
+        *subscription = (device_subscription_t) {.owner = owner, .generation = generation, .used = true};
+        const tabos_device_subscription_t handle = subscription_handle(index, generation);
+        platform_mutex_unlock(registry_mutex);
+        return handle;
+    }
+    platform_mutex_unlock(registry_mutex);
+    return TABOS_DEVICE_SUBSCRIPTION_INVALID;
+}
+
+bool device_registry_unsubscribe(const void* owner, tabos_device_subscription_t handle)
+{
+    if (registry_mutex == NULL) {
+        return false;
+    }
+    platform_mutex_lock(registry_mutex);
+    device_subscription_t* subscription = owned_subscription(owner, handle);
+    if (subscription == NULL) {
+        platform_mutex_unlock(registry_mutex);
+        return false;
+    }
+    const uint32_t generation = subscription->generation;
+    *subscription             = (device_subscription_t) {.generation = generation};
+    platform_mutex_unlock(registry_mutex);
+    return true;
+}
+
+void device_registry_unsubscribe_owner(const void* owner)
+{
+    if (registry_mutex == NULL || owner == NULL) {
+        return;
+    }
+    platform_mutex_lock(registry_mutex);
+    for (size_t index = 0U; index < DEVICE_SUBSCRIPTION_CAPACITY; ++index) {
+        device_subscription_t* subscription = &subscriptions[index];
+        if (subscription->used && subscription->owner == owner) {
+            const uint32_t generation = subscription->generation;
+            *subscription             = (device_subscription_t) {.generation = generation};
+        }
+    }
+    platform_mutex_unlock(registry_mutex);
+}
+
+int device_registry_read_event(const void* owner, tabos_device_subscription_t handle, tabos_device_event_t* event)
+{
+    if (registry_mutex == NULL || event == NULL) {
+        return -EINVAL;
+    }
+    platform_mutex_lock(registry_mutex);
+    device_subscription_t* subscription = owned_subscription(owner, handle);
+    if (subscription == NULL) {
+        platform_mutex_unlock(registry_mutex);
+        return -EBADF;
+    }
+    if (subscription->count == 0U) {
+        platform_mutex_unlock(registry_mutex);
+        return -EAGAIN;
+    }
+    *event             = subscription->events[subscription->head];
+    subscription->head = (subscription->head + 1U) % DEVICE_EVENT_QUEUE_CAPACITY;
+    --subscription->count;
+    if (subscription->overflow) {
+        event->flags           |= TABOS_DEVICE_EVENT_OVERFLOW;
+        subscription->overflow  = false;
+    }
+    platform_mutex_unlock(registry_mutex);
+    return 0;
 }

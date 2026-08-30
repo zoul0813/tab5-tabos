@@ -487,7 +487,8 @@ but is not a substitute for this execution path.
 
 - [x] Add fixed-capacity internal device registry model with generation-tagged IDs,
   tombstones, copied lookup, and ready/offline/fault state.
-- [ ] Expose public device enumeration/events and migrate existing drivers into registry.
+- [x] Expose public copied device enumeration and process-owned lifecycle events.
+- [ ] Migrate existing drivers into registry.
 - [x] Add RTC and wall-clock service; physical RX8130CE validation remains separately tracked.
 - [x] Add battery telemetry and charge control; sleep and wake remain future work.
 - [ ] Add USB host/OTG service beyond keyboard support.

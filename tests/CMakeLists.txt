@@ -25,6 +25,15 @@ tabos_enable_warnings(tabos_device_registry)
 tabos_enable_sanitizers(tabos_device_registry)
 add_test(NAME unit.device_registry COMMAND tabos_device_registry)
 
+add_executable(tabos_sdk_device
+    unit/sdk_device.c
+    "${TABOS_ROOT}/sdk/lib/device.c"
+)
+target_include_directories(tabos_sdk_device PRIVATE "${TABOS_ROOT}/sdk/include")
+tabos_enable_warnings(tabos_sdk_device)
+tabos_enable_sanitizers(tabos_sdk_device)
+add_test(NAME unit.sdk_device COMMAND tabos_sdk_device)
+
 add_executable(tabos_raster unit/raster.c ${TABOS_TEST_PLATFORM_FAKES})
 target_include_directories(tabos_raster PRIVATE
     "${TABOS_ROOT}/graphics/include"
