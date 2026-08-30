@@ -6,6 +6,7 @@ script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 project_root=$(dirname "$script_dir")
 msc_mount=${TABOS_MSC_MOUNT:-}
 make_arguments=
+with_doom=false
 
 for argument in "$@"; do
     case "$argument" in
@@ -14,6 +15,9 @@ for argument in "$@"; do
             ;;
         --msc-mount=*)
             msc_mount=${argument#--msc-mount=}
+            ;;
+        --with-doom)
+            with_doom=true
             ;;
         *)
             make_arguments="$make_arguments \"$argument\""
@@ -29,7 +33,7 @@ for application_dir in "$script_dir"/*; do
     if [ ! -f "$application_dir/Makefile" ]; then
         continue
     fi
-    if [ "$(basename "$application_dir")" = doom ]; then
+    if [ "$(basename "$application_dir")" = doom ] && [ "$with_doom" = false ]; then
         continue
     fi
     if [ -n "$make_arguments" ]; then
@@ -57,17 +61,24 @@ if [ -n "$msc_mount" ]; then
         case "$binary" in
             *.elf) continue ;;
         esac
-        found_binary=true
         relative_path=${binary#"$project_root/build/apps/"}
         case "$relative_path" in
-            coreutils/*/*)
-                relative_path=${relative_path#coreutils/}
-                relative_path=${relative_path#*/}
+            doom/*)
+                if [ "$with_doom" = false ]; then
+                    continue
+                fi
                 ;;
         esac
-        relative_path=${relative_path#*/}
-        target="$destination/$relative_path"
-        mkdir -p "$(dirname "$target")"
+
+        # Runnable outputs are extensionless files named after their immediate
+        # build directory. This excludes unstripped ELFs and source/build assets.
+        binary_name=${binary##*/}
+        binary_directory=${binary%/*}
+        if [ "$binary_name" != "${binary_directory##*/}" ]; then
+            continue
+        fi
+        found_binary=true
+        target="$destination/$binary_name"
         cp "$binary" "$target"
     done
     if [ "$found_binary" = false ]; then

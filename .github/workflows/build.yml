@@ -79,6 +79,20 @@ jobs:
           path: dist/tabos-linux-x64.tar.gz
           archive: false
 
+  doom:
+    name: DOOM application compile
+    runs-on: ubuntu-24.04
+    container: espressif/idf:v5.4.4
+    steps:
+      - uses: actions/checkout@v7
+      - name: Fetch and compile pinned DOOM application
+        shell: bash
+        run: |
+          . /opt/esp/idf/export.sh
+          make -C apps/doom fetch
+          make -C apps/doom build metadata
+          test -x build/apps/doom/doom
+
   tab5:
     name: Tab5 compile / ${{ matrix.configuration }}
     runs-on: ubuntu-24.04

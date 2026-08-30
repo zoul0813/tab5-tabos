@@ -12,13 +12,20 @@ Build and install every independently loaded application with:
 ./apps/build.sh
 ```
 
-Script discovers every `apps/*/Makefile`, builds each application, and installs runnable
-ELF images under `.local/rootfs/T/bin/`. It activates project-local ESP-IDF toolchain
-automatically when compiler is not already available. Arguments pass to each application
-Makefile; for example, this builds without installing:
+Script discovers maintained `apps/*/Makefile` projects, builds each default application,
+and installs runnable ELF images under `.local/rootfs/T/bin/`. Optional DOOM stays
+excluded unless `--with-doom` is present. Script activates project-local ESP-IDF
+toolchain automatically when compiler is not already available. Arguments pass to each
+application Makefile; for example, this builds without installing:
 
 ```sh
 ./apps/build.sh build
+```
+
+Explicitly fetch, build, and install pinned optional DOOM application with:
+
+```sh
+./apps/build.sh --with-doom
 ```
 
 To build and copy the applications to the Tab5 MSC volume, then safely eject
@@ -29,9 +36,20 @@ it after copying:
 ```
 
 The default mount point is `/Volumes/TAB5`. Use `--msc-mount=/path` or set
-`TABOS_MSC_MOUNT` to override it. Binaries are copied to the volume's `bin/`
-directory. Subdirectories in an application's build output are preserved; for
-example, `sys/ls` is copied to `bin/sys/ls`.
+`TABOS_MSC_MOUNT` to override it. Runnable extensionless outputs are copied to the
+volume's `bin/` directory. Intermediate build files and source assets are excluded.
+Grouped utility outputs are flattened; for example, `build/apps/coreutils/ls/ls` is
+copied to `bin/ls`.
+
+DOOM is not copied from an earlier build unless explicitly selected. To build and copy
+it with other applications, use:
+
+```sh
+./apps/build.sh build --msc --with-doom
+```
+
+When `build/apps/doom/doom` exists, `--msc --with-doom` copies that extensionless
+executable to `T:/bin/doom`. Build and installation never copy or download WAD data.
 
 Individual application commands such as `make -C apps/shell` remain available.
 

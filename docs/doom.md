@@ -7,10 +7,26 @@ outside normal application builds and release artifacts.
 Build it explicitly after activating or installing the project toolchain:
 
 ```sh
+./apps/build.sh --with-doom
+```
+
+This performs pinned fetch, build, and installation to `.local/rootfs/T/bin/doom`.
+DOOM remains excluded from plain `./apps/build.sh`. Individual targets remain available:
+
+```sh
 make -C apps/doom fetch
 make -C apps/doom build
 make -C apps/doom install
 ```
+
+To copy an existing or newly built executable to Tab5 MSC storage with other apps:
+
+```sh
+./apps/build.sh build --msc --with-doom
+```
+
+This writes extensionless `bin/doom`. DOOM binary and WAD files remain absent from
+published TabOS artifacts.
 
 For offline use, `DOOMGENERIC_SOURCE_DIR` may point to a pre-fetched Git checkout, but
 its checked-out `HEAD` must exactly equal the pinned commit. TabOS verifies this before
@@ -36,3 +52,8 @@ Current runtime support converts DOOM's 320x200 RGB framebuffer to RGB565 and pr
 it as a centered 960x720 4:3 image. Keyboard controls are W/S movement, A/D strafing,
 arrow turning, J or Control fire, E or Space use, Shift run, R always-run toggle, number
 weapon selection, and standard menu keys.
+
+Current stripped executable is 902,264 bytes on disk. ELF section totals are 421,636
+bytes text, 60,084 bytes data, and 241,072 bytes BSS. `.note.tabos` metadata version 1
+has a 32-byte descriptor, requires application ABI 1 and capability bits 1 (console), and
+requests an 8 MiB heap plus 64 KiB stack.

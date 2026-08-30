@@ -34,7 +34,8 @@ bitmap blit, and explicit presentation operations. See `docs/graphics-api.md`.
 
 Each application includes `sdk/make/application.mk`. `make` produces a stripped,
 extensionless executable and installs it under `.local/rootfs/T/bin/`. Run
-`./apps/build.sh` to build all applications.
+`./apps/build.sh` to build default applications. Optional applications such as DOOM
+require their documented opt-in flag.
 
 ABI v1 preserves this public SDK contract. Compatible runtime calls may be appended;
 incompatible changes require a new application ABI version.
