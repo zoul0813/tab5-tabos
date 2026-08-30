@@ -149,6 +149,15 @@ deferred beyond this milestone.
 - [ ] Allow Ctrl+C to stop early, print partial summary, cancel pending echo, and
   restore input state.
 
+### Network Time Utility
+
+- [x] Add `ntpdate` under `apps/netutils` using public DNS, UDP socket, wait-set,
+  and clock APIs only.
+- [x] Accept a selected IPv4 or IPv6 NTP server, validate synchronized NTPv4 server
+  responses, and set whole UTC Unix seconds.
+- [x] Validate `ntpdate` against a physical Tab5 Wi-Fi connection.
+- [ ] Confirm the RTC retains `ntpdate` UTC time after restart.
+
 ### Socket Interoperability Utility
 
 - [x] Add a host Python TCP/UDP echo service and `apps/netutils` `nettest`

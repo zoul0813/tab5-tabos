@@ -111,6 +111,23 @@ make -C apps/netutils ping
 It accepts `-4` or `-6`, `-c count`, and `-W timeout-ms`; without options it
 sends four requests with a one-second timeout.
 
+## NTP clock synchronization
+
+`ntpdate` is a network utility that resolves an NTP server, sends one bounded UDP
+NTP request, validates the server response, and sets the TabOS UTC clock. It defaults
+to `pool.ntp.org`; supply a server name or numeric address to select another server:
+
+```sh
+make -C apps/netutils ntpdate
+ntpdate
+ntpdate time.cloudflare.com
+ntpdate -6 time.cloudflare.com
+```
+
+The utility accepts synchronized NTPv4 server responses. IPv4 is the default; `-6`
+selects IPv6. It sets whole Unix seconds; sub-second clock discipline and NTP
+authentication are outside its scope.
+
 ## Host-to-Tab5 Socket Test
 
 The ordinary tester uses loopback sockets. To prove that TCP and UDP packets traverse
