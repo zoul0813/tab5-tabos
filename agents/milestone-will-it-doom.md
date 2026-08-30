@@ -213,11 +213,17 @@ firmware.
 
 ### Phase 4: SDK and Application Build Metadata
 
-- [ ] Add `TABOS_APP_HEAP_BYTES` and `TABOS_APP_STACK_BYTES` to SDK Make rules.
-- [ ] Emit `.note.tabos` automatically from application builds.
-- [ ] Keep defaults identical for applications that set no metadata variables.
-- [ ] Add metadata inspection/debugging command or documented inspection procedure.
-- [ ] Build and launch an existing application with explicit non-default limits.
+- [x] Add `TABOS_APP_HEAP_BYTES` and `TABOS_APP_STACK_BYTES` to SDK Make rules.
+- [x] Emit `.note.tabos` automatically from application builds.
+- [x] Keep defaults identical for applications that set no metadata variables.
+- [x] Add metadata inspection/debugging command or documented inspection procedure.
+- [x] Build and launch an existing application with explicit non-default limits.
+
+Phase 4 build validation: `make -C apps/hello_elf metadata` shows the SDK-default
+256 KiB heap and 16 KiB stack. `make -C apps/starfall metadata` shows Starfall's
+explicit 1 MiB heap and 16 KiB stack after stripping. The rebuilt Starfall binary is
+installed to the host rootfs. On physical Tab5, the rebuilt Starfall application loaded
+and ran successfully with its explicit metadata.
 
 ### Phase 5: Pinned DOOM Source
 

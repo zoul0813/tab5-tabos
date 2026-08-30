@@ -22,6 +22,9 @@ SECTIONS
         *(.sbss*)
         *(COMMON)
     } :load
+    .note.tabos : {
+        KEEP(*(.note.tabos))
+    } :NONE
     /DISCARD/ : {
         *(.comment*)
         *(.note*)

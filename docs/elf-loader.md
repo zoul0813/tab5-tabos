@@ -56,6 +56,23 @@ image, API table, arguments, heap, guard page, and stack, with a 24 MiB cap. On 
 the heap remains a lazy process-owned allocation and the requested task stack comes from
 PSRAM.
 
+SDK-built applications emit this note automatically. The shared application Make rules
+use a 256 KiB heap and 16 KiB stack by default. An application can request explicit
+limits before including `sdk/make/application.mk`:
+
+```make
+TABOS_APP_HEAP_BYTES := 1048576
+TABOS_APP_STACK_BYTES := 16384
+```
+
+Inspect a built, stripped application note with:
+
+```sh
+make -C apps/starfall metadata
+```
+
+This runs the matching RISC-V `readelf -n` command and shows the `TABOS` note.
+
 Host execution is resumable. Each application update executes at most 10,000 guest
 instructions, then yields to normal TabOS input, display, timer, and application work.
 Guest registers and memory persist into next update. This is scheduling quantum, not
