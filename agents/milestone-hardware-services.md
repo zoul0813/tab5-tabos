@@ -22,9 +22,12 @@ ESP-IDF, FreeRTOS, SDL, controller, bus, or native-handle interfaces.
   ESP32-C6 networking, TLS, and socket wait support exist.
 - [x] Existing application resources have deterministic cleanup paths for normal and
   failed process exit.
+- [x] The fixed-capacity device registry model, generation-tagged IDs, tombstones,
+  copied lookup, and state transitions are implemented and tested.
 - [ ] Existing display, keyboard, storage, Wi-Fi, RTC, and battery drivers still need
   registration and lifecycle reporting through the common device registry.
-- [ ] The device registry and generic non-socket wait sources are not implemented.
+- [ ] Public device enumeration, lifecycle subscriptions, and generic non-socket wait
+  sources are not implemented.
 
 ## Agreed Phase Order
 

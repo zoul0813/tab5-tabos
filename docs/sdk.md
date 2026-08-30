@@ -19,6 +19,13 @@ iteration, and nonblocking flags. TabOS does not claim full POSIX compatibility.
 `time()`, `gettimeofday()`, and realtime/monotonic `clock_gettime()` are supported.
 `<tabos/system.h>` provides portable target, device, display, processor, and memory data.
 
+## Device Types
+
+`<tabos/device.h>` defines the pre-release portable device ID, class, state, feature,
+and copied-information types used by the hardware-service registry. Device IDs are opaque;
+applications must not decode or persist them across reboot. Public enumeration and device
+lifecycle subscriptions are not exposed yet.
+
 ## Reboot and Power-Off
 
 `<sys/reboot.h>` provides `reboot(RB_AUTOBOOT)` and `reboot(RB_POWER_OFF)`. Successful

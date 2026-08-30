@@ -60,6 +60,19 @@ drivers do not apply timezone or daylight-saving policy. Applications receive a 
 calendar API plus standard `time()`, `gettimeofday()`, and `clock_gettime()` access.
 The existing monotonic clock remains separate and must be used for elapsed time.
 
+### Hardware device registry [DECIDED]
+
+TabOS owns a fixed-capacity registry of hardware and deterministic host-virtual devices.
+The registry has 32 lifetime slots per boot. Public 32-bit device IDs encode a boot
+generation and slot; removed slots become tombstones and are not reused until the next
+boot. Only detected devices are registered. Active entries carry a fixed-size logical
+name, driver name, device class, ready/offline/fault state, informational feature flags,
+and last error. Application access is not gated by a capability mask.
+
+The initial model supplies internal registration, removal, state transition, and copied
+lookup operations. Public enumeration, lifecycle subscriptions, generic wait integration,
+and driver registration are subsequent hardware-service phases.
+
 ### Reboot and power-off [DECIDED]
 
 Applications request immediate reboot or power-off through Linux-compatible

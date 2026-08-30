@@ -5,6 +5,7 @@
 #include <tabos/internal/diagnostic_apps.h>
 #include <tabos/internal/console.h>
 #include <tabos/internal/display.h>
+#include <tabos/internal/device_registry.h>
 #include <tabos/internal/filesystem.h>
 #include <tabos/internal/input.h>
 #include <tabos/internal/network.h>
@@ -121,6 +122,9 @@ bool kernel_runtime_init(void)
     }
 
     atomic_store_explicit(&requested_system_action, PLATFORM_SYSTEM_ACTION_NONE, memory_order_release);
+    if (!device_registry_init()) {
+        return false;
+    }
     runtime_initialized = true;
     input_init();
     return true;
@@ -301,6 +305,7 @@ void kernel_runtime_shutdown(void)
     filesystem_shutdown();
     runtime_initialized = false;
     input_shutdown();
+    device_registry_shutdown();
 }
 
 const char* kernel_runtime_version(void)

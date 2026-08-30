@@ -14,6 +14,17 @@ tabos_enable_sanitizers(tabos_core_smoke)
 
 add_test(NAME unit.core_smoke COMMAND tabos_core_smoke)
 
+add_executable(tabos_device_registry unit/device_registry.c ${TABOS_TEST_PLATFORM_FAKES})
+target_include_directories(tabos_device_registry PRIVATE
+    "${TABOS_ROOT}/kernel/include"
+    "${TABOS_ROOT}/platform/include"
+    "${TABOS_ROOT}/sdk/include"
+)
+target_link_libraries(tabos_device_registry PRIVATE tabos_core)
+tabos_enable_warnings(tabos_device_registry)
+tabos_enable_sanitizers(tabos_device_registry)
+add_test(NAME unit.device_registry COMMAND tabos_device_registry)
+
 add_executable(tabos_raster unit/raster.c ${TABOS_TEST_PLATFORM_FAKES})
 target_include_directories(tabos_raster PRIVATE
     "${TABOS_ROOT}/graphics/include"

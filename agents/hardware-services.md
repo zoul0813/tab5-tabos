@@ -1,4 +1,4 @@
-# Hardware Drivers and Services Milestone
+# Hardware Services Milestone
 
 ## Goal
 
@@ -47,6 +47,7 @@ documentation pass.
 - [x] Socket-only zero, finite, and infinite wait behavior exists.
 - [x] PPA and PIE graphics acceleration foundations exist.
 - [x] Process-owned file, socket, TLS, graphics, heap, and execution resources have cleanup paths.
+- [x] Fixed-capacity internal device registry model and deterministic registry tests exist.
 - [ ] Record a fresh macOS Debug/Release, Linux Debug/Release, Tab5 Debug/Release, app-build,
   and maintained-tester baseline before beginning Phase 1.
 
@@ -54,19 +55,19 @@ documentation pass.
 
 ### Registry model
 
-- [ ] Add a fixed-capacity registry with an initial capacity of 32 devices.
-- [ ] Define a generation-tagged 32-bit `tabos_device_id_t` and invalid sentinel.
-- [ ] Never reuse an ID during one boot, including after removal.
-- [ ] Retain an internal tombstone after removal so stale IDs fail deterministically.
-- [ ] Reject duplicate logical names.
-- [ ] Define device classes for display, keyboard, storage, RTC, battery, IMU/sensor, network,
+- [x] Add a fixed-capacity registry with an initial capacity of 32 devices.
+- [x] Define a generation-tagged 32-bit `tabos_device_id_t` and invalid sentinel.
+- [x] Never reuse an ID during one boot, including after removal.
+- [x] Retain an internal tombstone after removal so stale IDs fail deterministically.
+- [x] Reject duplicate logical names.
+- [x] Define device classes for display, keyboard, storage, RTC, battery, IMU/sensor, network,
   audio, pointer/touch, camera, and expansion I/O.
-- [ ] Define ready, offline, and fault states.
-- [ ] Store ID, class, logical name, driver name, state, device feature flags, and last error.
-- [ ] Keep logical names deterministic: `display0`, `keyboard0`, `storage0`, `rtc0`, `battery0`,
+- [x] Define ready, offline, and fault states.
+- [x] Store ID, class, logical name, driver name, state, device feature flags, and last error.
+- [x] Keep logical names deterministic: `display0`, `keyboard0`, `storage0`, `rtc0`, `battery0`,
   `imu0`, `wifi0`, `audio0`, `touch0`, and `camera0`.
-- [ ] Register a device only after physical or virtual presence is detected.
-- [ ] Permit a detected device to transition among ready, offline, and fault.
+- [x] Register a device only after physical or virtual presence is detected.
+- [x] Permit a detected device to transition among ready, offline, and fault.
 
 ### Public device API
 
@@ -96,8 +97,9 @@ documentation pass.
 
 - [ ] Add `devices` to `apps/coreutils`.
 - [ ] Print ID, logical name, class, state, driver, features, and last error without native details.
-- [ ] Unit-test capacity, duplicate names, deterministic lookup, state transitions, tombstones,
-  stale IDs, removal, event order, overflow, subscriptions, and cleanup.
+- [x] Unit-test capacity, duplicate names, deterministic lookup, state transitions,
+  tombstones, stale IDs, removal, and registry reinitialization.
+- [ ] Unit-test lifecycle-event order, overflow, subscriptions, and process cleanup.
 - [ ] Add deterministic host virtual devices.
 - [ ] Add maintained tester coverage for enumeration and lifecycle events.
 - [ ] Validate detected device listing on physical Tab5.
