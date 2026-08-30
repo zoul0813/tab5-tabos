@@ -179,8 +179,9 @@ const void* platform_executable_data_pointer(const void* memory, size_t size);
 void platform_executable_free(void* memory);
 bool platform_can_execute_riscv32(void);
 platform_riscv32_context_t* platform_riscv32_create(const void* entry, const void* memory, size_t memory_size,
-                                                    uint32_t minimum_address, const tabos_elf_api_t* api, size_t argc,
-                                                    const char* const* argv, void* user_data);
+                                                    uint32_t minimum_address, size_t heap_bytes, size_t stack_bytes,
+                                                    const tabos_elf_api_t* api, size_t argc, const char* const* argv,
+                                                    void* user_data);
 platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* context, unsigned int instruction_budget,
                                                 int* returned_status);
 void platform_riscv32_destroy(platform_riscv32_context_t* context);

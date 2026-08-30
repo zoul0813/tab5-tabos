@@ -56,7 +56,8 @@ static int test_tty_set_mode(int descriptor, uint32_t mode)
     return 0;
 }
 
-static platform_riscv32_result_t execute_raw(const uint32_t* instructions, size_t size, unsigned int budget)
+static platform_riscv32_result_t execute_raw_with_limits(const uint32_t* instructions, size_t size, unsigned int budget,
+                                                         size_t heap_bytes, size_t stack_bytes)
 {
     const tabos_elf_api_t api = {
         .abi_version       = TABOS_ELF_API_VERSION,
@@ -68,13 +69,18 @@ static platform_riscv32_result_t execute_raw(const uint32_t* instructions, size_
     };
     int returned_status = -1;
     platform_riscv32_context_t* context =
-        platform_riscv32_create(instructions, instructions, size, 0U, &api, 0U, NULL, NULL);
+        platform_riscv32_create(instructions, instructions, size, 0U, heap_bytes, stack_bytes, &api, 0U, NULL, NULL);
     if (context == NULL) {
         return PLATFORM_RISCV32_FAULT;
     }
     const platform_riscv32_result_t result = platform_riscv32_step(context, budget, &returned_status);
     platform_riscv32_destroy(context);
     return result;
+}
+
+static platform_riscv32_result_t execute_raw(const uint32_t* instructions, size_t size, unsigned int budget)
+{
+    return execute_raw_with_limits(instructions, size, budget, 256U * 1024U, 16U * 1024U);
 }
 
 int main(void)
@@ -95,7 +101,8 @@ int main(void)
     const char* const arguments[]       = {"hello", "one", "two words"};
     int returned_status                 = -1;
     platform_riscv32_context_t* context = platform_riscv32_create(
-        image.entry, image.memory, image.memory_size, image.info.minimum_address, &api, 3U, arguments, NULL);
+        image.entry, image.memory, image.memory_size, image.info.minimum_address, image.info.requested_heap_bytes,
+        image.info.requested_stack_bytes, &api, 3U, arguments, NULL);
     platform_riscv32_result_t result = PLATFORM_RISCV32_FAULT;
     if (context != NULL) {
         result = platform_riscv32_step(context, 10000U, &returned_status);
@@ -114,7 +121,12 @@ int main(void)
     static const uint32_t illegal_instruction[] = {UINT32_C(0xffffffff)};
     static const uint32_t invalid_load[]        = {
         UINT32_C(0x00200537), /* lui a0, 0x200: address 0x00200000 */
-        UINT32_C(0x00052503), /* lw a0, 0(a0): beyond 1 MiB guest RAM */
+        UINT32_C(0x00052503), /* lw a0, 0(a0): beyond default guest RAM */
+    };
+    static const uint32_t large_heap_load[] = {
+        UINT32_C(0x00200537), /* lui a0, 0x200: address 0x00200000 */
+        UINT32_C(0x00052503), /* lw a0, 0(a0): inside a 3 MiB guest heap */
+        UINT32_C(0x00008067), /* ret */
     };
     static const uint32_t runaway_loop[] = {
         UINT32_C(0x0000006f), /* jal zero, 0 */
@@ -124,17 +136,31 @@ int main(void)
         UINT32_C(0x00000013), /* nop */
         UINT32_C(0x00008067), /* ret */
     };
-    platform_riscv32_context_t* resumable = platform_riscv32_create(
-        resumable_program, resumable_program, sizeof(resumable_program), 0U, &api, 0U, NULL, NULL);
+    platform_riscv32_context_t* resumable =
+        platform_riscv32_create(resumable_program, resumable_program, sizeof(resumable_program), 0U, 256U * 1024U,
+                                16U * 1024U, &api, 0U, NULL, NULL);
     int resumable_status = -1;
     const bool resumed   = resumable != NULL &&
                          platform_riscv32_step(resumable, 2U, &resumable_status) == PLATFORM_RISCV32_YIELDED &&
                          platform_riscv32_step(resumable, 2U, &resumable_status) == PLATFORM_RISCV32_RETURNED;
     platform_riscv32_destroy(resumable);
 
-    return resumed && execute_raw(illegal_instruction, sizeof(illegal_instruction), 1U) == PLATFORM_RISCV32_FAULT &&
-                   execute_raw(invalid_load, sizeof(invalid_load), 2U) == PLATFORM_RISCV32_FAULT &&
-                   execute_raw(runaway_loop, sizeof(runaway_loop), 1000U) == PLATFORM_RISCV32_YIELDED ?
-               0 :
-               1;
+    platform_riscv32_context_t* capped =
+        platform_riscv32_create(resumable_program, resumable_program, sizeof(resumable_program), 0U,
+                                24U * 1024U * 1024U, 16U * 1024U, &api, 0U, NULL, NULL);
+    const bool cap_rejected = capped == NULL;
+    platform_riscv32_destroy(capped);
+
+    const bool illegal_fault =
+        execute_raw(illegal_instruction, sizeof(illegal_instruction), 1U) == PLATFORM_RISCV32_FAULT;
+    const bool invalid_fault   = execute_raw(invalid_load, sizeof(invalid_load), 2U) == PLATFORM_RISCV32_FAULT;
+    const bool large_heap_runs = execute_raw_with_limits(large_heap_load, sizeof(large_heap_load), 4U,
+                                                         3U * 1024U * 1024U, 16U * 1024U) == PLATFORM_RISCV32_RETURNED;
+    const bool runaway_yields  = execute_raw(runaway_loop, sizeof(runaway_loop), 1000U) == PLATFORM_RISCV32_YIELDED;
+    if (!resumed || !cap_rejected || !illegal_fault || !invalid_fault || !large_heap_runs || !runaway_yields) {
+        fprintf(stderr, "resumed=%d cap=%d illegal=%d invalid=%d large=%d runaway=%d\n", resumed, cap_rejected,
+                illegal_fault, invalid_fault, large_heap_runs, runaway_yields);
+        return 1;
+    }
+    return 0;
 }

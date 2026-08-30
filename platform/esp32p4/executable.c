@@ -35,6 +35,7 @@ struct platform_riscv32_context {
         size_t argc;
         const char* const* argv;
         void* user_data;
+        size_t stack_bytes;
         TaskHandle_t task;
         atomic_bool started;
         atomic_bool finished;
@@ -42,8 +43,7 @@ struct platform_riscv32_context {
 };
 
 enum {
-    ELF_TASK_STACK_BYTES = 16 * 1024,
-    ELF_TASK_PRIORITY    = 5,
+    ELF_TASK_PRIORITY = 5
 };
 
 static void elf_task_main(void* argument)
@@ -181,13 +181,15 @@ bool platform_can_execute_riscv32(void)
 }
 
 platform_riscv32_context_t* platform_riscv32_create(const void* entry, const void* memory, size_t memory_size,
-                                                    uint32_t minimum_address, const tabos_elf_api_t* api, size_t argc,
-                                                    const char* const* argv, void* user_data)
+                                                    uint32_t minimum_address, size_t heap_bytes, size_t stack_bytes,
+                                                    const tabos_elf_api_t* api, size_t argc, const char* const* argv,
+                                                    void* user_data)
 {
     (void) memory;
     (void) memory_size;
     (void) minimum_address;
-    if (entry == NULL || api == NULL || argc > TABOS_ELF_ARG_MAX || (argc > 0U && argv == NULL)) {
+    if (entry == NULL || api == NULL || heap_bytes == 0U || stack_bytes == 0U || argc > TABOS_ELF_ARG_MAX ||
+        (argc > 0U && argv == NULL) || stack_bytes > UINT32_MAX) {
         return NULL;
     }
     platform_riscv32_context_t* context = calloc(1U, sizeof(*context));
@@ -197,11 +199,12 @@ platform_riscv32_context_t* platform_riscv32_create(const void* entry, const voi
     tabos_elf_entry_fn entry_function = NULL;
     _Static_assert(sizeof(entry_function) == sizeof(entry), "ELF entry pointer must match data pointer size");
     memcpy(&entry_function, &entry, sizeof(entry_function));
-    context->entry     = entry_function;
-    context->api       = *api;
-    context->argc      = argc;
-    context->argv      = argv;
-    context->user_data = user_data;
+    context->entry       = entry_function;
+    context->api         = *api;
+    context->argc        = argc;
+    context->argv        = argv;
+    context->user_data   = user_data;
+    context->stack_bytes = stack_bytes;
     return context;
 }
 
@@ -212,7 +215,7 @@ platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* cont
         return PLATFORM_RISCV32_FAULT;
     }
     if (!atomic_load_explicit(&context->started, memory_order_acquire)) {
-        if (xTaskCreateWithCaps(elf_task_main, "tabos-app", ELF_TASK_STACK_BYTES / sizeof(StackType_t), context,
+        if (xTaskCreateWithCaps(elf_task_main, "tabos-app", context->stack_bytes / sizeof(StackType_t), context,
                                 ELF_TASK_PRIORITY, &context->task, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) != pdPASS) {
             ESP_LOGE(TAG, "Could not create ELF task; free internal=%u, PSRAM=%u",
                      (unsigned) heap_caps_get_free_size(MALLOC_CAP_INTERNAL),

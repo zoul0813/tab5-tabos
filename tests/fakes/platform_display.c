@@ -477,13 +477,16 @@ bool platform_can_execute_riscv32(void)
 }
 
 platform_riscv32_context_t* platform_riscv32_create(const void* entry, const void* memory, size_t memory_size,
-                                                    uint32_t minimum_address, const tabos_elf_api_t* api, size_t argc,
-                                                    const char* const* argv, void* user_data)
+                                                    uint32_t minimum_address, size_t heap_bytes, size_t stack_bytes,
+                                                    const tabos_elf_api_t* api, size_t argc, const char* const* argv,
+                                                    void* user_data)
 {
     (void) entry;
     (void) memory;
     (void) memory_size;
     (void) minimum_address;
+    (void) heap_bytes;
+    (void) stack_bytes;
     (void) api;
     (void) argc;
     (void) argv;

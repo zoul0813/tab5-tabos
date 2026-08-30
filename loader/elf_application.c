@@ -37,7 +37,6 @@ enum {
     ELF_TLS_INDEX_BITS            = 2,
     ELF_TLS_INDEX_MASK            = ELF_TLS_CAPACITY - 1,
     ELF_TLS_GENERATION_MAX        = INT32_MAX >> ELF_TLS_INDEX_BITS,
-    ELF_HEAP_MAX                  = 1024 * 1024,
     ELF_HEAP_GUARD_SIZE           = 32,
     ELF_HEAP_GUARD_VALUE          = 0xa5,
     ELF_GRAPHICS_COMMAND_CAPACITY = 64,
@@ -116,6 +115,7 @@ struct loader_elf_application {
         uint8_t* heap_allocation;
         uint8_t* heap;
         size_t heap_used;
+        size_t heap_limit;
         uint32_t tty_mode;
         char input_pending[4];
         uint8_t input_pending_offset;
@@ -628,16 +628,17 @@ static int elf_fd_set_flags(int descriptor, int flags)
 static void* elf_heap_sbrk(int32_t increment)
 {
     loader_elf_application_t* application = platform_riscv32_current_user_data();
-    if (application == NULL || increment < 0 || (size_t) increment > ELF_HEAP_MAX - application->heap_used) {
+    if (application == NULL || increment < 0 || application->heap_limit < application->heap_used ||
+        (size_t) increment > application->heap_limit - application->heap_used) {
         return (void*) -1;
     }
     if (application->heap == NULL) {
-        application->heap_allocation = malloc(ELF_HEAP_MAX + (2U * ELF_HEAP_GUARD_SIZE));
+        application->heap_allocation = malloc(application->heap_limit + (2U * ELF_HEAP_GUARD_SIZE));
         if (application->heap_allocation == NULL) {
             return (void*) -1;
         }
         memset(application->heap_allocation, ELF_HEAP_GUARD_VALUE, ELF_HEAP_GUARD_SIZE);
-        memset(application->heap_allocation + ELF_HEAP_GUARD_SIZE + ELF_HEAP_MAX, ELF_HEAP_GUARD_VALUE,
+        memset(application->heap_allocation + ELF_HEAP_GUARD_SIZE + application->heap_limit, ELF_HEAP_GUARD_VALUE,
                ELF_HEAP_GUARD_SIZE);
         application->heap = application->heap_allocation + ELF_HEAP_GUARD_SIZE;
     }
@@ -1528,6 +1529,7 @@ static bool elf_entry(tabos_app_context_t* context)
         (void) tabos_console_write_line(application->console, loader_elf_result_name(result));
         return false;
     }
+    application->heap_limit = application->image.info.requested_heap_bytes;
     if (!platform_can_execute_riscv32()) {
         (void) tabos_console_write_line(application->console, "ELF execution unsupported on this target");
         return false;
@@ -1610,7 +1612,8 @@ static bool elf_entry(tabos_app_context_t* context)
     };
     application->execution = platform_riscv32_create(
         application->image.entry, application->image.memory, application->image.memory_size,
-        application->image.info.minimum_address, &api, application->argc, application->argv, application);
+        application->image.info.minimum_address, application->image.info.requested_heap_bytes,
+        application->image.info.requested_stack_bytes, &api, application->argc, application->argv, application);
     if (application->execution == NULL) {
         (void) tabos_console_write_line(application->console, "ELF execution FAILED");
         return false;
@@ -1679,7 +1682,8 @@ static bool elf_heap_guards_intact(const loader_elf_application_t* application)
     }
     for (size_t index = 0U; index < ELF_HEAP_GUARD_SIZE; ++index) {
         if (application->heap_allocation[index] != ELF_HEAP_GUARD_VALUE ||
-            application->heap_allocation[ELF_HEAP_GUARD_SIZE + ELF_HEAP_MAX + index] != ELF_HEAP_GUARD_VALUE) {
+            application->heap_allocation[ELF_HEAP_GUARD_SIZE + application->heap_limit + index] !=
+                ELF_HEAP_GUARD_VALUE) {
             return false;
         }
     }
@@ -1740,6 +1744,7 @@ static void elf_release_resources(loader_elf_application_t* application)
     application->heap_allocation = NULL;
     application->heap            = NULL;
     application->heap_used       = 0U;
+    application->heap_limit      = 0U;
     application->context         = NULL;
     application->console         = NULL;
 }

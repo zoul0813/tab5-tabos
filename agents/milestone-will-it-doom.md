@@ -175,13 +175,20 @@ host test passed 30/30; `hello` image is 148 KiB; coreutils images range from
 
 ### Phase 2: Process Memory Limits
 
-- [ ] Replace host interpreter fixed 2 MiB guest RAM with calculated per-process allocation.
-- [ ] Include image, heap, stack, API table, arguments, and guard space in calculation.
-- [ ] Enforce 24 MiB host guest-RAM cap.
-- [ ] Keep Tab5 heap lazy and process-owned.
-- [ ] Allocate requested Tab5 task stack from PSRAM.
-- [ ] Reclaim guest memory, stack, heap, and metadata on every exit/fault path.
-- [ ] Test allocation failure and cleanup after partial process creation.
+- [x] Replace host interpreter fixed 2 MiB guest RAM with calculated per-process allocation.
+- [x] Include image, heap, stack, API table, arguments, and guard space in calculation.
+- [x] Enforce 24 MiB host guest-RAM cap.
+- [x] Keep Tab5 heap lazy and process-owned.
+- [x] Allocate requested Tab5 task stack from PSRAM.
+- [x] Reclaim guest memory, stack, heap, and metadata on every exit/fault path.
+- [x] Test allocation failure and cleanup after partial process creation.
+
+Phase 2 validation: macOS Debug host tests passed 30/30. The RV32 component test
+executes through a 3 MiB requested heap (above the former fixed 2 MiB guest-RAM
+limit), rejects an allocation that would exceed the 24 MiB cap, then continues
+creating and destroying execution contexts. On physical Tab5, the legacy `hello`
+application from `main` launched and exited successfully twice after flashing the
+Phase 2 firmware, confirming default resource cleanup and repeat launch.
 
 ### Phase 3: Raw Input Transport
 

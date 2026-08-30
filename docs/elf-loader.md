@@ -51,8 +51,10 @@ The loader validates metadata before process creation. Heap requests must range 
 256 KiB through 16 MiB and align to 4 KiB. Stack requests must range from 16 KiB
 through 256 KiB and align to 16 bytes. Current supported capability is console.
 Missing metadata uses legacy defaults of 256 KiB heap and 16 KiB stack. Resource
-allocation from these values is completed by the process-memory work that follows
-this parser.
+limits are applied per process. The host interpreter allocates guest RAM for the loaded
+image, API table, arguments, heap, guard page, and stack, with a 24 MiB cap. On Tab5,
+the heap remains a lazy process-owned allocation and the requested task stack comes from
+PSRAM.
 
 Host execution is resumable. Each application update executes at most 10,000 guest
 instructions, then yields to normal TabOS input, display, timer, and application work.
@@ -80,9 +82,10 @@ yield, TTY-mode, and clean-exit services. Applications use the public SDK interf
 not this internal call table.
 
 Each process starts with console descriptors 0, 1, and 2 and allocates file/device
-descriptors from 3 upward. It owns an inherited working directory, errno state, 16 KiB
-stack, and a heap that grows on demand to 1 MiB by default. Process cleanup closes open
-descriptors and releases heap and executable memory.
+descriptors from 3 upward. It owns an inherited working directory, errno state, and the
+metadata-selected (or legacy-default) 16 KiB stack. Its heap grows on demand to its
+metadata-selected (or legacy-default) 256 KiB limit. Process cleanup closes open
+descriptors and releases guest memory, task stack, heap, and executable memory.
 
 ## Tab5 Hardware Test
 
