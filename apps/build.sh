@@ -29,6 +29,9 @@ for application_dir in "$script_dir"/*; do
     if [ ! -f "$application_dir/Makefile" ]; then
         continue
     fi
+    if [ "$(basename "$application_dir")" = doom ]; then
+        continue
+    fi
     if [ -n "$make_arguments" ]; then
         # Keep make arguments word-separated while preserving the simple CLI
         # contract of this script.

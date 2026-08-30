@@ -55,9 +55,14 @@ all: install
 
 build: $(OUTPUT)
 
+ifndef TABOS_CUSTOM_BUILD
 $(UNSTRIPPED): $(SOURCES) $(TABOS_RUNTIME_SOURCES) $(SDK_ROOT)/linker/app-riscv32.ld $(TABOS_APPLICATION_MAKEFILE)
 	@mkdir -p $(dir $@)
 	$(CC) $(TABOS_CPPFLAGS) $(TABOS_CFLAGS) $(TABOS_LDFLAGS) -o $@ $(TABOS_RUNTIME_SOURCES) $(SOURCES)
+
+clean:
+	rm -rf $(BUILD_DIR)
+endif
 
 $(OUTPUT): $(UNSTRIPPED)
 	$(STRIP) --strip-unneeded $< -o $@
@@ -72,6 +77,3 @@ size: $(OUTPUT)
 
 metadata: $(OUTPUT)
 	$(READELF) -n $(OUTPUT)
-
-clean:
-	rm -rf $(BUILD_DIR)

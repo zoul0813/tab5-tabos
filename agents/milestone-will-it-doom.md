@@ -39,7 +39,8 @@ metadata instead of DOOM-specific kernel behavior.
 
 - Add optional `apps/doom` application named `doom`.
 - Fetch `ozkl/doomgeneric` commit
-  `dcb7a8dbc7a16ce3dda29382ac9aae9d77d21284` into ignored build storage.
+  `dcb7a8dbc7a16ce3dda29382ac9aae9d77d21284` into ignored `apps/doom/doomgeneric/`
+  storage.
 - Fetch by exact commit, verify the checked-out hash, and never follow moving branch
   state.
 - Support `DOOMGENERIC_SOURCE_DIR` for pre-fetched or offline source.
@@ -227,16 +228,24 @@ and ran successfully with its explicit metadata.
 
 ### Phase 5: Pinned DOOM Source
 
-- [ ] Add `apps/doom/` build structure and Make targets: `fetch`, `build`, `install`, `clean`.
-- [ ] Fetch only `ozkl/doomgeneric` commit `dcb7a8dbc7a16ce3dda29382ac9aae9d77d21284`.
-- [ ] Support `DOOMGENERIC_SOURCE_DIR` for offline/pre-fetched source.
-- [ ] Verify fetched commit hash before compiling.
-- [ ] Add explicit source allowlist; exclude SDL, X11, Windows, and Emscripten files.
-- [ ] Store compatibility patches and TabOS adapter in repository.
-- [ ] Record GPLv2 provenance and patch list.
-- [ ] Compile RV32I without compressed instructions.
-- [ ] Link required newlib and `libm` support.
-- [ ] Keep upstream warnings isolated from project-owned warning policy.
+- [x] Add `apps/doom/` build structure and Make targets: `fetch`, `build`, `install`, `clean`.
+- [x] Fetch only `ozkl/doomgeneric` commit `dcb7a8dbc7a16ce3dda29382ac9aae9d77d21284`.
+- [x] Support `DOOMGENERIC_SOURCE_DIR` for offline/pre-fetched source.
+- [x] Verify fetched commit hash before compiling.
+- [x] Add explicit source allowlist; exclude SDL, X11, Windows, and Emscripten files.
+- [x] Store compatibility patches and TabOS adapter in repository.
+- [x] Record GPLv2 provenance and patch list.
+- [x] Compile RV32I without compressed instructions.
+- [x] Link required newlib and `libm` support.
+- [x] Keep upstream warnings isolated from project-owned warning policy.
+
+Phase 5 validation: fetched pinned `doomgeneric` commit
+`dcb7a8dbc7a16ce3dda29382ac9aae9d77d21284`, verified its detached `HEAD`, and produced
+the stripped RV32I artifact. A second clean build used `DOOMGENERIC_SOURCE_DIR` pointing
+at the pre-fetched checkout and verified the same commit before copying and compiling.
+The artifact is 714,368 bytes (`text` 414,148, `data` 60,084, `bss` 240,136) and its
+`.note.tabos` requests 8 MiB heap and 64 KiB stack. Runtime graphics, timing, input, and
+quit behavior remain Phase 6 work.
 
 ### Phase 6: DOOM Runtime Adapter
 
