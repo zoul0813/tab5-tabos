@@ -1,6 +1,9 @@
 #include <tabos/input.h>
 #include <tabos/internal/elf_api.h>
 
+#include <errno.h>
+#include <stddef.h>
+
 static unsigned int polls;
 
 static int input_poll(tabos_input_event_t* event)
@@ -33,6 +36,10 @@ int sched_yield(void)
 int main(void)
 {
     tabos_input_event_t event;
+    errno = 0;
+    if (tabos_input_poll(NULL) || errno != EINVAL) {
+        return 1;
+    }
     if (tabos_input_poll(&event)) {
         return 1;
     }

@@ -14,6 +14,8 @@ static bool wrote_quoted_argument;
 static bool requested_exit;
 static int requested_status = -1;
 static uint32_t tty_mode;
+static bool input_event_available;
+static int raw_returned_status;
 
 static void test_console_write(const char* text)
 {
@@ -56,6 +58,25 @@ static int test_tty_set_mode(int descriptor, uint32_t mode)
     return 0;
 }
 
+static int test_input_poll(tabos_input_event_t* event)
+{
+    if (event == NULL) {
+        return -1;
+    }
+    if (!input_event_available) {
+        return 0;
+    }
+    *event = (tabos_input_event_t) {
+        .type      = TABOS_INPUT_KEY_UP,
+        .key       = TABOS_KEY_Q,
+        .modifiers = TABOS_MODIFIER_CONTROL,
+        .repeat    = true,
+        .text      = "q",
+    };
+    input_event_available = false;
+    return 1;
+}
+
 static platform_riscv32_result_t execute_raw_with_limits(const uint32_t* instructions, size_t size, unsigned int budget,
                                                          size_t heap_bytes, size_t stack_bytes)
 {
@@ -66,6 +87,7 @@ static platform_riscv32_result_t execute_raw_with_limits(const uint32_t* instruc
         .request_exit      = test_request_exit,
         .tty_get_mode      = test_tty_get_mode,
         .tty_set_mode      = test_tty_set_mode,
+        .input_poll        = test_input_poll,
     };
     int returned_status = -1;
     platform_riscv32_context_t* context =
@@ -74,6 +96,7 @@ static platform_riscv32_result_t execute_raw_with_limits(const uint32_t* instruc
         return PLATFORM_RISCV32_FAULT;
     }
     const platform_riscv32_result_t result = platform_riscv32_step(context, budget, &returned_status);
+    raw_returned_status                    = returned_status;
     platform_riscv32_destroy(context);
     return result;
 }
@@ -97,6 +120,7 @@ int main(void)
         .request_exit      = test_request_exit,
         .tty_get_mode      = test_tty_get_mode,
         .tty_set_mode      = test_tty_set_mode,
+        .input_poll        = test_input_poll,
     };
     const char* const arguments[]       = {"hello", "one", "two words"};
     int returned_status                 = -1;
@@ -136,6 +160,24 @@ int main(void)
         UINT32_C(0x00000013), /* nop */
         UINT32_C(0x00008067), /* ret */
     };
+    static const uint32_t input_poll_program[] = {
+        UINT32_C(0x00008393), /* addi t2, ra, 0: preserve caller return address */
+        UINT32_C(0x00050293), /* addi t0, a0, 0: retain API table pointer */
+        UINT32_C(0x0942a283), /* lw t0, 148(t0): input_poll table entry */
+        UINT32_C(0x20000313), /* addi t1, zero, 512: guest event storage */
+        UINT32_C(0x00030513), /* addi a0, t1, 0 */
+        UINT32_C(0x000280e7), /* jalr ra, t0, 0 */
+        UINT32_C(0x00038093), /* addi ra, t2, 0: restore caller return address */
+        UINT32_C(0x00432503), /* lw a0, 4(t1): return event key */
+        UINT32_C(0x00008067), /* ret */
+    };
+    static const uint32_t invalid_input_pointer_program[] = {
+        UINT32_C(0x00050293), /* addi t0, a0, 0: retain API table pointer */
+        UINT32_C(0x0942a283), /* lw t0, 148(t0): input_poll table entry */
+        UINT32_C(0x00200537), /* lui a0, 0x200: outside default guest RAM */
+        UINT32_C(0x000280e7), /* jalr ra, t0, 0 */
+        UINT32_C(0x00008067), /* ret */
+    };
     platform_riscv32_context_t* resumable =
         platform_riscv32_create(resumable_program, resumable_program, sizeof(resumable_program), 0U, 256U * 1024U,
                                 16U * 1024U, &api, 0U, NULL, NULL);
@@ -157,9 +199,19 @@ int main(void)
     const bool large_heap_runs = execute_raw_with_limits(large_heap_load, sizeof(large_heap_load), 4U,
                                                          3U * 1024U * 1024U, 16U * 1024U) == PLATFORM_RISCV32_RETURNED;
     const bool runaway_yields  = execute_raw(runaway_loop, sizeof(runaway_loop), 1000U) == PLATFORM_RISCV32_YIELDED;
-    if (!resumed || !cap_rejected || !illegal_fault || !invalid_fault || !large_heap_runs || !runaway_yields) {
-        fprintf(stderr, "resumed=%d cap=%d illegal=%d invalid=%d large=%d runaway=%d\n", resumed, cap_rejected,
-                illegal_fault, invalid_fault, large_heap_runs, runaway_yields);
+    input_event_available      = true;
+    const bool input_event_delivered =
+        execute_raw(input_poll_program, sizeof(input_poll_program), 20U) == PLATFORM_RISCV32_RETURNED;
+    const bool input_event_correct = raw_returned_status == (int) TABOS_KEY_Q;
+    const bool invalid_input_pointer_fault =
+        execute_raw(invalid_input_pointer_program, sizeof(invalid_input_pointer_program), 8U) == PLATFORM_RISCV32_FAULT;
+    if (!resumed || !cap_rejected || !illegal_fault || !invalid_fault || !large_heap_runs || !runaway_yields ||
+        !input_event_delivered || !input_event_correct || !invalid_input_pointer_fault || input_event_available) {
+        fprintf(stderr,
+                "resumed=%d cap=%d illegal=%d invalid=%d large=%d runaway=%d input=%d input_data=%d input_pointer=%d "
+                "pending=%d\n",
+                resumed, cap_rejected, illegal_fault, invalid_fault, large_heap_runs, runaway_yields,
+                input_event_delivered, input_event_correct, invalid_input_pointer_fault, input_event_available);
         return 1;
     }
     return 0;

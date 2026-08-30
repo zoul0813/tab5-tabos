@@ -192,14 +192,24 @@ Phase 2 firmware, confirming default resource cleanup and repeat launch.
 
 ### Phase 3: Raw Input Transport
 
-- [ ] Append fixed-layout input call to private ELF API transport without breaking prefix.
-- [ ] Add SDK `tabos_input_poll()` runtime stub.
-- [ ] Transport key-down, key-up, key code, text, modifiers, and repeat state.
-- [ ] Restrict event consumption to foreground process.
+- [x] Append fixed-layout input call to private ELF API transport without breaking prefix.
+- [x] Add SDK `tabos_input_poll()` runtime stub.
+- [x] Transport key-down, key-up, key code, text, modifiers, and repeat state.
+- [x] Restrict event consumption to foreground process.
 - [ ] Validate guest pointers in host interpreter and native Tab5 paths.
-- [ ] Define empty-queue and malformed-request behavior.
-- [ ] Add tests for event order, key-up, text, modifiers, repeats, ownership, and pointers.
-- [ ] Verify existing ABI-v1 fixtures launch unchanged.
+- [x] Define empty-queue and malformed-request behavior.
+- [x] Add tests for event order, key-up, text, modifiers, repeats, ownership, and pointers.
+- [x] Verify existing ABI-v1 fixtures launch unchanged.
+
+Phase 3 validation: the host RV32 component test calls the fixed input gate with
+guest-owned event storage and verifies a key-up event reaches guest code; an invalid
+guest event pointer faults before the callback runs. Input queue, console ownership,
+and SDK tests cover ordering, text, modifiers, repeat state, empty queue, and malformed
+null output pointers. Existing `hello` remains an ABI-v1 fixture. Native Tab5 can reject
+a null output pointer, but arbitrary bad native pointers cannot be safely contained until
+application memory isolation and a recoverable native fault boundary exist. On physical
+Tab5, `graphics-demo` opened and received keyboard input after flashing the Phase 3
+firmware.
 
 ### Phase 4: SDK and Application Build Metadata
 
