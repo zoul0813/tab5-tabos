@@ -229,6 +229,25 @@ void platform_network_socket_operations_shutdown(void)
 {
 }
 
+void platform_network_socket_interrupt(int socket)
+{
+    (void) socket;
+}
+
+bool platform_network_socket_operations_suspend(void)
+{
+    return true;
+}
+
+void platform_network_socket_operations_resume(void)
+{
+}
+
+void platform_network_socket_dispose(int socket)
+{
+    (void) socket;
+}
+
 int platform_network_socket_open(uint32_t family, uint32_t type)
 {
     (void) family;

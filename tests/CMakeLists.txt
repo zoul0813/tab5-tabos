@@ -273,6 +273,8 @@ add_executable(tabos_network_socket
     component/network_socket.c
     "${TABOS_ROOT}/platform/posix/socket.c"
 )
+find_package(Threads REQUIRED)
+target_link_libraries(tabos_network_socket PRIVATE Threads::Threads)
 target_include_directories(tabos_network_socket PRIVATE
     "${TABOS_ROOT}/platform/include"
     "${TABOS_ROOT}/sdk/include"

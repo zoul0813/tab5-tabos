@@ -73,7 +73,8 @@ Use official `esp_hosted` and `esp_wifi_remote` over 4-bit SDIO.
 - [x] Close process-owned sockets during application cleanup, including failed
   child exits and partially initialized socket ownership.
 - [x] Reject stale socket handles after a per-process slot is reused.
-- [ ] Cancel pending blocking socket work before forced process teardown.
+- [x] Interrupt pending blocking socket work and serialize worker teardown before
+  releasing process-owned sockets.
 - [ ] Defer TLS/HTTPS, static addressing, custom DNS, mDNS, SoftAP, routing, and
   Bluetooth.
 

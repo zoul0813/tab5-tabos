@@ -82,6 +82,12 @@ not expose POSIX, lwIP, ESP-IDF, or native socket structures. Handles carry a
 generation tag, so a handle retained after close cannot operate on a later
 socket that reuses the same per-process slot.
 
+Process cleanup interrupts blocked socket operations before it destroys the
+application execution context. The platform then prevents new socket operations,
+waits for the active backend operation to return, and disposes every owned socket.
+This keeps a terminated process from leaving a blocked worker or response for the
+next application.
+
 ## Ping
 
 The `ping` core utility uses only these public APIs. Build and install it with:

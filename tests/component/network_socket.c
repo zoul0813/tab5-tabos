@@ -3,12 +3,21 @@
 #include <tabos/platform/platform.h>
 
 #include <arpa/inet.h>
+#include <pthread.h>
 #include <stdio.h>
+#include <stdatomic.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <time.h>
 #include <unistd.h>
 
 static int failures;
+
+typedef struct {
+        int socket;
+        atomic_bool started;
+        int result;
+} blocking_receive_t;
 
 static void expect(bool condition, const char* message)
 {
@@ -71,6 +80,65 @@ static platform_network_address_t portable_address(int family)
     platform_network_address_t address = {.family = family == AF_INET ? 4U : 6U};
     (void) snprintf(address.text, sizeof(address.text), "%s", family == AF_INET ? "127.0.0.1" : "::1");
     return address;
+}
+
+static void* blocking_receive(void* argument)
+{
+    blocking_receive_t* receive = argument;
+    char byte;
+    atomic_store_explicit(&receive->started, true, memory_order_release);
+    receive->result = platform_network_socket_receive(receive->socket, &byte, sizeof(byte));
+    return NULL;
+}
+
+static void test_interrupted_receive(void)
+{
+    const uint16_t port                       = reserve_port(AF_INET, SOCK_STREAM);
+    const platform_network_address_t loopback = portable_address(AF_INET);
+    const int server                          = platform_network_socket_open(loopback.family, TABOS_SOCKET_TCP);
+    expect(port != 0U && server >= 0 && platform_network_socket_bind(server, &loopback, port) == 0 &&
+               platform_network_socket_listen(server, 1U) == 0,
+           "prepare interrupted receive server");
+
+    const int client = socket(AF_INET, SOCK_STREAM, 0);
+    struct sockaddr_storage target;
+    socklen_t target_size;
+    native_address(AF_INET, port, &target, &target_size);
+    expect(client >= 0 && connect(client, (const struct sockaddr*) &target, target_size) == 0,
+           "connect interrupted receive client");
+    platform_network_address_t peer;
+    uint16_t peer_port = 0U;
+    const int accepted = platform_network_socket_accept(server, &peer, &peer_port);
+    expect(accepted >= 0, "accept interrupted receive client");
+
+    blocking_receive_t receive = {.socket = accepted};
+    pthread_t thread;
+    const bool thread_created = pthread_create(&thread, NULL, blocking_receive, &receive) == 0;
+    expect(thread_created, "start blocking socket operation");
+    if (thread_created) {
+        const struct timespec poll = {.tv_nsec = 1000000L};
+        while (!atomic_load_explicit(&receive.started, memory_order_acquire)) {
+            (void) nanosleep(&poll, NULL);
+        }
+        const struct timespec settle = {.tv_nsec = 10000000L};
+        (void) nanosleep(&settle, NULL);
+        platform_network_socket_interrupt(accepted);
+        const bool suspended = platform_network_socket_operations_suspend();
+        expect(suspended, "wait for interrupted socket operation");
+        platform_network_socket_dispose(accepted);
+        if (suspended) {
+            platform_network_socket_operations_resume();
+        }
+        expect(pthread_join(thread, NULL) == 0 && receive.result <= 0, "interrupted receive returns");
+    } else if (accepted >= 0) {
+        (void) platform_network_socket_close(accepted);
+    }
+    if (server >= 0) {
+        (void) platform_network_socket_close(server);
+    }
+    if (client >= 0) {
+        (void) close(client);
+    }
 }
 
 static void test_tcp(int family)
@@ -154,5 +222,6 @@ int main(void)
     test_udp(AF_INET);
     test_tcp(AF_INET6);
     test_udp(AF_INET6);
+    test_interrupted_receive();
     return failures == 0 ? 0 : 1;
 }

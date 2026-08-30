@@ -125,6 +125,10 @@ bool platform_network_operations_init(void);
 void platform_network_operations_shutdown(void);
 bool platform_network_socket_operations_init(void);
 void platform_network_socket_operations_shutdown(void);
+void platform_network_socket_interrupt(int socket);
+bool platform_network_socket_operations_suspend(void);
+void platform_network_socket_operations_resume(void);
+void platform_network_socket_dispose(int socket);
 platform_network_operation_result_t platform_network_resolve(const char* hostname, uint32_t family,
                                                              platform_network_address_t* address);
 platform_network_operation_result_t platform_network_echo(const platform_network_address_t* address, uint16_t sequence,

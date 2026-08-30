@@ -316,6 +316,31 @@ void platform_network_socket_operations_shutdown(void)
     }
 }
 
+void platform_network_socket_interrupt(int socket)
+{
+    (void) shutdown(socket, SHUT_RDWR);
+}
+
+bool platform_network_socket_operations_suspend(void)
+{
+    if (!socket_worker_init()) {
+        return false;
+    }
+    return xSemaphoreTake(socket_mutex, portMAX_DELAY) == pdTRUE;
+}
+
+void platform_network_socket_operations_resume(void)
+{
+    if (socket_mutex != NULL) {
+        (void) xSemaphoreGive(socket_mutex);
+    }
+}
+
+void platform_network_socket_dispose(int socket)
+{
+    (void) close_native_socket(socket);
+}
+
 static int submit_socket_request(const socket_request_t* request, socket_response_t* response)
 {
     if (!socket_worker_init()) {
@@ -344,6 +369,25 @@ bool platform_network_socket_operations_init(void)
 
 void platform_network_socket_operations_shutdown(void)
 {
+}
+
+void platform_network_socket_interrupt(int socket)
+{
+    (void) shutdown(socket, SHUT_RDWR);
+}
+
+bool platform_network_socket_operations_suspend(void)
+{
+    return true;
+}
+
+void platform_network_socket_operations_resume(void)
+{
+}
+
+void platform_network_socket_dispose(int socket)
+{
+    (void) close_native_socket(socket);
 }
 
 static int submit_socket_request(const socket_request_t* request, socket_response_t* response)

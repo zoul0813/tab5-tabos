@@ -37,8 +37,7 @@ enum {
     ELF_GRAPHICS_COMMAND_CAPACITY = 64,
 };
 
-_Static_assert((ELF_SOCKET_CAPACITY & (ELF_SOCKET_CAPACITY - 1)) == 0,
-               "ELF socket capacity must be a power of two");
+_Static_assert((ELF_SOCKET_CAPACITY & (ELF_SOCKET_CAPACITY - 1)) == 0, "ELF socket capacity must be a power of two");
 
 typedef enum {
     ELF_GRAPHICS_FILL,
@@ -876,8 +875,8 @@ static int elf_socket_close(int socket)
         return -TABOS_EBADF;
     }
     const uint32_t generation = owned->generation;
-    const int result = platform_network_socket_close(owned->platform_socket);
-    *owned           = (elf_socket_t) {.generation = generation};
+    const int result          = platform_network_socket_close(owned->platform_socket);
+    *owned                    = (elf_socket_t) {.generation = generation};
     return result;
 }
 
@@ -1564,19 +1563,31 @@ static void elf_release_resources(loader_elf_application_t* application)
         platform_graphics_end();
         console_set_graphics_active(false);
     }
+    for (size_t index = 0U; index < ELF_SOCKET_CAPACITY; ++index) {
+        if (application->sockets[index].open) {
+            platform_network_socket_interrupt(application->sockets[index].platform_socket);
+        }
+    }
+    const bool socket_operations_suspended = platform_network_socket_operations_suspend();
+    if (!socket_operations_suspended) {
+        platform_log("Could not suspend socket operations during process cleanup");
+    }
+    for (size_t index = 0U; index < ELF_SOCKET_CAPACITY; ++index) {
+        if (application->sockets[index].open) {
+            platform_network_socket_dispose(application->sockets[index].platform_socket);
+            application->sockets[index] = (elf_socket_t) {0};
+        }
+    }
     platform_riscv32_destroy(application->execution);
     application->execution = NULL;
+    if (socket_operations_suspended) {
+        platform_network_socket_operations_resume();
+    }
     loader_elf_unload(&application->image);
     for (size_t index = 3U; index < ELF_DESCRIPTOR_CAPACITY; ++index) {
         if (application->descriptors[index].open) {
             (void) tabos_fs_close(application->descriptors[index].kernel_descriptor);
             application->descriptors[index] = (elf_descriptor_t) {0};
-        }
-    }
-    for (size_t index = 0U; index < ELF_SOCKET_CAPACITY; ++index) {
-        if (application->sockets[index].open) {
-            (void) platform_network_socket_close(application->sockets[index].platform_socket);
-            application->sockets[index] = (elf_socket_t) {0};
         }
     }
     if (!elf_heap_guards_intact(application)) {
