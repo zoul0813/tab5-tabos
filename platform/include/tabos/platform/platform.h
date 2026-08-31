@@ -17,6 +17,20 @@ typedef void (*platform_update_fn)(void);
 typedef struct platform_riscv32_context platform_riscv32_context_t;
 typedef struct platform_mutex platform_mutex_t;
 
+typedef void (*platform_audio_render_fn)(int16_t* stereo, size_t frames);
+typedef void (*platform_audio_capture_fn)(const int16_t* samples, size_t frames, uint32_t channels);
+typedef void (*platform_audio_error_fn)(int error);
+
+typedef struct {
+        const char* driver;
+        uint32_t features;
+        uint32_t routes;
+        uint32_t capture_channels;
+        bool detected;
+        bool ready;
+        int error;
+} platform_audio_info_t;
+
 typedef enum {
     PLATFORM_NETWORK_OFFLINE = 0,
     PLATFORM_NETWORK_STARTING,
@@ -142,6 +156,10 @@ bool platform_battery_status(platform_battery_status_t* status);
 bool platform_battery_set_charging(bool enabled);
 bool platform_battery_set_fast_charging(bool enabled);
 bool platform_battery_health(int* error);
+bool platform_audio_init(platform_audio_render_fn render, platform_audio_capture_fn capture,
+                         platform_audio_error_fn error, platform_audio_info_t* info);
+void platform_audio_shutdown(void);
+bool platform_audio_set_route(uint32_t route);
 bool platform_network_operations_init(void);
 void platform_network_operations_shutdown(void);
 bool platform_network_socket_operations_init(void);

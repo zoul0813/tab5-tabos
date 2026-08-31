@@ -19,6 +19,7 @@ This directory contains user and contributor documentation for TabOS.
 - [Filesystem and Storage](filesystem.md): POSIX-style file API, host root, and Tab5 microSD behavior.
 - [Shell](shell.md): build, install, start, and use filesystem-backed PID 0 shell.
 - [Networking](networking.md): saved Wi-Fi configuration, network status, and connection control.
+- [Audio Service](audio.md): PCM streams, waits, mixing, routes, and the audio test utility.
 
 ## Documentation Policy
 

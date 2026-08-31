@@ -1,4 +1,5 @@
 #include <tabos/internal/elf_application.h>
+#include <tabos/internal/audio.h>
 
 #include <tabos/internal/elf_api.h>
 #include <tabos/filesystem.h>
@@ -88,6 +89,7 @@ typedef struct {
 typedef enum {
     ELF_WAIT_SOURCE_SOCKET,
     ELF_WAIT_SOURCE_DEVICE_SUBSCRIPTION,
+    ELF_WAIT_SOURCE_AUDIO,
     ELF_WAIT_SOURCE_TYPE_COUNT,
 } elf_wait_source_type_t;
 
@@ -1226,6 +1228,12 @@ static int elf_wait_poll_device_subscription(loader_elf_application_t* applicati
     return 0;
 }
 
+static int elf_wait_poll_audio(loader_elf_application_t* application, uintptr_t parent, uint32_t requested_events,
+                               uint32_t* returned_events)
+{
+    return audio_service_poll(application, (tabos_audio_stream_t) parent, requested_events, returned_events);
+}
+
 static int elf_wait_prepare_socket(loader_elf_application_t* application, uintptr_t parent,
                                    platform_network_wait_item_t* item)
 {
@@ -1247,6 +1255,11 @@ static const elf_wait_source_adapter_t elf_wait_source_adapters[ELF_WAIT_SOURCE_
         {
                                   .valid_events = TABOS_WAIT_READABLE | TABOS_WAIT_STATE_CHANGED | TABOS_WAIT_ERROR | TABOS_WAIT_HANGUP,
                                   .poll         = elf_wait_poll_device_subscription,
+                                  },
+    [ELF_WAIT_SOURCE_AUDIO] =
+        {
+                                  .valid_events = TABOS_WAIT_READABLE | TABOS_WAIT_WRITABLE | TABOS_WAIT_ERROR | TABOS_WAIT_HANGUP,
+                                  .poll         = elf_wait_poll_audio,
                                   },
 };
 
@@ -1559,6 +1572,89 @@ static int elf_device_event_read(int subscription, tabos_device_event_t* event)
     loader_elf_application_t* application = platform_riscv32_current_user_data();
     tabos_device_event_t* writable = (tabos_device_event_t*) platform_executable_data_pointer(event, sizeof(*event));
     return writable != NULL ? device_registry_read_event(application, subscription, writable) : -TABOS_EINVAL;
+}
+
+static int elf_audio_info(tabos_audio_info_t* info)
+{
+    tabos_audio_info_t* writable = (tabos_audio_info_t*) platform_executable_data_pointer(info, sizeof(*info));
+    if (writable == NULL) {
+        return -TABOS_EINVAL;
+    }
+    return audio_service_info(writable, NULL, NULL) ? 0 : -TABOS_ENODEV;
+}
+
+static int elf_audio_open(const tabos_audio_config_t* config)
+{
+    loader_elf_application_t* application = platform_riscv32_current_user_data();
+    const tabos_audio_config_t* readable  = platform_executable_data_pointer(config, sizeof(*config));
+    if (application == NULL || readable == NULL) {
+        return -TABOS_EINVAL;
+    }
+    const tabos_audio_stream_t stream = audio_service_open(application, readable);
+    if (stream < 0) {
+        return stream;
+    }
+    const tabos_wait_source_t source = elf_wait_source_allocate(application, ELF_WAIT_SOURCE_AUDIO, (uintptr_t) stream);
+    if (source == TABOS_WAIT_SOURCE_INVALID) {
+        (void) audio_service_close(application, stream);
+        return -TABOS_ENFILE;
+    }
+    return stream;
+}
+
+static int elf_audio_close(int stream)
+{
+    loader_elf_application_t* application = platform_riscv32_current_user_data();
+    const int result                      = audio_service_close(application, stream);
+    if (result == 0) {
+        elf_wait_source_invalidate(application,
+                                   elf_wait_source_find(application, ELF_WAIT_SOURCE_AUDIO, (uintptr_t) stream));
+    }
+    return result;
+}
+
+static int elf_audio_write(int stream, const void* pcm, uint32_t bytes)
+{
+    loader_elf_application_t* application = platform_riscv32_current_user_data();
+    const void* readable                  = platform_executable_data_pointer(pcm, bytes);
+    return readable != NULL ? audio_service_write(application, stream, readable, bytes) : -TABOS_EINVAL;
+}
+
+static int elf_audio_read(int stream, void* pcm, uint32_t capacity)
+{
+    loader_elf_application_t* application = platform_riscv32_current_user_data();
+    void* writable                        = (void*) platform_executable_data_pointer(pcm, capacity);
+    return writable != NULL ? audio_service_read(application, stream, writable, capacity) : -TABOS_EINVAL;
+}
+
+static int elf_audio_set_volume(int stream, uint32_t volume)
+{
+    loader_elf_application_t* application = platform_riscv32_current_user_data();
+    return audio_service_set_volume(application, stream, volume);
+}
+
+static int elf_audio_set_route(int stream, uint32_t route)
+{
+    loader_elf_application_t* application = platform_riscv32_current_user_data();
+    return audio_service_set_route(application, stream, route);
+}
+
+static int elf_audio_status(int stream, tabos_audio_status_t* status)
+{
+    loader_elf_application_t* application = platform_riscv32_current_user_data();
+    tabos_audio_status_t* writable = (tabos_audio_status_t*) platform_executable_data_pointer(status, sizeof(*status));
+    return writable != NULL ? audio_service_get_status(application, stream, writable) : -TABOS_EINVAL;
+}
+
+static int elf_audio_wait_source(int stream)
+{
+    loader_elf_application_t* application = platform_riscv32_current_user_data();
+    uint32_t returned_events              = 0U;
+    if (audio_service_poll(application, stream, TABOS_WAIT_READABLE | TABOS_WAIT_WRITABLE, &returned_events) < 0) {
+        return -TABOS_EBADF;
+    }
+    const tabos_wait_source_t source = elf_wait_source_find(application, ELF_WAIT_SOURCE_AUDIO, (uintptr_t) stream);
+    return source != TABOS_WAIT_SOURCE_INVALID ? source : -TABOS_EBADF;
 }
 
 static int elf_battery_status(tabos_elf_battery_status_t* info)
@@ -1956,6 +2052,15 @@ static bool elf_entry(tabos_app_context_t* context)
         .socket_wait_source              = elf_socket_wait_source,
         .device_subscription_wait_source = elf_device_subscription_wait_source,
         .wait                            = elf_wait,
+        .audio_info                      = elf_audio_info,
+        .audio_open                      = elf_audio_open,
+        .audio_close                     = elf_audio_close,
+        .audio_write                     = elf_audio_write,
+        .audio_read                      = elf_audio_read,
+        .audio_set_volume                = elf_audio_set_volume,
+        .audio_set_route                 = elf_audio_set_route,
+        .audio_status                    = elf_audio_status,
+        .audio_wait_source               = elf_audio_wait_source,
     };
     application->execution = platform_riscv32_create(
         application->image.entry, application->image.memory, application->image.memory_size,
@@ -2061,10 +2166,12 @@ static void elf_release_resources(loader_elf_application_t* application)
         return;
     }
     elf_cancel_wait(application);
+    audio_service_close_owner(application);
     device_registry_unsubscribe_owner(application);
     for (size_t index = 0U; index < ELF_WAIT_SOURCE_CAPACITY; ++index) {
         if (application->wait_sources[index].open &&
-            application->wait_sources[index].type == ELF_WAIT_SOURCE_DEVICE_SUBSCRIPTION) {
+            (application->wait_sources[index].type == ELF_WAIT_SOURCE_DEVICE_SUBSCRIPTION ||
+             application->wait_sources[index].type == ELF_WAIT_SOURCE_AUDIO)) {
             const uint32_t generation        = application->wait_sources[index].generation;
             application->wait_sources[index] = (elf_wait_source_t) {.generation = generation};
         }

@@ -14,5 +14,8 @@ unsigned int test_platform_network_connect_calls(void);
 const char* test_platform_network_hostname(void);
 void test_platform_rtc_set_status(bool ready, int error);
 void test_platform_battery_set_status(bool ready, int error);
+void test_platform_audio_render(int16_t* stereo, size_t frames);
+void test_platform_audio_capture(const int16_t* samples, size_t frames, uint32_t channels);
+void test_platform_audio_error(int error);
 
 #endif

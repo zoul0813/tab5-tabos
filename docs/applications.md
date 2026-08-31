@@ -62,6 +62,10 @@ Sources live in `apps/coreutils/src/<name>/main.c`; each output installs directl
 logical name, class, state, symbolic features, driver name, and nonzero last error. It does not
 expose native platform handles or implementation details.
 
+`audiotest` exercises `audio0` through the public SDK. It reports capabilities, generates
+speaker or headphone tones, displays microphone levels, performs microphone loopback,
+changes routes, and reports deliberate underrun/overrun counters. See `docs/audio.md`.
+
 Networking utilities are grouped under `apps/netutils/`. Build one with
 `make -C apps/netutils netctl`, `make -C apps/netutils ping`, or
 `make -C apps/netutils nettest`. Sources live in

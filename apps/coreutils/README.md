@@ -19,6 +19,7 @@ make -C apps/coreutils reboot
 make -C apps/coreutils shutdown
 make -C apps/coreutils battery
 make -C apps/coreutils devices
+make -C apps/coreutils audiotest
 ```
 
 Use `build-ls`, `build-mkdir`, or `build-date` to compile without installing. Runnable
@@ -37,3 +38,7 @@ manually controls fast charging; fast charging is disabled by default.
 `devices` lists registered hardware and host-virtual devices. Output includes an unpadded decimal
 boot-local ID, logical name, class, state, symbolic informational features, driver name, and any
 nonzero last error.
+
+`audiotest` reports audio capabilities and exercises tone playback, microphone level,
+loopback, speaker/headphone routing, and deliberate buffer underrun/overrun accounting.
+See `docs/audio.md` for commands and stream behavior.

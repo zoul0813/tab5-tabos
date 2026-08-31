@@ -3,6 +3,7 @@
 
 #include <tabos/network.h>
 #include <tabos/device.h>
+#include <tabos/audio.h>
 
 #include <stdint.h>
 
@@ -28,6 +29,7 @@ typedef struct {
 
 tabos_wait_source_t tabos_socket_wait_source(tabos_socket_t socket);
 tabos_wait_source_t tabos_device_subscription_wait_source(tabos_device_subscription_t subscription);
+tabos_wait_source_t tabos_audio_wait_source(tabos_audio_stream_t stream);
 int tabos_wait(tabos_wait_item_t* items, uint32_t count, uint32_t timeout_ms);
 
 #endif

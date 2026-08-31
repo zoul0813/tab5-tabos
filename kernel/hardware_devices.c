@@ -1,4 +1,5 @@
 #include <tabos/internal/hardware_devices.h>
+#include <tabos/internal/audio.h>
 
 #include <tabos/device.h>
 #include <tabos/filesystem.h>
@@ -11,7 +12,8 @@
 static tabos_device_id_t network_device = TABOS_DEVICE_ID_INVALID;
 static tabos_device_id_t rtc_device     = TABOS_DEVICE_ID_INVALID;
 static tabos_device_id_t battery_device = TABOS_DEVICE_ID_INVALID;
-static tabos_device_id_t registered_devices[6];
+static tabos_device_id_t audio_device   = TABOS_DEVICE_ID_INVALID;
+static tabos_device_id_t registered_devices[7];
 static size_t registered_device_count;
 static bool initialized;
 
@@ -114,6 +116,36 @@ bool hardware_devices_init(void)
         hardware_devices_shutdown();
         return false;
     }
+    tabos_audio_info_t audio_info;
+    const char* audio_driver = NULL;
+    int audio_error          = 0;
+    if (audio_service_info(&audio_info, &audio_driver, &audio_error)) {
+        tabos_device_features_t features = 0U;
+        if ((audio_info.features & TABOS_AUDIO_FEATURE_PLAYBACK) != 0U) {
+            features |= TABOS_DEVICE_FEATURE_AUDIO_PLAYBACK;
+        }
+        if ((audio_info.features & TABOS_AUDIO_FEATURE_CAPTURE) != 0U) {
+            features |= TABOS_DEVICE_FEATURE_AUDIO_CAPTURE;
+        }
+        if ((audio_info.features & TABOS_AUDIO_FEATURE_AEC) != 0U) {
+            features |= TABOS_DEVICE_FEATURE_AUDIO_AEC;
+        }
+        if ((audio_info.routes & TABOS_AUDIO_ROUTE_SPEAKER) != 0U) {
+            features |= TABOS_DEVICE_FEATURE_AUDIO_SPEAKER;
+        }
+        if ((audio_info.routes & TABOS_AUDIO_ROUTE_HEADPHONE) != 0U) {
+            features |= TABOS_DEVICE_FEATURE_AUDIO_HEADPHONE;
+        }
+        if ((audio_info.routes & TABOS_AUDIO_ROUTE_MICROPHONE) != 0U) {
+            features |= TABOS_DEVICE_FEATURE_AUDIO_MICROPHONE;
+        }
+        if (!register_device(TABOS_DEVICE_NAME_AUDIO, audio_driver != NULL ? audio_driver : "audio",
+                             TABOS_DEVICE_CLASS_AUDIO, audio_error == 0 ? TABOS_DEVICE_READY : TABOS_DEVICE_FAULT,
+                             features, audio_error, &audio_device)) {
+            hardware_devices_shutdown();
+            return false;
+        }
+    }
     network_status_t network_status;
     if (diagnostics.network_present && network_service_status(&network_status) &&
         !register_device(TABOS_DEVICE_NAME_WIFI, diagnostics.network_name, TABOS_DEVICE_CLASS_NETWORK,
@@ -143,6 +175,12 @@ void hardware_devices_update(void)
         (void) device_registry_set_state(battery_device, battery_ready ? TABOS_DEVICE_READY : TABOS_DEVICE_FAULT,
                                          battery_ready ? 0 : (battery_error != 0 ? battery_error : EIO));
     }
+    if (audio_device != TABOS_DEVICE_ID_INVALID) {
+        int audio_error        = 0;
+        const bool audio_ready = audio_service_info(NULL, NULL, &audio_error) && audio_error == 0;
+        (void) device_registry_set_state(audio_device, audio_ready ? TABOS_DEVICE_READY : TABOS_DEVICE_FAULT,
+                                         audio_ready ? 0 : (audio_error != 0 ? audio_error : EIO));
+    }
     if (network_device != TABOS_DEVICE_ID_INVALID) {
         network_status_t status;
         if (!network_service_status(&status)) {
@@ -165,4 +203,5 @@ void hardware_devices_shutdown(void)
     network_device = TABOS_DEVICE_ID_INVALID;
     rtc_device     = TABOS_DEVICE_ID_INVALID;
     battery_device = TABOS_DEVICE_ID_INVALID;
+    audio_device   = TABOS_DEVICE_ID_INVALID;
 }

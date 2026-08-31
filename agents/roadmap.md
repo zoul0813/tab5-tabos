@@ -477,11 +477,11 @@ but is not a substitute for this execution path.
 
 ### Audio
 
-- [ ] Inventory and initialize Tab5 audio hardware.
-- [ ] Define public audio stream/mixer API.
-- [ ] Implement shared mixer.
-- [ ] Implement SDL3 host output backend.
-- [ ] Implement Tab5 audio backend.
+- [x] Inventory and initialize Tab5 audio hardware.
+- [x] Define public audio stream/mixer API.
+- [x] Implement shared mixer.
+- [x] Implement SDL3 host output backend.
+- [x] Implement Tab5 audio backend.
 - [ ] Test mixing, formats, latency, and real hardware output.
 
 ### Remaining Hardware and System Services

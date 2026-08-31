@@ -78,6 +78,9 @@ static bool fake_rtc_ready = true;
 static int fake_rtc_error;
 static bool fake_battery_ready = true;
 static int fake_battery_error;
+static platform_audio_error_fn fake_audio_error;
+static platform_audio_render_fn fake_audio_render;
+static platform_audio_capture_fn fake_audio_capture;
 
 bool platform_display_init(platform_framebuffer_t* framebuffer)
 {
@@ -212,6 +215,60 @@ void test_platform_battery_set_status(bool ready, int error)
 {
     fake_battery_ready = ready;
     fake_battery_error = error;
+}
+
+bool platform_audio_init(platform_audio_render_fn render, platform_audio_capture_fn capture,
+                         platform_audio_error_fn error, platform_audio_info_t* info)
+{
+    if (render == NULL || capture == NULL || error == NULL || info == NULL) {
+        return false;
+    }
+    fake_audio_render  = render;
+    fake_audio_capture = capture;
+    fake_audio_error   = error;
+    *info              = (platform_audio_info_t) {
+                     .driver           = "fake-audio",
+                     .features         = TABOS_AUDIO_FEATURE_PLAYBACK | TABOS_AUDIO_FEATURE_CAPTURE,
+                     .routes           = TABOS_AUDIO_ROUTE_SPEAKER | TABOS_AUDIO_ROUTE_HEADPHONE | TABOS_AUDIO_ROUTE_MICROPHONE,
+                     .capture_channels = 4U,
+                     .detected         = true,
+                     .ready            = true,
+    };
+    return true;
+}
+
+void platform_audio_shutdown(void)
+{
+    fake_audio_render  = NULL;
+    fake_audio_capture = NULL;
+    fake_audio_error   = NULL;
+}
+
+bool platform_audio_set_route(uint32_t route)
+{
+    return route == TABOS_AUDIO_ROUTE_SPEAKER || route == TABOS_AUDIO_ROUTE_HEADPHONE ||
+           route == TABOS_AUDIO_ROUTE_MICROPHONE;
+}
+
+void test_platform_audio_render(int16_t* stereo, size_t frames)
+{
+    if (fake_audio_render != NULL) {
+        fake_audio_render(stereo, frames);
+    }
+}
+
+void test_platform_audio_capture(const int16_t* samples, size_t frames, uint32_t channels)
+{
+    if (fake_audio_capture != NULL) {
+        fake_audio_capture(samples, frames, channels);
+    }
+}
+
+void test_platform_audio_error(int error)
+{
+    if (fake_audio_error != NULL) {
+        fake_audio_error(error);
+    }
 }
 
 bool platform_network_init(const char* hostname)

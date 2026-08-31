@@ -1,6 +1,7 @@
 #include <tabos/internal/runtime.h>
 
 #include <tabos/internal/application.h>
+#include <tabos/internal/audio.h>
 #include <tabos/internal/boot_report.h>
 #include <tabos/internal/diagnostic_apps.h>
 #include <tabos/internal/console.h>
@@ -182,12 +183,22 @@ bool kernel_runtime_start(void)
     }
     network_service_update();
 
+    if (!audio_service_init()) {
+        network_service_shutdown();
+        filesystem_shutdown();
+        return false;
+    }
+
     if (!display_init()) {
+        audio_service_shutdown();
+        network_service_shutdown();
+        filesystem_shutdown();
         return false;
     }
 
     if (!hardware_devices_init()) {
         display_shutdown();
+        audio_service_shutdown();
         network_service_shutdown();
         filesystem_shutdown();
         return false;
@@ -269,12 +280,19 @@ bool kernel_runtime_start(void)
                                                 KERNEL_BOOT_STATUS_INFO;
         (void) kernel_boot_report_add(&boot_report, "Network", network_detail, status);
     }
+    if (device_registry_find(TABOS_DEVICE_NAME_AUDIO, &registered_device)) {
+        (void) kernel_boot_report_add(&boot_report, "Audio", registered_device.driver,
+                                      device_boot_status(registered_device.state));
+    }
     (void) kernel_boot_report_add(&boot_report, "Kernel", "Runtime initialized", KERNEL_BOOT_STATUS_OK);
 
     kernel_boot_report_write_serial(&boot_report);
     if (!render_boot_report()) {
         hardware_devices_shutdown();
         display_shutdown();
+        audio_service_shutdown();
+        network_service_shutdown();
+        filesystem_shutdown();
         return false;
     }
 
@@ -282,6 +300,9 @@ bool kernel_runtime_start(void)
         terminal_shutdown(&terminal);
         hardware_devices_shutdown();
         display_shutdown();
+        audio_service_shutdown();
+        network_service_shutdown();
+        filesystem_shutdown();
         return false;
     }
     kernel_application_system_init();
@@ -291,6 +312,9 @@ bool kernel_runtime_start(void)
         terminal_shutdown(&terminal);
         hardware_devices_shutdown();
         display_shutdown();
+        audio_service_shutdown();
+        network_service_shutdown();
+        filesystem_shutdown();
         return false;
     }
     runtime_started = true;
@@ -307,6 +331,9 @@ bool kernel_runtime_start(void)
         runtime_started = false;
         hardware_devices_shutdown();
         display_shutdown();
+        audio_service_shutdown();
+        network_service_shutdown();
+        filesystem_shutdown();
         return false;
     }
     return true;
@@ -336,6 +363,7 @@ void kernel_runtime_shutdown(void)
         boot_report     = (kernel_boot_report_t) {0};
     }
 
+    audio_service_shutdown();
     network_service_shutdown();
     filesystem_shutdown();
     runtime_initialized = false;

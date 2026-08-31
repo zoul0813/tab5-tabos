@@ -44,6 +44,7 @@ TABOS_RUNTIME_SOURCES := $(SDK_ROOT)/crt/crt0.c $(SDK_ROOT)/crt/metadata.S $(SDK
                          $(SDK_ROOT)/lib/wait.c \
                          $(SDK_ROOT)/lib/tls.c \
                          $(SDK_ROOT)/lib/battery.c \
+                         $(SDK_ROOT)/lib/audio.c \
                          $(SDK_ROOT)/lib/clock.c \
                          $(SDK_ROOT)/lib/reboot.c \
                          $(SDK_ROOT)/lib/runtime.c \

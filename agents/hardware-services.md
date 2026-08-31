@@ -190,23 +190,23 @@ documentation pass.
 
 ## Phase 4: Audio Service
 
-- [ ] Detect and initialize ES8388/ES7210, then register `audio0`.
-- [ ] Add `<tabos/audio.h>` with process-owned playback and capture stream handles.
-- [ ] Require signed 16-bit little-endian PCM at 48 kHz as the mandatory format.
-- [ ] Support mono and stereo playback and backend-reported capture channel counts.
-- [ ] Use bounded ring buffers with nonblocking reads/writes and `EAGAIN`.
-- [ ] Expose readable/writable/error/hangup through generic waits.
-- [ ] Mix at least four playback streams with saturation and per-stream volume.
-- [ ] Support speaker, headphone, and microphone routes.
-- [ ] Expose AEC only when the backend reports working support.
-- [ ] Implement SDL3 host playback/capture and deterministic fake-buffer testing.
-- [ ] Implement Tab5 playback through ES8388 and capture through ES7210.
-- [ ] Stop streams, wake waiters, and free buffers on close, exit, failed launch, and process fault.
-- [ ] Add `audiotest` to `apps/coreutils` for tone, microphone level, loopback, route,
+- [x] Detect and initialize ES8388/ES7210, then register `audio0`.
+- [x] Add `<tabos/audio.h>` with process-owned playback and capture stream handles.
+- [x] Require signed 16-bit little-endian PCM at 48 kHz as the mandatory format.
+- [x] Support mono and stereo playback and backend-reported capture channel counts.
+- [x] Use bounded ring buffers with nonblocking reads/writes and `EAGAIN`.
+- [x] Expose readable/writable/error/hangup through generic waits.
+- [x] Mix at least four playback streams with saturation and per-stream volume.
+- [x] Support speaker, headphone, and microphone routes.
+- [x] Expose AEC only when the backend reports working support.
+- [x] Implement SDL3 host playback/capture and deterministic fake-buffer testing.
+- [x] Implement Tab5 playback through ES8388 and capture through ES7210.
+- [x] Stop streams, wake waiters, and free buffers on close, exit, failed launch, and process fault.
+- [x] Add `audiotest` to `apps/coreutils` for tone, microphone level, loopback, route,
   and underrun/overrun tests.
 - [ ] Validate speaker, headphone, microphones, simultaneous playback/capture, four-stream mixing,
   route changes, latency, underrun, overrun, cleanup, and repeat launch on physical Tab5.
-- [ ] Update audio API and utility documentation.
+- [x] Update audio API and utility documentation.
 
 ## Phase 5: Touch and Pointer
 

@@ -127,7 +127,7 @@ bool platform_init(bool headless)
     quit_requested                     = false;
     host_battery_charging_enabled      = true;
     host_battery_fast_charging_enabled = false;
-    const SDL_InitFlags flags          = headless ? 0U : SDL_INIT_VIDEO | SDL_INIT_EVENTS;
+    const SDL_InitFlags flags          = headless ? 0U : SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_AUDIO;
     if (!SDL_Init(flags)) {
         SDL_Log("SDL initialization failed: %s", SDL_GetError());
         return false;

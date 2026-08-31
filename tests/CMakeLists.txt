@@ -44,6 +44,28 @@ tabos_enable_warnings(tabos_sdk_battery)
 tabos_enable_sanitizers(tabos_sdk_battery)
 add_test(NAME unit.sdk_battery COMMAND tabos_sdk_battery)
 
+add_executable(tabos_audio_service unit/audio_service.c ${TABOS_TEST_PLATFORM_FAKES})
+target_include_directories(tabos_audio_service PRIVATE
+    "${TABOS_ROOT}/audio/include"
+    "${TABOS_ROOT}/platform/include"
+    "${TABOS_ROOT}/sdk/include"
+    "${CMAKE_CURRENT_LIST_DIR}/fakes"
+)
+target_link_libraries(tabos_audio_service PRIVATE tabos_core)
+tabos_enable_warnings(tabos_audio_service)
+tabos_enable_sanitizers(tabos_audio_service)
+add_test(NAME unit.audio_service COMMAND tabos_audio_service)
+
+add_executable(tabos_sdk_audio
+    unit/sdk_audio.c
+    "${TABOS_ROOT}/sdk/lib/audio.c"
+    "${TABOS_ROOT}/sdk/lib/wait.c"
+)
+target_include_directories(tabos_sdk_audio PRIVATE "${TABOS_ROOT}/sdk/include")
+tabos_enable_warnings(tabos_sdk_audio)
+tabos_enable_sanitizers(tabos_sdk_audio)
+add_test(NAME unit.sdk_audio COMMAND tabos_sdk_audio)
+
 add_executable(tabos_raster unit/raster.c ${TABOS_TEST_PLATFORM_FAKES})
 target_include_directories(tabos_raster PRIVATE
     "${TABOS_ROOT}/graphics/include"

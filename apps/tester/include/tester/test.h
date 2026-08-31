@@ -29,6 +29,7 @@ void tester_test_process(tester_context_t* context);
 void tester_test_runtime(tester_context_t* context);
 void tester_test_device(tester_context_t* context);
 void tester_test_battery(tester_context_t* context);
+void tester_test_audio(tester_context_t* context);
 void tester_test_graphics(tester_context_t* context);
 void tester_test_network(tester_context_t* context);
 

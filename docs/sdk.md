@@ -29,10 +29,18 @@ and copied-information types used by the hardware-service registry. Device IDs a
 applications must not decode or persist them across reboot.
 
 Current built-in logical names are `display0`, `keyboard0`, `storage0`, `rtc0`,
-`battery0`, and `wifi0`. TabOS registers only devices detected during startup. Host builds
+`battery0`, `audio0`, and `wifi0`. TabOS registers only devices detected during startup. Host builds
 publish deterministic virtual equivalents. Feature flags describe framebuffer, input,
 removable storage, wall-clock, battery telemetry/control, and Wi-Fi support; flags are
-informational and do not restrict application access.
+informational and do not restrict application access. Audio features identify playback,
+capture, speaker, headphone, microphone, and working AEC support.
+
+## Audio
+
+`<tabos/audio.h>` provides process-owned nonblocking PCM playback and capture streams,
+per-stream volume, physical route selection, and buffer counters. `<tabos/wait.h>` adapts
+streams to readable, writable, error, and hangup waits. See `docs/audio.md` for the format,
+lifecycle, mixing, and utility contract.
 
 `tabos_device_count()`, `tabos_device_at()`, `tabos_device_get()`, and
 `tabos_device_find()` enumerate present devices and return copied metadata. Indexed lookup

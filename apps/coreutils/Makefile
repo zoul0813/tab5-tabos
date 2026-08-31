@@ -1,6 +1,6 @@
 # Small independently loaded command-line utilities.
 
-PROGRAMS := ls mkdir rmdir cp rm mv cat hexdump date reboot shutdown wc battery devices
+PROGRAMS := ls mkdir rmdir cp rm mv cat hexdump date reboot shutdown wc battery devices audiotest
 
 ifeq ($(strip $(PROGRAM)),)
 

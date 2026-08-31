@@ -95,7 +95,16 @@ static _Thread_local uint32_t host_rv32_active_ram_size;
     X(WAIT, 304U)                            \
     X(BATTERY_STATUS, 236U)                  \
     X(BATTERY_SET_CHARGING, 240U)            \
-    X(BATTERY_SET_FAST_CHARGING, 244U)
+    X(BATTERY_SET_FAST_CHARGING, 244U)       \
+    X(AUDIO_INFO, 308U)                      \
+    X(AUDIO_OPEN, 312U)                      \
+    X(AUDIO_CLOSE, 316U)                     \
+    X(AUDIO_WRITE, 320U)                     \
+    X(AUDIO_READ, 324U)                      \
+    X(AUDIO_SET_VOLUME, 328U)                \
+    X(AUDIO_SET_ROUTE, 332U)                 \
+    X(AUDIO_STATUS, 336U)                    \
+    X(AUDIO_WAIT_SOURCE, 340U)
 
 enum {
 #define HOST_RV32_GATE_INDEX(name, api_offset) HOST_RV32_GATE_INDEX_##name,
@@ -856,6 +865,78 @@ platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* cont
             context->state.regs[10] = (uint32_t) operation(context->state.regs[10]);
             current_user_data       = NULL;
             context->state.pc       = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_AUDIO_INFO) {
+            tabos_audio_info_t* info = guest_buffer(context->memory, context->state.regs[10], sizeof(*info));
+            if (info == NULL || context->api.audio_info == NULL) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data       = context->user_data;
+            context->state.regs[10] = (uint32_t) context->api.audio_info(info);
+            current_user_data       = NULL;
+            context->state.pc       = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_AUDIO_OPEN) {
+            tabos_audio_config_t* config = guest_buffer(context->memory, context->state.regs[10], sizeof(*config));
+            if (config == NULL || context->api.audio_open == NULL) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data       = context->user_data;
+            context->state.regs[10] = (uint32_t) context->api.audio_open(config);
+            current_user_data       = NULL;
+            context->state.pc       = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_AUDIO_WRITE || context->state.pc == HOST_RV32_AUDIO_READ) {
+            void* pcm = guest_buffer(context->memory, context->state.regs[11], context->state.regs[12]);
+            if (pcm == NULL || (context->state.pc == HOST_RV32_AUDIO_WRITE && context->api.audio_write == NULL) ||
+                (context->state.pc == HOST_RV32_AUDIO_READ && context->api.audio_read == NULL)) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data = context->user_data;
+            if (context->state.pc == HOST_RV32_AUDIO_WRITE) {
+                context->state.regs[10] =
+                    (uint32_t) context->api.audio_write((int) context->state.regs[10], pcm, context->state.regs[12]);
+            } else {
+                context->state.regs[10] =
+                    (uint32_t) context->api.audio_read((int) context->state.regs[10], pcm, context->state.regs[12]);
+            }
+            current_user_data = NULL;
+            context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_AUDIO_STATUS) {
+            tabos_audio_status_t* status = guest_buffer(context->memory, context->state.regs[11], sizeof(*status));
+            if (status == NULL || context->api.audio_status == NULL) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data       = context->user_data;
+            context->state.regs[10] = (uint32_t) context->api.audio_status((int) context->state.regs[10], status);
+            current_user_data       = NULL;
+            context->state.pc       = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_AUDIO_CLOSE || context->state.pc == HOST_RV32_AUDIO_SET_VOLUME ||
+            context->state.pc == HOST_RV32_AUDIO_SET_ROUTE || context->state.pc == HOST_RV32_AUDIO_WAIT_SOURCE) {
+            current_user_data = context->user_data;
+            if (context->state.pc == HOST_RV32_AUDIO_CLOSE && context->api.audio_close != NULL) {
+                context->state.regs[10] = (uint32_t) context->api.audio_close((int) context->state.regs[10]);
+            } else if (context->state.pc == HOST_RV32_AUDIO_SET_VOLUME && context->api.audio_set_volume != NULL) {
+                context->state.regs[10] =
+                    (uint32_t) context->api.audio_set_volume((int) context->state.regs[10], context->state.regs[11]);
+            } else if (context->state.pc == HOST_RV32_AUDIO_SET_ROUTE && context->api.audio_set_route != NULL) {
+                context->state.regs[10] =
+                    (uint32_t) context->api.audio_set_route((int) context->state.regs[10], context->state.regs[11]);
+            } else if (context->state.pc == HOST_RV32_AUDIO_WAIT_SOURCE && context->api.audio_wait_source != NULL) {
+                context->state.regs[10] = (uint32_t) context->api.audio_wait_source((int) context->state.regs[10]);
+            } else {
+                current_user_data = NULL;
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data = NULL;
+            context->state.pc = context->state.regs[1];
             continue;
         }
         if (context->state.pc == HOST_RV32_TLS_CONNECT || context->state.pc == HOST_RV32_TLS_CLOSE ||

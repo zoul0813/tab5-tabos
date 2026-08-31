@@ -16,6 +16,8 @@ Tests are separate modules under `apps/tester/src/tests/`. The current modules c
 - process-owned heap and leaked-descriptor cleanup after nonzero child exit
 - RTC calendar, Unix time, `time()`, `gettimeofday()`, and realtime/monotonic clocks
 - battery registry state, telemetry validity, signed power consistency, and unchanged charger controls
+- audio registry state, capabilities, process-owned playback/capture streams, waits, volume,
+  routes, nonblocking reads, status, and stale handles
 
 Build and install into the host root filesystem:
 
@@ -48,6 +50,12 @@ intentionally changing the clock.
 Battery tests require `battery0` with telemetry and charge-control features, verify
 internally consistent signed readings, and write the already reported normal and fast
 charger settings back unchanged. They do not deliberately change charging policy.
+
+Audio tests require ready playback and capture on `audio0`. They write one silent stereo
+frame, leave physical volume policy unchanged apart from per-stream gain, select the
+already configured speaker route, accept either captured data or `EAGAIN`, and verify
+that closed stream handles become stale. Resource-failure children deliberately leak
+audio streams and wait sources so process teardown also validates reclamation.
 
 Add future API coverage as another focused source module and register it in
 `apps/tester/src/main.c`. Tests should remain deterministic, clean up persistent state,

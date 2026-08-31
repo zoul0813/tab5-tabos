@@ -34,6 +34,20 @@ tabos_wait_source_t tabos_device_subscription_wait_source(tabos_device_subscript
     return result;
 }
 
+tabos_wait_source_t tabos_audio_wait_source(tabos_audio_stream_t stream)
+{
+    if (tabos_runtime_api == NULL || tabos_runtime_api->audio_wait_source == NULL) {
+        errno = ENOSYS;
+        return TABOS_WAIT_SOURCE_INVALID;
+    }
+    const int result = tabos_runtime_api->audio_wait_source(stream);
+    if (result < 0) {
+        errno = -result;
+        return TABOS_WAIT_SOURCE_INVALID;
+    }
+    return result;
+}
+
 int tabos_wait(tabos_wait_item_t* items, uint32_t count, uint32_t timeout_ms)
 {
     const uint32_t valid_events =

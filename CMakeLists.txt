@@ -111,6 +111,7 @@ target_include_directories(tabos_core
         "${TABOS_ROOT}/apps/diag/console/include"
         "${TABOS_ROOT}/apps/diag/filesystem/include"
         "${TABOS_ROOT}/apps/diag/elf_loader/include"
+        "${TABOS_ROOT}/audio/include"
         "${TABOS_ROOT}/console/include"
         "${TABOS_ROOT}/fs/include"
         "${TABOS_ROOT}/graphics/include"

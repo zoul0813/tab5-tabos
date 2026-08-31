@@ -1,6 +1,7 @@
 #include <tester/test.h>
 
 #include <tabos/process.h>
+#include <tabos/audio.h>
 #include <tabos/network.h>
 #include <tabos/device.h>
 #include <tabos/wait.h>
@@ -17,6 +18,7 @@ enum {
     PROCESS_LEAK_DESCRIPTOR_COUNT   = 8,
     PROCESS_LEAK_SOCKET_COUNT       = 4,
     PROCESS_LEAK_SUBSCRIPTION_COUNT = 4,
+    PROCESS_LEAK_AUDIO_COUNT        = 2,
 };
 
 static int run_resource_failure_fixture(void)
@@ -43,6 +45,17 @@ static int run_resource_failure_fixture(void)
         if (subscription == TABOS_DEVICE_SUBSCRIPTION_INVALID ||
             tabos_device_subscription_wait_source(subscription) == TABOS_WAIT_SOURCE_INVALID) {
             return 77;
+        }
+    }
+    const tabos_audio_config_t audio_config = {
+        .direction = TABOS_AUDIO_PLAYBACK,
+        .channels  = 1U,
+        .route     = TABOS_AUDIO_ROUTE_SPEAKER,
+    };
+    for (unsigned int index = 0U; index < PROCESS_LEAK_AUDIO_COUNT; ++index) {
+        const tabos_audio_stream_t stream = tabos_audio_open(&audio_config);
+        if (stream == TABOS_AUDIO_STREAM_INVALID || tabos_audio_wait_source(stream) == TABOS_WAIT_SOURCE_INVALID) {
+            return 78;
         }
     }
     return 73;
@@ -109,6 +122,7 @@ int main(int argc, char** argv)
         {     "Time and system information",    tester_test_runtime},
         {          "Device registry access",     tester_test_device},
         {             "Battery integration",    tester_test_battery},
+        {               "Audio integration",      tester_test_audio},
         {              "TCP/UDP networking",    tester_test_network},
         {             "Fullscreen graphics",   tester_test_graphics},
     };
