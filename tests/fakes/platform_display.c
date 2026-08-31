@@ -74,6 +74,8 @@ static char last_log[256];
 static platform_network_status_t fake_network;
 static unsigned int network_connect_calls;
 static char network_hostname[33];
+static bool fake_rtc_ready = true;
+static int fake_rtc_error;
 
 bool platform_display_init(platform_framebuffer_t* framebuffer)
 {
@@ -135,8 +137,9 @@ bool platform_get_diagnostics(platform_diagnostics_t* diagnostics)
         .keyboard_present   = true,
         .keyboard_detected  = true,
         .rtc_name           = "TEST RTC",
-        .rtc_present        = true,
+        .rtc_present        = fake_rtc_ready,
         .rtc_detected       = true,
+        .rtc_error          = fake_rtc_error,
         .battery_name       = "TEST BATTERY",
         .battery_present    = true,
         .battery_detected   = true,
@@ -178,6 +181,20 @@ bool platform_wall_clock_get(int64_t* seconds)
 bool platform_wall_clock_set(int64_t seconds)
 {
     return seconds >= 0;
+}
+
+bool platform_wall_clock_status(int* error)
+{
+    if (error != NULL) {
+        *error = fake_rtc_error;
+    }
+    return fake_rtc_ready && fake_rtc_error == 0;
+}
+
+void test_platform_rtc_set_status(bool ready, int error)
+{
+    fake_rtc_ready = ready;
+    fake_rtc_error = error;
 }
 
 bool platform_network_init(const char* hostname)

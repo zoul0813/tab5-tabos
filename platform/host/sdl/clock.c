@@ -35,3 +35,11 @@ bool platform_wall_clock_set(int64_t seconds)
     wall_clock_offset = seconds - (int64_t) now;
     return true;
 }
+
+bool platform_wall_clock_status(int* error)
+{
+    if (error != NULL) {
+        *error = 0;
+    }
+    return true;
+}

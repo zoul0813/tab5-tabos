@@ -30,7 +30,8 @@
 - [x] Add UTC `date` utility for reading and setting wall-clock time.
 - [x] Add text `cal` application using the current UTC wall clock.
 - [x] Add standalone 640x360 graphical UTC `clock` application.
-- [ ] Validate RX8130 read/write behavior on physical Tab5 hardware.
+- [x] Validate RX8130 detection, calendar read, and unchanged-value write on physical Tab5 hardware.
+- [ ] Validate RX8130 wall-clock retention across a physical Tab5 restart.
 
 ### Reboot and Shutdown
 
@@ -500,7 +501,7 @@ but is not a substitute for this execution path.
 - [x] Add maintained validation for socket/device waits, mixed readiness, ownership,
   stale handles, cancellation, network transitions, and teardown.
 - [ ] Run complete generic-wait validation on macOS and Linux; physical Tab5 passes.
-- [x] Add RTC and wall-clock service; physical RX8130CE validation remains separately tracked.
+- [x] Add RTC and wall-clock service with live `rtc0` fault/ready reporting; physical restart-retention validation remains.
 - [x] Add battery telemetry and charge control; sleep and wake remain future work.
 - [ ] Add USB host/OTG service beyond keyboard support.
 - [ ] Add camera service when application needs justify it.

@@ -10,7 +10,8 @@ preserving the existing monotonic clock for elapsed-time measurement.
 
 The wall-clock service, `cal`, and graphical `clock` applications are implemented.
 On 2026-08-30, `apps/build.sh` produced and installed both as `T:/bin/cal` and
-`T:/bin/clock`. The remaining milestone work is physical RX8130CE validation on Tab5.
+`T:/bin/clock`. Maintained tester validation on physical Tab5 covers detection,
+calendar read, and unchanged-value write. Restart retention remains to be checked.
 
 ## Decisions
 
@@ -50,5 +51,6 @@ On 2026-08-30, `apps/build.sh` produced and installed both as `T:/bin/cal` and
 - [x] Add `clock`, a standalone graphical UTC wall-clock application.
 - [x] Build and install both applications through `apps/build.sh`.
 - [x] Document API, UTC semantics, limitations, and hardware validation steps.
-- [ ] Validate RX8130CE detection, calendar read, and unchanged-value write on
+- [x] Validate RX8130CE detection, calendar read, and unchanged-value write on
   physical Tab5 hardware.
+- [ ] Validate RTC time retention across a physical Tab5 restart.

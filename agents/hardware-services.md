@@ -148,9 +148,10 @@ documentation pass.
 
 ### RTC integration
 
-- [ ] Complete physical RX8130CE detection, calendar read, unchanged-value write, and restart-retention checks.
-- [ ] Preserve UTC storage and separation between wall clock and monotonic time.
-- [ ] Expose RTC presence and fault state through `rtc0`.
+- [ ] Complete physical RX8130CE restart-retention check.
+- [x] Validate physical RX8130CE detection, calendar read, and unchanged-value write through maintained tester.
+- [x] Preserve UTC storage and separation between wall clock and monotonic time.
+- [x] Expose RTC presence and live read/write fault state through `rtc0`.
 
 ### Battery integration
 

@@ -9,6 +9,7 @@
 #include <errno.h>
 
 static tabos_device_id_t network_device = TABOS_DEVICE_ID_INVALID;
+static tabos_device_id_t rtc_device     = TABOS_DEVICE_ID_INVALID;
 static tabos_device_id_t registered_devices[6];
 static size_t registered_device_count;
 static bool initialized;
@@ -97,8 +98,9 @@ bool hardware_devices_init(void)
     }
     if (diagnostics.rtc_detected &&
         !register_device(TABOS_DEVICE_NAME_RTC, diagnostics.rtc_name, TABOS_DEVICE_CLASS_RTC,
-                         diagnostics.rtc_present ? TABOS_DEVICE_READY : TABOS_DEVICE_FAULT,
-                         TABOS_DEVICE_FEATURE_RTC_WALL_CLOCK, diagnostics.rtc_error, NULL)) {
+                         diagnostics.rtc_present && diagnostics.rtc_error == 0 ? TABOS_DEVICE_READY :
+                                                                                 TABOS_DEVICE_FAULT,
+                         TABOS_DEVICE_FEATURE_RTC_WALL_CLOCK, diagnostics.rtc_error, &rtc_device)) {
         hardware_devices_shutdown();
         return false;
     }
@@ -124,16 +126,24 @@ bool hardware_devices_init(void)
 
 void hardware_devices_update(void)
 {
-    if (!initialized || network_device == TABOS_DEVICE_ID_INVALID) {
+    if (!initialized) {
         return;
     }
-    network_status_t status;
-    if (!network_service_status(&status)) {
-        (void) device_registry_set_state(network_device, TABOS_DEVICE_FAULT, EIO);
-        return;
+    if (rtc_device != TABOS_DEVICE_ID_INVALID) {
+        int rtc_error        = 0;
+        const bool rtc_ready = platform_wall_clock_status(&rtc_error);
+        (void) device_registry_set_state(rtc_device, rtc_ready ? TABOS_DEVICE_READY : TABOS_DEVICE_FAULT,
+                                         rtc_ready ? 0 : (rtc_error != 0 ? rtc_error : EIO));
     }
-    const tabos_device_state_t state = network_device_state(&status);
-    (void) device_registry_set_state(network_device, state, state == TABOS_DEVICE_FAULT ? EIO : 0);
+    if (network_device != TABOS_DEVICE_ID_INVALID) {
+        network_status_t status;
+        if (!network_service_status(&status)) {
+            (void) device_registry_set_state(network_device, TABOS_DEVICE_FAULT, EIO);
+            return;
+        }
+        const tabos_device_state_t state = network_device_state(&status);
+        (void) device_registry_set_state(network_device, state, state == TABOS_DEVICE_FAULT ? EIO : 0);
+    }
 }
 
 void hardware_devices_shutdown(void)
@@ -145,4 +155,5 @@ void hardware_devices_shutdown(void)
     }
     initialized    = false;
     network_device = TABOS_DEVICE_ID_INVALID;
+    rtc_device     = TABOS_DEVICE_ID_INVALID;
 }

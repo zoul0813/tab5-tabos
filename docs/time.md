@@ -67,4 +67,6 @@ or locale policy.
 Tab5 uses the onboard RX8130CE RTC at I2C address `0x32`. Host targets initialize
 from the workstation clock. Setting time in the host simulator changes only an
 in-process offset; it never changes the workstation clock. RTC absence or invalid
-calendar data is nonfatal and wall-clock calls fail with `errno` set.
+calendar data is nonfatal and wall-clock calls fail with `errno` set. Detected RTC
+hardware appears as `rtc0` in the device registry. Read/write or calendar-data failures
+move it to `fault`; a later successful operation restores `ready`.

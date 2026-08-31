@@ -4,6 +4,7 @@
 #include <tabos/network.h>
 #include <tabos/device.h>
 #include <tabos/wait.h>
+#include <tabos/ansi.h>
 
 #include <errno.h>
 #include <fcntl.h>
@@ -117,6 +118,6 @@ int main(int argc, char** argv)
         tester_run_test(&context, &tests[index]);
     }
     printf("\nAssertions: %u; failures: %u\n", context.assertions, context.failures);
-    puts(context.failures == 0U ? "[PASS] TabOS SDK tester" : "[FAIL] TabOS SDK tester");
+    puts(context.failures == 0U ? "[" ANSI_GREEN "PASS" ANSI_RESET "] TabOS SDK tester" : "[" ANSI_RED "FAIL" ANSI_RESET "] TabOS SDK tester");
     return context.failures == 0U ? 0 : 1;
 }

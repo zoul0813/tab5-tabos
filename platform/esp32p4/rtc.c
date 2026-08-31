@@ -138,6 +138,7 @@ bool platform_wall_clock_get(int64_t* seconds)
     }
     uint8_t registers[7];
     if (!rtc_read(RX8130_TIME_REGISTER, registers, sizeof(registers))) {
+        rtc_error = EIO;
         return false;
     }
     const uint8_t second  = registers[0] & 0x7fU;
@@ -149,6 +150,7 @@ bool platform_wall_clock_get(int64_t* seconds)
     const uint8_t weekday = registers[3] & 0x7fU;
     if (!bcd_valid(second) || !bcd_valid(minute) || !bcd_valid(hour) || !bcd_valid(day) || !bcd_valid(month) ||
         !bcd_valid(year) || weekday == 0U || (weekday & (weekday - 1U)) != 0U) {
+        rtc_error = EINVAL;
         return false;
     }
     tabos_datetime_t datetime = {
@@ -160,7 +162,12 @@ bool platform_wall_clock_get(int64_t* seconds)
         .minute  = bcd_decode(minute),
         .second  = bcd_decode(second),
     };
-    return wall_clock_datetime_to_epoch(&datetime, seconds);
+    if (!wall_clock_datetime_to_epoch(&datetime, seconds)) {
+        rtc_error = EINVAL;
+        return false;
+    }
+    rtc_error = 0;
+    return true;
 }
 
 bool platform_wall_clock_set(int64_t seconds)
@@ -181,5 +188,18 @@ bool platform_wall_clock_set(int64_t seconds)
         bcd_encode(datetime.month),
         bcd_encode((uint8_t) (datetime.year - 2000)),
     };
-    return rtc_write(RX8130_TIME_REGISTER, registers, sizeof(registers));
+    if (!rtc_write(RX8130_TIME_REGISTER, registers, sizeof(registers))) {
+        rtc_error = EIO;
+        return false;
+    }
+    rtc_error = 0;
+    return true;
+}
+
+bool platform_wall_clock_status(int* error)
+{
+    if (error != NULL) {
+        *error = rtc_error;
+    }
+    return rtc_available && rtc_error == 0;
 }

@@ -75,7 +75,9 @@ reports overflow on the next successful read, and is discarded during process cl
 Portable runtime integration registers initialized `display0`, `keyboard0`, `storage0`,
 `rtc0`, `battery0`, and `wifi0` entries from platform diagnostics while keeping typed
 drivers below the platform boundary. Host builds expose deterministic virtual counterparts.
-Wi-Fi registry state follows network-service offline, fault, and ready transitions.
+Wi-Fi registry state follows network-service offline, fault, and ready transitions. RTC
+read, write, and calendar-data failures move `rtc0` to fault with the platform error;
+a later successful RTC operation restores ready state.
 
 ### Generic wait sources [DECIDED]
 
