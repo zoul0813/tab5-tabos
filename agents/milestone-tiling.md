@@ -33,7 +33,8 @@ Add `<tabos/sprite.h>`:
   opacity, and an optional clip rectangle.
 - Transform the sprite pivot with the image, keeping the requested world position fixed.
 - `tabos_sprite_animation_frame()` selects a frame from explicit elapsed milliseconds.
-  Looping clips wrap; non-looping clips hold their final frame.
+  Each clip stores a repeat count: zero repeats forever, while a positive value plays
+  that many cycles and then holds its final frame.
 - `tabos_metasprite_draw()` draws ordered component sprites with signed offsets,
   per-part transforms, and opacity. Support overall horizontal and vertical mirroring,
   but not arbitrary-angle rotation.
@@ -80,7 +81,13 @@ existing queued-source lifetime: assets must remain unchanged until
 
 Add `./tools/tabos assets build <manifest>`:
 
-- Accept a versioned JSON manifest, PNG sprite images, and finite orthogonal Tiled JSON maps.
+- Accept a versioned JSON manifest, PNG or GIF sprite images, and finite orthogonal
+  Tiled JSON maps.
+- Treat a single-frame GIF as one image. Fully composite animated GIF frames according
+  to GIF transparency and disposal rules, import frame delays, and generate one named
+  animation clip. Preserve the GIF repeat count, using zero for indefinite repetition
+  and one when no loop extension exists. Clamp an animated frame delay below 10 ms to
+  10 ms unless the manifest supplies an explicit duration override.
 - Support multiple tile and object layers, multiple tilesets, tile flips, Tiled tile
   animations, and integer tile properties.
 - Convert multiple source images into one logical sprite set without requiring physical
@@ -92,8 +99,8 @@ Add `./tools/tabos assets build <manifest>`:
 - Reject infinite or isometric maps, ellipse/text/polygon/polyline/template objects,
   arbitrary object rotation, non-integral object geometry, unsupported properties, and
   malformed GIDs with clear diagnostics.
-- Convert opaque PNG pixels exactly like `TABOS_RGB565`. Require alpha values of 0 or 255;
-  reject partial alpha.
+- Convert opaque PNG and composited GIF pixels exactly like `TABOS_RGB565`. Require
+  alpha values of 0 or 255; reject partial alpha.
 - Select a deterministic unused RGB565 color key automatically when transparency exists.
   Allow an explicit manifest key only when no opaque pixel converts to the same value.
 - Produce deterministic generated `.c`/`.h` descriptors and versioned binary assets from
@@ -119,7 +126,7 @@ Binary formats:
 
 Install binary assets under `T:/data/<app-name>/`. Extend application build rules so each
 application explicitly declares generated asset outputs; normal installation and `--msc`
-copy only declared runtime assets, never source PNG, Tiled, or manifest files.
+copy only declared runtime assets, never source PNG, GIF, Tiled, or manifest files.
 
 ## Implementation and Documentation
 
@@ -139,7 +146,8 @@ copy only declared runtime assets, never source PNG, Tiled, or manifest files.
 ## Test and Acceptance Plan
 
 - Converter tests cover deterministic output, RGB565 conversion, automatic and explicit
-  color keys, multiple tilesets, Tiled transforms and animations, object markers,
+  color keys, static and animated GIF input, GIF transparency/disposal, frame timing and
+  repeat counts, multiple tilesets, Tiled transforms and animations, object markers,
   identifier collisions, and every rejected feature.
 - Binary-loader tests cover generated-C/binary equivalence, bad magic/version, truncation,
   overflow, invalid offsets/counts/GIDs, allocation failure, and leak-free cleanup.
@@ -166,7 +174,7 @@ copy only declared runtime assets, never source PNG, Tiled, or manifest files.
 - Rendering uses nearest-neighbor sampling only.
 - Maps are finite and orthogonal.
 - Object layers contain simple markers only; the game owns entity creation and behavior.
-- Runtime PNG and Tiled parsing remain excluded.
+- Runtime PNG, GIF, and Tiled parsing remain excluded.
 - Application binaries remain in `T:/bin`; application data belongs in
   `T:/data/<app-name>/`.
 - No compatibility shim is required because the application ABI remains pre-release.
