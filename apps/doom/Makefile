@@ -31,11 +31,12 @@ DOOM_UPSTREAM_SOURCES := \
 DOOM_UPSTREAM_OBJECTS := $(addprefix $(DOOM_OBJECT_DIR)/upstream/,$(DOOM_UPSTREAM_SOURCES:.c=.o))
 DOOM_UPSTREAM_SOURCE_PATHS := $(addprefix $(DOOM_UPSTREAM_DIR)/,$(DOOM_UPSTREAM_SOURCES))
 DOOM_ADAPTER_SOURCES := $(APP_DIR)/src/doom_tabos.c $(APP_DIR)/src/doom_tabos_input.c \
-    $(APP_DIR)/src/doom_tabos_storage.c $(APP_DIR)/src/doom_tabos_video.c
+    $(APP_DIR)/src/doom_tabos_storage.c $(APP_DIR)/src/doom_tabos_video.c \
+    $(APP_DIR)/src/doom_tabos_sfx.c $(APP_DIR)/src/doom_tabos_sound.c
 DOOM_ADAPTER_OBJECTS := $(patsubst $(APP_DIR)/src/%.c,$(DOOM_OBJECT_DIR)/adapter/%.o,$(DOOM_ADAPTER_SOURCES))
 DOOM_PATCHES := $(wildcard $(APP_DIR)/patches/*.patch)
 
-DOOM_UPSTREAM_CFLAGS := -D_POSIX_C_SOURCE=200809L
+DOOM_UPSTREAM_CFLAGS := -D_POSIX_C_SOURCE=200809L -DDOOM_TABOS_SOUND=1
 DOOM_UPSTREAM_CFLAGS += -DDOOMGENERIC_RESX=320 -DDOOMGENERIC_RESY=200
 DOOM_UPSTREAM_CFLAGS += -DDOOMGENERIC_DISABLE_TEXTMODE
 DOOM_ADAPTER_CFLAGS := -Wall -Wextra -Werror -I$(APP_DIR)/include

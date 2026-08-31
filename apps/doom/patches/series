@@ -1,2 +1,3 @@
 # Compatibility patches apply only to build/apps/doom/source.
 0001-exit-with-defined-status.patch - make normal quit and error status explicit
+0002-enable-tabos-sfx-module.patch - register TabOS SFX without enabling SDL music

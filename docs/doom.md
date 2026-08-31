@@ -53,7 +53,18 @@ it as a centered 960x720 4:3 image. Keyboard controls are W/S movement, A/D stra
 arrow turning, J or Control fire, E or Space use, Shift run, R always-run toggle, number
 weapon selection, and standard menu keys.
 
-Current stripped executable is 902,264 bytes on disk. ELF section totals are 421,636
-bytes text, 60,084 bytes data, and 241,072 bytes BSS. `.note.tabos` metadata version 1
+DOOM sound effects use eight independently queued channels. The adapter decodes DMX
+lumps, resamples them to signed stereo 48 kHz PCM, applies a source-rate low-pass filter
+plus engine volume and stereo separation, and feeds one nonblocking TabOS playback stream
+per active channel. Each stream maintains 120 ms of lookahead to prevent playback underruns
+while DOOM renders. Closing a stopped or replaced channel discards its queued PCM before the
+kernel mixes active channels, preventing stale effects from overlapping replacements.
+Speaker output is the default. Run
+`doom -headphone` for headphone output, `doom -nosfx` to disable effects, or
+`doom -nosound` to skip audio initialization. Music remains silent because MUS/MIDI
+synthesis is intentionally deferred.
+
+Current stripped executable is 912,640 bytes on disk. ELF section totals are 426,916
+bytes text, 60,152 bytes data, and 256,824 bytes BSS. `.note.tabos` metadata version 1
 has a 32-byte descriptor, requires application ABI 1 and capability bits 1 (console), and
 requests an 8 MiB heap plus 64 KiB stack.

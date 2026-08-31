@@ -1,0 +1,26 @@
+diff --git a/doomgeneric/i_sound.c b/doomgeneric/i_sound.c
+index 70e9202..5216da9 100644
+--- a/doomgeneric/i_sound.c
++++ b/doomgeneric/i_sound.c
+@@ -73,7 +73,7 @@ static music_module_t *music_module = NULL;
+ 
+ static sound_module_t *sound_modules[] = 
+ {
+-    #ifdef FEATURE_SOUND
++    #if defined(FEATURE_SOUND) || defined(DOOM_TABOS_SOUND)
+     &DG_sound_module,
+     #endif
+     NULL,
+diff --git a/doomgeneric/i_sound.h b/doomgeneric/i_sound.h
+index 85f8e43..07c5374 100644
+--- a/doomgeneric/i_sound.h
++++ b/doomgeneric/i_sound.h
+@@ -237,7 +237,7 @@ void I_BindSoundVariables(void);
+ // Sound modules
+ 
+ void I_InitTimidityConfig(void);
+-#ifdef FEATURE_SOUND
++#if defined(FEATURE_SOUND) || defined(DOOM_TABOS_SOUND)
+ extern sound_module_t DG_sound_module;
+ extern music_module_t DG_music_module;
+ #endif

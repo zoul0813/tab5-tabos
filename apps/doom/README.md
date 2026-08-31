@@ -4,12 +4,22 @@ Optional TabOS port of [ozkl/doomgeneric](https://github.com/ozkl/doomgeneric), 
 to commit `dcb7a8dbc7a16ce3dda29382ac9aae9d77d21284`. It is GPL-2.0-only; upstream
 source is checked out under ignored `apps/doom/doomgeneric/` and is never vendored here.
 
-TabOS provides graphics, timing, and keyboard integration. DOOM renders its 320x200 RGB
+TabOS provides graphics, timing, keyboard, and sound-effect integration. DOOM renders its 320x200 RGB
 framebuffer as RGB565, then scales it to a centered 960x720 4:3 image with black side
 bars. Controls use W/S to move, A/D to strafe, arrows to turn, J or Control to fire,
 E or Space to use, Shift to run, R to toggle always-run, number keys for weapons, and
 standard Escape/Enter/arrow/Y/N/F-key menu controls. This is not a normal TabOS release
 artifact.
+
+DOOM resamples each of its eight DMX sound-effect channels into a separate stereo 48 kHz
+TabOS playback stream. A source-rate low-pass filter suppresses upsampling aliases before
+channels are mixed. Each stream keeps 120 ms of lookahead to prevent underruns while DOOM
+renders, and closing a stopped or replaced channel immediately discards its queued PCM.
+The TabOS mixer combines active channels. Volume and stereo separation follow
+the engine's normal controls. Speaker output is the default; pass `-headphone` to select
+headphone output. `-nosfx` disables sound effects and `-nosound` disables all audio
+initialization. Music remains unsupported and is intentionally left silent until a MUS/MIDI
+synthesizer is added.
 
 ## Install game data
 
@@ -51,7 +61,7 @@ user-provided source directory. For offline or pre-fetched sources, point
 make -C apps/doom build DOOMGENERIC_SOURCE_DIR=/path/to/doomgeneric-checkout
 ```
 
-Only upstream engine files listed in `apps/doom/Makefile` compile. SDL, X11, Windows,
+Only upstream engine files listed in `apps/doom/Makefile` compile. SDL, SDL_mixer, X11, Windows,
 Emscripten, Allegro, Linux-VT, and SOSO platform files remain excluded.
 
 The built program requests 8 MiB heap and 64 KiB stack. It uses RV32I (`-march=rv32i`),
@@ -67,6 +77,7 @@ data.
 
 ## Patches
 
-`patches/series` records source compatibility patches. Phase 6 makes upstream normal
-quit and error statuses explicit. Patches apply only to `build/apps/doom/source`, never
-the ignored upstream checkout or an external `DOOMGENERIC_SOURCE_DIR` checkout.
+`patches/series` records source compatibility patches. They make upstream normal quit
+and error statuses explicit and register the TabOS SFX module without enabling upstream
+SDL music. Patches apply only to `build/apps/doom/source`, never the ignored upstream
+checkout or an external `DOOMGENERIC_SOURCE_DIR` checkout.
