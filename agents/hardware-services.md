@@ -133,13 +133,16 @@ documentation pass.
 
 ### Phase 2 validation
 
-- [ ] Test zero, finite, and infinite waits on each available source type.
-- [ ] Test mixed socket and device-event waits.
-- [ ] Test readiness ordering, timeout, spurious wake handling, cancellation, stale sources,
+- [x] Test zero, finite, and infinite waits on each available source type.
+- [x] Test mixed socket and device-event waits.
+- [x] Test readiness ordering, timeout, spurious wake handling, cancellation, stale sources,
   closed parents, foreign ownership, and process teardown.
-- [ ] Test disconnect and reconnect while waiting.
-- [ ] Run wait and networking tests on macOS, Linux, and Tab5.
-- [ ] Update wait, networking, lifecycle, and SDK documentation.
+- [x] Test disconnect and reconnect around retained parent wait sources.
+- [ ] Run wait and networking tests on every supported target.
+  - [x] macOS full `tester` run.
+  - [ ] Linux full `tester` run.
+  - [x] Physical Tab5 full `tester` run.
+- [x] Update wait, networking, lifecycle, and SDK documentation.
 
 ## Phase 3: RTC, Battery, and BMI270 IMU
 

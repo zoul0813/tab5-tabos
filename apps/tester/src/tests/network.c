@@ -1,9 +1,14 @@
 #include <tester/test.h>
 
+#include <tabos/device.h>
 #include <tabos/network.h>
+#include <tabos/process.h>
+#include <tabos/runtime_time.h>
 #include <tabos/wait.h>
 
 #include <errno.h>
+#include <inttypes.h>
+#include <stdio.h>
 #include <string.h>
 
 static tabos_socket_endpoint_t loopback_endpoint(void)
@@ -209,6 +214,136 @@ static void test_full_table_accept(tester_context_t* context)
     }
 }
 
+static int run_fixture(const char* operation)
+{
+    const char* const arguments[] = {
+        "T:/bin/tester",
+        operation,
+        NULL,
+    };
+    return tabos_exec(arguments[0], 2, arguments);
+}
+
+static void test_wait_sources(tester_context_t* context)
+{
+    const tabos_device_subscription_t subscription = tabos_device_subscribe();
+    const tabos_wait_source_t device_source        = tabos_device_subscription_wait_source(subscription);
+    tester_expect(context,
+                  subscription != TABOS_DEVICE_SUBSCRIPTION_INVALID && device_source != TABOS_WAIT_SOURCE_INVALID,
+                  "device lifecycle wait source opens");
+
+    tabos_wait_item_t device_item = {
+        .source = device_source,
+        .events = TABOS_WAIT_READABLE | TABOS_WAIT_STATE_CHANGED,
+    };
+    const uint64_t timeout_started = tabos_monotonic_ms();
+    const int timeout_result       = tabos_wait(&device_item, 1U, 20U);
+    const uint64_t timeout_elapsed = tabos_monotonic_ms() - timeout_started;
+    tester_expect(context, timeout_result == 0 && device_item.returned_events == 0U && timeout_elapsed >= 5U,
+                  "finite device wait reaches monotonic timeout without spurious readiness");
+
+    char source_text[16];
+    (void) snprintf(source_text, sizeof(source_text), "%" PRId32, device_source);
+    const char* const foreign_arguments[] = {
+        "T:/bin/tester",
+        "--foreign-wait-source",
+        source_text,
+        NULL,
+    };
+    tester_expect(context, tabos_exec(foreign_arguments[0], 3, foreign_arguments) == 79,
+                  "child process rejects parent wait source");
+
+    tabos_socket_endpoint_t endpoint = loopback_endpoint();
+    const tabos_socket_t receiver    = tabos_socket_open(TABOS_NETWORK_FAMILY_IPV4, TABOS_SOCKET_UDP);
+    const tabos_socket_t sender      = tabos_socket_open(TABOS_NETWORK_FAMILY_IPV4, TABOS_SOCKET_UDP);
+    const bool sockets_ready         = receiver >= 0 && sender >= 0 && tabos_socket_bind(receiver, &endpoint) == 0 &&
+                               tabos_socket_get_local_endpoint(receiver, &endpoint) == 0 && endpoint.port != 0U;
+    tester_expect(context, sockets_ready, "mixed-wait UDP sockets open");
+
+    static const char payload[] = "wait-source";
+    const bool payload_sent =
+        sockets_ready && tabos_socket_send_to(sender, payload, sizeof(payload), &endpoint) == (int) sizeof(payload);
+    tabos_wait_item_t mixed_items[] = {
+        {                     .source = device_source, .events = TABOS_WAIT_READABLE | TABOS_WAIT_STATE_CHANGED},
+        {.source = tabos_socket_wait_source(receiver),                            .events = TABOS_WAIT_READABLE},
+    };
+    const int mixed_ready = payload_sent ? tabos_wait(mixed_items, 2U, 1000U) : -1;
+    tester_expect(context,
+                  mixed_ready == 1 && mixed_items[0].returned_events == 0U &&
+                      (mixed_items[1].returned_events & TABOS_WAIT_READABLE) != 0U,
+                  "bounded mixed wait preserves item order and reports only readable socket");
+
+    char buffer[32];
+    if (mixed_ready > 0) {
+        (void) tabos_socket_receive(receiver, buffer, sizeof(buffer));
+    }
+    mixed_items[0].returned_events = UINT32_MAX;
+    mixed_items[1].returned_events = UINT32_MAX;
+    tester_expect(context,
+                  tabos_wait(mixed_items, 2U, 0U) == 0 && mixed_items[0].returned_events == 0U &&
+                      mixed_items[1].returned_events == 0U,
+                  "zero-time mixed wait clears old readiness without spurious wake");
+
+    tabos_network_status_t initial_status;
+    const bool status_available = tabos_network_get_status(&initial_status) == 0;
+    if (status_available && initial_status.state == TABOS_NETWORK_ONLINE) {
+        const int disconnect_status = run_fixture("--network-disconnect");
+        const int lifecycle_ready   = tabos_wait(&device_item, 1U, 1000U);
+        const bool mixed_payload_sent =
+            sockets_ready && tabos_socket_send_to(sender, payload, sizeof(payload), &endpoint) == (int) sizeof(payload);
+        bool mixed_device_observed = false;
+        bool mixed_socket_observed = false;
+        bool mixed_wait_valid      = mixed_payload_sent;
+        const uint64_t deadline    = tabos_monotonic_ms() + 1000U;
+        while (mixed_wait_valid && !mixed_socket_observed && tabos_monotonic_ms() < deadline) {
+            mixed_items[0].returned_events = 0U;
+            mixed_items[1].returned_events = 0U;
+            const int ready                = tabos_wait(mixed_items, 2U, 0U);
+            if (ready < 0) {
+                mixed_wait_valid = false;
+                break;
+            }
+            mixed_device_observed = mixed_device_observed || mixed_items[0].returned_events != 0U;
+            mixed_socket_observed =
+                mixed_socket_observed || (mixed_items[1].returned_events & TABOS_WAIT_READABLE) != 0U;
+            if (!mixed_socket_observed) {
+                (void) tabos_sleep_ms(1U);
+            }
+        }
+        if (mixed_socket_observed) {
+            (void) tabos_socket_receive(receiver, buffer, sizeof(buffer));
+        }
+        bool offline_event = false;
+        tabos_device_event_t event;
+        while (tabos_device_event_read(subscription, &event) == 0) {
+            if (strcmp(event.device.name, TABOS_DEVICE_NAME_WIFI) == 0 && event.device.state == TABOS_DEVICE_OFFLINE) {
+                offline_event = true;
+            }
+        }
+        tester_expect(context,
+                      disconnect_status == 81 && lifecycle_ready == 1 &&
+                          (device_item.returned_events & (TABOS_WAIT_READABLE | TABOS_WAIT_STATE_CHANGED)) != 0U &&
+                          offline_event,
+                      "bounded device wait reports Wi-Fi disconnect lifecycle event");
+        tester_expect(context, mixed_wait_valid && mixed_device_observed && mixed_socket_observed,
+                      "device and socket readiness coexist in one ordered wait");
+        if (initial_status.saved_config) {
+            tester_expect(context, run_fixture("--network-connect-saved") == 83,
+                          "saved Wi-Fi reconnect starts after lifecycle wait");
+        }
+    }
+
+    if (sender >= 0) {
+        (void) tabos_socket_close(sender);
+    }
+    if (receiver >= 0) {
+        (void) tabos_socket_close(receiver);
+    }
+    if (subscription != TABOS_DEVICE_SUBSCRIPTION_INVALID) {
+        (void) tabos_device_subscription_close(subscription);
+    }
+}
+
 void tester_test_network(tester_context_t* context)
 {
     test_tcp(context);
@@ -216,4 +351,5 @@ void tester_test_network(tester_context_t* context)
     test_stale_handle(context);
     test_socket_capacity(context);
     test_full_table_accept(context);
+    test_wait_sources(context);
 }

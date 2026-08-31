@@ -110,6 +110,11 @@ the operation. The return value is the number of ready items, zero for timeout,
 or `-1` with `errno` set. Process teardown cancels an active wait before closing
 its parent resources.
 
+`tester` exercises socket-only and mixed socket/device waits. On an online configured
+system it also disconnects Wi-Fi, confirms `wifi0` lifecycle readiness, and starts a saved
+reconnect. This may briefly interrupt external networking while tester runs; loopback
+socket coverage remains independent of Wi-Fi state.
+
 ### TLS client connections
 
 `<tabos/tls.h>` provides certificate-verified client TLS connections. A TLS

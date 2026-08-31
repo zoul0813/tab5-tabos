@@ -10,6 +10,7 @@
 #include <tabos/internal/filesystem.h>
 #include <tabos/internal/display.h>
 #include <tabos/internal/device_registry.h>
+#include <tabos/internal/hardware_devices.h>
 #include <tabos/internal/console.h>
 #include <tabos/internal/raster.h>
 #include <tabos/internal/runtime.h>
@@ -805,12 +806,20 @@ static int elf_network_connect_saved(void)
     if (result != NETWORK_CONFIG_OK) {
         return -TABOS_EIO;
     }
-    return network_service_connect(config.ssid, config.password, config.auto_connect) ? 0 : -TABOS_EIO;
+    if (!network_service_connect(config.ssid, config.password, config.auto_connect)) {
+        return -TABOS_EIO;
+    }
+    hardware_devices_update();
+    return 0;
 }
 
 static int elf_network_disconnect(void)
 {
-    return network_service_disconnect() ? 0 : -TABOS_EIO;
+    if (!network_service_disconnect()) {
+        return -TABOS_EIO;
+    }
+    hardware_devices_update();
+    return 0;
 }
 
 static int network_operation_error(network_operation_result_t result)

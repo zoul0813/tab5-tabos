@@ -167,6 +167,12 @@ Process module must remain self-contained: tester parent launches tester child, 
 launches tester grandchild, known statuses unwind in reverse, and parent repeats chain to
 prove cleanup and reload. Run tester from shell so this also exercises persistent PID 0.
 
+Generic-wait validation covers zero and finite application waits, cancellable infinite
+backend waits, monotonic timeout, readiness clearing, source ordering, mixed socket/device
+readiness, stale and foreign handles, interrupted waits, and leaked-source process cleanup. With configured
+online Wi-Fi, a nested tester child disconnects and reconnects the network so the retained
+parent can verify `wifi0` lifecycle readiness without a test-only device mutation API.
+
 ---
 
 ## 4. Target Definitions

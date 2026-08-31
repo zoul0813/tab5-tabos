@@ -497,6 +497,9 @@ but is not a substitute for this execution path.
 - [x] Add the generic process-owned wait API, generation-tagged sources, socket adapter,
   stale-parent rejection, and teardown cancellation.
 - [x] Add device-subscription wait sources and reusable hooks for future hardware-service adapters.
+- [x] Add maintained validation for socket/device waits, mixed readiness, ownership,
+  stale handles, cancellation, network transitions, and teardown.
+- [ ] Run complete generic-wait validation on macOS and Linux; physical Tab5 passes.
 - [x] Add RTC and wall-clock service; physical RX8130CE validation remains separately tracked.
 - [x] Add battery telemetry and charge control; sleep and wake remain future work.
 - [ ] Add USB host/OTG service beyond keyboard support.

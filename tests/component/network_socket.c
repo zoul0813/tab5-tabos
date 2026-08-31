@@ -153,6 +153,19 @@ static void test_interrupted_operation(bool wait)
     }
 }
 
+static void test_descriptorless_wait(void)
+{
+    struct timespec started     = {0};
+    struct timespec finished    = {0};
+    const bool clocks_available = clock_gettime(CLOCK_MONOTONIC, &started) == 0;
+    const int result            = platform_network_socket_wait(NULL, 0U, 10U);
+    const bool finished_clock   = clock_gettime(CLOCK_MONOTONIC, &finished) == 0;
+    const int64_t elapsed_ms    = (int64_t) (finished.tv_sec - started.tv_sec) * 1000L +
+                               (int64_t) (finished.tv_nsec - started.tv_nsec) / 1000000L;
+    expect(clocks_available && finished_clock && result == 0 && elapsed_ms >= 5,
+           "descriptorless internal wait provides bounded polling delay");
+}
+
 static void test_tcp(int family)
 {
     const uint16_t port = reserve_port(family, SOCK_STREAM);
@@ -242,6 +255,7 @@ static void test_udp(int family)
 
 int main(void)
 {
+    test_descriptorless_wait();
     test_tcp(AF_INET);
     test_udp(AF_INET);
     test_tcp(AF_INET6);

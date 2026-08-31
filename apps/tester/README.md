@@ -22,3 +22,10 @@ Tester prints one result per module and returns zero only when every assertion p
 The filesystem module uses `T:/tabos-tester/` temporarily and removes it before return.
 The input module briefly enables nonblocking stdin and consumes any input already queued
 for the process.
+
+The networking module validates zero and finite waits; mixed socket/device sources;
+stable item ordering; stale and foreign handles; and process cleanup. Backend component
+tests validate cancellable infinite waits without risking an unrecoverable application hang. When Wi-Fi
+is online, it briefly disconnects through a nested tester child, verifies the queued
+`wifi0` lifecycle event, then starts a saved-config reconnect. Run tester with saved Wi-Fi
+configuration when validating this path on Tab5.

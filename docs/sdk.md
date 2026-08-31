@@ -48,6 +48,10 @@ subscription. It reports readable or state-changed while an event is queued and 
 combined with socket sources in one `tabos_wait()` call. Closing the subscription invalidates
 its source; later waits fail with `EBADF`.
 
+Wait readiness does not consume a lifecycle event. Read queued events with
+`tabos_device_event_read()` until it returns `EAGAIN`; otherwise the wait source remains
+readable. Requested item order is preserved when socket and lifecycle sources are mixed.
+
 ## Reboot and Power-Off
 
 `<sys/reboot.h>` provides `reboot(RB_AUTOBOOT)` and `reboot(RB_POWER_OFF)`. Successful

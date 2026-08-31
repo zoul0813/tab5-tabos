@@ -3,7 +3,9 @@
 #include <tabos/process.h>
 #include <tabos/network.h>
 #include <tabos/device.h>
+#include <tabos/wait.h>
 
+#include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,7 +38,9 @@ static int run_resource_failure_fixture(void)
         }
     }
     for (unsigned int index = 0U; index < PROCESS_LEAK_SUBSCRIPTION_COUNT; ++index) {
-        if (tabos_device_subscribe() == TABOS_DEVICE_SUBSCRIPTION_INVALID) {
+        const tabos_device_subscription_t subscription = tabos_device_subscribe();
+        if (subscription == TABOS_DEVICE_SUBSCRIPTION_INVALID ||
+            tabos_device_subscription_wait_source(subscription) == TABOS_WAIT_SOURCE_INVALID) {
             return 77;
         }
     }
@@ -45,7 +49,21 @@ static int run_resource_failure_fixture(void)
 
 static int run_process_fixture(int argc, char** argv)
 {
-    if (argc != 2 || argv == NULL) {
+    if (argc < 2 || argv == NULL) {
+        return -1;
+    }
+    if (argc == 3 && strcmp(argv[1], "--foreign-wait-source") == 0) {
+        char* end              = NULL;
+        const long parsed      = strtol(argv[2], &end, 10);
+        tabos_wait_item_t item = {
+            .source = (tabos_wait_source_t) parsed,
+            .events = TABOS_WAIT_READABLE,
+        };
+        errno               = 0;
+        const bool rejected = end != argv[2] && *end == '\0' && tabos_wait(&item, 1U, 0U) < 0 && errno == EBADF;
+        return rejected ? 79 : 80;
+    }
+    if (argc != 2) {
         return -1;
     }
     if (strcmp(argv[1], "--process-leaf") == 0) {
@@ -53,6 +71,12 @@ static int run_process_fixture(int argc, char** argv)
     }
     if (strcmp(argv[1], "--process-resource-failure") == 0) {
         return run_resource_failure_fixture();
+    }
+    if (strcmp(argv[1], "--network-disconnect") == 0) {
+        return tabos_network_disconnect() == 0 ? 81 : 82;
+    }
+    if (strcmp(argv[1], "--network-connect-saved") == 0) {
+        return tabos_network_connect_saved() == 0 ? 83 : 84;
     }
     if (strcmp(argv[1], "--process-child") != 0) {
         return -1;
