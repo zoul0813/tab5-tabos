@@ -14,8 +14,102 @@ enum {
 
 static _Thread_local uint32_t host_rv32_active_ram_size;
 
-#define HOST_RV32_API_GATE_FIRST  UINT32_C(0xffff0000)
-#define HOST_RV32_API_GATE_LAST   UINT32_C(0xffff0100)
+#define HOST_RV32_NO_API_OFFSET UINT32_MAX
+#define HOST_RV32_API_GATE_BASE UINT32_C(0xffff0000)
+
+/* Append new ABI gates. List order defines their contiguous trap addresses. */
+#define HOST_RV32_API_GATES(X)         \
+    X(CONSOLE_WRITE, 4U)               \
+    X(REQUEST_EXIT, 8U)                \
+    X(RETURN, HOST_RV32_NO_API_OFFSET) \
+    X(CONSOLE_READ, 12U)               \
+    X(CONSOLE_CLEAR, 16U)              \
+    X(FS_GETCWD, 20U)                  \
+    X(FS_CHDIR, 24U)                   \
+    X(FS_LIST, 28U)                    \
+    X(EXEC, 32U)                       \
+    X(YIELD, 36U)                      \
+    X(CONSOLE_WRITE_RAW, 40U)          \
+    X(FD_OPEN, 44U)                    \
+    X(FD_CLOSE, 48U)                   \
+    X(FD_READ, 52U)                    \
+    X(FD_WRITE, 56U)                   \
+    X(FD_SEEK, 60U)                    \
+    X(FS_STAT, 64U)                    \
+    X(FD_STAT, 68U)                    \
+    X(FS_MKDIR, 72U)                   \
+    X(FS_UNLINK, 76U)                  \
+    X(FS_RENAME, 80U)                  \
+    X(FD_GET_FLAGS, 84U)               \
+    X(FD_SET_FLAGS, 88U)               \
+    X(HEAP_SBRK, 92U)                  \
+    X(FS_RMDIR, 96U)                   \
+    X(MONOTONIC_MS, 100U)              \
+    X(SYSTEM_INFO, 104U)               \
+    X(GRAPHICS_OPEN, 108U)             \
+    X(GRAPHICS_CLEAR, 112U)            \
+    X(GRAPHICS_FILL_RECT, 116U)        \
+    X(GRAPHICS_BLIT, 120U)             \
+    X(GRAPHICS_PRESENT, 124U)          \
+    X(GRAPHICS_CLOSE, 128U)            \
+    X(GRAPHICS_CAPABILITIES, 132U)     \
+    X(GRAPHICS_BLIT_EX, 136U)          \
+    X(TTY_GET_MODE, 140U)              \
+    X(TTY_SET_MODE, 144U)              \
+    X(INPUT_POLL, 148U)                \
+    X(WALL_TIME_GET, 152U)             \
+    X(WALL_TIME_SET, 156U)             \
+    X(SYSTEM_ACTION, 160U)             \
+    X(NETWORK_STATUS, 164U)            \
+    X(NETWORK_CONNECT_SAVED, 168U)     \
+    X(NETWORK_DISCONNECT, 172U)        \
+    X(NETWORK_RESOLVE, 176U)           \
+    X(NETWORK_ECHO, 180U)              \
+    X(SOCKET_OPEN, 184U)               \
+    X(SOCKET_CLOSE, 188U)              \
+    X(SOCKET_BIND, 192U)               \
+    X(SOCKET_LISTEN, 196U)             \
+    X(SOCKET_ACCEPT, 200U)             \
+    X(SOCKET_CONNECT, 204U)            \
+    X(SOCKET_NONBLOCKING, 208U)        \
+    X(SOCKET_SHUTDOWN, 212U)           \
+    X(SOCKET_SEND, 216U)               \
+    X(SOCKET_RECEIVE, 220U)            \
+    X(SOCKET_SEND_TO, 224U)            \
+    X(SOCKET_RECEIVE_FROM, 228U)       \
+    X(SOCKET_LOCAL_ENDPOINT, 232U)     \
+    X(GRAPHICS_SET_OVERLAYS, 248U)     \
+    X(SOCKET_WAIT, 252U)               \
+    X(TLS_CONNECT, 256U)               \
+    X(TLS_CLOSE, 260U)                 \
+    X(TLS_SEND, 264U)                  \
+    X(TLS_RECEIVE, 268U)               \
+    X(DEVICE_COUNT, 272U)              \
+    X(DEVICE_AT, 276U)                 \
+    X(DEVICE_GET, 280U)                \
+    X(DEVICE_FIND, 284U)               \
+    X(DEVICE_SUBSCRIBE, 288U)          \
+    X(DEVICE_CLOSE, 292U)              \
+    X(DEVICE_EVENT_READ, 296U)         \
+    X(SOCKET_WAIT_SOURCE, 300U)        \
+    X(WAIT, 304U)
+
+enum {
+#define HOST_RV32_GATE_INDEX(name, api_offset) HOST_RV32_GATE_INDEX_##name,
+    HOST_RV32_API_GATES(HOST_RV32_GATE_INDEX)
+#undef HOST_RV32_GATE_INDEX
+    HOST_RV32_API_GATE_COUNT,
+};
+
+#define HOST_RV32_GATE_VALUE(name, api_offset) \
+    static const uint32_t HOST_RV32_##name =   \
+        HOST_RV32_API_GATE_BASE + (uint32_t) HOST_RV32_GATE_INDEX_##name * sizeof(uint32_t);
+HOST_RV32_API_GATES(HOST_RV32_GATE_VALUE)
+#undef HOST_RV32_GATE_VALUE
+
+#define HOST_RV32_API_GATE_FIRST HOST_RV32_API_GATE_BASE
+#define HOST_RV32_API_GATE_LAST \
+    (HOST_RV32_API_GATE_BASE + ((uint32_t) HOST_RV32_API_GATE_COUNT - 1U) * sizeof(uint32_t))
 #define MINI_RV32_RAM_SIZE        host_rv32_active_ram_size
 #define MINIRV32_RAM_IMAGE_OFFSET 0U
 #define MINIRV32_POSTEXEC(pc, ir, trap)                                                                      \
@@ -45,84 +139,15 @@ static _Thread_local uint32_t host_rv32_active_ram_size;
 #pragma GCC diagnostic pop
 #endif
 
-static const uint32_t HOST_RV32_CONSOLE_WRITE         = UINT32_C(0xffff0000);
-static const uint32_t HOST_RV32_REQUEST_EXIT          = UINT32_C(0xffff0004);
-static const uint32_t HOST_RV32_RETURN                = UINT32_C(0xffff0008);
-static const uint32_t HOST_RV32_CONSOLE_READ          = UINT32_C(0xffff000c);
-static const uint32_t HOST_RV32_CONSOLE_CLEAR         = UINT32_C(0xffff0010);
-static const uint32_t HOST_RV32_FS_GETCWD             = UINT32_C(0xffff0014);
-static const uint32_t HOST_RV32_FS_CHDIR              = UINT32_C(0xffff0018);
-static const uint32_t HOST_RV32_FS_LIST               = UINT32_C(0xffff001c);
-static const uint32_t HOST_RV32_EXEC                  = UINT32_C(0xffff0020);
-static const uint32_t HOST_RV32_YIELD                 = UINT32_C(0xffff0024);
-static const uint32_t HOST_RV32_CONSOLE_WRITE_RAW     = UINT32_C(0xffff0028);
-static const uint32_t HOST_RV32_FD_OPEN               = UINT32_C(0xffff002c);
-static const uint32_t HOST_RV32_FD_CLOSE              = UINT32_C(0xffff0030);
-static const uint32_t HOST_RV32_FD_READ               = UINT32_C(0xffff0034);
-static const uint32_t HOST_RV32_FD_WRITE              = UINT32_C(0xffff0038);
-static const uint32_t HOST_RV32_FD_SEEK               = UINT32_C(0xffff003c);
-static const uint32_t HOST_RV32_FS_STAT               = UINT32_C(0xffff0040);
-static const uint32_t HOST_RV32_FD_STAT               = UINT32_C(0xffff0044);
-static const uint32_t HOST_RV32_FS_MKDIR              = UINT32_C(0xffff0048);
-static const uint32_t HOST_RV32_FS_UNLINK             = UINT32_C(0xffff004c);
-static const uint32_t HOST_RV32_FS_RENAME             = UINT32_C(0xffff0050);
-static const uint32_t HOST_RV32_FD_GET_FLAGS          = UINT32_C(0xffff0054);
-static const uint32_t HOST_RV32_FD_SET_FLAGS          = UINT32_C(0xffff0058);
-static const uint32_t HOST_RV32_HEAP_SBRK             = UINT32_C(0xffff005c);
-static const uint32_t HOST_RV32_FS_RMDIR              = UINT32_C(0xffff0060);
-static const uint32_t HOST_RV32_MONOTONIC_MS          = UINT32_C(0xffff0064);
-static const uint32_t HOST_RV32_SYSTEM_INFO           = UINT32_C(0xffff0068);
-static const uint32_t HOST_RV32_GRAPHICS_OPEN         = UINT32_C(0xffff006c);
-static const uint32_t HOST_RV32_GRAPHICS_CLEAR        = UINT32_C(0xffff0070);
-static const uint32_t HOST_RV32_GRAPHICS_FILL_RECT    = UINT32_C(0xffff0074);
-static const uint32_t HOST_RV32_GRAPHICS_BLIT         = UINT32_C(0xffff0078);
-static const uint32_t HOST_RV32_GRAPHICS_PRESENT      = UINT32_C(0xffff007c);
-static const uint32_t HOST_RV32_GRAPHICS_CLOSE        = UINT32_C(0xffff0080);
-static const uint32_t HOST_RV32_GRAPHICS_CAPABILITIES = UINT32_C(0xffff0084);
-static const uint32_t HOST_RV32_GRAPHICS_BLIT_EX      = UINT32_C(0xffff0088);
-static const uint32_t HOST_RV32_TTY_GET_MODE          = UINT32_C(0xffff008c);
-static const uint32_t HOST_RV32_TTY_SET_MODE          = UINT32_C(0xffff0090);
-static const uint32_t HOST_RV32_INPUT_POLL            = UINT32_C(0xffff0094);
-static const uint32_t HOST_RV32_WALL_TIME_GET         = UINT32_C(0xffff0098);
-static const uint32_t HOST_RV32_WALL_TIME_SET         = UINT32_C(0xffff009c);
-static const uint32_t HOST_RV32_SYSTEM_ACTION         = UINT32_C(0xffff00a0);
-static const uint32_t HOST_RV32_NETWORK_STATUS        = UINT32_C(0xffff00a4);
-static const uint32_t HOST_RV32_NETWORK_CONNECT_SAVED = UINT32_C(0xffff00a8);
-static const uint32_t HOST_RV32_NETWORK_DISCONNECT    = UINT32_C(0xffff00ac);
-static const uint32_t HOST_RV32_NETWORK_RESOLVE       = UINT32_C(0xffff00b0);
-static const uint32_t HOST_RV32_NETWORK_ECHO          = UINT32_C(0xffff00b4);
-static const uint32_t HOST_RV32_SOCKET_OPEN           = UINT32_C(0xffff00b8);
-static const uint32_t HOST_RV32_SOCKET_CLOSE          = UINT32_C(0xffff00bc);
-static const uint32_t HOST_RV32_SOCKET_BIND           = UINT32_C(0xffff00c0);
-static const uint32_t HOST_RV32_SOCKET_LISTEN         = UINT32_C(0xffff00c4);
-static const uint32_t HOST_RV32_SOCKET_ACCEPT         = UINT32_C(0xffff00c8);
-static const uint32_t HOST_RV32_SOCKET_CONNECT        = UINT32_C(0xffff00cc);
-static const uint32_t HOST_RV32_SOCKET_NONBLOCKING    = UINT32_C(0xffff00d0);
-static const uint32_t HOST_RV32_SOCKET_SHUTDOWN       = UINT32_C(0xffff00d4);
-static const uint32_t HOST_RV32_SOCKET_SEND           = UINT32_C(0xffff00d8);
-static const uint32_t HOST_RV32_SOCKET_RECEIVE        = UINT32_C(0xffff00dc);
-static const uint32_t HOST_RV32_SOCKET_SEND_TO        = UINT32_C(0xffff00e0);
-static const uint32_t HOST_RV32_SOCKET_RECEIVE_FROM   = UINT32_C(0xffff00e4);
-static const uint32_t HOST_RV32_SOCKET_LOCAL_ENDPOINT = UINT32_C(0xffff00e8);
-static const uint32_t HOST_RV32_GRAPHICS_SET_OVERLAYS = UINT32_C(0xffff00ec);
-static const uint32_t HOST_RV32_SOCKET_WAIT           = UINT32_C(0xffff00f0);
-static const uint32_t HOST_RV32_TLS_CONNECT           = UINT32_C(0xffff00f4);
-static const uint32_t HOST_RV32_TLS_CLOSE             = UINT32_C(0xffff00f8);
-static const uint32_t HOST_RV32_TLS_SEND              = UINT32_C(0xffff00fc);
-static const uint32_t HOST_RV32_TLS_RECEIVE           = UINT32_C(0xffff0100);
-static const uint32_t HOST_RV32_DEVICE_COUNT          = UINT32_C(0xffff0104);
-static const uint32_t HOST_RV32_DEVICE_AT             = UINT32_C(0xffff0108);
-static const uint32_t HOST_RV32_DEVICE_GET            = UINT32_C(0xffff010c);
-static const uint32_t HOST_RV32_DEVICE_FIND           = UINT32_C(0xffff0110);
-static const uint32_t HOST_RV32_DEVICE_SUBSCRIBE      = UINT32_C(0xffff0114);
-static const uint32_t HOST_RV32_DEVICE_CLOSE          = UINT32_C(0xffff0118);
-static const uint32_t HOST_RV32_DEVICE_EVENT_READ     = UINT32_C(0xffff011c);
-static const uint32_t HOST_RV32_SOCKET_WAIT_SOURCE    = UINT32_C(0xffff0120);
-static const uint32_t HOST_RV32_WAIT                  = UINT32_C(0xffff0124);
+typedef struct {
+        uint32_t gate;
+        uint32_t api_offset;
+} host_rv32_api_gate_t;
 
-enum {
-    HOST_RV32_API_SIZE = 308,
-};
+#define HOST_RV32_GATE_DESCRIPTOR(name, offset) \
+    {.gate = HOST_RV32_API_GATE_BASE + (uint32_t) HOST_RV32_GATE_INDEX_##name * sizeof(uint32_t), .api_offset = offset},
+static const host_rv32_api_gate_t host_rv32_api_gates[] = {HOST_RV32_API_GATES(HOST_RV32_GATE_DESCRIPTOR)};
+#undef HOST_RV32_GATE_DESCRIPTOR
 
 struct platform_riscv32_context {
         uint8_t* memory;
@@ -143,6 +168,18 @@ static void write_u32(uint8_t* memory, uint32_t address, uint32_t value)
     memory[address + 1U] = (uint8_t) (value >> 8U);
     memory[address + 2U] = (uint8_t) (value >> 16U);
     memory[address + 3U] = (uint8_t) (value >> 24U);
+}
+
+static size_t host_rv32_api_size(void)
+{
+    uint32_t last_offset = 0U;
+    for (size_t index = 0U; index < sizeof(host_rv32_api_gates) / sizeof(host_rv32_api_gates[0]); ++index) {
+        const uint32_t offset = host_rv32_api_gates[index].api_offset;
+        if (offset != HOST_RV32_NO_API_OFFSET && offset > last_offset) {
+            last_offset = offset;
+        }
+    }
+    return (size_t) last_offset + sizeof(uint32_t);
 }
 
 static uint16_t read_u16(const uint8_t* memory, uint32_t address)
@@ -232,11 +269,12 @@ platform_riscv32_context_t* platform_riscv32_create(const void* entry, const voi
     }
     const size_t image_end   = (size_t) minimum_address + memory_size;
     const size_t api_address = (image_end + 15U) & ~((size_t) 15U);
-    if (api_address > HOST_RV32_MAX_RAM_SIZE || HOST_RV32_API_SIZE > HOST_RV32_MAX_RAM_SIZE - api_address) {
+    const size_t api_size    = host_rv32_api_size();
+    if (api_address > HOST_RV32_MAX_RAM_SIZE || api_size > HOST_RV32_MAX_RAM_SIZE - api_address) {
         free(context);
         return NULL;
     }
-    const size_t argument_data_address = api_address + HOST_RV32_API_SIZE;
+    const size_t argument_data_address = api_address + api_size;
     size_t argument_data_end           = argument_data_address;
     for (size_t index = 0U; index < argc; ++index) {
         if (argv[index] == NULL) {
@@ -278,80 +316,12 @@ platform_riscv32_context_t* platform_riscv32_create(const void* entry, const voi
     host_rv32_active_ram_size        = context->memory_size;
     const uint32_t guest_api_address = (uint32_t) api_address;
     write_u32(context->memory, guest_api_address, api->abi_version);
-    write_u32(context->memory, guest_api_address + 4U, HOST_RV32_CONSOLE_WRITE);
-    write_u32(context->memory, guest_api_address + 8U, HOST_RV32_REQUEST_EXIT);
-    write_u32(context->memory, guest_api_address + 12U, HOST_RV32_CONSOLE_READ);
-    write_u32(context->memory, guest_api_address + 16U, HOST_RV32_CONSOLE_CLEAR);
-    write_u32(context->memory, guest_api_address + 20U, HOST_RV32_FS_GETCWD);
-    write_u32(context->memory, guest_api_address + 24U, HOST_RV32_FS_CHDIR);
-    write_u32(context->memory, guest_api_address + 28U, HOST_RV32_FS_LIST);
-    write_u32(context->memory, guest_api_address + 32U, HOST_RV32_EXEC);
-    write_u32(context->memory, guest_api_address + 36U, HOST_RV32_YIELD);
-    write_u32(context->memory, guest_api_address + 40U, HOST_RV32_CONSOLE_WRITE_RAW);
-    write_u32(context->memory, guest_api_address + 44U, HOST_RV32_FD_OPEN);
-    write_u32(context->memory, guest_api_address + 48U, HOST_RV32_FD_CLOSE);
-    write_u32(context->memory, guest_api_address + 52U, HOST_RV32_FD_READ);
-    write_u32(context->memory, guest_api_address + 56U, HOST_RV32_FD_WRITE);
-    write_u32(context->memory, guest_api_address + 60U, HOST_RV32_FD_SEEK);
-    write_u32(context->memory, guest_api_address + 64U, HOST_RV32_FS_STAT);
-    write_u32(context->memory, guest_api_address + 68U, HOST_RV32_FD_STAT);
-    write_u32(context->memory, guest_api_address + 72U, HOST_RV32_FS_MKDIR);
-    write_u32(context->memory, guest_api_address + 76U, HOST_RV32_FS_UNLINK);
-    write_u32(context->memory, guest_api_address + 80U, HOST_RV32_FS_RENAME);
-    write_u32(context->memory, guest_api_address + 84U, HOST_RV32_FD_GET_FLAGS);
-    write_u32(context->memory, guest_api_address + 88U, HOST_RV32_FD_SET_FLAGS);
-    write_u32(context->memory, guest_api_address + 92U, HOST_RV32_HEAP_SBRK);
-    write_u32(context->memory, guest_api_address + 96U, HOST_RV32_FS_RMDIR);
-    write_u32(context->memory, guest_api_address + 100U, HOST_RV32_MONOTONIC_MS);
-    write_u32(context->memory, guest_api_address + 104U, HOST_RV32_SYSTEM_INFO);
-    write_u32(context->memory, guest_api_address + 108U, HOST_RV32_GRAPHICS_OPEN);
-    write_u32(context->memory, guest_api_address + 112U, HOST_RV32_GRAPHICS_CLEAR);
-    write_u32(context->memory, guest_api_address + 116U, HOST_RV32_GRAPHICS_FILL_RECT);
-    write_u32(context->memory, guest_api_address + 120U, HOST_RV32_GRAPHICS_BLIT);
-    write_u32(context->memory, guest_api_address + 124U, HOST_RV32_GRAPHICS_PRESENT);
-    write_u32(context->memory, guest_api_address + 128U, HOST_RV32_GRAPHICS_CLOSE);
-    write_u32(context->memory, guest_api_address + 132U, HOST_RV32_GRAPHICS_CAPABILITIES);
-    write_u32(context->memory, guest_api_address + 136U, HOST_RV32_GRAPHICS_BLIT_EX);
-    write_u32(context->memory, guest_api_address + 140U, HOST_RV32_TTY_GET_MODE);
-    write_u32(context->memory, guest_api_address + 144U, HOST_RV32_TTY_SET_MODE);
-    write_u32(context->memory, guest_api_address + 148U, HOST_RV32_INPUT_POLL);
-    write_u32(context->memory, guest_api_address + 152U, HOST_RV32_WALL_TIME_GET);
-    write_u32(context->memory, guest_api_address + 156U, HOST_RV32_WALL_TIME_SET);
-    write_u32(context->memory, guest_api_address + 160U, HOST_RV32_SYSTEM_ACTION);
-    write_u32(context->memory, guest_api_address + 164U, HOST_RV32_NETWORK_STATUS);
-    write_u32(context->memory, guest_api_address + 168U, HOST_RV32_NETWORK_CONNECT_SAVED);
-    write_u32(context->memory, guest_api_address + 172U, HOST_RV32_NETWORK_DISCONNECT);
-    write_u32(context->memory, guest_api_address + 176U, HOST_RV32_NETWORK_RESOLVE);
-    write_u32(context->memory, guest_api_address + 180U, HOST_RV32_NETWORK_ECHO);
-    write_u32(context->memory, guest_api_address + 184U, HOST_RV32_SOCKET_OPEN);
-    write_u32(context->memory, guest_api_address + 188U, HOST_RV32_SOCKET_CLOSE);
-    write_u32(context->memory, guest_api_address + 192U, HOST_RV32_SOCKET_BIND);
-    write_u32(context->memory, guest_api_address + 196U, HOST_RV32_SOCKET_LISTEN);
-    write_u32(context->memory, guest_api_address + 200U, HOST_RV32_SOCKET_ACCEPT);
-    write_u32(context->memory, guest_api_address + 204U, HOST_RV32_SOCKET_CONNECT);
-    write_u32(context->memory, guest_api_address + 208U, HOST_RV32_SOCKET_NONBLOCKING);
-    write_u32(context->memory, guest_api_address + 212U, HOST_RV32_SOCKET_SHUTDOWN);
-    write_u32(context->memory, guest_api_address + 216U, HOST_RV32_SOCKET_SEND);
-    write_u32(context->memory, guest_api_address + 220U, HOST_RV32_SOCKET_RECEIVE);
-    write_u32(context->memory, guest_api_address + 224U, HOST_RV32_SOCKET_SEND_TO);
-    write_u32(context->memory, guest_api_address + 228U, HOST_RV32_SOCKET_RECEIVE_FROM);
-    write_u32(context->memory, guest_api_address + 232U, HOST_RV32_SOCKET_LOCAL_ENDPOINT);
-    write_u32(context->memory, guest_api_address + 248U, HOST_RV32_GRAPHICS_SET_OVERLAYS);
-    write_u32(context->memory, guest_api_address + 252U, HOST_RV32_SOCKET_WAIT);
-    write_u32(context->memory, guest_api_address + 256U, HOST_RV32_TLS_CONNECT);
-    write_u32(context->memory, guest_api_address + 260U, HOST_RV32_TLS_CLOSE);
-    write_u32(context->memory, guest_api_address + 264U, HOST_RV32_TLS_SEND);
-    write_u32(context->memory, guest_api_address + 268U, HOST_RV32_TLS_RECEIVE);
-
-    write_u32(context->memory, guest_api_address + 272U, HOST_RV32_DEVICE_COUNT);
-    write_u32(context->memory, guest_api_address + 276U, HOST_RV32_DEVICE_AT);
-    write_u32(context->memory, guest_api_address + 280U, HOST_RV32_DEVICE_GET);
-    write_u32(context->memory, guest_api_address + 284U, HOST_RV32_DEVICE_FIND);
-    write_u32(context->memory, guest_api_address + 288U, HOST_RV32_DEVICE_SUBSCRIBE);
-    write_u32(context->memory, guest_api_address + 292U, HOST_RV32_DEVICE_CLOSE);
-    write_u32(context->memory, guest_api_address + 296U, HOST_RV32_DEVICE_EVENT_READ);
-    write_u32(context->memory, guest_api_address + 300U, HOST_RV32_SOCKET_WAIT_SOURCE);
-    write_u32(context->memory, guest_api_address + 304U, HOST_RV32_WAIT);
+    for (size_t index = 0U; index < sizeof(host_rv32_api_gates) / sizeof(host_rv32_api_gates[0]); ++index) {
+        const host_rv32_api_gate_t* gate = &host_rv32_api_gates[index];
+        if (gate->api_offset != HOST_RV32_NO_API_OFFSET) {
+            write_u32(context->memory, guest_api_address + gate->api_offset, gate->gate);
+        }
+    }
 
     size_t next_argument = argument_data_address;
     for (size_t index = 0U; index < argc; ++index) {
