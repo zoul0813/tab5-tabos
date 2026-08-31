@@ -134,12 +134,17 @@ static int test_lifecycle_events(void)
     if (first < 0 || second < 0 || first == second) {
         return 1;
     }
+    if (device_registry_event_pending(&owner_a, first) != 0 ||
+        device_registry_event_pending(&owner_b, first) != -TABOS_EBADF) {
+        return 1;
+    }
 
     const device_registry_registration_t display = registration(TABOS_DEVICE_NAME_DISPLAY, TABOS_DEVICE_CLASS_DISPLAY);
     const tabos_device_id_t id                   = device_registry_register(&display);
     tabos_device_event_t event;
-    if (id == TABOS_DEVICE_ID_INVALID || device_registry_read_event(&owner_a, first, &event) != 0 ||
-        event.type != TABOS_DEVICE_EVENT_ADDED || event.flags != 0U || event.device.id != id ||
+    if (id == TABOS_DEVICE_ID_INVALID || device_registry_event_pending(&owner_a, first) != 1 ||
+        device_registry_read_event(&owner_a, first, &event) != 0 || event.type != TABOS_DEVICE_EVENT_ADDED ||
+        event.flags != 0U || event.device.id != id || device_registry_event_pending(&owner_a, first) != 0 ||
         device_registry_read_event(&owner_a, first, &event) != -TABOS_EAGAIN ||
         device_registry_read_event(&owner_b, first, &event) != -TABOS_EBADF) {
         return 1;
@@ -173,7 +178,8 @@ static int test_lifecycle_events(void)
         return 1;
     }
     if (!device_registry_unsubscribe(&owner_a, first) ||
-        device_registry_read_event(&owner_a, first, &event) != -TABOS_EBADF) {
+        device_registry_read_event(&owner_a, first, &event) != -TABOS_EBADF ||
+        device_registry_event_pending(&owner_a, first) != -TABOS_EBADF) {
         return 1;
     }
     device_registry_unsubscribe_owner(&owner_b);

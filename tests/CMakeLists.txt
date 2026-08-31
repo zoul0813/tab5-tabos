@@ -28,6 +28,7 @@ add_test(NAME unit.device_registry COMMAND tabos_device_registry)
 add_executable(tabos_sdk_device
     unit/sdk_device.c
     "${TABOS_ROOT}/sdk/lib/device.c"
+    "${TABOS_ROOT}/sdk/lib/wait.c"
 )
 target_include_directories(tabos_sdk_device PRIVATE "${TABOS_ROOT}/sdk/include")
 tabos_enable_warnings(tabos_sdk_device)

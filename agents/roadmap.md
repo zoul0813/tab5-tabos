@@ -496,7 +496,7 @@ but is not a substitute for this execution path.
 - [x] Validate `devices` output and device-registry tester coverage on physical Tab5.
 - [x] Add the generic process-owned wait API, generation-tagged sources, socket adapter,
   stale-parent rejection, and teardown cancellation.
-- [ ] Add device-subscription and future hardware-service wait-source adapters.
+- [x] Add device-subscription wait sources and reusable hooks for future hardware-service adapters.
 - [x] Add RTC and wall-clock service; physical RX8130CE validation remains separately tracked.
 - [x] Add battery telemetry and charge control; sleep and wake remain future work.
 - [ ] Add USB host/OTG service beyond keyboard support.

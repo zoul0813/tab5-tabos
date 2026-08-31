@@ -87,7 +87,10 @@ each source adapter accepts only meaningful bits. `tabos_wait()` supports zero-t
 finite monotonic millisecond deadlines, and infinite waits. Process teardown marks waits
 cancelled and wakes native workers before disposing parent resources, so a later process
 cannot receive stale completions. Sockets expose sources through
-`tabos_socket_wait_source()`; other service adapters join this API incrementally.
+`tabos_socket_wait_source()` and device lifecycle subscriptions through
+`tabos_device_subscription_wait_source()`. A type-indexed internal adapter table supplies
+per-source event validation and readiness translation so future services can join without
+adding service-specific wait transports.
 
 ### Reboot and power-off [DECIDED]
 

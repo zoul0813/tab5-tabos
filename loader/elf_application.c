@@ -86,7 +86,20 @@ typedef struct {
 
 typedef enum {
     ELF_WAIT_SOURCE_SOCKET,
+    ELF_WAIT_SOURCE_DEVICE_SUBSCRIPTION,
+    ELF_WAIT_SOURCE_TYPE_COUNT,
 } elf_wait_source_type_t;
+
+typedef int (*elf_wait_source_poll_fn)(loader_elf_application_t* application, uintptr_t parent,
+                                       uint32_t requested_events, uint32_t* returned_events);
+typedef int (*elf_wait_source_socket_fn)(loader_elf_application_t* application, uintptr_t parent,
+                                         platform_network_wait_item_t* item);
+
+typedef struct {
+        uint32_t valid_events;
+        elf_wait_source_poll_fn poll;
+        elf_wait_source_socket_fn socket;
+} elf_wait_source_adapter_t;
 
 typedef struct {
         uintptr_t parent;
@@ -924,6 +937,21 @@ static void elf_wait_source_invalidate(loader_elf_application_t* application, ta
     *owned                    = (elf_wait_source_t) {.generation = generation};
 }
 
+static tabos_wait_source_t elf_wait_source_find(const loader_elf_application_t* application,
+                                                elf_wait_source_type_t type, uintptr_t parent)
+{
+    if (application == NULL) {
+        return TABOS_WAIT_SOURCE_INVALID;
+    }
+    for (uint32_t index = 0U; index < ELF_WAIT_SOURCE_CAPACITY; ++index) {
+        const elf_wait_source_t* source = &application->wait_sources[index];
+        if (source->open && source->type == type && source->parent == parent) {
+            return (tabos_wait_source_t) ((source->generation << ELF_WAIT_SOURCE_INDEX_BITS) | index);
+        }
+    }
+    return TABOS_WAIT_SOURCE_INVALID;
+}
+
 static int elf_socket_allocate(loader_elf_application_t* application, int platform_socket)
 {
     for (int index = 0; index < ELF_SOCKET_CAPACITY; ++index) {
@@ -1178,37 +1206,142 @@ static int elf_socket_receive_from(int socket, void* data, uint32_t capacity, ta
     return received;
 }
 
-static int elf_socket_wait(tabos_elf_wait_item_t* items, uint32_t count, uint32_t timeout_ms)
+static int elf_wait_poll_device_subscription(loader_elf_application_t* application, uintptr_t parent,
+                                             uint32_t requested_events, uint32_t* returned_events)
 {
-    loader_elf_application_t* application = platform_riscv32_current_user_data();
-    tabos_elf_wait_item_t* writable =
-        (tabos_elf_wait_item_t*) platform_executable_data_pointer(items, count * sizeof(*items));
-    if (application == NULL || writable == NULL || count == 0U || count > TABOS_WAIT_MAX) {
-        return -TABOS_EINVAL;
+    const int pending = device_registry_event_pending(application, (tabos_device_subscription_t) parent);
+    if (pending < 0) {
+        return pending;
     }
-    const uint32_t valid_events = TABOS_WAIT_READABLE | TABOS_WAIT_WRITABLE | TABOS_WAIT_ERROR | TABOS_WAIT_HANGUP;
-    platform_network_wait_item_t platform_items[TABOS_WAIT_MAX];
+    *returned_events = pending > 0 ? requested_events & (TABOS_WAIT_READABLE | TABOS_WAIT_STATE_CHANGED) : 0U;
+    return 0;
+}
+
+static int elf_wait_prepare_socket(loader_elf_application_t* application, uintptr_t parent,
+                                   platform_network_wait_item_t* item)
+{
+    elf_socket_t* socket = elf_socket(application, (int) parent);
+    if (socket == NULL) {
+        return -TABOS_EBADF;
+    }
+    item->socket = socket->platform_socket;
+    return 0;
+}
+
+static const elf_wait_source_adapter_t elf_wait_source_adapters[ELF_WAIT_SOURCE_TYPE_COUNT] = {
+    [ELF_WAIT_SOURCE_SOCKET] =
+        {
+                                  .valid_events = TABOS_WAIT_READABLE | TABOS_WAIT_WRITABLE | TABOS_WAIT_ERROR | TABOS_WAIT_HANGUP,
+                                  .socket       = elf_wait_prepare_socket,
+                                  },
+    [ELF_WAIT_SOURCE_DEVICE_SUBSCRIPTION] =
+        {
+                                  .valid_events = TABOS_WAIT_READABLE | TABOS_WAIT_STATE_CHANGED | TABOS_WAIT_ERROR | TABOS_WAIT_HANGUP,
+                                  .poll         = elf_wait_poll_device_subscription,
+                                  },
+};
+
+static int elf_wait_sources(loader_elf_application_t* application, tabos_elf_wait_item_t* items, uint32_t count,
+                            uint32_t timeout_ms)
+{
+    enum {
+        ELF_WAIT_POLL_SLICE_MS = 10U,
+    };
+    platform_network_wait_item_t socket_items[TABOS_SOCKET_MAX];
+    uint32_t socket_item_indices[TABOS_SOCKET_MAX];
+    uint32_t socket_count = 0U;
+    bool requires_polling = false;
     for (uint32_t index = 0U; index < count; ++index) {
-        elf_socket_t* owned = elf_socket(application, writable[index].socket);
-        if (owned == NULL) {
+        elf_wait_source_t* source = elf_wait_source(application, items[index].source);
+        if (source == NULL || source->type >= ELF_WAIT_SOURCE_TYPE_COUNT) {
             return -TABOS_EBADF;
         }
-        if (writable[index].events == 0U || (writable[index].events & ~valid_events) != 0U) {
+        const elf_wait_source_adapter_t* adapter = &elf_wait_source_adapters[source->type];
+        if (items[index].events == 0U || (items[index].events & ~adapter->valid_events) != 0U) {
             return -TABOS_EINVAL;
         }
-        writable[index].returned_events = 0U;
-        platform_items[index]           = (platform_network_wait_item_t) {
-                      .socket = owned->platform_socket,
-                      .events = writable[index].events,
-        };
-    }
-    const int result = platform_network_socket_wait(platform_items, count, timeout_ms);
-    if (result >= 0) {
-        for (uint32_t index = 0U; index < count; ++index) {
-            writable[index].returned_events = platform_items[index].returned_events;
+        if (adapter->socket != NULL) {
+            if (socket_count >= TABOS_SOCKET_MAX) {
+                return -TABOS_EINVAL;
+            }
+            socket_items[socket_count] = (platform_network_wait_item_t) {
+                .events = items[index].events,
+            };
+            const int prepared = adapter->socket(application, source->parent, &socket_items[socket_count]);
+            if (prepared < 0) {
+                return prepared;
+            }
+            socket_item_indices[socket_count++] = index;
+        } else if (adapter->poll != NULL) {
+            requires_polling = true;
+        } else {
+            return -TABOS_EINVAL;
         }
     }
-    return result;
+
+    const uint64_t started_ms = platform_time_ms();
+    while (true) {
+        int ready = 0;
+        for (uint32_t index = 0U; index < count; ++index) {
+            items[index].returned_events = 0U;
+            elf_wait_source_t* source    = elf_wait_source(application, items[index].source);
+            if (source == NULL || source->type >= ELF_WAIT_SOURCE_TYPE_COUNT) {
+                return -TABOS_EBADF;
+            }
+            const elf_wait_source_adapter_t* adapter = &elf_wait_source_adapters[source->type];
+            if (adapter->poll != NULL) {
+                const int polled =
+                    adapter->poll(application, source->parent, items[index].events, &items[index].returned_events);
+                if (polled < 0) {
+                    return polled;
+                }
+                if (items[index].returned_events != 0U) {
+                    ++ready;
+                }
+            }
+        }
+
+        uint32_t socket_timeout = 0U;
+        if (ready == 0 && timeout_ms != 0U) {
+            if (!requires_polling) {
+                socket_timeout = timeout_ms;
+            } else if (timeout_ms == TABOS_WAIT_TIMEOUT_INFINITE) {
+                socket_timeout = ELF_WAIT_POLL_SLICE_MS;
+            } else {
+                const uint64_t elapsed = platform_time_ms() - started_ms;
+                if (elapsed >= timeout_ms) {
+                    return 0;
+                }
+                const uint32_t remaining = timeout_ms - (uint32_t) elapsed;
+                socket_timeout           = remaining < ELF_WAIT_POLL_SLICE_MS ? remaining : ELF_WAIT_POLL_SLICE_MS;
+            }
+        }
+
+        if (socket_count > 0U || (ready == 0 && requires_polling && timeout_ms != 0U)) {
+            for (uint32_t index = 0U; index < socket_count; ++index) {
+                socket_items[index].returned_events = 0U;
+            }
+            const int socket_ready =
+                platform_network_socket_wait(socket_count > 0U ? socket_items : NULL, socket_count, socket_timeout);
+            if (socket_ready < 0) {
+                return socket_ready;
+            }
+            for (uint32_t index = 0U; index < socket_count; ++index) {
+                tabos_elf_wait_item_t* item = &items[socket_item_indices[index]];
+                item->returned_events       = socket_items[index].returned_events;
+                if (item->returned_events != 0U) {
+                    ++ready;
+                }
+            }
+        }
+
+        if (ready > 0 || timeout_ms == 0U || !requires_polling) {
+            return ready;
+        }
+        if (atomic_load_explicit(&application->wait_cancel_requested, memory_order_acquire)) {
+            return -TABOS_ECANCELED;
+        }
+    }
 }
 
 static int elf_wait(tabos_elf_wait_item_t* items, uint32_t count, uint32_t timeout_ms)
@@ -1219,46 +1352,15 @@ static int elf_wait(tabos_elf_wait_item_t* items, uint32_t count, uint32_t timeo
     if (application == NULL || writable == NULL || count == 0U || count > TABOS_WAIT_MAX) {
         return -TABOS_EINVAL;
     }
-    const uint32_t valid_events =
-        TABOS_WAIT_READABLE | TABOS_WAIT_WRITABLE | TABOS_WAIT_STATE_CHANGED | TABOS_WAIT_ERROR | TABOS_WAIT_HANGUP;
-    platform_network_wait_item_t platform_items[TABOS_WAIT_MAX];
-    for (uint32_t index = 0U; index < count; ++index) {
-        elf_wait_source_t* source = elf_wait_source(application, writable[index].source);
-        if (source == NULL) {
-            return -TABOS_EBADF;
-        }
-        if (writable[index].events == 0U || (writable[index].events & ~valid_events) != 0U) {
-            return -TABOS_EINVAL;
-        }
-        if (source->type != ELF_WAIT_SOURCE_SOCKET || (writable[index].events & TABOS_WAIT_STATE_CHANGED) != 0U) {
-            return -TABOS_EINVAL;
-        }
-        elf_socket_t* socket = elf_socket(application, (int) source->parent);
-        if (socket == NULL || socket->wait_source != writable[index].source) {
-            return -TABOS_EBADF;
-        }
-        writable[index].returned_events = 0U;
-        platform_items[index]           = (platform_network_wait_item_t) {
-                      .socket = socket->platform_socket,
-                      .events = writable[index].events,
-        };
-    }
     atomic_store_explicit(&application->wait_active, true, memory_order_release);
+    int result;
     if (atomic_load_explicit(&application->wait_cancel_requested, memory_order_acquire)) {
-        atomic_store_explicit(&application->wait_active, false, memory_order_release);
-        return -TABOS_ECANCELED;
+        result = -TABOS_ECANCELED;
+    } else {
+        result = elf_wait_sources(application, writable, count, timeout_ms);
     }
-    const int result = platform_network_socket_wait(platform_items, count, timeout_ms);
     atomic_store_explicit(&application->wait_active, false, memory_order_release);
-    if (atomic_load_explicit(&application->wait_cancel_requested, memory_order_acquire)) {
-        return -TABOS_ECANCELED;
-    }
-    if (result >= 0) {
-        for (uint32_t index = 0U; index < count; ++index) {
-            writable[index].returned_events = platform_items[index].returned_events;
-        }
-    }
-    return result;
+    return atomic_load_explicit(&application->wait_cancel_requested, memory_order_acquire) ? -TABOS_ECANCELED : result;
 }
 
 static elf_tls_t* elf_tls(loader_elf_application_t* application, int connection)
@@ -1409,13 +1511,38 @@ static int elf_device_subscribe(void)
 {
     loader_elf_application_t* application          = platform_riscv32_current_user_data();
     const tabos_device_subscription_t subscription = device_registry_subscribe(application);
-    return subscription == TABOS_DEVICE_SUBSCRIPTION_INVALID ? -TABOS_ENFILE : subscription;
+    if (subscription == TABOS_DEVICE_SUBSCRIPTION_INVALID) {
+        return -TABOS_ENFILE;
+    }
+    const tabos_wait_source_t source =
+        elf_wait_source_allocate(application, ELF_WAIT_SOURCE_DEVICE_SUBSCRIPTION, (uintptr_t) subscription);
+    if (source == TABOS_WAIT_SOURCE_INVALID) {
+        (void) device_registry_unsubscribe(application, subscription);
+        return -TABOS_ENFILE;
+    }
+    return subscription;
 }
 
 static int elf_device_subscription_close(int subscription)
 {
     loader_elf_application_t* application = platform_riscv32_current_user_data();
-    return device_registry_unsubscribe(application, subscription) ? 0 : -TABOS_EBADF;
+    if (!device_registry_unsubscribe(application, subscription)) {
+        return -TABOS_EBADF;
+    }
+    elf_wait_source_invalidate(
+        application, elf_wait_source_find(application, ELF_WAIT_SOURCE_DEVICE_SUBSCRIPTION, (uintptr_t) subscription));
+    return 0;
+}
+
+static int elf_device_subscription_wait_source(int subscription)
+{
+    loader_elf_application_t* application = platform_riscv32_current_user_data();
+    if (device_registry_event_pending(application, subscription) < 0) {
+        return -TABOS_EBADF;
+    }
+    const tabos_wait_source_t source =
+        elf_wait_source_find(application, ELF_WAIT_SOURCE_DEVICE_SUBSCRIPTION, (uintptr_t) subscription);
+    return source != TABOS_WAIT_SOURCE_INVALID ? source : -TABOS_EBADF;
 }
 
 static int elf_device_event_read(int subscription, tabos_device_event_t* event)
@@ -1732,83 +1859,83 @@ static bool elf_entry(tabos_app_context_t* context)
     platform_log(load_message);
 
     const tabos_elf_api_t api = {
-        .abi_version               = TABOS_ELF_API_VERSION,
-        .console_write             = elf_console_write,
-        .request_exit              = elf_request_exit,
-        .console_read              = elf_console_read,
-        .console_clear             = elf_console_clear,
-        .fs_getcwd                 = elf_fs_getcwd,
-        .fs_chdir                  = elf_fs_chdir,
-        .fs_list                   = elf_fs_list,
-        .exec                      = elf_exec,
-        .yield                     = elf_yield,
-        .console_write_raw         = elf_console_write_raw,
-        .fd_open                   = elf_fd_open,
-        .fd_close                  = elf_fd_close,
-        .fd_read                   = elf_fd_read,
-        .fd_write                  = elf_fd_write,
-        .fd_seek                   = elf_fd_seek,
-        .fs_stat                   = elf_fs_stat_path,
-        .fd_stat                   = elf_fd_stat,
-        .fs_mkdir                  = elf_fs_mkdir_path,
-        .fs_unlink                 = elf_fs_unlink_path,
-        .fs_rename                 = elf_fs_rename_path,
-        .fd_get_flags              = elf_fd_get_flags,
-        .fd_set_flags              = elf_fd_set_flags,
-        .heap_sbrk                 = elf_heap_sbrk,
-        .fs_rmdir                  = elf_fs_rmdir_path,
-        .monotonic_ms              = elf_monotonic_ms,
-        .system_info               = elf_system_info,
-        .graphics_open             = elf_graphics_open,
-        .graphics_clear            = elf_graphics_clear,
-        .graphics_fill_rect        = elf_graphics_fill_rect,
-        .graphics_blit             = elf_graphics_blit,
-        .graphics_present          = elf_graphics_present,
-        .graphics_close            = elf_graphics_close,
-        .graphics_capabilities     = elf_graphics_capabilities,
-        .graphics_blit_ex          = elf_graphics_blit_ex,
-        .tty_get_mode              = elf_tty_get_mode,
-        .tty_set_mode              = elf_tty_set_mode,
-        .input_poll                = elf_input_poll,
-        .wall_time_get             = elf_wall_time_get,
-        .wall_time_set             = elf_wall_time_set,
-        .system_action             = elf_system_action,
-        .network_status            = elf_network_status,
-        .network_connect_saved     = elf_network_connect_saved,
-        .network_disconnect        = elf_network_disconnect,
-        .network_resolve           = elf_network_resolve,
-        .network_echo              = elf_network_echo,
-        .socket_open               = elf_socket_open,
-        .socket_close              = elf_socket_close,
-        .socket_bind               = elf_socket_bind,
-        .socket_listen             = elf_socket_listen,
-        .socket_accept             = elf_socket_accept,
-        .socket_connect            = elf_socket_connect,
-        .socket_set_nonblocking    = elf_socket_set_nonblocking,
-        .socket_shutdown           = elf_socket_shutdown,
-        .socket_send               = elf_socket_send,
-        .socket_receive            = elf_socket_receive,
-        .socket_send_to            = elf_socket_send_to,
-        .socket_receive_from       = elf_socket_receive_from,
-        .socket_get_local_endpoint = elf_socket_get_local_endpoint,
-        .battery_status            = elf_battery_status,
-        .battery_set_charging      = elf_battery_set_charging,
-        .battery_set_fast_charging = elf_battery_set_fast_charging,
-        .graphics_set_overlays     = elf_graphics_set_overlays,
-        .socket_wait               = elf_socket_wait,
-        .tls_connect               = elf_tls_connect,
-        .tls_close                 = elf_tls_close,
-        .tls_send                  = elf_tls_send,
-        .tls_receive               = elf_tls_receive,
-        .device_count              = elf_device_count,
-        .device_at                 = elf_device_at,
-        .device_get                = elf_device_get,
-        .device_find               = elf_device_find,
-        .device_subscribe          = elf_device_subscribe,
-        .device_subscription_close = elf_device_subscription_close,
-        .device_event_read         = elf_device_event_read,
-        .socket_wait_source        = elf_socket_wait_source,
-        .wait                      = elf_wait,
+        .abi_version                     = TABOS_ELF_API_VERSION,
+        .console_write                   = elf_console_write,
+        .request_exit                    = elf_request_exit,
+        .console_read                    = elf_console_read,
+        .console_clear                   = elf_console_clear,
+        .fs_getcwd                       = elf_fs_getcwd,
+        .fs_chdir                        = elf_fs_chdir,
+        .fs_list                         = elf_fs_list,
+        .exec                            = elf_exec,
+        .yield                           = elf_yield,
+        .console_write_raw               = elf_console_write_raw,
+        .fd_open                         = elf_fd_open,
+        .fd_close                        = elf_fd_close,
+        .fd_read                         = elf_fd_read,
+        .fd_write                        = elf_fd_write,
+        .fd_seek                         = elf_fd_seek,
+        .fs_stat                         = elf_fs_stat_path,
+        .fd_stat                         = elf_fd_stat,
+        .fs_mkdir                        = elf_fs_mkdir_path,
+        .fs_unlink                       = elf_fs_unlink_path,
+        .fs_rename                       = elf_fs_rename_path,
+        .fd_get_flags                    = elf_fd_get_flags,
+        .fd_set_flags                    = elf_fd_set_flags,
+        .heap_sbrk                       = elf_heap_sbrk,
+        .fs_rmdir                        = elf_fs_rmdir_path,
+        .monotonic_ms                    = elf_monotonic_ms,
+        .system_info                     = elf_system_info,
+        .graphics_open                   = elf_graphics_open,
+        .graphics_clear                  = elf_graphics_clear,
+        .graphics_fill_rect              = elf_graphics_fill_rect,
+        .graphics_blit                   = elf_graphics_blit,
+        .graphics_present                = elf_graphics_present,
+        .graphics_close                  = elf_graphics_close,
+        .graphics_capabilities           = elf_graphics_capabilities,
+        .graphics_blit_ex                = elf_graphics_blit_ex,
+        .tty_get_mode                    = elf_tty_get_mode,
+        .tty_set_mode                    = elf_tty_set_mode,
+        .input_poll                      = elf_input_poll,
+        .wall_time_get                   = elf_wall_time_get,
+        .wall_time_set                   = elf_wall_time_set,
+        .system_action                   = elf_system_action,
+        .network_status                  = elf_network_status,
+        .network_connect_saved           = elf_network_connect_saved,
+        .network_disconnect              = elf_network_disconnect,
+        .network_resolve                 = elf_network_resolve,
+        .network_echo                    = elf_network_echo,
+        .socket_open                     = elf_socket_open,
+        .socket_close                    = elf_socket_close,
+        .socket_bind                     = elf_socket_bind,
+        .socket_listen                   = elf_socket_listen,
+        .socket_accept                   = elf_socket_accept,
+        .socket_connect                  = elf_socket_connect,
+        .socket_set_nonblocking          = elf_socket_set_nonblocking,
+        .socket_shutdown                 = elf_socket_shutdown,
+        .socket_send                     = elf_socket_send,
+        .socket_receive                  = elf_socket_receive,
+        .socket_send_to                  = elf_socket_send_to,
+        .socket_receive_from             = elf_socket_receive_from,
+        .socket_get_local_endpoint       = elf_socket_get_local_endpoint,
+        .battery_status                  = elf_battery_status,
+        .battery_set_charging            = elf_battery_set_charging,
+        .battery_set_fast_charging       = elf_battery_set_fast_charging,
+        .graphics_set_overlays           = elf_graphics_set_overlays,
+        .tls_connect                     = elf_tls_connect,
+        .tls_close                       = elf_tls_close,
+        .tls_send                        = elf_tls_send,
+        .tls_receive                     = elf_tls_receive,
+        .device_count                    = elf_device_count,
+        .device_at                       = elf_device_at,
+        .device_get                      = elf_device_get,
+        .device_find                     = elf_device_find,
+        .device_subscribe                = elf_device_subscribe,
+        .device_subscription_close       = elf_device_subscription_close,
+        .device_event_read               = elf_device_event_read,
+        .socket_wait_source              = elf_socket_wait_source,
+        .device_subscription_wait_source = elf_device_subscription_wait_source,
+        .wait                            = elf_wait,
     };
     application->execution = platform_riscv32_create(
         application->image.entry, application->image.memory, application->image.memory_size,
@@ -1915,6 +2042,13 @@ static void elf_release_resources(loader_elf_application_t* application)
     }
     elf_cancel_wait(application);
     device_registry_unsubscribe_owner(application);
+    for (size_t index = 0U; index < ELF_WAIT_SOURCE_CAPACITY; ++index) {
+        if (application->wait_sources[index].open &&
+            application->wait_sources[index].type == ELF_WAIT_SOURCE_DEVICE_SUBSCRIPTION) {
+            const uint32_t generation        = application->wait_sources[index].generation;
+            application->wait_sources[index] = (elf_wait_source_t) {.generation = generation};
+        }
+    }
     if (application->graphics_active) {
         (void) elf_graphics_drain(application);
         (void) display_graphics_present();

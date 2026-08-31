@@ -1,5 +1,6 @@
 #include <tabos/device.h>
 #include <tabos/internal/elf_api.h>
+#include <tabos/wait.h>
 
 #include <errno.h>
 #include <string.h>
@@ -58,17 +59,23 @@ static int device_read(int subscription, tabos_device_event_t* event)
     return 0;
 }
 
+static int device_wait_source(int subscription)
+{
+    return subscription == 17 ? 23 : -EBADF;
+}
+
 int main(void)
 {
     const tabos_elf_api_t api = {
-        .abi_version               = TABOS_ELF_API_VERSION,
-        .device_count              = device_count,
-        .device_at                 = device_at,
-        .device_get                = device_get,
-        .device_find               = device_find,
-        .device_subscribe          = device_subscribe,
-        .device_subscription_close = device_close,
-        .device_event_read         = device_read,
+        .abi_version                     = TABOS_ELF_API_VERSION,
+        .device_count                    = device_count,
+        .device_at                       = device_at,
+        .device_get                      = device_get,
+        .device_find                     = device_find,
+        .device_subscribe                = device_subscribe,
+        .device_subscription_close       = device_close,
+        .device_event_read               = device_read,
+        .device_subscription_wait_source = device_wait_source,
     };
     tabos_runtime_api = &api;
 
@@ -81,10 +88,11 @@ int main(void)
         return 1;
     }
     const tabos_device_subscription_t subscription = tabos_device_subscribe();
-    if (subscription != 17 || tabos_device_event_read(subscription, &event) != 0 ||
-        event.type != TABOS_DEVICE_EVENT_ADDED || event.device.id != expected.id ||
-        tabos_device_subscription_close(subscription) != 0 || tabos_device_subscription_close(99) != -1 ||
-        errno != EBADF) {
+    if (subscription != 17 || tabos_device_subscription_wait_source(subscription) != 23 ||
+        tabos_device_subscription_wait_source(99) != TABOS_WAIT_SOURCE_INVALID || errno != EBADF ||
+        tabos_device_event_read(subscription, &event) != 0 || event.type != TABOS_DEVICE_EVENT_ADDED ||
+        event.device.id != expected.id || tabos_device_subscription_close(subscription) != 0 ||
+        tabos_device_subscription_close(99) != -1 || errno != EBADF) {
         return 1;
     }
     return 0;

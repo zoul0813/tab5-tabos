@@ -107,7 +107,6 @@ int main(void)
         .socket_close          = close_socket,
         .socket_send           = send_socket,
         .socket_receive        = receive_socket,
-        .socket_wait           = wait_socket,
         .socket_wait_source    = socket_wait_source,
         .wait                  = wait_socket,
     };

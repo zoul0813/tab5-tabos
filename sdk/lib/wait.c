@@ -20,6 +20,20 @@ tabos_wait_source_t tabos_socket_wait_source(tabos_socket_t socket)
     return result;
 }
 
+tabos_wait_source_t tabos_device_subscription_wait_source(tabos_device_subscription_t subscription)
+{
+    if (tabos_runtime_api == NULL || tabos_runtime_api->device_subscription_wait_source == NULL) {
+        errno = ENOSYS;
+        return TABOS_WAIT_SOURCE_INVALID;
+    }
+    const int result = tabos_runtime_api->device_subscription_wait_source(subscription);
+    if (result < 0) {
+        errno = -result;
+        return TABOS_WAIT_SOURCE_INVALID;
+    }
+    return result;
+}
+
 int tabos_wait(tabos_wait_item_t* items, uint32_t count, uint32_t timeout_ms)
 {
     const uint32_t valid_events =

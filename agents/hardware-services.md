@@ -124,9 +124,9 @@ documentation pass.
 ### Source adapters and migration
 
 - [x] Add socket-to-wait-source conversion.
-- [ ] Add device-subscription wait sources.
-- [ ] Add reusable internal hooks for future sensor, audio, pointer, camera, and expansion sources.
-- [ ] Replace old private transport slots and update the host interpreter.
+- [x] Add device-subscription wait sources.
+- [x] Add reusable internal hooks for future sensor, audio, pointer, camera, and expansion sources.
+- [x] Replace old private transport slots and update the host interpreter.
 - [x] Migrate networking service tests and SDK tests.
 - [x] Migrate `nettest`, `ntpdate`, IRC, tester, and every other application using socket waits.
 - [x] Remove the old public socket-only wait API and compatibility code.

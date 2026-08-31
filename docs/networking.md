@@ -98,9 +98,12 @@ socket with `tabos_socket_wait_source()`, place the resulting source in a
 items. Wait sources are process-owned and generation-tagged. Closing a socket
 invalidates its source; stale or foreign sources fail with `EBADF`.
 
+Device lifecycle sources returned by `tabos_device_subscription_wait_source()` may share
+the same wait call, allowing one application loop to wait for network and device activity.
+
 Wait items may request readable, writable, state-changed, error, or hangup events.
-Sockets support readable, writable, error, and hangup. The state-changed event is
-reserved for device and service sources added through the same API. A zero timeout
+Sockets support readable, writable, error, and hangup. Device lifecycle sources support
+readable and state-changed. A zero timeout
 polls immediately, a finite timeout uses monotonic milliseconds, and
 `TABOS_WAIT_TIMEOUT_INFINITE` waits until an event or process cleanup interrupts
 the operation. The return value is the number of ready items, zero for timeout,

@@ -35,5 +35,6 @@ bool device_registry_unsubscribe(const void* owner, tabos_device_subscription_t 
 void device_registry_unsubscribe_owner(const void* owner);
 int device_registry_read_event(const void* owner, tabos_device_subscription_t subscription,
                                tabos_device_event_t* event);
+int device_registry_event_pending(const void* owner, tabos_device_subscription_t subscription);
 
 #endif

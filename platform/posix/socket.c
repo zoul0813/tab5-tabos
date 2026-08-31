@@ -664,7 +664,7 @@ int platform_network_socket_receive_from(int socket, void* data, uint32_t capaci
 
 int platform_network_socket_wait(platform_network_wait_item_t* items, uint32_t count, uint32_t timeout_ms)
 {
-    if (items == NULL || count == 0U || count > TABOS_SOCKET_MAX) {
+    if (count > TABOS_SOCKET_MAX || (count > 0U && items == NULL)) {
         return -TABOS_EINVAL;
     }
     socket_request_t request = {
@@ -672,10 +672,12 @@ int platform_network_socket_wait(platform_network_wait_item_t* items, uint32_t c
         .wait_count = count,
         .timeout_ms = timeout_ms,
     };
-    memcpy(request.wait_items, items, count * sizeof(*items));
+    if (count > 0U) {
+        memcpy(request.wait_items, items, count * sizeof(*items));
+    }
     socket_response_t response;
     const int result = submit_socket_request(&request, &response);
-    if (result >= 0) {
+    if (result >= 0 && count > 0U) {
         memcpy(items, response.wait_items, count * sizeof(*items));
     }
     return result;

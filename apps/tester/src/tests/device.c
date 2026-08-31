@@ -1,6 +1,7 @@
 #include <tester/test.h>
 
 #include <tabos/device.h>
+#include <tabos/wait.h>
 
 #include <errno.h>
 #include <string.h>
@@ -52,6 +53,11 @@ void tester_test_device(tester_context_t* context)
 
     const tabos_device_subscription_t subscription = tabos_device_subscribe();
     tester_expect(context, subscription != TABOS_DEVICE_SUBSCRIPTION_INVALID, "lifecycle subscription opens");
+    const tabos_wait_source_t source = tabos_device_subscription_wait_source(subscription);
+    tester_expect(context, source != TABOS_WAIT_SOURCE_INVALID, "lifecycle subscription exposes a wait source");
+    tabos_wait_item_t wait_item = {.source = source, .events = TABOS_WAIT_READABLE};
+    tester_expect(context, tabos_wait(&wait_item, 1U, 0U) == 0 && wait_item.returned_events == 0U,
+                  "empty lifecycle source is not ready");
     tabos_device_event_t event;
     errno                  = 0;
     const int read_result  = tabos_device_event_read(subscription, &event);
@@ -62,6 +68,9 @@ void tester_test_device(tester_context_t* context)
                              event.device.state < TABOS_DEVICE_STATE_COUNT;
     tester_expect(context, queue_empty || event_valid, "lifecycle read returns EAGAIN or a valid event");
     tester_expect(context, tabos_device_subscription_close(subscription) == 0, "lifecycle subscription closes");
+    errno = 0;
+    tester_expect(context, tabos_wait(&wait_item, 1U, 0U) < 0 && errno == EBADF,
+                  "closed lifecycle wait source is stale");
     errno                  = 0;
     const int stale_result = tabos_device_event_read(subscription, &event);
     tester_expect(context, stale_result < 0 && errno == EBADF, "closed lifecycle subscription is stale");

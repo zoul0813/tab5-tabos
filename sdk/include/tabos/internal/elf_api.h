@@ -7,7 +7,7 @@
 
 #include <stdint.h>
 
-#define TABOS_ELF_API_VERSION  13U
+#define TABOS_ELF_API_VERSION  14U
 #define TABOS_ELF_EXEC_PENDING (-2147483647 - 1)
 
 enum {
@@ -157,7 +157,6 @@ typedef struct {
         int (*battery_set_charging)(uint32_t enabled);
         int (*battery_set_fast_charging)(uint32_t enabled);
         int (*graphics_set_overlays)(uint32_t flags);
-        int (*socket_wait)(tabos_elf_wait_item_t* items, uint32_t count, uint32_t timeout_ms);
         int (*tls_connect)(const char* hostname, uint32_t port);
         int (*tls_close)(int connection);
         int (*tls_send)(int connection, const void* data, uint32_t size);
@@ -170,6 +169,7 @@ typedef struct {
         int (*device_subscription_close)(int subscription);
         int (*device_event_read)(int subscription, tabos_device_event_t* event);
         int (*socket_wait_source)(int socket);
+        int (*device_subscription_wait_source)(int subscription);
         int (*wait)(tabos_elf_wait_item_t* items, uint32_t count, uint32_t timeout_ms);
 } tabos_elf_api_t;
 

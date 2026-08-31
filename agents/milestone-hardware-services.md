@@ -30,8 +30,8 @@ ESP-IDF, FreeRTOS, SDL, controller, bus, or native-handle interfaces.
   report lifecycle state through the common device registry.
 - [x] Generic wait-source API, socket adapter, process ownership, stale-handle rejection,
   and teardown cancellation are implemented.
-- [ ] Device subscriptions and future asynchronous hardware services still need generic
-  wait-source adapters.
+- [x] Device subscriptions use generic wait sources, and reusable type-indexed adapter hooks
+  are ready for future asynchronous hardware services.
 
 ## Agreed Phase Order
 

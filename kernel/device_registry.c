@@ -418,3 +418,19 @@ int device_registry_read_event(const void* owner, tabos_device_subscription_t ha
     platform_mutex_unlock(registry_mutex);
     return 0;
 }
+
+int device_registry_event_pending(const void* owner, tabos_device_subscription_t handle)
+{
+    if (registry_mutex == NULL) {
+        return -TABOS_EINVAL;
+    }
+    platform_mutex_lock(registry_mutex);
+    const device_subscription_t* subscription = owned_subscription(owner, handle);
+    if (subscription == NULL) {
+        platform_mutex_unlock(registry_mutex);
+        return -TABOS_EBADF;
+    }
+    const int pending = subscription->count > 0U ? 1 : 0;
+    platform_mutex_unlock(registry_mutex);
+    return pending;
+}

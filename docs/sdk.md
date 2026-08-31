@@ -43,6 +43,11 @@ On overflow, TabOS drops the oldest event and sets `TABOS_DEVICE_EVENT_OVERFLOW`
 event read. Close subscriptions with `tabos_device_subscription_close()`; TabOS also closes
 them automatically when the owning process exits.
 
+Call `tabos_device_subscription_wait_source()` to obtain a generic wait source for a
+subscription. It reports readable or state-changed while an event is queued and can be
+combined with socket sources in one `tabos_wait()` call. Closing the subscription invalidates
+its source; later waits fail with `EBADF`.
+
 ## Reboot and Power-Off
 
 `<sys/reboot.h>` provides `reboot(RB_AUTOBOOT)` and `reboot(RB_POWER_OFF)`. Successful

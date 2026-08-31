@@ -18,80 +18,80 @@ static _Thread_local uint32_t host_rv32_active_ram_size;
 #define HOST_RV32_API_GATE_BASE UINT32_C(0xffff0000)
 
 /* Append new ABI gates. List order defines their contiguous trap addresses. */
-#define HOST_RV32_API_GATES(X)         \
-    X(CONSOLE_WRITE, 4U)               \
-    X(REQUEST_EXIT, 8U)                \
-    X(RETURN, HOST_RV32_NO_API_OFFSET) \
-    X(CONSOLE_READ, 12U)               \
-    X(CONSOLE_CLEAR, 16U)              \
-    X(FS_GETCWD, 20U)                  \
-    X(FS_CHDIR, 24U)                   \
-    X(FS_LIST, 28U)                    \
-    X(EXEC, 32U)                       \
-    X(YIELD, 36U)                      \
-    X(CONSOLE_WRITE_RAW, 40U)          \
-    X(FD_OPEN, 44U)                    \
-    X(FD_CLOSE, 48U)                   \
-    X(FD_READ, 52U)                    \
-    X(FD_WRITE, 56U)                   \
-    X(FD_SEEK, 60U)                    \
-    X(FS_STAT, 64U)                    \
-    X(FD_STAT, 68U)                    \
-    X(FS_MKDIR, 72U)                   \
-    X(FS_UNLINK, 76U)                  \
-    X(FS_RENAME, 80U)                  \
-    X(FD_GET_FLAGS, 84U)               \
-    X(FD_SET_FLAGS, 88U)               \
-    X(HEAP_SBRK, 92U)                  \
-    X(FS_RMDIR, 96U)                   \
-    X(MONOTONIC_MS, 100U)              \
-    X(SYSTEM_INFO, 104U)               \
-    X(GRAPHICS_OPEN, 108U)             \
-    X(GRAPHICS_CLEAR, 112U)            \
-    X(GRAPHICS_FILL_RECT, 116U)        \
-    X(GRAPHICS_BLIT, 120U)             \
-    X(GRAPHICS_PRESENT, 124U)          \
-    X(GRAPHICS_CLOSE, 128U)            \
-    X(GRAPHICS_CAPABILITIES, 132U)     \
-    X(GRAPHICS_BLIT_EX, 136U)          \
-    X(TTY_GET_MODE, 140U)              \
-    X(TTY_SET_MODE, 144U)              \
-    X(INPUT_POLL, 148U)                \
-    X(WALL_TIME_GET, 152U)             \
-    X(WALL_TIME_SET, 156U)             \
-    X(SYSTEM_ACTION, 160U)             \
-    X(NETWORK_STATUS, 164U)            \
-    X(NETWORK_CONNECT_SAVED, 168U)     \
-    X(NETWORK_DISCONNECT, 172U)        \
-    X(NETWORK_RESOLVE, 176U)           \
-    X(NETWORK_ECHO, 180U)              \
-    X(SOCKET_OPEN, 184U)               \
-    X(SOCKET_CLOSE, 188U)              \
-    X(SOCKET_BIND, 192U)               \
-    X(SOCKET_LISTEN, 196U)             \
-    X(SOCKET_ACCEPT, 200U)             \
-    X(SOCKET_CONNECT, 204U)            \
-    X(SOCKET_NONBLOCKING, 208U)        \
-    X(SOCKET_SHUTDOWN, 212U)           \
-    X(SOCKET_SEND, 216U)               \
-    X(SOCKET_RECEIVE, 220U)            \
-    X(SOCKET_SEND_TO, 224U)            \
-    X(SOCKET_RECEIVE_FROM, 228U)       \
-    X(SOCKET_LOCAL_ENDPOINT, 232U)     \
-    X(GRAPHICS_SET_OVERLAYS, 248U)     \
-    X(SOCKET_WAIT, 252U)               \
-    X(TLS_CONNECT, 256U)               \
-    X(TLS_CLOSE, 260U)                 \
-    X(TLS_SEND, 264U)                  \
-    X(TLS_RECEIVE, 268U)               \
-    X(DEVICE_COUNT, 272U)              \
-    X(DEVICE_AT, 276U)                 \
-    X(DEVICE_GET, 280U)                \
-    X(DEVICE_FIND, 284U)               \
-    X(DEVICE_SUBSCRIBE, 288U)          \
-    X(DEVICE_CLOSE, 292U)              \
-    X(DEVICE_EVENT_READ, 296U)         \
-    X(SOCKET_WAIT_SOURCE, 300U)        \
+#define HOST_RV32_API_GATES(X)               \
+    X(CONSOLE_WRITE, 4U)                     \
+    X(REQUEST_EXIT, 8U)                      \
+    X(RETURN, HOST_RV32_NO_API_OFFSET)       \
+    X(CONSOLE_READ, 12U)                     \
+    X(CONSOLE_CLEAR, 16U)                    \
+    X(FS_GETCWD, 20U)                        \
+    X(FS_CHDIR, 24U)                         \
+    X(FS_LIST, 28U)                          \
+    X(EXEC, 32U)                             \
+    X(YIELD, 36U)                            \
+    X(CONSOLE_WRITE_RAW, 40U)                \
+    X(FD_OPEN, 44U)                          \
+    X(FD_CLOSE, 48U)                         \
+    X(FD_READ, 52U)                          \
+    X(FD_WRITE, 56U)                         \
+    X(FD_SEEK, 60U)                          \
+    X(FS_STAT, 64U)                          \
+    X(FD_STAT, 68U)                          \
+    X(FS_MKDIR, 72U)                         \
+    X(FS_UNLINK, 76U)                        \
+    X(FS_RENAME, 80U)                        \
+    X(FD_GET_FLAGS, 84U)                     \
+    X(FD_SET_FLAGS, 88U)                     \
+    X(HEAP_SBRK, 92U)                        \
+    X(FS_RMDIR, 96U)                         \
+    X(MONOTONIC_MS, 100U)                    \
+    X(SYSTEM_INFO, 104U)                     \
+    X(GRAPHICS_OPEN, 108U)                   \
+    X(GRAPHICS_CLEAR, 112U)                  \
+    X(GRAPHICS_FILL_RECT, 116U)              \
+    X(GRAPHICS_BLIT, 120U)                   \
+    X(GRAPHICS_PRESENT, 124U)                \
+    X(GRAPHICS_CLOSE, 128U)                  \
+    X(GRAPHICS_CAPABILITIES, 132U)           \
+    X(GRAPHICS_BLIT_EX, 136U)                \
+    X(TTY_GET_MODE, 140U)                    \
+    X(TTY_SET_MODE, 144U)                    \
+    X(INPUT_POLL, 148U)                      \
+    X(WALL_TIME_GET, 152U)                   \
+    X(WALL_TIME_SET, 156U)                   \
+    X(SYSTEM_ACTION, 160U)                   \
+    X(NETWORK_STATUS, 164U)                  \
+    X(NETWORK_CONNECT_SAVED, 168U)           \
+    X(NETWORK_DISCONNECT, 172U)              \
+    X(NETWORK_RESOLVE, 176U)                 \
+    X(NETWORK_ECHO, 180U)                    \
+    X(SOCKET_OPEN, 184U)                     \
+    X(SOCKET_CLOSE, 188U)                    \
+    X(SOCKET_BIND, 192U)                     \
+    X(SOCKET_LISTEN, 196U)                   \
+    X(SOCKET_ACCEPT, 200U)                   \
+    X(SOCKET_CONNECT, 204U)                  \
+    X(SOCKET_NONBLOCKING, 208U)              \
+    X(SOCKET_SHUTDOWN, 212U)                 \
+    X(SOCKET_SEND, 216U)                     \
+    X(SOCKET_RECEIVE, 220U)                  \
+    X(SOCKET_SEND_TO, 224U)                  \
+    X(SOCKET_RECEIVE_FROM, 228U)             \
+    X(SOCKET_LOCAL_ENDPOINT, 232U)           \
+    X(GRAPHICS_SET_OVERLAYS, 248U)           \
+    X(TLS_CONNECT, 252U)                     \
+    X(TLS_CLOSE, 256U)                       \
+    X(TLS_SEND, 260U)                        \
+    X(TLS_RECEIVE, 264U)                     \
+    X(DEVICE_COUNT, 268U)                    \
+    X(DEVICE_AT, 272U)                       \
+    X(DEVICE_GET, 276U)                      \
+    X(DEVICE_FIND, 280U)                     \
+    X(DEVICE_SUBSCRIBE, 284U)                \
+    X(DEVICE_CLOSE, 288U)                    \
+    X(DEVICE_EVENT_READ, 292U)               \
+    X(SOCKET_WAIT_SOURCE, 296U)              \
+    X(DEVICE_SUBSCRIPTION_WAIT_SOURCE, 300U) \
     X(WAIT, 304U)
 
 enum {
@@ -813,22 +813,6 @@ platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* cont
             context->state.pc = context->state.regs[1];
             continue;
         }
-        if (context->state.pc == HOST_RV32_SOCKET_WAIT) {
-            const uint32_t item_count = context->state.regs[11];
-            if (item_count == 0U || item_count > TABOS_WAIT_MAX) {
-                return PLATFORM_RISCV32_FAULT;
-            }
-            tabos_elf_wait_item_t* items =
-                guest_buffer(context->memory, context->state.regs[10], item_count * sizeof(*items));
-            if (items == NULL || context->api.socket_wait == NULL) {
-                return PLATFORM_RISCV32_FAULT;
-            }
-            current_user_data       = context->user_data;
-            context->state.regs[10] = (uint32_t) context->api.socket_wait(items, item_count, context->state.regs[12]);
-            current_user_data       = NULL;
-            context->state.pc       = context->state.regs[1];
-            continue;
-        }
         if (context->state.pc == HOST_RV32_WAIT) {
             const uint32_t item_count = context->state.regs[11];
             if (item_count == 0U || item_count > TABOS_WAIT_MAX) {
@@ -874,7 +858,8 @@ platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* cont
             continue;
         }
         if (context->state.pc == HOST_RV32_DEVICE_COUNT || context->state.pc == HOST_RV32_DEVICE_SUBSCRIBE ||
-            context->state.pc == HOST_RV32_DEVICE_CLOSE || context->state.pc == HOST_RV32_SOCKET_WAIT_SOURCE) {
+            context->state.pc == HOST_RV32_DEVICE_CLOSE || context->state.pc == HOST_RV32_SOCKET_WAIT_SOURCE ||
+            context->state.pc == HOST_RV32_DEVICE_SUBSCRIPTION_WAIT_SOURCE) {
             current_user_data = context->user_data;
             if (context->state.pc == HOST_RV32_DEVICE_COUNT && context->api.device_count != NULL) {
                 context->state.regs[10] = context->api.device_count();
@@ -885,6 +870,10 @@ platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* cont
                     (uint32_t) context->api.device_subscription_close((int) context->state.regs[10]);
             } else if (context->state.pc == HOST_RV32_SOCKET_WAIT_SOURCE && context->api.socket_wait_source != NULL) {
                 context->state.regs[10] = (uint32_t) context->api.socket_wait_source((int) context->state.regs[10]);
+            } else if (context->state.pc == HOST_RV32_DEVICE_SUBSCRIPTION_WAIT_SOURCE &&
+                       context->api.device_subscription_wait_source != NULL) {
+                context->state.regs[10] =
+                    (uint32_t) context->api.device_subscription_wait_source((int) context->state.regs[10]);
             } else {
                 current_user_data = NULL;
                 return PLATFORM_RISCV32_FAULT;

@@ -205,7 +205,7 @@ int main(void)
     static const uint32_t late_api_gate_program[] = {
         UINT32_C(0x00008393), /* addi t2, ra, 0: preserve caller return address */
         UINT32_C(0x00050293), /* addi t0, a0, 0: retain API table pointer */
-        UINT32_C(0x1102a283), /* lw t0, 272(t0): device_count table entry */
+        UINT32_C(0x10c2a283), /* lw t0, 268(t0): device_count table entry */
         UINT32_C(0x000280e7), /* jalr ra, t0, 0 */
         UINT32_C(0x00038093), /* addi ra, t2, 0: restore caller return address */
         UINT32_C(0x00008067), /* ret with device count */
