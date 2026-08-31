@@ -76,6 +76,8 @@ static unsigned int network_connect_calls;
 static char network_hostname[33];
 static bool fake_rtc_ready = true;
 static int fake_rtc_error;
+static bool fake_battery_ready = true;
+static int fake_battery_error;
 
 bool platform_display_init(platform_framebuffer_t* framebuffer)
 {
@@ -141,8 +143,9 @@ bool platform_get_diagnostics(platform_diagnostics_t* diagnostics)
         .rtc_detected       = true,
         .rtc_error          = fake_rtc_error,
         .battery_name       = "TEST BATTERY",
-        .battery_present    = true,
+        .battery_present    = fake_battery_ready,
         .battery_detected   = true,
+        .battery_error      = fake_battery_error,
         .network_name       = "TEST NETWORK",
         .network_present    = true,
     };
@@ -195,6 +198,20 @@ void test_platform_rtc_set_status(bool ready, int error)
 {
     fake_rtc_ready = ready;
     fake_rtc_error = error;
+}
+
+bool platform_battery_health(int* error)
+{
+    if (error != NULL) {
+        *error = fake_battery_error;
+    }
+    return fake_battery_ready && fake_battery_error == 0;
+}
+
+void test_platform_battery_set_status(bool ready, int error)
+{
+    fake_battery_ready = ready;
+    fake_battery_error = error;
 }
 
 bool platform_network_init(const char* hostname)

@@ -7,7 +7,7 @@
 
 #include <stdint.h>
 
-#define TABOS_ELF_API_VERSION  14U
+#define TABOS_ELF_API_VERSION  15U
 #define TABOS_ELF_EXEC_PENDING (-2147483647 - 1)
 
 enum {
@@ -58,8 +58,10 @@ typedef struct {
 
 typedef struct {
         uint32_t available;
+        uint32_t external_power_present;
         uint32_t charging_enabled;
         uint32_t fast_charging_enabled;
+        uint32_t valid;
         uint32_t voltage_mv;
         int32_t current_ma;
         int32_t power_mw;

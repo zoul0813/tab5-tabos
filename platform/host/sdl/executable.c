@@ -92,7 +92,10 @@ static _Thread_local uint32_t host_rv32_active_ram_size;
     X(DEVICE_EVENT_READ, 292U)               \
     X(SOCKET_WAIT_SOURCE, 296U)              \
     X(DEVICE_SUBSCRIPTION_WAIT_SOURCE, 300U) \
-    X(WAIT, 304U)
+    X(WAIT, 304U)                            \
+    X(BATTERY_STATUS, 236U)                  \
+    X(BATTERY_SET_CHARGING, 240U)            \
+    X(BATTERY_SET_FAST_CHARGING, 244U)
 
 enum {
 #define HOST_RV32_GATE_INDEX(name, api_offset) HOST_RV32_GATE_INDEX_##name,
@@ -825,6 +828,32 @@ platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* cont
             }
             current_user_data       = context->user_data;
             context->state.regs[10] = (uint32_t) context->api.wait(items, item_count, context->state.regs[12]);
+            current_user_data       = NULL;
+            context->state.pc       = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_BATTERY_STATUS) {
+            tabos_elf_battery_status_t* status =
+                guest_buffer(context->memory, context->state.regs[10], sizeof(*status));
+            if (status == NULL || context->api.battery_status == NULL) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data       = context->user_data;
+            context->state.regs[10] = (uint32_t) context->api.battery_status(status);
+            current_user_data       = NULL;
+            context->state.pc       = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_BATTERY_SET_CHARGING ||
+            context->state.pc == HOST_RV32_BATTERY_SET_FAST_CHARGING) {
+            int (*operation)(uint32_t) = context->state.pc == HOST_RV32_BATTERY_SET_CHARGING ?
+                                             context->api.battery_set_charging :
+                                             context->api.battery_set_fast_charging;
+            if (operation == NULL) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data       = context->user_data;
+            context->state.regs[10] = (uint32_t) operation(context->state.regs[10]);
             current_user_data       = NULL;
             context->state.pc       = context->state.regs[1];
             continue;

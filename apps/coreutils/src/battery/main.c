@@ -20,13 +20,37 @@ static int show_status(void)
         puts("Battery: unavailable");
         return 0;
     }
-    printf("State: %s\n", tabos_battery_state_name(status.state));
-    printf("Charge: %s\n", status.charging_enabled ? "enabled" : "disabled");
-    printf("Fast charge: %s\n", status.fast_charging_enabled ? "enabled" : "disabled");
-    printf("Level: %lu%% (estimated)\n", (unsigned long) status.percentage);
-    printf("Voltage: %lu mV\n", (unsigned long) status.voltage_mv);
-    printf("Current: %ld mA\n", (long) status.current_ma);
-    printf("Power: %ld mW\n", (long) status.power_mw);
+    printf("Source: %s\n", (status.valid & TABOS_BATTERY_VALID_SOURCE) == 0U ? "unknown" :
+                           status.external_power_present                     ? "external" :
+                                                                               "battery");
+    printf("State: %s\n",
+           (status.valid & TABOS_BATTERY_VALID_STATE) != 0U ? tabos_battery_state_name(status.state) : "unknown");
+    printf("Charge: %s\n", (status.valid & TABOS_BATTERY_VALID_CHARGING_CONTROL) == 0U ? "unknown" :
+                           status.charging_enabled                                     ? "enabled" :
+                                                                                         "disabled");
+    printf("Fast charge: %s\n", (status.valid & TABOS_BATTERY_VALID_FAST_CHARGING_CONTROL) == 0U ? "unknown" :
+                                status.fast_charging_enabled                                     ? "enabled" :
+                                                                                                   "disabled");
+    if ((status.valid & TABOS_BATTERY_VALID_PERCENTAGE) != 0U) {
+        printf("Level: %lu%% (estimated)\n", (unsigned long) status.percentage);
+    } else {
+        puts("Level: unknown");
+    }
+    if ((status.valid & TABOS_BATTERY_VALID_VOLTAGE) != 0U) {
+        printf("Voltage: %lu mV\n", (unsigned long) status.voltage_mv);
+    } else {
+        puts("Voltage: unknown");
+    }
+    if ((status.valid & TABOS_BATTERY_VALID_CURRENT) != 0U) {
+        printf("Current: %+ld mA\n", (long) status.current_ma);
+    } else {
+        puts("Current: unknown");
+    }
+    if ((status.valid & TABOS_BATTERY_VALID_POWER) != 0U) {
+        printf("Power: %+ld mW\n", (long) status.power_mw);
+    } else {
+        puts("Power: unknown");
+    }
     return 0;
 }
 

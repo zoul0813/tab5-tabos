@@ -77,7 +77,10 @@ Portable runtime integration registers initialized `display0`, `keyboard0`, `sto
 drivers below the platform boundary. Host builds expose deterministic virtual counterparts.
 Wi-Fi registry state follows network-service offline, fault, and ready transitions. RTC
 read, write, and calendar-data failures move `rtc0` to fault with the platform error;
-a later successful RTC operation restores ready state.
+a later successful RTC operation restores ready state. Battery telemetry and charger-control
+failures likewise move `battery0` to fault, and successful retries restore ready state.
+Battery status carries explicit per-field validity; signed current and power are positive
+while discharging and negative while charging.
 
 ### Generic wait sources [DECIDED]
 

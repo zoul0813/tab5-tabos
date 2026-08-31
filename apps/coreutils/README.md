@@ -28,9 +28,11 @@ binaries install to `.local/rootfs/T/bin/` without filename extensions.
 unmounts storage and requests system power-off. Neither command schedules a delayed
 action.
 
-`battery` reports Tab5 battery telemetry. `battery charge on|off` controls normal
-charging. `battery fast on|off` manually controls fast charging; fast charging is
-disabled by default.
+`battery` reports source, charge state, charger controls, estimated level, voltage,
+signed current, and signed power. Unknown or unavailable fields are labeled rather
+than printed as measurements. Positive current/power means discharge; negative means
+charging. `battery charge on|off` controls normal charging. `battery fast on|off`
+manually controls fast charging; fast charging is disabled by default.
 
 `devices` lists registered hardware and host-virtual devices. Output includes an unpadded decimal
 boot-local ID, logical name, class, state, symbolic informational features, driver name, and any

@@ -23,14 +23,21 @@ int tabos_battery_get_status(tabos_battery_status_t* status)
         return -1;
     }
     memset(status, 0, sizeof(*status));
-    status->available = source.available != 0U;
-    status->charging_enabled = source.charging_enabled != 0U;
-    status->fast_charging_enabled = source.fast_charging_enabled != 0U;
-    status->state = (tabos_battery_state_t) source.charge_state;
+    status->available              = source.available != 0U;
+    status->external_power_present = source.external_power_present != 0U;
+    status->charging_enabled       = source.charging_enabled != 0U;
+    status->fast_charging_enabled  = source.fast_charging_enabled != 0U;
+    status->valid                  = source.valid;
+    status->state                  = source.charge_state <= TABOS_BATTERY_STATE_NOT_PRESENT ?
+                                         (tabos_battery_state_t) source.charge_state :
+                                         TABOS_BATTERY_STATE_UNKNOWN;
+    if (source.charge_state > TABOS_BATTERY_STATE_NOT_PRESENT) {
+        status->valid &= ~(uint32_t) TABOS_BATTERY_VALID_STATE;
+    }
     status->percentage = source.percentage;
     status->voltage_mv = source.voltage_mv;
     status->current_ma = source.current_ma;
-    status->power_mw = source.power_mw;
+    status->power_mw   = source.power_mw;
     return 0;
 }
 
@@ -65,15 +72,10 @@ int tabos_battery_set_charging(bool enabled)
 const char* tabos_battery_state_name(tabos_battery_state_t state)
 {
     switch (state) {
-    case TABOS_BATTERY_STATE_CHARGING:
-        return "charging";
-    case TABOS_BATTERY_STATE_DISCHARGING:
-        return "discharging";
-    case TABOS_BATTERY_STATE_FULL:
-        return "full";
-    case TABOS_BATTERY_STATE_NOT_PRESENT:
-        return "not present";
-    default:
-        return "unknown";
+        case TABOS_BATTERY_STATE_CHARGING: return "charging";
+        case TABOS_BATTERY_STATE_DISCHARGING: return "discharging";
+        case TABOS_BATTERY_STATE_FULL: return "full";
+        case TABOS_BATTERY_STATE_NOT_PRESENT: return "not present";
+        default: return "unknown";
     }
 }

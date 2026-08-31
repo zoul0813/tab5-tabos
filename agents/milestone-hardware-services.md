@@ -69,7 +69,7 @@ USB host HID and mass storage are deferred until after camera work.
   to migrate or validate, not unstarted hardware milestones.
 - [DECIDED] New service order is sensors/power, audio, touch, camera, expansion, then
   low power. USB host remains deferred.
-- [DECIDED] Small diagnostics such as `devices`, `sensors`, `power`, `audiotest`,
+- [DECIDED] Small diagnostics such as `devices`, `audiotest`,
   `touchtest`, `cameratest`, and `serialctl` belong in `apps/coreutils`.
 - [DECIDED] Raw GPIO, I2C, SPI, and UART access remains unavailable to external apps.
 - [DECIDED] GUI, gestures, compositor, window manager, signed-app policy, secure boot,

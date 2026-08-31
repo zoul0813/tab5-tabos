@@ -108,6 +108,7 @@ int main(int argc, char** argv)
         {        "Nested process execution",    tester_test_process},
         {     "Time and system information",    tester_test_runtime},
         {          "Device registry access",     tester_test_device},
+        {             "Battery integration",    tester_test_battery},
         {              "TCP/UDP networking",    tester_test_network},
         {             "Fullscreen graphics",   tester_test_graphics},
     };
@@ -118,6 +119,7 @@ int main(int argc, char** argv)
         tester_run_test(&context, &tests[index]);
     }
     printf("\nAssertions: %u; failures: %u\n", context.assertions, context.failures);
-    puts(context.failures == 0U ? "[" ANSI_GREEN "PASS" ANSI_RESET "] TabOS SDK tester" : "[" ANSI_RED "FAIL" ANSI_RESET "] TabOS SDK tester");
+    puts(context.failures == 0U ? "[" ANSI_GREEN "PASS" ANSI_RESET "] TabOS SDK tester" :
+                                  "[" ANSI_RED "FAIL" ANSI_RESET "] TabOS SDK tester");
     return context.failures == 0U ? 0 : 1;
 }

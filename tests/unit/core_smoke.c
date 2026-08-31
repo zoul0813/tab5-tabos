@@ -63,8 +63,10 @@ int main(void)
         device.device_class != TABOS_DEVICE_CLASS_RTC || device.state != TABOS_DEVICE_READY ||
         device.features != TABOS_DEVICE_FEATURE_RTC_WALL_CLOCK ||
         !device_registry_find(TABOS_DEVICE_NAME_BATTERY, &device) ||
-        device.device_class != TABOS_DEVICE_CLASS_BATTERY || !device_registry_find(TABOS_DEVICE_NAME_WIFI, &device) ||
-        device.device_class != TABOS_DEVICE_CLASS_NETWORK || device.state != TABOS_DEVICE_OFFLINE) {
+        device.device_class != TABOS_DEVICE_CLASS_BATTERY || device.state != TABOS_DEVICE_READY ||
+        device.features != (TABOS_DEVICE_FEATURE_BATTERY_TELEMETRY | TABOS_DEVICE_FEATURE_BATTERY_CHARGE_CONTROL) ||
+        !device_registry_find(TABOS_DEVICE_NAME_WIFI, &device) || device.device_class != TABOS_DEVICE_CLASS_NETWORK ||
+        device.state != TABOS_DEVICE_OFFLINE) {
         return 1;
     }
 
@@ -77,6 +79,19 @@ int main(void)
     test_platform_rtc_set_status(true, 0);
     kernel_runtime_update();
     if (!device_registry_find(TABOS_DEVICE_NAME_RTC, &device) || device.state != TABOS_DEVICE_READY ||
+        device.last_error != 0) {
+        return 1;
+    }
+
+    test_platform_battery_set_status(false, EIO);
+    kernel_runtime_update();
+    if (!device_registry_find(TABOS_DEVICE_NAME_BATTERY, &device) || device.state != TABOS_DEVICE_FAULT ||
+        device.last_error != EIO) {
+        return 1;
+    }
+    test_platform_battery_set_status(true, 0);
+    kernel_runtime_update();
+    if (!device_registry_find(TABOS_DEVICE_NAME_BATTERY, &device) || device.state != TABOS_DEVICE_READY ||
         device.last_error != 0) {
         return 1;
     }

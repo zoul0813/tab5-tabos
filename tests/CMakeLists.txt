@@ -35,6 +35,15 @@ tabos_enable_warnings(tabos_sdk_device)
 tabos_enable_sanitizers(tabos_sdk_device)
 add_test(NAME unit.sdk_device COMMAND tabos_sdk_device)
 
+add_executable(tabos_sdk_battery
+    unit/sdk_battery.c
+    "${TABOS_ROOT}/sdk/lib/battery.c"
+)
+target_include_directories(tabos_sdk_battery PRIVATE "${TABOS_ROOT}/sdk/include")
+tabos_enable_warnings(tabos_sdk_battery)
+tabos_enable_sanitizers(tabos_sdk_battery)
+add_test(NAME unit.sdk_battery COMMAND tabos_sdk_battery)
+
 add_executable(tabos_raster unit/raster.c ${TABOS_TEST_PLATFORM_FAKES})
 target_include_directories(tabos_raster PRIVATE
     "${TABOS_ROOT}/graphics/include"

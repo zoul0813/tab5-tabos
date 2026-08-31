@@ -4,6 +4,7 @@
 #include <tabos/platform/storage_backend.h>
 #include <tabos/platform/platform.h>
 
+
 bool platform_battery_status(platform_battery_status_t* status)
 {
     if (status != NULL) {

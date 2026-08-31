@@ -90,6 +90,9 @@ bool platform_init(bool headless)
     if (!platform_battery_charging_enable()) {
         ESP_LOGW(TAG, "Battery charging may remain disabled");
     }
+    if (!platform_battery_set_fast_charging(false)) {
+        ESP_LOGW(TAG, "Could not initialize fast-charge control");
+    }
     if (!platform_battery_monitor_init()) {
         ESP_LOGW(TAG, "Battery monitor initialization failed");
     }

@@ -1569,30 +1569,41 @@ static int elf_battery_status(tabos_elf_battery_status_t* info)
     tabos_elf_battery_status_t* writable =
         (tabos_elf_battery_status_t*) platform_executable_data_pointer(info, sizeof(*info));
     platform_battery_status_t source;
-    if (writable == NULL || !platform_battery_status(&source)) {
+    if (writable == NULL) {
+        return -TABOS_EINVAL;
+    }
+    if (!platform_battery_status(&source)) {
+        hardware_devices_update();
         return -TABOS_EIO;
     }
+    hardware_devices_update();
     *writable = (tabos_elf_battery_status_t) {
-        .available             = source.available ? 1U : 0U,
-        .charging_enabled      = source.charging_enabled ? 1U : 0U,
-        .fast_charging_enabled = source.fast_charging_enabled ? 1U : 0U,
-        .voltage_mv            = source.voltage_mv,
-        .current_ma            = source.current_ma,
-        .power_mw              = source.power_mw,
-        .percentage            = source.percentage,
-        .charge_state          = source.charge_state,
+        .available              = source.available ? 1U : 0U,
+        .external_power_present = source.external_power_present ? 1U : 0U,
+        .charging_enabled       = source.charging_enabled ? 1U : 0U,
+        .fast_charging_enabled  = source.fast_charging_enabled ? 1U : 0U,
+        .valid                  = source.valid,
+        .voltage_mv             = source.voltage_mv,
+        .current_ma             = source.current_ma,
+        .power_mw               = source.power_mw,
+        .percentage             = source.percentage,
+        .charge_state           = source.charge_state,
     };
     return 0;
 }
 
 static int elf_battery_set_charging(uint32_t enabled)
 {
-    return platform_battery_set_charging(enabled != 0U) ? 0 : -TABOS_EIO;
+    const bool success = platform_battery_set_charging(enabled != 0U);
+    hardware_devices_update();
+    return success ? 0 : -TABOS_EIO;
 }
 
 static int elf_battery_set_fast_charging(uint32_t enabled)
 {
-    return platform_battery_set_fast_charging(enabled != 0U) ? 0 : -TABOS_EIO;
+    const bool success = platform_battery_set_fast_charging(enabled != 0U);
+    hardware_devices_update();
+    return success ? 0 : -TABOS_EIO;
 }
 
 static int elf_graphics_open(uint32_t* width, uint32_t* height)

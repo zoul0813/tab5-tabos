@@ -10,6 +10,7 @@
 
 static tabos_device_id_t network_device = TABOS_DEVICE_ID_INVALID;
 static tabos_device_id_t rtc_device     = TABOS_DEVICE_ID_INVALID;
+static tabos_device_id_t battery_device = TABOS_DEVICE_ID_INVALID;
 static tabos_device_id_t registered_devices[6];
 static size_t registered_device_count;
 static bool initialized;
@@ -106,9 +107,10 @@ bool hardware_devices_init(void)
     }
     if (diagnostics.battery_detected &&
         !register_device(TABOS_DEVICE_NAME_BATTERY, diagnostics.battery_name, TABOS_DEVICE_CLASS_BATTERY,
-                         diagnostics.battery_present ? TABOS_DEVICE_READY : TABOS_DEVICE_FAULT,
+                         diagnostics.battery_present && diagnostics.battery_error == 0 ? TABOS_DEVICE_READY :
+                                                                                         TABOS_DEVICE_FAULT,
                          TABOS_DEVICE_FEATURE_BATTERY_TELEMETRY | TABOS_DEVICE_FEATURE_BATTERY_CHARGE_CONTROL,
-                         diagnostics.battery_error, NULL)) {
+                         diagnostics.battery_error, &battery_device)) {
         hardware_devices_shutdown();
         return false;
     }
@@ -135,6 +137,12 @@ void hardware_devices_update(void)
         (void) device_registry_set_state(rtc_device, rtc_ready ? TABOS_DEVICE_READY : TABOS_DEVICE_FAULT,
                                          rtc_ready ? 0 : (rtc_error != 0 ? rtc_error : EIO));
     }
+    if (battery_device != TABOS_DEVICE_ID_INVALID) {
+        int battery_error        = 0;
+        const bool battery_ready = platform_battery_health(&battery_error);
+        (void) device_registry_set_state(battery_device, battery_ready ? TABOS_DEVICE_READY : TABOS_DEVICE_FAULT,
+                                         battery_ready ? 0 : (battery_error != 0 ? battery_error : EIO));
+    }
     if (network_device != TABOS_DEVICE_ID_INVALID) {
         network_status_t status;
         if (!network_service_status(&status)) {
@@ -156,4 +164,5 @@ void hardware_devices_shutdown(void)
     initialized    = false;
     network_device = TABOS_DEVICE_ID_INVALID;
     rtc_device     = TABOS_DEVICE_ID_INVALID;
+    battery_device = TABOS_DEVICE_ID_INVALID;
 }

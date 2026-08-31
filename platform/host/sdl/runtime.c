@@ -13,6 +13,8 @@ SDL_Window* host_window;
 static bool is_headless;
 static bool quit_requested;
 static platform_network_status_t network_status;
+static bool host_battery_charging_enabled;
+static bool host_battery_fast_charging_enabled;
 
 static char* window_state_path(void)
 {
@@ -121,9 +123,11 @@ void platform_perform_system_action(platform_system_action_t action)
 
 bool platform_init(bool headless)
 {
-    is_headless               = headless;
-    quit_requested            = false;
-    const SDL_InitFlags flags = headless ? 0U : SDL_INIT_VIDEO | SDL_INIT_EVENTS;
+    is_headless                        = headless;
+    quit_requested                     = false;
+    host_battery_charging_enabled      = true;
+    host_battery_fast_charging_enabled = false;
+    const SDL_InitFlags flags          = headless ? 0U : SDL_INIT_VIDEO | SDL_INIT_EVENTS;
     if (!SDL_Init(flags)) {
         SDL_Log("SDL initialization failed: %s", SDL_GetError());
         return false;
@@ -203,28 +207,40 @@ bool platform_battery_status(platform_battery_status_t* status)
         return false;
     }
     *status = (platform_battery_status_t) {
-        .available             = true,
-        .charging_enabled      = true,
-        .fast_charging_enabled = false,
-        .voltage_mv            = 8000U,
-        .current_ma            = -500,
-        .power_mw              = -4000,
-        .percentage            = 80U,
-        .charge_state          = TABOS_BATTERY_STATE_CHARGING,
+        .available              = true,
+        .external_power_present = true,
+        .charging_enabled       = host_battery_charging_enabled,
+        .fast_charging_enabled  = host_battery_fast_charging_enabled,
+        .valid = TABOS_BATTERY_VALID_STATE | TABOS_BATTERY_VALID_SOURCE | TABOS_BATTERY_VALID_PERCENTAGE |
+                 TABOS_BATTERY_VALID_VOLTAGE | TABOS_BATTERY_VALID_CURRENT | TABOS_BATTERY_VALID_POWER |
+                 TABOS_BATTERY_VALID_CHARGING_CONTROL | TABOS_BATTERY_VALID_FAST_CHARGING_CONTROL,
+        .voltage_mv   = 8000U,
+        .current_ma   = -500,
+        .power_mw     = -4000,
+        .percentage   = 80U,
+        .charge_state = TABOS_BATTERY_STATE_CHARGING,
     };
     return true;
 }
 
 bool platform_battery_set_charging(bool enabled)
 {
-    (void) enabled;
-    return false;
+    host_battery_charging_enabled = enabled;
+    return true;
 }
 
 bool platform_battery_set_fast_charging(bool enabled)
 {
-    (void) enabled;
-    return false;
+    host_battery_fast_charging_enabled = enabled;
+    return true;
+}
+
+bool platform_battery_health(int* error)
+{
+    if (error != NULL) {
+        *error = 0;
+    }
+    return true;
 }
 
 int platform_run(platform_update_fn update)

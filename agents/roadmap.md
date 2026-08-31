@@ -502,7 +502,8 @@ but is not a substitute for this execution path.
   stale handles, cancellation, network transitions, and teardown.
 - [ ] Run complete generic-wait validation on macOS and Linux; physical Tab5 passes.
 - [x] Add RTC and wall-clock service with live `rtc0` fault/ready reporting; physical restart-retention validation remains.
-- [x] Add battery telemetry and charge control; sleep and wake remain future work.
+- [x] Add validated battery telemetry fields, charger controls, and live `battery0` fault/ready reporting;
+  physical telemetry, charger, external-power, and shutdown validation remains.
 - [ ] Add USB host/OTG service beyond keyboard support.
 - [ ] Add camera service when application needs justify it.
 - [ ] Add supported sensor APIs.

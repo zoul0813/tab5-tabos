@@ -15,6 +15,7 @@ Tests are separate modules under `apps/tester/src/tests/`. The current modules c
 - nested child/grandchild status delivery and parent restoration
 - process-owned heap and leaked-descriptor cleanup after nonzero child exit
 - RTC calendar, Unix time, `time()`, `gettimeofday()`, and realtime/monotonic clocks
+- battery registry state, telemetry validity, signed power consistency, and unchanged charger controls
 
 Build and install into the host root filesystem:
 
@@ -43,6 +44,10 @@ fixture file, proving child teardown reclaimed descriptors before resuming the p
 Runtime tests read the UTC wall clock through TabOS and libc interfaces. They write
 the immediately reread epoch value back unchanged to verify the RTC write path without
 intentionally changing the clock.
+
+Battery tests require `battery0` with telemetry and charge-control features, verify
+internally consistent signed readings, and write the already reported normal and fast
+charger settings back unchanged. They do not deliberately change charging policy.
 
 Add future API coverage as another focused source module and register it in
 `apps/tester/src/main.c`. Tests should remain deterministic, clean up persistent state,

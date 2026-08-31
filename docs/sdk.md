@@ -18,6 +18,9 @@ iteration, and nonblocking flags. TabOS does not claim full POSIX compatibility.
 `<tabos/clock.h>` provides UTC RTC calendar and Unix-epoch access; normal libc
 `time()`, `gettimeofday()`, and realtime/monotonic `clock_gettime()` are supported.
 `<tabos/system.h>` provides portable target, device, display, processor, and memory data.
+`<tabos/battery.h>` provides battery telemetry and charger controls. Status validity bits
+identify meaningful source, state, level, voltage, signed current, signed power, and
+control-state fields; see `docs/power.md`.
 
 ## Device Types
 

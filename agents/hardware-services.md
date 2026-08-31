@@ -155,10 +155,10 @@ documentation pass.
 
 ### Battery integration
 
-- [ ] Expose battery presence and fault state through `battery0`.
-- [ ] Audit INA226 initialization, validity flags, signed current direction, voltage, power,
+- [x] Expose battery presence and live telemetry/control fault state through `battery0`.
+- [x] Audit INA226 initialization, validity flags, signed current direction, voltage, power,
   charge state, percentage approximation, and charger-control error propagation.
-- [ ] Preserve orderly reboot and shutdown paths.
+- [x] Preserve orderly reboot and shutdown paths.
 - [ ] Validate telemetry plausibility, charger toggling, external-power behavior, and shutdown on Tab5.
 
 ### IMU service
@@ -177,11 +177,16 @@ documentation pass.
 
 ### Utilities and validation
 
-- [ ] Add `sensors` and `power` to `apps/coreutils`; retain `battery`, `date`, `reboot`, and `shutdown`.
+- [x] Retain `battery`, `date`, `reboot`, and `shutdown` in `apps/coreutils`.
+- [x] Improve `battery status` into the single power diagnostic: report availability,
+  battery/external-power source, charge/discharge/full state, charger state, estimated level,
+  voltage, signed current, and power with clear labels for unavailable or unknown values.
+- [x] Keep normal and fast charger controls under `battery`; report backend and control failures clearly.
 - [ ] Add tester coverage for sensor open/read/wait/close, rates, overflow, stale handles,
   unavailable hardware, and cleanup.
 - [ ] Validate axis orientation, units, sample rates, and idle behavior on physical Tab5.
-- [ ] Update RTC, battery, sensor, power, and utility documentation.
+- [x] Update RTC, battery, and battery-utility documentation.
+- [ ] Update sensor and sensor-utility documentation.
 
 ## Phase 4: Audio Service
 
@@ -260,7 +265,7 @@ documentation pass.
 - [ ] Add typed scalar/vector sensor descriptors for supported modules.
 - [ ] Enforce exclusive bus/address claims and deterministic conflict errors.
 - [ ] Keep arbitrary raw GPIO, I2C, SPI, and UART unavailable to external applications.
-- [ ] Add `serialctl` to `apps/coreutils` and extend `sensors` for expansion devices.
+- [ ] Add `serialctl` to `apps/coreutils`.
 - [ ] Test host fake-device enumeration, hotplug, contention, disconnect, overflow,
   stale handles, waits, and cleanup.
 - [ ] Validate physical RS-485 loopback and at least one supported expansion sensor.
