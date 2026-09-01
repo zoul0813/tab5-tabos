@@ -56,7 +56,7 @@ int main(void)
 #endif
 
     tabos_device_info_t device;
-    if (device_registry_count() != 5U || !device_registry_find(TABOS_DEVICE_NAME_DISPLAY, &device) ||
+    if (device_registry_count() != 6U || !device_registry_find(TABOS_DEVICE_NAME_DISPLAY, &device) ||
         device.device_class != TABOS_DEVICE_CLASS_DISPLAY || device.state != TABOS_DEVICE_READY ||
         !device_registry_find(TABOS_DEVICE_NAME_KEYBOARD, &device) ||
         device.device_class != TABOS_DEVICE_CLASS_KEYBOARD || !device_registry_find(TABOS_DEVICE_NAME_RTC, &device) ||
@@ -65,6 +65,11 @@ int main(void)
         !device_registry_find(TABOS_DEVICE_NAME_BATTERY, &device) ||
         device.device_class != TABOS_DEVICE_CLASS_BATTERY || device.state != TABOS_DEVICE_READY ||
         device.features != (TABOS_DEVICE_FEATURE_BATTERY_TELEMETRY | TABOS_DEVICE_FEATURE_BATTERY_CHARGE_CONTROL) ||
+        !device_registry_find(TABOS_DEVICE_NAME_AUDIO, &device) || device.device_class != TABOS_DEVICE_CLASS_AUDIO ||
+        device.state != TABOS_DEVICE_READY ||
+        device.features != (TABOS_DEVICE_FEATURE_AUDIO_PLAYBACK | TABOS_DEVICE_FEATURE_AUDIO_CAPTURE |
+                            TABOS_DEVICE_FEATURE_AUDIO_SPEAKER | TABOS_DEVICE_FEATURE_AUDIO_HEADPHONE |
+                            TABOS_DEVICE_FEATURE_AUDIO_MICROPHONE) ||
         !device_registry_find(TABOS_DEVICE_NAME_WIFI, &device) || device.device_class != TABOS_DEVICE_CLASS_NETWORK ||
         device.state != TABOS_DEVICE_OFFLINE) {
         return 1;

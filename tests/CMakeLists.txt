@@ -382,6 +382,9 @@ add_executable(tabos_network_socket
 )
 find_package(Threads REQUIRED)
 target_link_libraries(tabos_network_socket PRIVATE Threads::Threads)
+if(TABOS_TARGET STREQUAL "linux")
+    target_compile_definitions(tabos_network_socket PRIVATE _POSIX_C_SOURCE=200809L)
+endif()
 target_include_directories(tabos_network_socket PRIVATE
     "${TABOS_ROOT}/platform/include"
     "${TABOS_ROOT}/sdk/include"

@@ -1,3 +1,7 @@
+#if defined(__linux__) && !defined(_DEFAULT_SOURCE)
+#define _DEFAULT_SOURCE
+#endif
+
 #include "doom_tabos_storage.h"
 
 #include <errno.h>
