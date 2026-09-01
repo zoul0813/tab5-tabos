@@ -88,6 +88,30 @@ static void ring_push_byte(audio_stream_t* stream, uint8_t value)
     ++stream->count;
 }
 
+static void ring_write(audio_stream_t* stream, const uint8_t* source, size_t bytes)
+{
+    const size_t tail = (stream->head + stream->count) % AUDIO_RING_CAPACITY;
+    size_t first      = AUDIO_RING_CAPACITY - tail;
+    if (first > bytes) {
+        first = bytes;
+    }
+    memcpy(stream->ring + tail, source, first);
+    memcpy(stream->ring, source + first, bytes - first);
+    stream->count += bytes;
+}
+
+static void ring_read(audio_stream_t* stream, uint8_t* destination, size_t bytes)
+{
+    size_t first = AUDIO_RING_CAPACITY - stream->head;
+    if (first > bytes) {
+        first = bytes;
+    }
+    memcpy(destination, stream->ring + stream->head, first);
+    memcpy(destination + first, stream->ring, bytes - first);
+    stream->head   = (stream->head + bytes) % AUDIO_RING_CAPACITY;
+    stream->count -= bytes;
+}
+
 static int16_t ring_pop_sample(audio_stream_t* stream)
 {
     const uint16_t low  = ring_pop_byte(stream);
@@ -111,6 +135,14 @@ static int16_t saturate(int32_t sample)
         return INT16_MIN;
     }
     return (int16_t) sample;
+}
+
+static int32_t apply_volume(int16_t sample, uint32_t volume)
+{
+    if (volume == TABOS_AUDIO_VOLUME_MAX) {
+        return sample;
+    }
+    return ((int32_t) sample * (int32_t) volume) / TABOS_AUDIO_VOLUME_MAX;
 }
 
 bool audio_service_init(void)
@@ -257,6 +289,23 @@ int audio_service_close(const void* owner, tabos_audio_stream_t handle)
     return 0;
 }
 
+int audio_service_flush(const void* owner, tabos_audio_stream_t handle)
+{
+    if (!initialized) {
+        return -TABOS_EBADF;
+    }
+    platform_mutex_lock(audio_mutex);
+    audio_stream_t* stream = owned_stream(owner, handle);
+    if (stream == NULL || stream->direction != TABOS_AUDIO_PLAYBACK) {
+        platform_mutex_unlock(audio_mutex);
+        return -TABOS_EBADF;
+    }
+    stream->head  = 0U;
+    stream->count = 0U;
+    platform_mutex_unlock(audio_mutex);
+    return 0;
+}
+
 void audio_service_close_owner(const void* owner)
 {
     if (!initialized || owner == NULL) {
@@ -303,10 +352,7 @@ int audio_service_write(const void* owner, tabos_audio_stream_t handle, const vo
         platform_mutex_unlock(audio_mutex);
         return -TABOS_EAGAIN;
     }
-    const uint8_t* source = pcm;
-    for (size_t index = 0U; index < copied; ++index) {
-        ring_push_byte(stream, source[index]);
-    }
+    ring_write(stream, pcm, copied);
     platform_mutex_unlock(audio_mutex);
     return (int) copied;
 }
@@ -337,10 +383,7 @@ int audio_service_read(const void* owner, tabos_audio_stream_t handle, void* pcm
         platform_mutex_unlock(audio_mutex);
         return -TABOS_EAGAIN;
     }
-    uint8_t* destination = pcm;
-    for (size_t index = 0U; index < copied; ++index) {
-        destination[index] = ring_pop_byte(stream);
-    }
+    ring_read(stream, pcm, copied);
     platform_mutex_unlock(audio_mutex);
     return (int) copied;
 }
@@ -459,11 +502,10 @@ void audio_service_render(int16_t* stereo, size_t frames)
                 }
                 continue;
             }
-            const int32_t first =
-                ((int32_t) ring_pop_sample(stream) * (int32_t) stream->volume) / TABOS_AUDIO_VOLUME_MAX;
-            int32_t second = first;
+            const int32_t first = apply_volume(ring_pop_sample(stream), stream->volume);
+            int32_t second      = first;
             if (stream->channels == 2U) {
-                second = ((int32_t) ring_pop_sample(stream) * (int32_t) stream->volume) / TABOS_AUDIO_VOLUME_MAX;
+                second = apply_volume(ring_pop_sample(stream), stream->volume);
             }
             left  += first;
             right += second;

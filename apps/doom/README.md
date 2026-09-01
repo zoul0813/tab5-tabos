@@ -14,7 +14,8 @@ artifact.
 DOOM resamples each of its eight DMX sound-effect channels into a separate stereo 48 kHz
 TabOS playback stream. A source-rate low-pass filter suppresses upsampling aliases before
 channels are mixed. Each stream keeps 120 ms of lookahead to prevent underruns while DOOM
-renders, and closing a stopped or replaced channel immediately discards its queued PCM.
+renders. Opened channel streams are reused; stopping or replacing a channel flushes its queued
+PCM immediately without reallocating the stream.
 The TabOS mixer combines active channels. Volume and stereo separation follow
 the engine's normal controls. Speaker output is the default; pass `-headphone` to select
 headphone output. `-nosfx` disables sound effects and `-nosound` disables all audio

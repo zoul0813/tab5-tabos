@@ -57,14 +57,15 @@ DOOM sound effects use eight independently queued channels. The adapter decodes 
 lumps, resamples them to signed stereo 48 kHz PCM, applies a source-rate low-pass filter
 plus engine volume and stereo separation, and feeds one nonblocking TabOS playback stream
 per active channel. Each stream maintains 120 ms of lookahead to prevent playback underruns
-while DOOM renders. Closing a stopped or replaced channel discards its queued PCM before the
-kernel mixes active channels, preventing stale effects from overlapping replacements.
+while DOOM renders. DOOM reuses opened channel streams and flushes a stopped or replaced
+channel before queuing new PCM, preventing stale effects from overlapping replacements without
+repeated stream allocation or physical route setup.
 Speaker output is the default. Run
 `doom -headphone` for headphone output, `doom -nosfx` to disable effects, or
 `doom -nosound` to skip audio initialization. Music remains silent because MUS/MIDI
 synthesis is intentionally deferred.
 
-Current stripped executable is 912,640 bytes on disk. ELF section totals are 426,916
-bytes text, 60,152 bytes data, and 256,824 bytes BSS. `.note.tabos` metadata version 1
-has a 32-byte descriptor, requires application ABI 1 and capability bits 1 (console), and
+Current stripped executable is 913,000 bytes on disk. ELF section totals are 427,140
+bytes text, 60,152 bytes data, and 256,856 bytes BSS. `.note.tabos` metadata version 1
+has a 32-byte descriptor, requires application ABI 2 and capability bits 1 (console), and
 requests an 8 MiB heap plus 64 KiB stack.

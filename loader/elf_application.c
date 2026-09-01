@@ -1613,6 +1613,12 @@ static int elf_audio_close(int stream)
     return result;
 }
 
+static int elf_audio_flush(int stream)
+{
+    loader_elf_application_t* application = platform_riscv32_current_user_data();
+    return audio_service_flush(application, stream);
+}
+
 static int elf_audio_write(int stream, const void* pcm, uint32_t bytes)
 {
     loader_elf_application_t* application = platform_riscv32_current_user_data();
@@ -2061,6 +2067,7 @@ static bool elf_entry(tabos_app_context_t* context)
         .audio_set_route                 = elf_audio_set_route,
         .audio_status                    = elf_audio_status,
         .audio_wait_source               = elf_audio_wait_source,
+        .audio_flush                     = elf_audio_flush,
     };
     application->execution = platform_riscv32_create(
         application->image.entry, application->image.memory, application->image.memory_size,

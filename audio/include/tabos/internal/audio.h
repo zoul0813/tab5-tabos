@@ -12,6 +12,7 @@ void audio_service_shutdown(void);
 bool audio_service_info(tabos_audio_info_t* info, const char** driver, int* error);
 tabos_audio_stream_t audio_service_open(const void* owner, const tabos_audio_config_t* config);
 int audio_service_close(const void* owner, tabos_audio_stream_t stream);
+int audio_service_flush(const void* owner, tabos_audio_stream_t stream);
 void audio_service_close_owner(const void* owner);
 int audio_service_write(const void* owner, tabos_audio_stream_t stream, const void* pcm, uint32_t bytes);
 int audio_service_read(const void* owner, tabos_audio_stream_t stream, void* pcm, uint32_t capacity);

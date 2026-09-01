@@ -325,7 +325,7 @@ stale DOOM output unless `--with-doom` is selected, then copies the extensionles
 to `T:/bin/doom`. Dedicated Linux ESP-IDF CI fetches the pinned source, compiles it, and
 prints metadata without uploading DOOM or WAD artifacts. Final stripped file size is
 902,264 bytes; ELF totals are 421,636 bytes text, 60,084 bytes data, and 241,072 bytes
-BSS. Metadata version 1 uses a 32-byte descriptor, requires ABI 1 and capability bits 1
+BSS. Metadata version 1 uses a 32-byte descriptor, requires ABI 2 and capability bits 1
 (console), and requests an 8 MiB heap and 64 KiB stack.
 
 ### Phase 10: Validation and Hardware

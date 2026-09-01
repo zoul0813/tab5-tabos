@@ -195,6 +195,7 @@ documentation pass.
 - [x] Require signed 16-bit little-endian PCM at 48 kHz as the mandatory format.
 - [x] Support mono and stereo playback and backend-reported capture channel counts.
 - [x] Use bounded ring buffers with nonblocking reads/writes and `EAGAIN`.
+- [x] Allow queued playback PCM to be flushed without closing and reopening the stream.
 - [x] Expose readable/writable/error/hangup through generic waits.
 - [x] Mix at least four playback streams with saturation and per-stream volume.
 - [x] Support speaker, headphone, and microphone routes.

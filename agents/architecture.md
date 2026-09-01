@@ -44,7 +44,7 @@ does not append `.bin` to command names.
 ### Pre-release application ABI [DECIDED]
 
 Applications consume public SDK headers only; the ELF transport table is private to CRT
-and SDK runtime sources. The current version value is 1, but the ABI is not released or
+and SDK runtime sources. The current version value is 2, but the ABI is not released or
 frozen. Incompatible changes are allowed while TabOS is being defined, and bundled
 applications are rebuilt with the system. No compatibility shims are required for
 unreleased binaries. The current runtime uses newlib for C17 allocation and stdio, provides the

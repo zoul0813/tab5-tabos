@@ -7,7 +7,7 @@
 
 #include <tabos/console.h>
 
-#define TABOS_APPLICATION_ABI_VERSION 1U
+#define TABOS_APPLICATION_ABI_VERSION 2U
 
 typedef uint32_t tabos_app_capabilities_t;
 

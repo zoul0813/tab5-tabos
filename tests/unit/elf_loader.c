@@ -66,7 +66,7 @@ static void build_metadata_elf(uint8_t* data, uint32_t note_size, uint32_t note_
     memcpy(data + 96U, "TABOS", 5U);
     write_u32(data + 104U, descriptor_version);
     write_u32(data + 108U, descriptor_size);
-    write_u32(data + 112U, 1U);
+    write_u32(data + 112U, TABOS_APPLICATION_ABI_VERSION);
     write_u32(data + 116U, heap_bytes);
     write_u32(data + 120U, stack_bytes);
     write_u32(data + 124U, capabilities);
@@ -100,7 +100,7 @@ int main(void)
                        false);
     loader_elf_info_t metadata_info;
     if (loader_elf_inspect(metadata_elf, sizeof(metadata_elf), &metadata_info) != LOADER_ELF_OK ||
-        !metadata_info.metadata_present || metadata_info.application_abi_version != 1U ||
+        !metadata_info.metadata_present || metadata_info.application_abi_version != TABOS_APPLICATION_ABI_VERSION ||
         metadata_info.requested_heap_bytes != 512U * 1024U || metadata_info.requested_stack_bytes != 64U * 1024U ||
         metadata_info.capabilities != TABOS_APP_CAPABILITY_CONSOLE ||
         loader_elf_inspect(loader_hello_elf, loader_hello_elf_size, &metadata_info) != LOADER_ELF_OK ||

@@ -483,6 +483,7 @@ but is not a substitute for this execution path.
 - [x] Implement SDL3 host output backend.
 - [x] Implement Tab5 audio backend.
 - [x] Add application-local DMX sound-effect mixing and TabOS PCM output for DOOM.
+- [x] Reuse and flush DOOM playback streams so effect replacement does not stall rendering.
 - [ ] Add DOOM MUS/MIDI synthesis when a suitable bounded software synthesizer is selected.
 - [ ] Test mixing, formats, latency, and real hardware output.
 

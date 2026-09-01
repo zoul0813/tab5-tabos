@@ -22,6 +22,10 @@ byte count when progress is possible and fail with `EAGAIN` when the ring cannot
 provide one complete frame. Buffers and byte counts must contain complete PCM frames and
 one call is limited to `TABOS_AUDIO_IO_MAX` bytes.
 
+`tabos_audio_flush()` immediately discards PCM queued on a playback stream without closing
+the stream. Use it when replacing or stopping time-sensitive audio. Capture streams and
+foreign or stale handles fail with `EBADF`.
+
 Use `tabos_audio_wait_source()` with `tabos_wait()` to wait for `TABOS_WAIT_WRITABLE` on
 playback or `TABOS_WAIT_READABLE` on capture. Request `TABOS_WAIT_ERROR` and
 `TABOS_WAIT_HANGUP` as well when a stream must detect an asynchronous backend failure.

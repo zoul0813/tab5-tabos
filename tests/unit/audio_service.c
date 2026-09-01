@@ -63,6 +63,13 @@ int main(void)
         audio_service_close(&owner_b, playback[0]) != -TABOS_EBADF) {
         return fail("playback ownership or writable readiness mismatch");
     }
+    tabos_audio_status_t status;
+    if (audio_service_write(&owner_a, playback[0], &sample, sizeof(sample)) != (int) sizeof(sample) ||
+        audio_service_flush(&owner_a, playback[0]) != 0 ||
+        audio_service_get_status(&owner_a, playback[0], &status) != 0 || status.buffered_bytes != 0U ||
+        audio_service_flush(&owner_b, playback[0]) != -TABOS_EBADF) {
+        return fail("playback flush did not discard buffered PCM");
+    }
 
     const tabos_audio_config_t capture_config = {
         .direction = TABOS_AUDIO_CAPTURE,
@@ -88,7 +95,6 @@ int main(void)
     for (size_t iteration = 0U; iteration < 40U; ++iteration) {
         test_platform_audio_capture(overflow_input, 512U, 2U);
     }
-    tabos_audio_status_t status;
     if (audio_service_get_status(&owner_a, capture, &status) != 0 || status.overruns == 0U ||
         status.buffered_bytes != status.buffer_capacity) {
         return fail("capture overflow accounting mismatch");

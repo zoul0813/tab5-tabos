@@ -40,15 +40,15 @@ void tester_test_audio(tester_context_t* context)
     };
     int16_t silence[2] = {0};
     tabos_audio_status_t status;
-    tester_expect(context,
-                  playback != TABOS_AUDIO_STREAM_INVALID && playback_source != TABOS_WAIT_SOURCE_INVALID &&
-                      tabos_wait(&playback_wait, 1U, 0U) == 1 &&
-                      (playback_wait.returned_events & TABOS_WAIT_WRITABLE) != 0U &&
-                      tabos_audio_write(playback, silence, sizeof(silence)) == (int) sizeof(silence) &&
-                      tabos_audio_set_volume(playback, TABOS_AUDIO_VOLUME_MAX / 2U) == 0 &&
-                      tabos_audio_set_route(playback, TABOS_AUDIO_ROUTE_SPEAKER) == 0 &&
-                      tabos_audio_get_status(playback, &status) == 0 && status.buffer_capacity > 0U,
-                  "playback open, wait, write, volume, route, and status work");
+    tester_expect(
+        context,
+        playback != TABOS_AUDIO_STREAM_INVALID && playback_source != TABOS_WAIT_SOURCE_INVALID &&
+            tabos_wait(&playback_wait, 1U, 0U) == 1 && (playback_wait.returned_events & TABOS_WAIT_WRITABLE) != 0U &&
+            tabos_audio_write(playback, silence, sizeof(silence)) == (int) sizeof(silence) &&
+            tabos_audio_flush(playback) == 0 && tabos_audio_set_volume(playback, TABOS_AUDIO_VOLUME_MAX / 2U) == 0 &&
+            tabos_audio_set_route(playback, TABOS_AUDIO_ROUTE_SPEAKER) == 0 &&
+            tabos_audio_get_status(playback, &status) == 0 && status.buffer_capacity > 0U,
+        "playback open, wait, write, flush, volume, route, and status work");
     tester_expect(context, tabos_audio_close(playback) == 0 && tabos_audio_close(playback) < 0 && errno == EBADF,
                   "playback close stales stream handle");
 

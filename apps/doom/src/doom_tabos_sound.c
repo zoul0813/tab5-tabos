@@ -97,20 +97,43 @@ static void close_output(unsigned int channel)
 
 static boolean open_output(unsigned int channel)
 {
+    if (outputs[channel].stream != TABOS_AUDIO_STREAM_INVALID) {
+        return true;
+    }
     const tabos_audio_config_t config = {
         .direction = TABOS_AUDIO_PLAYBACK,
         .channels  = 2U,
         .route     = playback_route,
     };
-    close_output(channel);
     outputs[channel].stream = tabos_audio_open(&config);
     return outputs[channel].stream != TABOS_AUDIO_STREAM_INVALID;
+}
+
+static boolean discard_output(unsigned int channel)
+{
+    doom_audio_output_t* output = &outputs[channel];
+    output->frames              = 0U;
+    output->offset              = 0U;
+    output->playing             = false;
+    if (output->stream == TABOS_AUDIO_STREAM_INVALID) {
+        return true;
+    }
+    if (tabos_audio_flush(output->stream) != 0) {
+        close_output(channel);
+        return false;
+    }
+    return true;
+}
+
+static boolean reset_output(unsigned int channel)
+{
+    return open_output(channel) && discard_output(channel);
 }
 
 static void sound_update_channel(unsigned int channel)
 {
     doom_audio_output_t* output = &outputs[channel];
-    if (output->stream == TABOS_AUDIO_STREAM_INVALID) {
+    if (output->stream == TABOS_AUDIO_STREAM_INVALID || !output->playing) {
         return;
     }
     tabos_audio_status_t status;
@@ -145,9 +168,6 @@ static void sound_update_channel(unsigned int channel)
     }
     output->playing =
         doom_tabos_sfx_playing(&mixer, channel) || output->offset < output->frames || buffered_frames > 0U;
-    if (!output->playing) {
-        close_output(channel);
-    }
 }
 
 static void sound_update(void)
@@ -170,7 +190,9 @@ static int sound_start(sfxinfo_t* sound, int channel, int volume, int separation
         return -1;
     }
     doom_tabos_sfx_stop(&mixer, (unsigned int) channel);
-    close_output((unsigned int) channel);
+    if (!reset_output((unsigned int) channel)) {
+        return -1;
+    }
     const int lump        = sound->lumpnum;
     const int lump_length = W_LumpLength((unsigned int) lump);
     uint8_t* data         = W_CacheLumpNum(lump, PU_STATIC);
@@ -184,7 +206,7 @@ static int sound_start(sfxinfo_t* sound, int channel, int volume, int separation
     const bool started =
         doom_tabos_sfx_start(&mixer, (unsigned int) channel, samples, sample_count, sample_rate, volume, separation);
     W_ReleaseLumpNum(lump);
-    if (!started || !open_output((unsigned int) channel)) {
+    if (!started) {
         doom_tabos_sfx_stop(&mixer, (unsigned int) channel);
         return -1;
     }
@@ -197,7 +219,7 @@ static void sound_stop(int channel)
 {
     if (channel >= 0 && channel < DOOM_TABOS_SFX_CHANNELS) {
         doom_tabos_sfx_stop(&mixer, (unsigned int) channel);
-        close_output((unsigned int) channel);
+        (void) discard_output((unsigned int) channel);
     }
 }
 

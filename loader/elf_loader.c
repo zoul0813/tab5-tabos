@@ -104,7 +104,7 @@ static loader_elf_result_t inspect_metadata(const uint8_t* data, size_t size, lo
     const uint16_t section_count      = read_u16(data + 48U);
     bool found                        = false;
 
-    info->application_abi_version = 1U;
+    info->application_abi_version = TABOS_APPLICATION_ABI_VERSION;
     info->requested_heap_bytes    = LOADER_ELF_DEFAULT_HEAP_BYTES;
     info->requested_stack_bytes   = LOADER_ELF_DEFAULT_STACK_BYTES;
     info->capabilities            = TABOS_APP_CAPABILITY_CONSOLE;
@@ -146,7 +146,7 @@ static loader_elf_result_t inspect_metadata(const uint8_t* data, size_t size, lo
                 const uint8_t* descriptor = name + name_padded;
                 if (read_u32(descriptor) != LOADER_ELF_METADATA_VERSION ||
                     read_u32(descriptor + 4U) != LOADER_ELF_METADATA_DESCRIPTOR_SIZE ||
-                    read_u32(descriptor + 8U) != 1U || read_u32(descriptor + 24U) != 0U ||
+                    read_u32(descriptor + 8U) != TABOS_APPLICATION_ABI_VERSION || read_u32(descriptor + 24U) != 0U ||
                     read_u32(descriptor + 28U) != 0U) {
                     return LOADER_ELF_UNSUPPORTED_FORMAT;
                 }

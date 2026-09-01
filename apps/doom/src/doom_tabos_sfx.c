@@ -6,9 +6,12 @@
 
 enum {
     SFX_POSITION_BITS = 16,
+    SFX_POSITION_MASK = (1U << SFX_POSITION_BITS) - 1U,
     SFX_GAIN_MAX      = 255,
-    SFX_FILTER_BITS   = 16,
-    SFX_PI_X_100      = 314,
+    // Shift-based gain and a 14-bit filter keep software division and 64-bit multiplication out of the RV32I hot path.
+    SFX_GAIN_SHIFT  = 8,
+    SFX_FILTER_BITS = 14,
+    SFX_PI_X_100    = 314,
 };
 
 static int clamp(int value, int minimum, int maximum)
@@ -129,22 +132,22 @@ static bool mix_channel_frame(doom_tabos_sfx_mixer_t* mixer, unsigned int channe
     if (!sound->active) {
         return false;
     }
-    const size_t source_index = (size_t) (sound->position >> SFX_POSITION_BITS);
-    if (source_index >= sound->sample_count) {
+    if (sound->source_index >= sound->sample_count) {
         doom_tabos_sfx_stop(mixer, channel);
         return false;
     }
-    const int32_t sample = (int32_t) sound->samples[source_index] * 257 - 32768;
+    const int32_t sample = (int32_t) sound->samples[sound->source_index] * 257 - 32768;
     if (!sound->filter_initialized) {
         sound->filter_sample      = sample;
         sound->filter_initialized = true;
     } else {
-        sound->filter_sample +=
-            (int32_t) (((int64_t) sound->filter_alpha * (sample - sound->filter_sample)) >> SFX_FILTER_BITS);
+        sound->filter_sample += ((int32_t) sound->filter_alpha * (sample - sound->filter_sample)) >> SFX_FILTER_BITS;
     }
-    *left           += (sound->filter_sample * sound->left_gain) / SFX_GAIN_MAX;
-    *right          += (sound->filter_sample * sound->right_gain) / SFX_GAIN_MAX;
-    sound->position += sound->step;
+    *left               += (sound->filter_sample * sound->left_gain) >> SFX_GAIN_SHIFT;
+    *right              += (sound->filter_sample * sound->right_gain) >> SFX_GAIN_SHIFT;
+    sound->fraction     += sound->step;
+    sound->source_index += sound->fraction >> SFX_POSITION_BITS;
+    sound->fraction     &= SFX_POSITION_MASK;
     return true;
 }
 

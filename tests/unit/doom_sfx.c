@@ -121,7 +121,10 @@ static int test_independent_channel_render(void)
     }
     int16_t output[2] = {0};
     doom_tabos_sfx_render_channel(&mixer, 0U, output, 1U);
-    const int result = output[0] > 0 && output[1] > 0 && mixer.channels[1].position == 0U ? 0 : 1;
+    int result = 0;
+    if (output[0] <= 0 || output[1] <= 0 || mixer.channels[1].source_index != 0U || mixer.channels[1].fraction != 0U) {
+        result = 1;
+    }
     doom_tabos_sfx_destroy(&mixer);
     return result;
 }

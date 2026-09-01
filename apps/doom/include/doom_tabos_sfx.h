@@ -13,7 +13,8 @@ enum {
 typedef struct {
         uint8_t* samples;
         size_t sample_count;
-        uint64_t position;
+        size_t source_index;
+        uint32_t fraction;
         uint32_t step;
         uint32_t filter_alpha;
         int32_t filter_sample;

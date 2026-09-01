@@ -55,6 +55,15 @@ int tabos_audio_close(tabos_audio_stream_t stream)
     return api_result(tabos_runtime_api->audio_close(stream));
 }
 
+int tabos_audio_flush(tabos_audio_stream_t stream)
+{
+    if (tabos_runtime_api == NULL || tabos_runtime_api->audio_flush == NULL) {
+        errno = ENOSYS;
+        return -1;
+    }
+    return api_result(tabos_runtime_api->audio_flush(stream));
+}
+
 int tabos_audio_write(tabos_audio_stream_t stream, const void* pcm, uint32_t bytes)
 {
     if (pcm == NULL || bytes == 0U) {

@@ -1,7 +1,7 @@
 # TabOS Application SDK
 
 TabOS applications are independently compiled RV32 C17 executables. The current
-pre-release ABI version value is 1. Applications
+pre-release ABI version value is 2. Applications
 include public headers under `sdk/include/` and do not access the private ELF API table,
 ESP-IDF, FreeRTOS, or SDL.
 

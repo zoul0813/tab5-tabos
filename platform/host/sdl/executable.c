@@ -104,7 +104,8 @@ static _Thread_local uint32_t host_rv32_active_ram_size;
     X(AUDIO_SET_VOLUME, 328U)                \
     X(AUDIO_SET_ROUTE, 332U)                 \
     X(AUDIO_STATUS, 336U)                    \
-    X(AUDIO_WAIT_SOURCE, 340U)
+    X(AUDIO_WAIT_SOURCE, 340U)               \
+    X(AUDIO_FLUSH, 344U)
 
 enum {
 #define HOST_RV32_GATE_INDEX(name, api_offset) HOST_RV32_GATE_INDEX_##name,
@@ -919,7 +920,8 @@ platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* cont
             continue;
         }
         if (context->state.pc == HOST_RV32_AUDIO_CLOSE || context->state.pc == HOST_RV32_AUDIO_SET_VOLUME ||
-            context->state.pc == HOST_RV32_AUDIO_SET_ROUTE || context->state.pc == HOST_RV32_AUDIO_WAIT_SOURCE) {
+            context->state.pc == HOST_RV32_AUDIO_SET_ROUTE || context->state.pc == HOST_RV32_AUDIO_WAIT_SOURCE ||
+            context->state.pc == HOST_RV32_AUDIO_FLUSH) {
             current_user_data = context->user_data;
             if (context->state.pc == HOST_RV32_AUDIO_CLOSE && context->api.audio_close != NULL) {
                 context->state.regs[10] = (uint32_t) context->api.audio_close((int) context->state.regs[10]);
@@ -931,6 +933,8 @@ platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* cont
                     (uint32_t) context->api.audio_set_route((int) context->state.regs[10], context->state.regs[11]);
             } else if (context->state.pc == HOST_RV32_AUDIO_WAIT_SOURCE && context->api.audio_wait_source != NULL) {
                 context->state.regs[10] = (uint32_t) context->api.audio_wait_source((int) context->state.regs[10]);
+            } else if (context->state.pc == HOST_RV32_AUDIO_FLUSH && context->api.audio_flush != NULL) {
+                context->state.regs[10] = (uint32_t) context->api.audio_flush((int) context->state.regs[10]);
             } else {
                 current_user_data = NULL;
                 return PLATFORM_RISCV32_FAULT;

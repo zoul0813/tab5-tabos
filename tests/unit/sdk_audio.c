@@ -29,6 +29,11 @@ static int close_call(int stream)
     return stream == 17 ? 0 : -TABOS_EBADF;
 }
 
+static int flush_call(int stream)
+{
+    return stream == 17 ? 0 : -TABOS_EBADF;
+}
+
 static int write_call(int stream, const void* pcm, uint32_t bytes)
 {
     return stream == 17 && pcm != NULL ? (int) bytes : -TABOS_EBADF;
@@ -73,6 +78,7 @@ int main(void)
         .audio_set_route   = value_call,
         .audio_status      = status_call,
         .audio_wait_source = wait_source_call,
+        .audio_flush       = flush_call,
     };
     tabos_runtime_api = &api;
     tabos_audio_info_t info;
@@ -93,7 +99,7 @@ int main(void)
     }
     if (tabos_audio_set_volume(stream, 500U) != 0 || tabos_audio_set_route(stream, TABOS_AUDIO_ROUTE_SPEAKER) != 0 ||
         tabos_audio_get_status(stream, &status) != 0 || status.buffer_capacity != 32768U ||
-        tabos_audio_wait_source(stream) != 23 || tabos_audio_close(stream) != 0) {
+        tabos_audio_wait_source(stream) != 23 || tabos_audio_flush(stream) != 0 || tabos_audio_close(stream) != 0) {
         return 3;
     }
     tabos_runtime_api = NULL;
