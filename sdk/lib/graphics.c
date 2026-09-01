@@ -9,7 +9,7 @@ extern const tabos_elf_api_t* tabos_runtime_api;
 
 #if defined(TABOS_APPLICATION)
 _Static_assert(sizeof(void*) == 4U, "TabOS applications require 32-bit pointers");
-_Static_assert(sizeof(tabos_graphics_blit_options_t) == 56U, "graphics ABI layout changed");
+_Static_assert(sizeof(tabos_graphics_blit_options_t) == 76U, "graphics ABI layout changed");
 #endif
 
 static int result(int value)
@@ -49,6 +49,16 @@ static tabos_color_t blend(tabos_color_t source, tabos_color_t destination, uint
         ((((source >> 5U) & 0x3fU) * opacity) + (((destination >> 5U) & 0x3fU) * inverse) + 127U) / 255U;
     const unsigned int blue = (((source & 0x1fU) * opacity) + ((destination & 0x1fU) * inverse) + 127U) / 255U;
     return (tabos_color_t) ((red << 11U) | (green << 5U) | blue);
+}
+
+static bool inside_clip(const tabos_graphics_blit_options_t* options, int64_t x, int64_t y)
+{
+    if (!options->clip_enabled) {
+        return true;
+    }
+    const int64_t right  = (int64_t) options->clip.x + options->clip.width;
+    const int64_t bottom = (int64_t) options->clip.y + options->clip.height;
+    return x >= options->clip.x && x < right && y >= options->clip.y && y < bottom;
 }
 
 int tabos_graphics_open(tabos_graphics_t* graphics)
@@ -282,7 +292,7 @@ static int scaled_blit(tabos_graphics_t* graphics, const tabos_graphics_blit_opt
         const uint32_t ry = (uint32_t) ((uint64_t) dy * rotated_height / options->destination.height);
         for (uint32_t dx = 0U; dx < options->destination.width; ++dx) {
             const int64_t output_x = (int64_t) options->destination.x + dx;
-            if (output_x < 0 || output_x >= (int64_t) graphics->width) {
+            if (output_x < 0 || output_x >= (int64_t) graphics->width || !inside_clip(options, output_x, output_y)) {
                 continue;
             }
             const uint32_t rx = (uint32_t) ((uint64_t) dx * rotated_width / options->destination.width);

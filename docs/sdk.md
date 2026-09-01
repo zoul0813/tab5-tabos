@@ -76,12 +76,21 @@ unmounts storage, and shuts down services before applying the platform action. S
 `<tabos/graphics.h>` provides foreground fullscreen RGB565 clear, clipped rectangle,
 bitmap blit, and explicit presentation operations. See `docs/graphics-api.md`.
 
+`<tabos/sprite.h>` adds sprite sets, pivots, transforms, explicit-time animation, flags,
+metasprites, and `.tsp` loading. `<tabos/tilemap.h>` adds finite orthogonal map layers,
+writable cells, Tiled transforms, object markers, properties, and `.tmap` loading. See
+`docs/tile-assets.md`.
+
 ## Building
 
 Each application includes `sdk/make/application.mk`. `make` produces a stripped,
 extensionless executable and installs it under `.local/rootfs/T/bin/`. Run
 `./apps/build.sh` to build default applications. Optional applications such as DOOM
 require their documented opt-in flag.
+
+Applications declare generated runtime files with `TABOS_RUNTIME_ASSETS`. Build rules
+stage only those files under `build/apps/<app>/data/` and install them under
+`.local/rootfs/T/data/<app>/`; source images and manifests are not installed.
 
 TabOS has not released or frozen its application ABI. SDK and transport changes may be
 incompatible during development, and all bundled applications must be rebuilt with the

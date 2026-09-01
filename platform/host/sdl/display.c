@@ -119,7 +119,7 @@ bool platform_graphics_blit(platform_framebuffer_t* framebuffer, const tabos_gra
         options->bitmap_width == 0U || options->bitmap_height == 0U || options->source.x < 0 || options->source.y < 0 ||
         options->source.width == 0U || options->source.height == 0U || options->destination.width == 0U ||
         options->destination.height == 0U || options->rotation != TABOS_GRAPHICS_ROTATE_0 || options->mirror_x ||
-        options->mirror_y || options->opacity != 255U || options->color_key_enabled ||
+        options->mirror_y || options->opacity != 255U || options->color_key_enabled || options->clip_enabled ||
         (uint64_t) (uint32_t) options->source.x + options->source.width > options->bitmap_width ||
         (uint64_t) (uint32_t) options->source.y + options->source.height > options->bitmap_height ||
         framebuffer->width > INT_MAX || framebuffer->height > INT_MAX ||

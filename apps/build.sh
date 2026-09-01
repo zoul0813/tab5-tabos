@@ -86,6 +86,20 @@ if [ -n "$msc_mount" ]; then
         exit 1
     fi
 
+    for data_dir in "$project_root"/build/apps/*/data; do
+        if [ ! -d "$data_dir" ]; then
+            continue
+        fi
+        app_name=${data_dir%/data}
+        app_name=${app_name##*/}
+        mkdir -p "$msc_mount/data/$app_name"
+        for asset in "$data_dir"/*; do
+            if [ -f "$asset" ]; then
+                cp "$asset" "$msc_mount/data/$app_name/${asset##*/}"
+            fi
+        done
+    done
+
     sync
     if ! command -v diskutil >/dev/null 2>&1; then
         printf 'apps/build.sh: diskutil unavailable; leaving MSC mounted at %s\n' "$msc_mount" >&2

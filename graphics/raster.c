@@ -71,6 +71,16 @@ static tabos_color_t blend(tabos_color_t source, tabos_color_t destination, uint
     return (tabos_color_t) ((red << 11U) | (green << 5U) | blue);
 }
 
+static bool inside_clip(const tabos_graphics_blit_options_t* options, int64_t x, int64_t y)
+{
+    if (!options->clip_enabled) {
+        return true;
+    }
+    const int64_t right  = (int64_t) options->clip.x + options->clip.width;
+    const int64_t bottom = (int64_t) options->clip.y + options->clip.height;
+    return x >= options->clip.x && x < right && y >= options->clip.y && y < bottom;
+}
+
 bool raster_blit(platform_framebuffer_t* framebuffer, const tabos_graphics_blit_options_t* options)
 {
     if (framebuffer == NULL || framebuffer->pixels == NULL || options == NULL || options->pixels == NULL ||
@@ -83,9 +93,9 @@ bool raster_blit(platform_framebuffer_t* framebuffer, const tabos_graphics_blit_
         return false;
     }
 
-    if (options->rotation == TABOS_GRAPHICS_ROTATE_0 && !options->mirror_x && !options->mirror_y &&
-        options->source.width == options->destination.width && options->source.height == options->destination.height &&
-        options->opacity == 255U) {
+    if (!options->clip_enabled && options->rotation == TABOS_GRAPHICS_ROTATE_0 && !options->mirror_x &&
+        !options->mirror_y && options->source.width == options->destination.width &&
+        options->source.height == options->destination.height && options->opacity == 255U) {
         for (uint32_t row = 0U; row < options->destination.height; ++row) {
             const int64_t output_y = (int64_t) options->destination.y + row;
             if (output_y < 0 || output_y >= (int64_t) framebuffer->height) {
@@ -149,7 +159,7 @@ bool raster_blit(platform_framebuffer_t* framebuffer, const tabos_graphics_blit_
         const uint32_t ry = (uint32_t) ((uint64_t) dy * rotated_height / options->destination.height);
         for (uint32_t dx = 0U; dx < options->destination.width; ++dx) {
             const int64_t output_x = (int64_t) options->destination.x + dx;
-            if (output_x < 0 || output_x >= (int64_t) framebuffer->width) {
+            if (output_x < 0 || output_x >= (int64_t) framebuffer->width || !inside_clip(options, output_x, output_y)) {
                 continue;
             }
             const uint32_t rx = (uint32_t) ((uint64_t) dx * rotated_width / options->destination.width);

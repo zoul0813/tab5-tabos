@@ -59,9 +59,17 @@ tabos_graphics_set_overlays(&graphics, TABOS_GRAPHICS_OVERLAY_ALL);
 Closing or terminating an application restores both overlays.
 
 `tabos_graphics_blit_ex()` adds source and destination rectangles, nearest-neighbor
-scaling, quarter-turn rotation, mirroring, fixed opacity, and an inclusive RGB565
-color-key range. Query portable behavior and active acceleration with
+scaling, quarter-turn rotation, mirroring, uniform opacity, an inclusive RGB565
+color-key range, and an optional destination clip rectangle. Zero-initialized clip
+fields disable clipping; an enabled empty clip draws nothing successfully. RGB565 has
+no per-pixel alpha channel. Assets therefore use exact color-key transparency and may
+blend the whole operation with `opacity`. Query portable behavior and active acceleration with
 `tabos_graphics_capabilities()`.
+
+`<tabos/sprite.h>` and `<tabos/tilemap.h>` provide portable sprites, explicit-time
+animation, ordered metasprites, writable finite maps, object markers, and camera-based
+layer drawing. They lower to the same blit API and work in native and logical-canvas
+modes. See `docs/tile-assets.md` for API and authoring details.
 
 Drawing calls enqueue commands. Their source buffers must remain valid and unchanged
 until `tabos_graphics_present()` returns. Present is the completion fence and scanout
@@ -109,3 +117,6 @@ Run `graphics-demo` to exercise a 320×240 logical canvas automatically scaled 3
 pillarboxing; use E/A/S/D to move, R to rotate, Up/Down to cycle the 16-color VGA
 letterbox palette, and Q to exit. Run
 `graphics-benchmark` to measure 120 queued frames and report active acceleration.
+Run `tile-demo` to exercise binary assets, scrolling layers, transforms, animation,
+metasprites, editable cells, flags, and object markers. Arrow keys scroll, E toggles a
+wall cell, and Q exits.

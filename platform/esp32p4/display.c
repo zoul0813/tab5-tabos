@@ -447,6 +447,8 @@ static bool native_blit_cpu(const tabos_graphics_blit_options_t* options)
         options->rotation == TABOS_GRAPHICS_ROTATE_90 || options->rotation == TABOS_GRAPHICS_ROTATE_270 ?
             options->source.width :
             options->source.height;
+    const int64_t clip_right  = (int64_t) options->clip.x + options->clip.width;
+    const int64_t clip_bottom = (int64_t) options->clip.y + options->clip.height;
     for (uint32_t dy = 0U; dy < options->destination.height; ++dy) {
         const int64_t logical_y = (int64_t) options->destination.y + dy;
         if (logical_y < 0 || logical_y >= TABOS_DISPLAY_HEIGHT) {
@@ -456,6 +458,10 @@ static bool native_blit_cpu(const tabos_graphics_blit_options_t* options)
         for (uint32_t dx = 0U; dx < options->destination.width; ++dx) {
             const int64_t logical_x = (int64_t) options->destination.x + dx;
             if (logical_x < 0 || logical_x >= TABOS_DISPLAY_WIDTH) {
+                continue;
+            }
+            if (options->clip_enabled && (logical_x < options->clip.x || logical_x >= clip_right ||
+                                          logical_y < options->clip.y || logical_y >= clip_bottom)) {
                 continue;
             }
             const uint32_t rx = (uint32_t) ((uint64_t) dx * rotated_width / options->destination.width);
@@ -505,7 +511,7 @@ static bool native_blit_ppa(const tabos_graphics_blit_options_t* options)
         (uint64_t) (uint32_t) options->destination.x + options->destination.width > TABOS_DISPLAY_WIDTH ||
         (uint64_t) (uint32_t) options->destination.y + options->destination.height > TABOS_DISPLAY_HEIGHT ||
         options->rotation != TABOS_GRAPHICS_ROTATE_0 || options->mirror_x || options->mirror_y ||
-        options->opacity != 255U || options->color_key_enabled ||
+        options->opacity != 255U || options->color_key_enabled || options->clip_enabled ||
         (uint64_t) options->destination.width * options->destination.height < TAB5_PPA_BLIT_MIN_PIXELS) {
         return false;
     }
@@ -651,7 +657,7 @@ bool platform_graphics_blit(platform_framebuffer_t* framebuffer, const tabos_gra
         (uint64_t) (uint32_t) options->destination.x + options->destination.width > framebuffer->width ||
         (uint64_t) (uint32_t) options->destination.y + options->destination.height > framebuffer->height ||
         options->source.width == 0U || options->source.height == 0U || options->destination.width == 0U ||
-        options->destination.height == 0U ||
+        options->destination.height == 0U || options->clip_enabled ||
         (uint64_t) options->destination.width * options->destination.height < TAB5_PPA_BLIT_MIN_PIXELS) {
         return false;
     }

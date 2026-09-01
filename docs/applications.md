@@ -38,7 +38,8 @@ eject it after copying:
 
 The default mount point is `/Volumes/TAB5`. Use `--msc-mount=/path` or set
 `TABOS_MSC_MOUNT` to override it. Runnable extensionless outputs are copied to the
-volume's `bin/` directory. Intermediate build files and source assets are excluded.
+volume's `bin/` directory. Declared runtime assets are copied to `data/<app-name>/`.
+Intermediate build files, PNG/GIF and Tiled sources, and manifests are excluded.
 Grouped utility outputs are flattened; for example, `build/apps/coreutils/ls/ls` is
 copied to `bin/ls`.
 
@@ -53,6 +54,10 @@ When `build/apps/doom/doom` exists, `--msc --with-doom` copies that extensionles
 executable to `T:/bin/doom`. Build and installation never copy or download WAD data.
 
 Individual application commands such as `make -C apps/shell` remain available.
+
+`tile-demo` demonstrates sprite/tile APIs and declares generated `.tsp` and `.tmap`
+files with `TABOS_RUNTIME_ASSETS`. Build it with `make -C apps/tile-demo`; run
+`T:/bin/tile-demo` after installation.
 
 Core utilities are grouped under `apps/coreutils/`, but each utility remains a separate
 program. Build one with `make -C apps/coreutils ls` or `make -C apps/coreutils mkdir`.

@@ -86,6 +86,35 @@ tabos_enable_warnings(tabos_sdk_graphics)
 tabos_enable_sanitizers(tabos_sdk_graphics)
 add_test(NAME unit.sdk_graphics COMMAND tabos_sdk_graphics)
 
+add_executable(tabos_sdk_tiles
+    unit/sdk_tiles.c
+    "${TABOS_ROOT}/sdk/lib/graphics.c"
+    "${TABOS_ROOT}/sdk/lib/sprite.c"
+    "${TABOS_ROOT}/sdk/lib/tilemap.c"
+)
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+set(TABOS_TEST_TILE_ASSETS "${CMAKE_CURRENT_BINARY_DIR}/tile-assets")
+add_custom_command(
+    OUTPUT "${TABOS_TEST_TILE_ASSETS}/tile-demo.tsp" "${TABOS_TEST_TILE_ASSETS}/world.tmap"
+    COMMAND "${Python3_EXECUTABLE}" "${TABOS_ROOT}/tools/tabos" assets build
+        "${TABOS_ROOT}/apps/tile-demo/assets/manifest.json" --output "${TABOS_TEST_TILE_ASSETS}"
+    DEPENDS
+        "${TABOS_ROOT}/tools/tabos"
+        "${TABOS_ROOT}/tools/tabos_tools/assets.py"
+        "${TABOS_ROOT}/apps/tile-demo/assets/manifest.json"
+        "${TABOS_ROOT}/apps/tile-demo/assets/world.tmj"
+        "${TABOS_ROOT}/apps/tile-demo/assets/sprites-64.png"
+)
+add_custom_target(tabos_test_tile_assets DEPENDS
+    "${TABOS_TEST_TILE_ASSETS}/tile-demo.tsp" "${TABOS_TEST_TILE_ASSETS}/world.tmap")
+add_dependencies(tabos_sdk_tiles tabos_test_tile_assets)
+target_include_directories(tabos_sdk_tiles PRIVATE "${TABOS_ROOT}/sdk/include")
+tabos_enable_warnings(tabos_sdk_tiles)
+tabos_enable_sanitizers(tabos_sdk_tiles)
+add_test(NAME unit.sdk_tiles COMMAND tabos_sdk_tiles
+    "${TABOS_TEST_TILE_ASSETS}/tile-demo.tsp" "${TABOS_TEST_TILE_ASSETS}/world.tmap")
+add_test(NAME unit.asset_converter COMMAND "${Python3_EXECUTABLE}" "${TABOS_ROOT}/tests/assets_converter.py")
+
 add_executable(tabos_sdk_input
     unit/sdk_input.c
     "${TABOS_ROOT}/sdk/lib/input.c"

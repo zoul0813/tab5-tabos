@@ -17,6 +17,12 @@ jobs:
         configuration: [debug, release]
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install asset tools
+        run: python -m pip install -r tools/requirements.txt
       - name: Install SDL3
         run: brew install sdl3
       - name: Build and test
@@ -56,6 +62,12 @@ jobs:
       - name: Install SDL3
         run: sudo apt-get update && sudo apt-get install -y libsdl3-dev
       - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install asset tools
+        run: python -m pip install -r tools/requirements.txt
       - name: Build and test
         run: ./tools/tabos linux ${{ matrix.configuration }} test
       - name: Package Linux host

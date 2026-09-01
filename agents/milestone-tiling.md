@@ -1,5 +1,7 @@
 # Sprite and Tile Graphics Milestone
 
+> Status: implemented on `feature/tiling`; validation tracked in `agents/roadmap.md`.
+
 ## Summary
 
 Add a portable, game-focused SDK layer over the existing RGB565 graphics API.

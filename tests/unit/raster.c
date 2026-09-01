@@ -62,6 +62,20 @@ int main(void)
     assert(raster_blit(&framebuffer, &blended));
     assert(pixels[0] == 0x8410U);
 
+    const tabos_graphics_blit_options_t clipped = {
+        .pixels        = source,
+        .bitmap_width  = 2U,
+        .bitmap_height = 2U,
+        .source        = {.width = 2U, .height = 2U},
+        .destination   = {.x = 1, .y = 1, .width = 2U, .height = 2U},
+        .opacity       = 255U,
+        .clip          = {.x = 2, .y = 1, .width = 1U, .height = 1U},
+        .clip_enabled  = true,
+    };
+    memset(pixels, 0, sizeof(pixels));
+    assert(raster_blit(&framebuffer, &clipped));
+    assert(pixels[5] == 0U && pixels[6] == 2U && pixels[9] == 0U && pixels[10] == 0U);
+
     platform_pixel_t spans[] = {1U, 2U, 3U, 4U, 5U, 6U, 7U, 8U, 9U};
     raster_copy_span(spans + 1U, spans, 8U);
     const platform_pixel_t shifted[] = {1U, 1U, 2U, 3U, 4U, 5U, 6U, 7U, 8U};

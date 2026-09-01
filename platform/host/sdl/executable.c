@@ -1158,7 +1158,7 @@ platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* cont
         }
         if (context->state.pc == HOST_RV32_GRAPHICS_BLIT_EX) {
             const uint32_t address = context->state.regs[10];
-            const uint8_t* guest   = guest_buffer(context->memory, address, 56U);
+            const uint8_t* guest   = guest_buffer(context->memory, address, 76U);
             if (guest == NULL || context->api.graphics_blit_ex == NULL) {
                 return PLATFORM_RISCV32_FAULT;
             }
@@ -1186,6 +1186,14 @@ platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* cont
                 .color_key_enabled = guest[51U] != 0U,
                 .color_key_low     = read_u16(guest, 52U),
                 .color_key_high    = read_u16(guest, 54U),
+                .clip =
+                    {
+                             .x      = (int32_t) read_u32(guest, 56U),
+                             .y      = (int32_t) read_u32(guest, 60U),
+                             .width  = read_u32(guest, 64U),
+                             .height = read_u32(guest, 68U),
+                             },
+                .clip_enabled = guest[72U] != 0U,
             };
             if (options.bitmap_width != 0U && options.bitmap_height > UINT32_MAX / options.bitmap_width) {
                 return PLATFORM_RISCV32_FAULT;

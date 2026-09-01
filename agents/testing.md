@@ -6,6 +6,17 @@
 >
 > This document is written primarily for Codex and contributors. It should be read together with `architecture.md` and `TABOS_CONTEXT.md`.
 
+## Sprite, Tile, and Asset Validation
+
+Host tests cover clip behavior, sprite pivots/transparency/animation/metasprites, tile
+get/set/camera/transforms, binary loading and cleanup, deterministic conversion, GIF
+timing/repeat metadata, and generated-C compilation.
+
+Physical Tab5 acceptance must validate 58 FPS panel cadence, seam-free scrolling,
+transform/color-key output, repeated load/unload, and terminal restoration. Measure a
+320×180 canvas with three visible 16×16 layers plus 64 sprites. Add bounded private bulk
+submission only when frame construction excluding VSYNC exceeds 12 ms.
+
 ## 1. Goal
 
 TabOS should be developed as a **multi-target codebase**, not as firmware that can only be meaningfully exercised on physical hardware.

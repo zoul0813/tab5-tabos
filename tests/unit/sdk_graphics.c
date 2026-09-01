@@ -127,15 +127,26 @@ int main(void)
         .rotation      = TABOS_GRAPHICS_ROTATE_90,
         .opacity       = 255U,
     };
+    const tabos_graphics_blit_options_t clipped = {
+        .pixels        = sprite,
+        .bitmap_width  = 2U,
+        .bitmap_height = 2U,
+        .source        = {.width = 2U, .height = 2U},
+        .destination   = {.x = 20, .y = 20, .width = 2U, .height = 2U},
+        .opacity       = 255U,
+        .clip          = {.x = 20, .y = 20, .width = 1U, .height = 1U},
+        .clip_enabled  = true,
+    };
     expected_width         = 320U;
     expected_height        = 180U;
     expected_x             = 0;
     expected_y             = 0;
     expected_output_width  = 1280U;
     expected_output_height = 720U;
-    if (tabos_graphics_blit_ex(&graphics, &blit) != 0 || tabos_graphics_present(&graphics) != 0 || !upscale_valid ||
-        present_count != 2U || clear_count != 1U || tabos_graphics_close(&graphics) != 0 || close_count != 2U ||
-        graphics.open) {
+    if (tabos_graphics_blit_ex(&graphics, &blit) != 0 || tabos_graphics_blit_ex(&graphics, &clipped) != 0 ||
+        graphics.pixels[20U * graphics.width + 20U] != red || graphics.pixels[20U * graphics.width + 21U] != blue ||
+        tabos_graphics_present(&graphics) != 0 || !upscale_valid || present_count != 2U || clear_count != 1U ||
+        tabos_graphics_close(&graphics) != 0 || close_count != 2U || graphics.open) {
         return 1;
     }
 

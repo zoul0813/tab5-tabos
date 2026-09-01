@@ -3,6 +3,19 @@
 > Status: project context distilled from TabOS planning discussions through 2026-08-10.
 > Purpose: give Codex a stable architectural baseline. Treat items marked **Decision** as the current direction, **Proposed** as a likely design that still needs validation, and **Open** as unresolved.
 
+## Sprite and Tile SDK
+
+- `[DECIDED]` Sprites, animations, metasprites, and finite orthogonal tilemaps are
+  portable SDK data lowered to `tabos_graphics_blit_ex()`; no retained renderer or
+  platform texture handles enter public API.
+- `[DECIDED]` RGB565 color-key transparency and operation-wide opacity remain graphics
+  model. No per-pixel alpha, runtime PNG/GIF parsing, tinting, palettes, entities,
+  physics, or collision solver.
+- `[DECIDED]` Versioned `.tsp` and `.tmap` assets load fully into process-owned memory.
+  Authoring accepts PNG, animated GIF, and finite orthogonal Tiled JSON.
+- `[DECIDED]` Runtime assets live under `T:/data/<app-name>/`; builds copy only explicit
+  generated outputs.
+
 ## 1. Project Goal
 
 TabOS is a Zeal OS-inspired operating environment for the **M5Stack Tab5 with the Tab5 Keyboard**.

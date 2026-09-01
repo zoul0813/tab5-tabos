@@ -7,6 +7,7 @@ import re
 import shlex
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 from .common import (
@@ -176,5 +177,6 @@ def command_setup(_args: argparse.Namespace) -> None:
 def command_activate_idf(_args: argparse.Namespace) -> None:
     if not local_idf_installed():
         fail("local ESP-IDF is not installed; run './tools/tabos setup'")
+    print(f"export TABOS_HOST_PYTHON={shlex.quote(sys.executable)}")
     print(f"export IDF_TOOLS_PATH={shlex.quote(str(LOCAL_IDF_TOOLS))}")
     print(f". {shlex.quote(str(LOCAL_IDF / 'export.sh'))}")

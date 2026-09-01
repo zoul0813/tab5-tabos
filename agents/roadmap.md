@@ -20,6 +20,18 @@
 
 ## Current Work
 
+### Sprite and Tile Graphics
+
+- [x] Add clip rectangles across SDK, private ABI, scalar, SDL, and Tab5 paths.
+- [x] Add portable sprite, animation, metasprite, tilemap, object, property, and flag APIs.
+- [x] Add validated versioned `.tsp` and `.tmap` loaders.
+- [x] Add deterministic PNG/GIF/Tiled converter and generated C output.
+- [x] Add explicit runtime-asset installation and MSC copying under `T:/data/<app>`.
+- [x] Add original binary-backed `tile-demo` and host tests.
+- [x] Validate Debug/Release builds on macOS and Tab5.
+- [ ] Validate Debug/Release builds on Linux.
+- [ ] Validate rendering, repeated load/unload, terminal restoration, and performance on physical Tab5.
+
 ### RTC and Wall Clock
 
 - [x] Add validated Gregorian calendar and signed Unix-epoch conversion.

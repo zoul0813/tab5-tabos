@@ -4,6 +4,19 @@
 >
 > This document defines the intended structure of TabOS and the architectural boundaries that implementation work should preserve. It is written primarily for Codex and contributors working in the repository.
 
+## Sprite and Tile Layer
+
+`sdk/lib/sprite.c` and `sdk/lib/tilemap.c` are portable application-side libraries.
+Descriptors may be generated C data or validated process-owned binary data with identical
+IDs and rendering semantics. Applications own gameplay and choose layer draw order.
+
+Per-operation clip rectangles extend existing blits. Scalar and logical-canvas paths
+implement exact clipping. SDL/PPA adapters may decline clipped work so portable fallback
+remains pixel-identical. Private RV32 marshaling carries all clip fields.
+
+Asset conversion belongs under `tools/tabos_tools/`; runtime code never parses PNG, GIF,
+or Tiled JSON. Runtime formats contain little-endian offsets/counts, never pointers.
+
 ## 1. Overview
 
 TabOS is a small native-computing environment for the **M5Stack Tab5 with the Tab5 Keyboard**.

@@ -7,6 +7,8 @@ This directory contains user and contributor documentation for TabOS.
 - [Project Configuration](configuration.md): persistent host and device options managed by `tools/tabos config`.
 - [Directory Structure](directory-structure.md): repository layout, directory responsibilities, and dependency boundaries.
 - [Display System](display.md): logical framebuffer contract, host presentation, and Tab5 display behavior.
+- [Graphics API](graphics-api.md): RGB565 drawing, logical canvases, transforms, opacity, and clipping.
+- [Sprite and Tile Assets](tile-assets.md): sprite/tile runtime APIs, PNG/GIF/Tiled conversion, and installation.
 - [Keyboard Input](input.md): public events, SDL3 translation, and Tab5 Keyboard protocol.
 - [Starfall](starfall.md): build, run, controls, storage, and asset provenance for the demo game.
 - [Console Service](console.md): foreground ownership, terminal controls, input, and diagnostic app.

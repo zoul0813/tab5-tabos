@@ -52,6 +52,8 @@ typedef struct {
         bool color_key_enabled;
         tabos_color_t color_key_low;
         tabos_color_t color_key_high;
+        tabos_graphics_rect_t clip;
+        bool clip_enabled;
 } tabos_graphics_blit_options_t;
 
 enum {

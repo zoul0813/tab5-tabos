@@ -1,0 +1,72 @@
+{
+  "type": "map",
+  "version": "1.10",
+  "orientation": "orthogonal",
+  "renderorder": "right-down",
+  "infinite": false,
+  "width": 12,
+  "height": 8,
+  "tilewidth": 16,
+  "tileheight": 16,
+  "tilesets": [
+    {
+      "firstgid": 1,
+      "name": "demo",
+      "image": "sprites-64.png",
+      "imagewidth": 64,
+      "imageheight": 64,
+      "tilewidth": 16,
+      "tileheight": 16,
+      "columns": 4,
+      "tilecount": 16,
+      "tiles": [
+        {"id": 1, "properties": [{"name": "water", "type": "bool", "value": true}]},
+        {"id": 2, "properties": [{"name": "solid", "type": "bool", "value": true}]}
+      ]
+    }
+  ],
+  "layers": [
+    {
+      "type": "tilelayer",
+      "name": "ground",
+      "width": 12,
+      "height": 8,
+      "data": [
+        2,2,2,2,2,2,2,2,2,2,2,2,
+        2,1,1,1,1,1,1,1,1,1,1,2,
+        2,1,4,1,1,1,4,1,1,4,1,2,
+        2,1,1,1,2,2,1,1,1,1,1,2,
+        2,1,1,1,2,2,1,1,4,1,1,2,
+        2,1,4,1,1,1,1,1,1,1,1,2,
+        2,1,1,1,1,1,1,4,1,1,1,2,
+        2,2,2,2,2,2,2,2,2,2,2,2
+      ]
+    },
+    {
+      "type": "tilelayer",
+      "name": "foreground",
+      "width": 12,
+      "height": 8,
+      "data": [
+        3,3,3,3,3,3,3,3,3,3,3,3,
+        3,0,0,0,0,0,0,0,0,0,0,3,
+        3,0,0,0,0,0,0,0,0,0,0,3,
+        3,0,0,0,0,0,0,0,0,0,0,3,
+        3,0,0,0,0,0,0,0,0,0,0,3,
+        3,0,0,0,0,0,0,0,0,0,0,3,
+        3,0,0,0,0,0,0,0,0,0,0,3,
+        3,3,3,3,3,3,3,3,3,3,3,3
+      ]
+    },
+    {
+      "type": "objectgroup",
+      "name": "markers",
+      "objects": [
+        {"id": 1, "name": "spawn", "class": "spawn", "point": true, "x": 48, "y": 48},
+        {"id": 2, "name": "grove", "class": "trigger", "x": 112, "y": 64, "width": 32, "height": 32,
+         "properties": [{"name": "trees", "type": "int", "value": 3}]},
+        {"id": 3, "name": "gem", "class": "pickup", "gid": 11, "x": 144, "y": 96, "width": 16, "height": 16}
+      ]
+    }
+  ]
+}

@@ -8,7 +8,7 @@
 
 #include <stdint.h>
 
-#define TABOS_ELF_API_VERSION  18U
+#define TABOS_ELF_API_VERSION  19U
 #define TABOS_ELF_EXEC_PENDING (-2147483647 - 1)
 
 enum {
