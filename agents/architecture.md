@@ -16,6 +16,9 @@ remains pixel-identical. Private RV32 marshaling carries all clip fields.
 
 Asset conversion belongs under `tools/tabos_tools/`; runtime code never parses PNG, GIF,
 or Tiled JSON. Runtime formats contain little-endian offsets/counts, never pointers.
+TMJ/TSJ is authoritative for imported tileset images, atlas regions, tile metadata, and
+tile animations. A manifest orchestrates outputs and adds only metadata not represented
+by imported Tiled sources; it must not re-import the same tileset image or sprite regions.
 
 ## 1. Overview
 

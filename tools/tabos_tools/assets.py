@@ -271,6 +271,9 @@ def load_manifest(path: Path) -> AssetSet:
         if not isinstance(entry, dict):
             fail("each images entry must be an object")
         add_image_entry(assets, path.parent, entry, flags)
+    for entry in manifest.get("maps", []):
+        assets.maps.append(load_tiled_map(assets, path.parent / require_string(entry, "source"),
+                                          require_string(entry, "name"), flags))
     sprite_ids = {sprite.name: index for index, sprite in enumerate(assets.sprites)}
     for entry in manifest.get("animations", []):
         frames = []
@@ -304,9 +307,6 @@ def load_manifest(path: Path) -> AssetSet:
         if not parts:
             fail("metasprite needs at least one part")
         assets.metasprites.append(Metasprite(require_string(entry, "name"), parts))
-    for entry in manifest.get("maps", []):
-        assets.maps.append(load_tiled_map(assets, path.parent / require_string(entry, "source"),
-                                          require_string(entry, "name"), flags))
     assets.constants = {"FLAG": list(flags), "SPRITE": [item.name for item in assets.sprites],
                         "ANIMATION": [item.name for item in assets.animations],
                         "METASPRITE": [item.name for item in assets.metasprites],
@@ -361,6 +361,22 @@ def load_tiled_map(assets: AssetSet, path: Path, name: str, flags: dict[str, int
         if len(frames) != 1:
             fail("Tiled tileset image must not be animated")
         image_width, image_height, rgba, _ = frames[0]
+        transparent_color = tileset.get("transparentcolor")
+        if transparent_color is not None:
+            if not isinstance(transparent_color, str) or re.fullmatch(r"#[0-9A-Fa-f]{6}", transparent_color) is None:
+                fail("Tiled transparentcolor must be #RRGGBB")
+            color = tuple(int(transparent_color[index:index + 2], 16) for index in (1, 3, 5))
+            tolerance = 0
+            for prop in tileset.get("properties", []):
+                if prop.get("name") == "transparent_tolerance":
+                    if prop.get("type") != "int":
+                        fail("transparent_tolerance must be an integer property")
+                    tolerance = integer(prop.get("value"), "transparent_tolerance")
+                    if tolerance < 0 or tolerance > 255:
+                        fail("transparent_tolerance must be between 0 and 255")
+            rgba = [(red, green, blue, 0 if max(abs(red - color[0]), abs(green - color[1]),
+                                                abs(blue - color[2])) <= tolerance else alpha)
+                    for red, green, blue, alpha in rgba]
         pixels, key = convert_pixels(rgba)
         image_id = len(assets.images)
         tileset_name = str(tileset.get("name", image_path.stem))
@@ -373,6 +389,7 @@ def load_tiled_map(assets: AssetSet, path: Path, name: str, flags: dict[str, int
         spacing = integer(tileset.get("spacing", 0), "tileset spacing")
         metadata = {integer(item.get("id"), "tile id"): item for item in tileset.get("tiles", [])}
         local_sprite_ids = []
+        animation_names: dict[int, str] = {}
         for local_id in range(tile_count):
             x = margin + (local_id % columns) * (tw + spacing)
             y = margin + (local_id // columns) * (th + spacing)
@@ -380,14 +397,32 @@ def load_tiled_map(assets: AssetSet, path: Path, name: str, flags: dict[str, int
                 fail(f"tileset tile {local_id} lies outside image")
             properties = metadata.get(local_id, {}).get("properties", [])
             tile_flags = 0
+            sprite_name = f"{name}_{tileset_name}_{local_id}"
+            pivot_x = 0
+            pivot_y = 0
             for prop in properties:
-                if prop.get("type") not in ("int", "bool"):
-                    fail("only integer and boolean tile properties are supported")
                 prop_name = require_string(prop, "name")
-                if prop_name in flags and bool(prop.get("value")):
+                prop_type = prop.get("type")
+                if prop_name in ("name", "animation_name"):
+                    if prop_type != "string" or not isinstance(prop.get("value"), str) or not prop["value"]:
+                        fail(f"{prop_name} must be a non-empty string property")
+                    if prop_name == "name":
+                        sprite_name = prop["value"]
+                    else:
+                        animation_names[local_id] = prop["value"]
+                elif prop_name in ("pivot_x", "pivot_y"):
+                    if prop_type != "int":
+                        fail(f"{prop_name} must be an integer property")
+                    if prop_name == "pivot_x":
+                        pivot_x = integer(prop.get("value"), prop_name)
+                    else:
+                        pivot_y = integer(prop.get("value"), prop_name)
+                elif prop_type not in ("int", "bool"):
+                    fail("only integer and boolean tile properties plus reserved TabOS metadata are supported")
+                elif prop_name in flags and bool(prop.get("value")):
                     tile_flags |= flags[prop_name]
             sprite_id = len(assets.sprites)
-            assets.sprites.append(Sprite(f"{name}_{tileset_name}_{local_id}", image_id, x, y, tw, th, 0, 0, tile_flags))
+            assets.sprites.append(Sprite(sprite_name, image_id, x, y, tw, th, pivot_x, pivot_y, tile_flags))
             gid_map[first_gid + local_id] = sprite_id
             local_sprite_ids.append(sprite_id)
         for local_id, item in metadata.items():
@@ -403,7 +438,8 @@ def load_tiled_map(assets: AssetSet, path: Path, name: str, flags: dict[str, int
                     frames_out.append((local_sprite_ids[frame_id], max(duration, 10)))
                 if not frames_out:
                     fail("Tiled animation needs at least one frame")
-                assets.animations.append(Animation(f"{name}_{tileset_name}_{local_id}", frames_out, 0,
+                animation_name = animation_names.get(local_id, f"{name}_{tileset_name}_{local_id}")
+                assets.animations.append(Animation(animation_name, frames_out, 0,
                                                     local_sprite_ids[local_id]))
     layers = []
     objects = []

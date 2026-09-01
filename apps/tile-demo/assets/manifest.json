@@ -5,43 +5,6 @@
     "solid": 1,
     "water": 2
   },
-  "images": [
-    {
-      "name": "sheet",
-      "source": "sprites-64.png",
-      "transparent_rgb": [248, 3, 247],
-      "transparent_tolerance": 20,
-      "sprites": [
-        {"name": "grass", "x": 0, "y": 0, "width": 16, "height": 16},
-        {"name": "water", "x": 16, "y": 0, "width": 16, "height": 16, "flags": ["water"]},
-        {"name": "wall", "x": 32, "y": 0, "width": 16, "height": 16, "flags": ["solid"]},
-        {"name": "flowers", "x": 48, "y": 0, "width": 16, "height": 16},
-        {"name": "robot_0", "x": 0, "y": 16, "width": 16, "height": 16, "pivot": [8, 14]},
-        {"name": "robot_1", "x": 16, "y": 16, "width": 16, "height": 16, "pivot": [8, 14]},
-        {"name": "robot_2", "x": 32, "y": 16, "width": 16, "height": 16, "pivot": [8, 14]},
-        {"name": "robot_3", "x": 48, "y": 16, "width": 16, "height": 16, "pivot": [8, 14]},
-        {"name": "tree", "x": 0, "y": 32, "width": 16, "height": 16, "pivot": [8, 15]},
-        {"name": "crate", "x": 16, "y": 32, "width": 16, "height": 16, "pivot": [8, 15], "flags": ["solid"]},
-        {"name": "gem", "x": 32, "y": 32, "width": 16, "height": 16, "pivot": [8, 8]},
-        {"name": "shadow", "x": 48, "y": 32, "width": 16, "height": 16, "pivot": [8, 8]},
-        {"name": "bush", "x": 0, "y": 48, "width": 16, "height": 16, "pivot": [8, 15]},
-        {"name": "rock", "x": 16, "y": 48, "width": 16, "height": 16, "pivot": [8, 15], "flags": ["solid"]},
-        {"name": "reeds", "x": 32, "y": 48, "width": 16, "height": 16, "pivot": [8, 15]},
-        {"name": "dirt", "x": 48, "y": 48, "width": 16, "height": 16}
-      ]
-    }
-  ],
-  "animations": [
-    {
-      "name": "robot_walk",
-      "frames": [
-        {"sprite": "robot_0", "duration_ms": 120},
-        {"sprite": "robot_1", "duration_ms": 120},
-        {"sprite": "robot_2", "duration_ms": 120},
-        {"sprite": "robot_3", "duration_ms": 120}
-      ]
-    }
-  ],
   "metasprites": [
     {
       "name": "tree_shadow",

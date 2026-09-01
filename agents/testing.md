@@ -10,7 +10,8 @@
 
 Host tests cover clip behavior, sprite pivots/transparency/animation/metasprites, tile
 get/set/camera/transforms, binary loading and cleanup, deterministic conversion, GIF
-timing/repeat metadata, and generated-C compilation.
+timing/repeat metadata, generated-C compilation, editable TMJ/TSJ metadata, and absence
+of duplicate images or sprites when a manifest imports a Tiled tileset.
 
 Physical Tab5 acceptance must validate 58 FPS panel cadence, seam-free scrolling,
 transform/color-key output, repeated load/unload, and terminal restoration. Measure a

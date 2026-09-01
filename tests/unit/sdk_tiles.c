@@ -179,9 +179,10 @@ int main(int argc, char** argv)
     if (argc == 3) {
         tabos_sprite_set_t loaded_sprites = {0};
         tabos_tilemap_t loaded_map        = {0};
-        if (tabos_sprite_set_load(argv[1], &loaded_sprites) != 0 || loaded_sprites.sprite_count < 20U ||
-            tabos_tilemap_load(argv[2], &loaded_map) != 0 || loaded_map.layer_count != 3U ||
-            tabos_tilemap_get(&loaded_map, 0U, 0U, 0U, &tile) != 0 || tile == TABOS_TILE_EMPTY) {
+        if (tabos_sprite_set_load(argv[1], &loaded_sprites) != 0 || loaded_sprites.image_count != 1U ||
+            loaded_sprites.sprite_count != 16U || tabos_tilemap_load(argv[2], &loaded_map) != 0 ||
+            loaded_map.layer_count != 3U || tabos_tilemap_get(&loaded_map, 0U, 0U, 0U, &tile) != 0 ||
+            tile == TABOS_TILE_EMPTY) {
             return 1;
         }
         int32_t property = 0;

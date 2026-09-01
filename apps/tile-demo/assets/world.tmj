@@ -1,72 +1,119 @@
 {
-  "type": "map",
-  "version": "1.10",
+  "compressionlevel": -1,
+  "height": 8,
+  "infinite": false,
+  "layers": [
+    {
+      "data": [
+        2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+        2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2,
+        2, 1, 4, 1, 1, 1, 4, 1, 1, 4, 1, 2,
+        2, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 2,
+        2, 1, 1, 1, 2, 2, 1, 1, 4, 1, 1, 2,
+        2, 1, 4, 1, 1, 1, 1, 1, 1, 1, 1, 2,
+        2, 1, 1, 1, 1, 1, 1, 4, 1, 1, 1, 2,
+        2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2
+      ],
+      "height": 8,
+      "id": 1,
+      "name": "ground",
+      "opacity": 1,
+      "type": "tilelayer",
+      "visible": true,
+      "width": 12,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "data": [
+        3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+        3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3,
+        3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3,
+        3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3,
+        3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3,
+        3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3,
+        3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3,
+        3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3
+      ],
+      "height": 8,
+      "id": 2,
+      "name": "foreground",
+      "opacity": 1,
+      "type": "tilelayer",
+      "visible": true,
+      "width": 12,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "draworder": "topdown",
+      "id": 3,
+      "name": "markers",
+      "objects": [
+        {
+          "class": "spawn",
+          "height": 0,
+          "id": 1,
+          "name": "spawn",
+          "point": true,
+          "rotation": 0,
+          "visible": true,
+          "width": 0,
+          "x": 48,
+          "y": 48
+        },
+        {
+          "class": "trigger",
+          "height": 32,
+          "id": 2,
+          "name": "grove",
+          "properties": [
+            {
+              "name": "trees",
+              "type": "int",
+              "value": 3
+            }
+          ],
+          "rotation": 0,
+          "visible": true,
+          "width": 32,
+          "x": 112,
+          "y": 64
+        },
+        {
+          "class": "pickup",
+          "gid": 11,
+          "height": 16,
+          "id": 3,
+          "name": "gem",
+          "rotation": 0,
+          "visible": true,
+          "width": 16,
+          "x": 144,
+          "y": 96
+        }
+      ],
+      "opacity": 1,
+      "type": "objectgroup",
+      "visible": true,
+      "x": 0,
+      "y": 0
+    }
+  ],
+  "nextlayerid": 4,
+  "nextobjectid": 4,
   "orientation": "orthogonal",
   "renderorder": "right-down",
-  "infinite": false,
-  "width": 12,
-  "height": 8,
-  "tilewidth": 16,
+  "tiledversion": "1.11.2",
   "tileheight": 16,
   "tilesets": [
     {
       "firstgid": 1,
-      "name": "demo",
-      "image": "sprites-64.png",
-      "imagewidth": 64,
-      "imageheight": 64,
-      "tilewidth": 16,
-      "tileheight": 16,
-      "columns": 4,
-      "tilecount": 16,
-      "tiles": [
-        {"id": 1, "properties": [{"name": "water", "type": "bool", "value": true}]},
-        {"id": 2, "properties": [{"name": "solid", "type": "bool", "value": true}]}
-      ]
+      "source": "demo.tsj"
     }
   ],
-  "layers": [
-    {
-      "type": "tilelayer",
-      "name": "ground",
-      "width": 12,
-      "height": 8,
-      "data": [
-        2,2,2,2,2,2,2,2,2,2,2,2,
-        2,1,1,1,1,1,1,1,1,1,1,2,
-        2,1,4,1,1,1,4,1,1,4,1,2,
-        2,1,1,1,2,2,1,1,1,1,1,2,
-        2,1,1,1,2,2,1,1,4,1,1,2,
-        2,1,4,1,1,1,1,1,1,1,1,2,
-        2,1,1,1,1,1,1,4,1,1,1,2,
-        2,2,2,2,2,2,2,2,2,2,2,2
-      ]
-    },
-    {
-      "type": "tilelayer",
-      "name": "foreground",
-      "width": 12,
-      "height": 8,
-      "data": [
-        3,3,3,3,3,3,3,3,3,3,3,3,
-        3,0,0,0,0,0,0,0,0,0,0,3,
-        3,0,0,0,0,0,0,0,0,0,0,3,
-        3,0,0,0,0,0,0,0,0,0,0,3,
-        3,0,0,0,0,0,0,0,0,0,0,3,
-        3,0,0,0,0,0,0,0,0,0,0,3,
-        3,0,0,0,0,0,0,0,0,0,0,3,
-        3,3,3,3,3,3,3,3,3,3,3,3
-      ]
-    },
-    {
-      "type": "objectgroup",
-      "name": "markers",
-      "objects": [
-        {"id": 1, "name": "spawn", "class": "spawn", "point": true, "x": 48, "y": 48},
-        {"id": 2, "name": "grove", "class": "trigger", "x": 112, "y": 64, "width": 32, "height": 32,
-         "properties": [{"name": "trees", "type": "int", "value": 3}]},
-        {"id": 3, "name": "gem", "class": "pickup", "gid": 11, "x": 144, "y": 96, "width": 16, "height": 16}
-      ]
-    }
-  ]
+  "tilewidth": 16,
+  "type": "map",
+  "version": "1.10",
+  "width": 12
 }

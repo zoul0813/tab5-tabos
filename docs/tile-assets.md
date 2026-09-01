@@ -45,18 +45,6 @@ Version-1 JSON manifests contain `name`, optional numeric `flags`, and arrays na
   "version": 1,
   "name": "game",
   "flags": {"solid": 1},
-  "images": [
-    {"name": "hero", "source": "hero.gif"},
-    {"name": "tiles", "source": "tiles.png",
-     "sprites": [
-       {"name": "wall", "x": 0, "y": 0, "width": 16, "height": 16,
-        "pivot": [0, 0], "flags": ["solid"]}
-     ]}
-  ],
-  "animations": [
-    {"name": "blink", "repeat_count": 0,
-     "frames": [{"sprite": "wall", "duration_ms": 120}]}
-  ],
   "metasprites": [
     {"name": "actor", "parts": [{"sprite": "wall", "x": 0, "y": 0}]}
   ],
@@ -76,6 +64,23 @@ layers, transforms, animations, integer/boolean tile properties, and integer obj
 properties. Only integral point, rectangle, and tile objects with zero rotation are
 accepted. Unsupported map modes, object geometry, partial alpha, unknown GIDs, and the
 reserved GID bit fail with diagnostics.
+
+When a manifest imports a Tiled map, its TMJ/TSJ files are authoritative for atlas
+regions and tile animations; do not list the same tileset image under manifest `images`.
+The converter loads maps before manifest animations and metasprites, allowing those
+entries to reference sprites named in TSJ tile properties. Supported TSJ metadata is:
+
+- `name` string tile property: generated sprite name.
+- `pivot_x` and `pivot_y` integer tile properties: local source-pixel anchor. Sprite
+  drawing places this anchor at the requested destination coordinate; `(0, 0)` anchors
+  the top-left, while `(width / 2, height - 1)` anchors near the bottom-center.
+- `animation_name` string tile property: name of that tile's Tiled animation.
+- Manifest flag names as boolean/integer tile properties: sprite flag bits.
+- Standard tileset `transparentcolor`, plus optional integer tileset property
+  `transparent_tolerance` from 0 through 255: color-key preparation.
+
+Keep manifest content for orchestration and metadata Tiled cannot represent, such as
+asset-set name, flag-bit registry, standalone PNG/GIF imports, and metasprite composition.
 
 Output contains deterministic generated `.c`/`.h`, one `TSP1` `.tsp`, and a `TMP1`
 `.tmap` per map. Binary tables are little-endian, four-byte aligned, offset/count based,

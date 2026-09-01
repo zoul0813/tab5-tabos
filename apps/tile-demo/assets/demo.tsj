@@ -1,0 +1,154 @@
+{
+  "columns": 4,
+  "image": "sprites-64.png",
+  "imageheight": 64,
+  "imagewidth": 64,
+  "margin": 0,
+  "name": "demo",
+  "properties": [
+    {
+      "name": "transparent_tolerance",
+      "type": "int",
+      "value": 20
+    }
+  ],
+  "spacing": 0,
+  "tilecount": 16,
+  "tiledversion": "1.11.2",
+  "tileheight": 16,
+  "tiles": [
+    {
+      "id": 0,
+      "properties": [
+        {"name": "name", "type": "string", "value": "grass"}
+      ]
+    },
+    {
+      "id": 1,
+      "properties": [
+        {"name": "name", "type": "string", "value": "water"},
+        {"name": "water", "type": "bool", "value": true}
+      ]
+    },
+    {
+      "id": 2,
+      "properties": [
+        {"name": "solid", "type": "bool", "value": true},
+        {"name": "name", "type": "string", "value": "wall"}
+      ]
+    },
+    {
+      "id": 3,
+      "properties": [
+        {"name": "name", "type": "string", "value": "flowers"}
+      ]
+    },
+    {
+      "animation": [
+        {"duration": 120, "tileid": 4},
+        {"duration": 120, "tileid": 5},
+        {"duration": 120, "tileid": 6},
+        {"duration": 120, "tileid": 7}
+      ],
+      "id": 4,
+      "properties": [
+        {"name": "animation_name", "type": "string", "value": "robot_walk"},
+        {"name": "name", "type": "string", "value": "robot_0"},
+        {"name": "pivot_x", "type": "int", "value": 8},
+        {"name": "pivot_y", "type": "int", "value": 14}
+      ]
+    },
+    {
+      "id": 5,
+      "properties": [
+        {"name": "name", "type": "string", "value": "robot_1"},
+        {"name": "pivot_x", "type": "int", "value": 8},
+        {"name": "pivot_y", "type": "int", "value": 14}
+      ]
+    },
+    {
+      "id": 6,
+      "properties": [
+        {"name": "name", "type": "string", "value": "robot_2"},
+        {"name": "pivot_x", "type": "int", "value": 8},
+        {"name": "pivot_y", "type": "int", "value": 14}
+      ]
+    },
+    {
+      "id": 7,
+      "properties": [
+        {"name": "name", "type": "string", "value": "robot_3"},
+        {"name": "pivot_x", "type": "int", "value": 8},
+        {"name": "pivot_y", "type": "int", "value": 14}
+      ]
+    },
+    {
+      "id": 8,
+      "properties": [
+        {"name": "name", "type": "string", "value": "tree"},
+        {"name": "pivot_x", "type": "int", "value": 8},
+        {"name": "pivot_y", "type": "int", "value": 15}
+      ]
+    },
+    {
+      "id": 9,
+      "properties": [
+        {"name": "solid", "type": "bool", "value": true},
+        {"name": "name", "type": "string", "value": "crate"},
+        {"name": "pivot_x", "type": "int", "value": 8},
+        {"name": "pivot_y", "type": "int", "value": 15}
+      ]
+    },
+    {
+      "id": 10,
+      "properties": [
+        {"name": "name", "type": "string", "value": "gem"},
+        {"name": "pivot_x", "type": "int", "value": 8},
+        {"name": "pivot_y", "type": "int", "value": 8}
+      ]
+    },
+    {
+      "id": 11,
+      "properties": [
+        {"name": "name", "type": "string", "value": "shadow"},
+        {"name": "pivot_x", "type": "int", "value": 8},
+        {"name": "pivot_y", "type": "int", "value": 8}
+      ]
+    },
+    {
+      "id": 12,
+      "properties": [
+        {"name": "name", "type": "string", "value": "bush"},
+        {"name": "pivot_x", "type": "int", "value": 8},
+        {"name": "pivot_y", "type": "int", "value": 15}
+      ]
+    },
+    {
+      "id": 13,
+      "properties": [
+        {"name": "solid", "type": "bool", "value": true},
+        {"name": "name", "type": "string", "value": "rock"},
+        {"name": "pivot_x", "type": "int", "value": 8},
+        {"name": "pivot_y", "type": "int", "value": 15}
+      ]
+    },
+    {
+      "id": 14,
+      "properties": [
+        {"name": "name", "type": "string", "value": "reeds"},
+        {"name": "pivot_x", "type": "int", "value": 8},
+        {"name": "pivot_y", "type": "int", "value": 15}
+      ]
+    },
+    {
+      "id": 15,
+      "properties": [
+        {"name": "name", "type": "string", "value": "dirt"}
+      ]
+    }
+  ],
+  "tilewidth": 16,
+  "transparentcolor": "#f803f7",
+  "type": "tileset",
+  "version": "1.10"
+}

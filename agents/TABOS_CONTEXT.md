@@ -15,6 +15,9 @@
   Authoring accepts PNG, animated GIF, and finite orthogonal Tiled JSON.
 - `[DECIDED]` Runtime assets live under `T:/data/<app-name>/`; builds copy only explicit
   generated outputs.
+- `[DECIDED]` Imported TMJ/TSJ files own tileset images, regions, tile metadata, and tile
+  animations. Manifests orchestrate outputs and non-Tiled metadata without duplicating
+  imported tiles or images.
 
 ## 1. Project Goal
 

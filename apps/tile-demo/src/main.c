@@ -64,7 +64,7 @@ int main(void)
             } else if (event.key == TABOS_KEY_E) {
                 tabos_tile_t tile = 0U;
                 if (tabos_tilemap_get(&map, 1U, 5U, 3U, &tile) == 0) {
-                    (void) tabos_tilemap_set(&map, 1U, 5U, 3U, tile == 0U ? TABOS_TILE(18U) : 0U);
+                    (void) tabos_tilemap_set(&map, 1U, 5U, 3U, tile == 0U ? TABOS_TILE(2U) : 0U);
                 }
             }
         }

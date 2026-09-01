@@ -103,6 +103,7 @@ add_custom_command(
         "${TABOS_ROOT}/tools/tabos_tools/assets.py"
         "${TABOS_ROOT}/apps/tile-demo/assets/manifest.json"
         "${TABOS_ROOT}/apps/tile-demo/assets/world.tmj"
+        "${TABOS_ROOT}/apps/tile-demo/assets/demo.tsj"
         "${TABOS_ROOT}/apps/tile-demo/assets/sprites-64.png"
 )
 add_custom_target(tabos_test_tile_assets DEPENDS

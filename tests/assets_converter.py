@@ -29,6 +29,25 @@ def main() -> int:
     except ImportError:
         print("Pillow unavailable", file=sys.stderr)
         return 1
+    demo_map = json.loads((ROOT / "apps/tile-demo/assets/world.tmj").read_text(encoding="utf-8"))
+    demo_tileset = json.loads((ROOT / "apps/tile-demo/assets/demo.tsj").read_text(encoding="utf-8"))
+    if (not demo_map.get("tiledversion") or demo_map.get("nextlayerid") != 4 or
+            demo_map.get("nextobjectid") != 4 or not all(layer.get("visible") for layer in demo_map["layers"]) or
+            any("id" not in layer for layer in demo_map["layers"]) or
+            demo_map["tilesets"] != [{"firstgid": 1, "source": "demo.tsj"}] or
+            demo_tileset.get("type") != "tileset" or demo_tileset.get("image") != "sprites-64.png"):
+        return 1
+    demo_assets = load_manifest(ROOT / "apps/tile-demo/assets/manifest.json")
+    if (len(demo_assets.images) != 1 or len(demo_assets.sprites) != 16 or
+            [sprite.name for sprite in demo_assets.sprites] != [
+                "grass", "water", "wall", "flowers", "robot_0", "robot_1", "robot_2", "robot_3",
+                "tree", "crate", "gem", "shadow", "bush", "rock", "reeds", "dirt"] or
+            (demo_assets.sprites[4].pivot_x, demo_assets.sprites[4].pivot_y) != (8, 14) or
+            (demo_assets.sprites[8].pivot_x, demo_assets.sprites[8].pivot_y) != (8, 15) or
+            len(demo_assets.animations) != 1 or demo_assets.animations[0].name != "robot_walk" or
+            demo_assets.animations[0].frames != [(4, 120), (5, 120), (6, 120), (7, 120)] or
+            len(demo_assets.metasprites) != 1):
+        return 1
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
         first = Image.new("RGBA", (2, 2), (255, 0, 0, 255))
