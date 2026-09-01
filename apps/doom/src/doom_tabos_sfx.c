@@ -7,11 +7,7 @@
 enum {
     SFX_POSITION_BITS = 16,
     SFX_POSITION_MASK = (1U << SFX_POSITION_BITS) - 1U,
-    SFX_GAIN_MAX      = 255,
-    // Shift-based gain and a 14-bit filter keep software division and 64-bit multiplication out of the RV32I hot path.
-    SFX_GAIN_SHIFT  = 8,
-    SFX_FILTER_BITS = 14,
-    SFX_PI_X_100    = 314,
+    SFX_GAIN_SHIFT = 8,
 };
 
 static int clamp(int value, int minimum, int maximum)
@@ -106,15 +102,14 @@ bool doom_tabos_sfx_start(doom_tabos_sfx_mixer_t* mixer, unsigned int channel, c
     }
     memcpy(copy, samples, sample_count);
     uint64_t step = ((uint64_t) sample_rate << SFX_POSITION_BITS) / DOOM_TABOS_SFX_SAMPLE_RATE;
-    if (step == 0U) {
-        step = 1U;
+    if (step == 0U || step > UINT32_MAX) {
+        free(copy);
+        return false;
     }
     mixer->channels[channel] = (doom_tabos_sfx_channel_t) {
         .samples      = copy,
         .sample_count = sample_count,
         .step         = (uint32_t) step,
-        .filter_alpha = (uint32_t) ((((uint64_t) SFX_PI_X_100 * sample_rate) << SFX_FILTER_BITS) /
-                                    (DOOM_TABOS_SFX_SAMPLE_RATE * 100U + SFX_PI_X_100 * sample_rate)),
         .active       = true,
     };
     doom_tabos_sfx_set_params(mixer, channel, volume, separation);
@@ -136,15 +131,9 @@ static bool mix_channel_frame(doom_tabos_sfx_mixer_t* mixer, unsigned int channe
         doom_tabos_sfx_stop(mixer, channel);
         return false;
     }
-    const int32_t sample = (int32_t) sound->samples[sound->source_index] * 257 - 32768;
-    if (!sound->filter_initialized) {
-        sound->filter_sample      = sample;
-        sound->filter_initialized = true;
-    } else {
-        sound->filter_sample += ((int32_t) sound->filter_alpha * (sample - sound->filter_sample)) >> SFX_FILTER_BITS;
-    }
-    *left               += (sound->filter_sample * sound->left_gain) >> SFX_GAIN_SHIFT;
-    *right              += (sound->filter_sample * sound->right_gain) >> SFX_GAIN_SHIFT;
+    const int32_t sample = ((int32_t) sound->samples[sound->source_index] - 128) * 256;
+    *left               += (sample * sound->left_gain) >> SFX_GAIN_SHIFT;
+    *right              += (sample * sound->right_gain) >> SFX_GAIN_SHIFT;
     sound->fraction     += sound->step;
     sound->source_index += sound->fraction >> SFX_POSITION_BITS;
     sound->fraction     &= SFX_POSITION_MASK;

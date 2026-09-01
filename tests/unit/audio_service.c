@@ -26,6 +26,8 @@ int main(void)
     const char* driver = NULL;
     int error          = -1;
     if (!audio_service_info(&info, &driver, &error) || driver == NULL || error != 0 || info.capture_channels != 4U ||
+        info.sample_rates != TABOS_AUDIO_RATES_ALL || info.default_sample_rate != TABOS_AUDIO_DEFAULT_SAMPLE_RATE ||
+        test_platform_audio_sample_rate() != TABOS_AUDIO_DEFAULT_SAMPLE_RATE ||
         (info.features & (TABOS_AUDIO_FEATURE_PLAYBACK | TABOS_AUDIO_FEATURE_CAPTURE)) !=
             (TABOS_AUDIO_FEATURE_PLAYBACK | TABOS_AUDIO_FEATURE_CAPTURE)) {
         return fail("audio service info mismatch");
@@ -37,6 +39,43 @@ int main(void)
         .channels  = 1U,
         .route     = TABOS_AUDIO_ROUTE_SPEAKER,
     };
+    const tabos_audio_config_t native_rate_config = {
+        .direction   = TABOS_AUDIO_PLAYBACK,
+        .channels    = 2U,
+        .route       = TABOS_AUDIO_ROUTE_SPEAKER,
+        .sample_rate = TABOS_AUDIO_SAMPLE_RATE_11025,
+    };
+    const tabos_audio_stream_t native_rate = audio_service_open(&owner_a, &native_rate_config);
+    tabos_audio_config_t conflicting_rate_config = native_rate_config;
+    conflicting_rate_config.sample_rate          = TABOS_AUDIO_SAMPLE_RATE_48000;
+    tabos_audio_config_t unsupported_rate_config = native_rate_config;
+    unsupported_rate_config.sample_rate          = 12345U;
+    if (native_rate <= 0 || test_platform_audio_sample_rate() != TABOS_AUDIO_SAMPLE_RATE_11025 ||
+        audio_service_open(&owner_b, &conflicting_rate_config) != -TABOS_EBUSY ||
+        audio_service_open(&owner_b, &unsupported_rate_config) != -TABOS_EINVAL ||
+        audio_service_close(&owner_a, native_rate) != 0) {
+        return fail("sample-rate selection or shared-clock arbitration failed");
+    }
+    const tabos_audio_stream_t default_rate = audio_service_open(&owner_a, &playback_config);
+    if (default_rate <= 0 || test_platform_audio_sample_rate() != TABOS_AUDIO_DEFAULT_SAMPLE_RATE ||
+        audio_service_close(&owner_a, default_rate) != 0) {
+        return fail("default sample rate was not restored on next open");
+    }
+    static const uint32_t native_rates[] = {
+        TABOS_AUDIO_SAMPLE_RATE_8000,  TABOS_AUDIO_SAMPLE_RATE_11025, TABOS_AUDIO_SAMPLE_RATE_12000,
+        TABOS_AUDIO_SAMPLE_RATE_16000, TABOS_AUDIO_SAMPLE_RATE_22050, TABOS_AUDIO_SAMPLE_RATE_24000,
+        TABOS_AUDIO_SAMPLE_RATE_32000, TABOS_AUDIO_SAMPLE_RATE_44100, TABOS_AUDIO_SAMPLE_RATE_48000,
+        TABOS_AUDIO_SAMPLE_RATE_88200, TABOS_AUDIO_SAMPLE_RATE_96000,
+    };
+    for (size_t index = 0U; index < sizeof(native_rates) / sizeof(native_rates[0]); ++index) {
+        tabos_audio_config_t config = playback_config;
+        config.sample_rate          = native_rates[index];
+        const tabos_audio_stream_t stream = audio_service_open(&owner_a, &config);
+        if (stream <= 0 || test_platform_audio_sample_rate() != native_rates[index] ||
+            audio_service_close(&owner_a, stream) != 0) {
+            return fail("supported native sample rate did not open");
+        }
+    }
     const int16_t sample = 2000;
     for (size_t index = 0U; index < 4U; ++index) {
         playback[index] = audio_service_open(&owner_a, &playback_config);

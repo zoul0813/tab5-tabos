@@ -1,7 +1,7 @@
 # TabOS Application SDK
 
 TabOS applications are independently compiled RV32 C17 executables. The current
-pre-release ABI version value is 2. Applications
+pre-release ABI version value is 3. Applications
 include public headers under `sdk/include/` and do not access the private ELF API table,
 ESP-IDF, FreeRTOS, or SDL.
 
@@ -38,7 +38,8 @@ capture, speaker, headphone, microphone, and working AEC support.
 ## Audio
 
 `<tabos/audio.h>` provides process-owned nonblocking PCM playback and capture streams,
-per-stream volume, physical route selection, and buffer counters. `<tabos/wait.h>` adapts
+selectable 8–96 kHz hardware sample rates, per-stream volume, physical route selection,
+and buffer counters. `<tabos/wait.h>` adapts
 streams to readable, writable, error, and hangup waits. See `docs/audio.md` for the format,
 lifecycle, mixing, and utility contract.
 

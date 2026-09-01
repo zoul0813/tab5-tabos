@@ -18,6 +18,8 @@ void tester_test_audio(tester_context_t* context)
 
     tabos_audio_info_t info;
     const bool info_ok = tabos_audio_get_info(&info) == 0 && info.capture_channels > 0U &&
+                         info.sample_rates == TABOS_AUDIO_RATES_ALL &&
+                         info.default_sample_rate == TABOS_AUDIO_DEFAULT_SAMPLE_RATE &&
                          (info.features & (TABOS_AUDIO_FEATURE_PLAYBACK | TABOS_AUDIO_FEATURE_CAPTURE)) ==
                              (TABOS_AUDIO_FEATURE_PLAYBACK | TABOS_AUDIO_FEATURE_CAPTURE) &&
                          (info.routes & (TABOS_AUDIO_ROUTE_SPEAKER | TABOS_AUDIO_ROUTE_MICROPHONE)) ==

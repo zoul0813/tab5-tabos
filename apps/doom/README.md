@@ -11,9 +11,10 @@ E or Space to use, Shift to run, R to toggle always-run, number keys for weapons
 standard Escape/Enter/arrow/Y/N/F-key menu controls. This is not a normal TabOS release
 artifact.
 
-DOOM resamples each of its eight DMX sound-effect channels into a separate stereo 48 kHz
-TabOS playback stream. A source-rate low-pass filter suppresses upsampling aliases before
-channels are mixed. Each stream keeps 120 ms of lookahead to prevent underruns while DOOM
+DOOM converts each unsigned 8-bit mono DMX sound-effect channel to a separate signed 16-bit
+stereo TabOS playback stream at 11.025 kHz. Native-rate lumps require no conversion;
+alternate-rate WAD lumps use nearest-sample phase conversion without filtering. Engine volume
+and stereo separation are applied directly. Each stream keeps 120 ms of lookahead while DOOM
 renders. Opened channel streams are reused; stopping or replacing a channel flushes its queued
 PCM immediately without reallocating the stream.
 The TabOS mixer combines active channels. Volume and stereo separation follow

@@ -17,5 +17,6 @@ void test_platform_battery_set_status(bool ready, int error);
 void test_platform_audio_render(int16_t* stereo, size_t frames);
 void test_platform_audio_capture(const int16_t* samples, size_t frames, uint32_t channels);
 void test_platform_audio_error(int error);
+uint32_t test_platform_audio_sample_rate(void);
 
 #endif

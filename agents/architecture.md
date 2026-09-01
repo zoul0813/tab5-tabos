@@ -44,7 +44,7 @@ does not append `.bin` to command names.
 ### Pre-release application ABI [DECIDED]
 
 Applications consume public SDK headers only; the ELF transport table is private to CRT
-and SDK runtime sources. The current version value is 2, but the ABI is not released or
+and SDK runtime sources. The current version value is 3, but the ABI is not released or
 frozen. Incompatible changes are allowed while TabOS is being defined, and bundled
 applications are rebuilt with the system. No compatibility shims are required for
 unreleased binaries. The current runtime uses newlib for C17 allocation and stdio, provides the
@@ -801,9 +801,12 @@ hardware
 
 Applications should not directly configure audio peripherals.
 
-A central mixer is likely desirable so multiple applications and system sounds can coexist.
-
-The exact streaming and mixer API remains unresolved.
+A central mixer combines process-owned playback streams with saturation and per-stream gain.
+Streams use signed 16-bit little-endian PCM and select one of the backend's reported native
+sample rates. Playback and capture share one physical clock rate: the first open stream selects
+it, conflicting concurrent opens fail with `EBUSY`, and the next open after all streams close may
+select a new rate. The default rate is 44.1 kHz. Applications must perform any desired
+cross-rate conversion themselves.
 
 ---
 

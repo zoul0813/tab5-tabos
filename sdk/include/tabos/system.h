@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define TABOS_APPLICATION_ABI_VERSION 2U
+#define TABOS_APPLICATION_ABI_VERSION 3U
 
 typedef struct {
         char target[16];

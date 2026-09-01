@@ -482,6 +482,9 @@ but is not a substitute for this execution path.
 - [x] Implement shared mixer.
 - [x] Implement SDL3 host output backend.
 - [x] Implement Tab5 audio backend.
+- [x] Expose native 8–96 kHz hardware rates with a 44.1 kHz default and shared-clock arbitration.
+- [x] Monitor the Tab5 headphone jack and automatically mute the main speaker on insertion.
+- [ ] Validate headphone insertion, speaker muting, and unplug restoration on physical Tab5 hardware.
 - [x] Add application-local DMX sound-effect mixing and TabOS PCM output for DOOM.
 - [x] Reuse and flush DOOM playback streams so effect replacement does not stall rendering.
 - [ ] Add DOOM MUS/MIDI synthesis when a suitable bounded software synthesizer is selected.

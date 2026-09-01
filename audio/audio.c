@@ -26,6 +26,7 @@ typedef struct {
         uint32_t generation;
         uint32_t channels;
         uint32_t route;
+        uint32_t sample_rate;
         uint32_t volume;
         uint32_t underruns;
         uint32_t overruns;
@@ -37,6 +38,8 @@ typedef struct {
 static audio_stream_t streams[AUDIO_STREAM_CAPACITY];
 static platform_mutex_t* audio_mutex;
 static platform_audio_info_t platform_info;
+static uint32_t active_sample_rate;
+static bool reconfiguring;
 static bool initialized;
 
 static uint32_t next_generation(uint32_t generation)
@@ -158,6 +161,7 @@ bool audio_service_init(void)
     }
     initialized = true;
     (void) platform_audio_init(audio_service_render, audio_service_capture, audio_service_error, &platform_info);
+    active_sample_rate = platform_info.default_sample_rate;
     return true;
 }
 
@@ -177,6 +181,8 @@ void audio_service_shutdown(void)
     platform_mutex_destroy(audio_mutex);
     audio_mutex   = NULL;
     platform_info = (platform_audio_info_t) {0};
+    active_sample_rate = 0U;
+    reconfiguring      = false;
     initialized   = false;
 }
 
@@ -188,9 +194,11 @@ bool audio_service_info(tabos_audio_info_t* info, const char** driver, int* erro
     platform_mutex_lock(audio_mutex);
     if (info != NULL) {
         *info = (tabos_audio_info_t) {
-            .features         = platform_info.features,
-            .routes           = platform_info.routes,
-            .capture_channels = platform_info.capture_channels,
+            .features            = platform_info.features,
+            .routes              = platform_info.routes,
+            .capture_channels    = platform_info.capture_channels,
+            .sample_rates        = platform_info.sample_rates,
+            .default_sample_rate = platform_info.default_sample_rate,
         };
     }
     if (driver != NULL) {
@@ -204,11 +212,54 @@ bool audio_service_info(tabos_audio_info_t* info, const char** driver, int* erro
     return detected;
 }
 
+static uint32_t sample_rate_flag(uint32_t sample_rate)
+{
+    switch (sample_rate) {
+        case TABOS_AUDIO_SAMPLE_RATE_8000:
+            return TABOS_AUDIO_RATE_8000;
+        case TABOS_AUDIO_SAMPLE_RATE_11025:
+            return TABOS_AUDIO_RATE_11025;
+        case TABOS_AUDIO_SAMPLE_RATE_12000:
+            return TABOS_AUDIO_RATE_12000;
+        case TABOS_AUDIO_SAMPLE_RATE_16000:
+            return TABOS_AUDIO_RATE_16000;
+        case TABOS_AUDIO_SAMPLE_RATE_22050:
+            return TABOS_AUDIO_RATE_22050;
+        case TABOS_AUDIO_SAMPLE_RATE_24000:
+            return TABOS_AUDIO_RATE_24000;
+        case TABOS_AUDIO_SAMPLE_RATE_32000:
+            return TABOS_AUDIO_RATE_32000;
+        case TABOS_AUDIO_SAMPLE_RATE_44100:
+            return TABOS_AUDIO_RATE_44100;
+        case TABOS_AUDIO_SAMPLE_RATE_48000:
+            return TABOS_AUDIO_RATE_48000;
+        case TABOS_AUDIO_SAMPLE_RATE_88200:
+            return TABOS_AUDIO_RATE_88200;
+        case TABOS_AUDIO_SAMPLE_RATE_96000:
+            return TABOS_AUDIO_RATE_96000;
+        default:
+            return 0U;
+    }
+}
+
+static bool streams_open(void)
+{
+    for (size_t index = 0U; index < AUDIO_STREAM_CAPACITY; ++index) {
+        if (streams[index].open) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static bool config_valid(const tabos_audio_config_t* config)
 {
+    const uint32_t sample_rate = config != NULL && config->sample_rate != 0U ? config->sample_rate :
+                                                                                 platform_info.default_sample_rate;
     if (config == NULL || !platform_info.ready || config->channels == 0U ||
         config->channels > TABOS_AUDIO_IO_MAX / sizeof(int16_t) || (config->route & (config->route - 1U)) != 0U ||
-        (config->route & platform_info.routes) == 0U) {
+        (config->route & platform_info.routes) == 0U ||
+        (sample_rate_flag(sample_rate) & platform_info.sample_rates) == 0U) {
         return false;
     }
     if (config->direction == TABOS_AUDIO_PLAYBACK) {
@@ -242,20 +293,40 @@ tabos_audio_stream_t audio_service_open(const void* owner, const tabos_audio_con
         free(ring);
         return -TABOS_EINVAL;
     }
+    const uint32_t sample_rate = config->sample_rate != 0U ? config->sample_rate : platform_info.default_sample_rate;
+    if (reconfiguring || (streams_open() && sample_rate != active_sample_rate)) {
+        platform_mutex_unlock(audio_mutex);
+        free(ring);
+        return -TABOS_EBUSY;
+    }
+    if (!streams_open() && sample_rate != active_sample_rate) {
+        reconfiguring = true;
+        platform_mutex_unlock(audio_mutex);
+        const bool configured = platform_audio_set_sample_rate(sample_rate);
+        platform_mutex_lock(audio_mutex);
+        reconfiguring = false;
+        if (!configured) {
+            platform_mutex_unlock(audio_mutex);
+            free(ring);
+            return -TABOS_EIO;
+        }
+        active_sample_rate = sample_rate;
+    }
     for (size_t index = 0U; index < AUDIO_STREAM_CAPACITY; ++index) {
         if (streams[index].open) {
             continue;
         }
         const uint32_t generation = next_generation(streams[index].generation);
         streams[index]            = (audio_stream_t) {
-                       .owner      = owner,
-                       .ring       = ring,
-                       .generation = generation,
-                       .channels   = config->channels,
-                       .route      = config->route,
-                       .volume     = TABOS_AUDIO_VOLUME_MAX,
-                       .direction  = config->direction,
-                       .open       = true,
+                       .owner       = owner,
+                       .ring        = ring,
+                       .generation  = generation,
+                       .channels    = config->channels,
+                       .route       = config->route,
+                       .sample_rate = sample_rate,
+                       .volume      = TABOS_AUDIO_VOLUME_MAX,
+                       .direction   = config->direction,
+                       .open        = true,
         };
         const tabos_audio_stream_t handle = stream_handle(index, generation);
         platform_mutex_unlock(audio_mutex);

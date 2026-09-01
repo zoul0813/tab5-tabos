@@ -192,8 +192,10 @@ documentation pass.
 
 - [x] Detect and initialize ES8388/ES7210, then register `audio0`.
 - [x] Add `<tabos/audio.h>` with process-owned playback and capture stream handles.
-- [x] Require signed 16-bit little-endian PCM at 48 kHz as the mandatory format.
+- [x] Require signed 16-bit little-endian PCM and support native 8, 11.025, 12, 16,
+  22.05, 24, 32, 44.1, 48, 88.2, and 96 kHz rates, defaulting to 44.1 kHz.
 - [x] Support mono and stereo playback and backend-reported capture channel counts.
+- [x] Detect Tab5 headphone insertion and automatically disable the main speaker amplifier.
 - [x] Use bounded ring buffers with nonblocking reads/writes and `EAGAIN`.
 - [x] Allow queued playback PCM to be flushed without closing and reopening the stream.
 - [x] Expose readable/writable/error/hangup through generic waits.

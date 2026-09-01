@@ -23,7 +23,7 @@ defaults to `T:/bin`, with user-configurable semicolon-separated PATH entries.
 Paths containing `/` are resolved relative to the current drive and working
 directory; explicit drive paths such as `T:/bin/tester` remain supported.
 
-The current pre-release application contract is identified as TabOS application ABI v2,
+The current pre-release application contract is identified as TabOS application ABI v3,
 but it is not frozen or published. The ABI, SDK, and private transport may change freely
 while TabOS is being defined; bundled applications are rebuilt with the system.
 The ELF API table is private transport used only by CRT and SDK runtime sources.

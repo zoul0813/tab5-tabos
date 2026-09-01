@@ -15,13 +15,15 @@ static int info_call(tabos_audio_info_t* info)
         .features         = TABOS_AUDIO_FEATURE_PLAYBACK | TABOS_AUDIO_FEATURE_CAPTURE,
         .routes           = TABOS_AUDIO_ROUTE_SPEAKER | TABOS_AUDIO_ROUTE_MICROPHONE,
         .capture_channels = 2U,
+        .sample_rates     = TABOS_AUDIO_RATES_ALL,
+        .default_sample_rate = TABOS_AUDIO_DEFAULT_SAMPLE_RATE,
     };
     return 0;
 }
 
 static int open_call(const tabos_audio_config_t* config)
 {
-    return config->channels == 2U ? 17 : -TABOS_EINVAL;
+    return config->channels == 2U && config->sample_rate == TABOS_AUDIO_SAMPLE_RATE_11025 ? 17 : -TABOS_EINVAL;
 }
 
 static int close_call(int stream)
@@ -86,11 +88,14 @@ int main(void)
         .direction = TABOS_AUDIO_PLAYBACK,
         .channels  = 2U,
         .route     = TABOS_AUDIO_ROUTE_SPEAKER,
+        .sample_rate = TABOS_AUDIO_SAMPLE_RATE_11025,
     };
     int16_t pcm[2] = {0};
     tabos_audio_status_t status;
     const tabos_audio_stream_t stream = tabos_audio_open(&config);
-    if (tabos_audio_get_info(&info) != 0 || info.capture_channels != 2U || stream != 17) {
+    if (tabos_audio_get_info(&info) != 0 || info.capture_channels != 2U ||
+        info.default_sample_rate != TABOS_AUDIO_DEFAULT_SAMPLE_RATE || info.sample_rates != TABOS_AUDIO_RATES_ALL ||
+        stream != 17) {
         return 1;
     }
     if (tabos_audio_write(stream, pcm, sizeof(pcm)) != (int) sizeof(pcm) ||

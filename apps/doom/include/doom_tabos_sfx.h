@@ -7,7 +7,7 @@
 
 enum {
     DOOM_TABOS_SFX_CHANNELS    = 8,
-    DOOM_TABOS_SFX_SAMPLE_RATE = 48000,
+    DOOM_TABOS_SFX_SAMPLE_RATE = 11025,
 };
 
 typedef struct {
@@ -16,11 +16,8 @@ typedef struct {
         size_t source_index;
         uint32_t fraction;
         uint32_t step;
-        uint32_t filter_alpha;
-        int32_t filter_sample;
         uint16_t left_gain;
         uint16_t right_gain;
-        bool filter_initialized;
         bool active;
 } doom_tabos_sfx_channel_t;
 

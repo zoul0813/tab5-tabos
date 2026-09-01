@@ -36,7 +36,31 @@ static int show_info(void)
         fprintf(stderr, "audiotest: audio unavailable: %s\n", strerror(errno));
         return 1;
     }
-    printf("Format: signed 16-bit little-endian PCM, %u Hz\n", TABOS_AUDIO_SAMPLE_RATE);
+    printf("Format: signed 16-bit little-endian PCM\n");
+    printf("Default sample rate: %lu Hz\n", (unsigned long) info.default_sample_rate);
+    printf("Sample rates:");
+    const struct {
+            uint32_t flag;
+            uint32_t rate;
+    } rates[] = {
+        {TABOS_AUDIO_RATE_8000, TABOS_AUDIO_SAMPLE_RATE_8000},
+        {TABOS_AUDIO_RATE_11025, TABOS_AUDIO_SAMPLE_RATE_11025},
+        {TABOS_AUDIO_RATE_12000, TABOS_AUDIO_SAMPLE_RATE_12000},
+        {TABOS_AUDIO_RATE_16000, TABOS_AUDIO_SAMPLE_RATE_16000},
+        {TABOS_AUDIO_RATE_22050, TABOS_AUDIO_SAMPLE_RATE_22050},
+        {TABOS_AUDIO_RATE_24000, TABOS_AUDIO_SAMPLE_RATE_24000},
+        {TABOS_AUDIO_RATE_32000, TABOS_AUDIO_SAMPLE_RATE_32000},
+        {TABOS_AUDIO_RATE_44100, TABOS_AUDIO_SAMPLE_RATE_44100},
+        {TABOS_AUDIO_RATE_48000, TABOS_AUDIO_SAMPLE_RATE_48000},
+        {TABOS_AUDIO_RATE_88200, TABOS_AUDIO_SAMPLE_RATE_88200},
+        {TABOS_AUDIO_RATE_96000, TABOS_AUDIO_SAMPLE_RATE_96000},
+    };
+    for (size_t index = 0U; index < sizeof(rates) / sizeof(rates[0]); ++index) {
+        if ((info.sample_rates & rates[index].flag) != 0U) {
+            printf(" %lu", (unsigned long) rates[index].rate);
+        }
+    }
+    putchar('\n');
     printf("Playback: %s\n", (info.features & TABOS_AUDIO_FEATURE_PLAYBACK) != 0U ? "yes" : "no");
     printf("Capture: %s (%lu channels)\n", (info.features & TABOS_AUDIO_FEATURE_CAPTURE) != 0U ? "yes" : "no",
            (unsigned long) info.capture_channels);

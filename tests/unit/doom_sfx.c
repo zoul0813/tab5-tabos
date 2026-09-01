@@ -23,24 +23,41 @@ static int test_dmx_decode(void)
     return doom_tabos_sfx_decode_dmx(lump, sizeof(lump), &samples, &sample_count, &sample_rate) ? 1 : 0;
 }
 
-static int test_resampling_and_lifecycle(void)
+static int test_native_playback_and_lifecycle(void)
 {
     doom_tabos_sfx_mixer_t mixer;
     doom_tabos_sfx_init(&mixer);
     const uint8_t samples[] = {128U, 255U};
-    if (!doom_tabos_sfx_start(&mixer, 0U, samples, 2U, 24000U, 127, 128)) {
+    if (!doom_tabos_sfx_start(&mixer, 0U, samples, 2U, DOOM_TABOS_SFX_SAMPLE_RATE, 127, 128)) {
         return 1;
     }
-    int16_t output[10] = {0};
-    doom_tabos_sfx_mix(&mixer, output, 5U);
-    if (output[0] <= 0 || output[1] <= 0 || output[2] != output[0] || output[3] != output[1] ||
-        output[4] <= output[2] || output[5] <= output[3] || output[6] < output[4] || output[7] < output[5] ||
-        output[8] != 0 || output[9] != 0 || doom_tabos_sfx_playing(&mixer, 0U)) {
+    int16_t output[6] = {0};
+    doom_tabos_sfx_mix(&mixer, output, 3U);
+    if (output[0] != 0 || output[1] != 0 || output[2] <= 0 || output[3] <= 0 || output[4] != 0 ||
+        output[5] != 0 || doom_tabos_sfx_playing(&mixer, 0U)) {
         doom_tabos_sfx_destroy(&mixer);
         return 1;
     }
     doom_tabos_sfx_destroy(&mixer);
     return 0;
+}
+
+static int test_alternate_rate_conversion(void)
+{
+    doom_tabos_sfx_mixer_t mixer;
+    doom_tabos_sfx_init(&mixer);
+    const uint8_t samples[] = {128U, 0U, 255U, 0U};
+    if (!doom_tabos_sfx_start(&mixer, 0U, samples, 4U, 22050U, 127, 128)) {
+        return 1;
+    }
+    int16_t output[6] = {0};
+    doom_tabos_sfx_mix(&mixer, output, 3U);
+    const int result = output[0] == 0 && output[1] == 0 && output[2] > 0 && output[3] > 0 && output[4] == 0 &&
+                               output[5] == 0 && !doom_tabos_sfx_playing(&mixer, 0U) ?
+                           0 :
+                           1;
+    doom_tabos_sfx_destroy(&mixer);
+    return result;
 }
 
 static int test_pan_volume_and_stop(void)
@@ -72,7 +89,7 @@ static int test_pan_volume_and_stop(void)
     return 0;
 }
 
-static int test_resampling_low_pass_filter(void)
+static int test_unsigned_pcm_conversion(void)
 {
     doom_tabos_sfx_mixer_t mixer;
     doom_tabos_sfx_init(&mixer);
@@ -82,8 +99,7 @@ static int test_resampling_low_pass_filter(void)
     }
     int16_t output[4] = {0};
     doom_tabos_sfx_mix(&mixer, output, 2U);
-    const int result = output[0] > 0 && output[1] > 0 && output[2] < 0 && output[3] < 0 && output[2] > -output[0] &&
-                               output[3] > -output[1] ?
+    const int result = output[0] > 0 && output[1] > 0 && output[2] < 0 && output[3] < 0 ?
                            0 :
                            1;
     doom_tabos_sfx_destroy(&mixer);
@@ -122,7 +138,7 @@ static int test_independent_channel_render(void)
     int16_t output[2] = {0};
     doom_tabos_sfx_render_channel(&mixer, 0U, output, 1U);
     int result = 0;
-    if (output[0] <= 0 || output[1] <= 0 || mixer.channels[1].source_index != 0U || mixer.channels[1].fraction != 0U) {
+    if (output[0] <= 0 || output[1] <= 0 || mixer.channels[1].source_index != 0U) {
         result = 1;
     }
     doom_tabos_sfx_destroy(&mixer);
@@ -135,16 +151,20 @@ int main(void)
         (void) fprintf(stderr, "DMX decode failed\n");
         return 1;
     }
-    if (test_resampling_and_lifecycle() != 0) {
-        (void) fprintf(stderr, "resampling lifecycle failed\n");
+    if (test_native_playback_and_lifecycle() != 0) {
+        (void) fprintf(stderr, "native playback lifecycle failed\n");
+        return 1;
+    }
+    if (test_alternate_rate_conversion() != 0) {
+        (void) fprintf(stderr, "alternate-rate conversion failed\n");
         return 1;
     }
     if (test_pan_volume_and_stop() != 0) {
         (void) fprintf(stderr, "pan, volume, and stop failed\n");
         return 1;
     }
-    if (test_resampling_low_pass_filter() != 0) {
-        (void) fprintf(stderr, "resampling low-pass filter failed\n");
+    if (test_unsigned_pcm_conversion() != 0) {
+        (void) fprintf(stderr, "unsigned PCM conversion failed\n");
         return 1;
     }
     if (test_saturating_mix() != 0) {

@@ -17,8 +17,8 @@
 // RV32 rendering can leave more than one 35 Hz game tic between audio updates. Per-channel
 // streams allow this lookahead without retaining stopped or replaced effects.
 enum {
-    DOOM_AUDIO_CHUNK_FRAMES  = 480,
-    DOOM_AUDIO_TARGET_FRAMES = 5760,
+    DOOM_AUDIO_CHUNK_FRAMES  = DOOM_TABOS_SFX_SAMPLE_RATE / 100,
+    DOOM_AUDIO_TARGET_FRAMES = DOOM_TABOS_SFX_SAMPLE_RATE * 120 / 1000,
 };
 
 typedef struct {
@@ -104,6 +104,7 @@ static boolean open_output(unsigned int channel)
         .direction = TABOS_AUDIO_PLAYBACK,
         .channels  = 2U,
         .route     = playback_route,
+        .sample_rate = DOOM_TABOS_SFX_SAMPLE_RATE,
     };
     outputs[channel].stream = tabos_audio_open(&config);
     return outputs[channel].stream != TABOS_AUDIO_STREAM_INVALID;

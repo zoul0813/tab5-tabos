@@ -81,6 +81,7 @@ static int fake_battery_error;
 static platform_audio_error_fn fake_audio_error;
 static platform_audio_render_fn fake_audio_render;
 static platform_audio_capture_fn fake_audio_capture;
+static uint32_t fake_audio_sample_rate;
 
 bool platform_display_init(platform_framebuffer_t* framebuffer)
 {
@@ -231,9 +232,12 @@ bool platform_audio_init(platform_audio_render_fn render, platform_audio_capture
                      .features         = TABOS_AUDIO_FEATURE_PLAYBACK | TABOS_AUDIO_FEATURE_CAPTURE,
                      .routes           = TABOS_AUDIO_ROUTE_SPEAKER | TABOS_AUDIO_ROUTE_HEADPHONE | TABOS_AUDIO_ROUTE_MICROPHONE,
                      .capture_channels = 4U,
+                     .sample_rates     = TABOS_AUDIO_RATES_ALL,
+                     .default_sample_rate = TABOS_AUDIO_DEFAULT_SAMPLE_RATE,
                      .detected         = true,
                      .ready            = true,
     };
+    fake_audio_sample_rate = TABOS_AUDIO_DEFAULT_SAMPLE_RATE;
     return true;
 }
 
@@ -248,6 +252,32 @@ bool platform_audio_set_route(uint32_t route)
 {
     return route == TABOS_AUDIO_ROUTE_SPEAKER || route == TABOS_AUDIO_ROUTE_HEADPHONE ||
            route == TABOS_AUDIO_ROUTE_MICROPHONE;
+}
+
+bool platform_audio_set_sample_rate(uint32_t sample_rate)
+{
+    switch (sample_rate) {
+        case TABOS_AUDIO_SAMPLE_RATE_8000:
+        case TABOS_AUDIO_SAMPLE_RATE_11025:
+        case TABOS_AUDIO_SAMPLE_RATE_12000:
+        case TABOS_AUDIO_SAMPLE_RATE_16000:
+        case TABOS_AUDIO_SAMPLE_RATE_22050:
+        case TABOS_AUDIO_SAMPLE_RATE_24000:
+        case TABOS_AUDIO_SAMPLE_RATE_32000:
+        case TABOS_AUDIO_SAMPLE_RATE_44100:
+        case TABOS_AUDIO_SAMPLE_RATE_48000:
+        case TABOS_AUDIO_SAMPLE_RATE_88200:
+        case TABOS_AUDIO_SAMPLE_RATE_96000:
+            fake_audio_sample_rate = sample_rate;
+            return true;
+        default:
+            return false;
+    }
+}
+
+uint32_t test_platform_audio_sample_rate(void)
+{
+    return fake_audio_sample_rate;
 }
 
 void test_platform_audio_render(int16_t* stereo, size_t frames)
