@@ -34,7 +34,7 @@ DOOM_ADAPTER_SOURCES := $(APP_DIR)/src/doom_tabos.c $(APP_DIR)/src/doom_tabos_in
     $(APP_DIR)/src/doom_tabos_storage.c $(APP_DIR)/src/doom_tabos_video.c \
     $(APP_DIR)/src/doom_tabos_sfx.c $(APP_DIR)/src/doom_tabos_sound.c
 DOOM_ADAPTER_OBJECTS := $(patsubst $(APP_DIR)/src/%.c,$(DOOM_OBJECT_DIR)/adapter/%.o,$(DOOM_ADAPTER_SOURCES))
-DOOM_PATCHES := $(wildcard $(APP_DIR)/patches/*.patch)
+DOOM_PATCHES := $(wildcard $(abspath $(APP_DIR)/patches)/*.patch)
 
 DOOM_UPSTREAM_CFLAGS := -D_POSIX_C_SOURCE=200809L -DDOOM_TABOS_SOUND=1
 DOOM_UPSTREAM_CFLAGS += -DDOOMGENERIC_RESX=320 -DDOOMGENERIC_RESY=200
@@ -50,7 +50,8 @@ fetch: $(DOOM_UPSTREAM_DIR)
 
 $(DOOM_UPSTREAM_DIR): $(DOOM_PATCHES)
 	@mkdir -p $(BUILD_DIR)
-	@if [ -n "$(DOOMGENERIC_SOURCE_DIR)" ]; then \
+	@set -e; \
+	if [ -n "$(DOOMGENERIC_SOURCE_DIR)" ]; then \
 		if [ ! -d "$(DOOMGENERIC_SOURCE_DIR)/doomgeneric" ]; then \
 			printf '%s\n' 'apps/doom: DOOMGENERIC_SOURCE_DIR must contain doomgeneric/' >&2; \
 			exit 1; \
