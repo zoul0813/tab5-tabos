@@ -1,4 +1,4 @@
 APP_NAME := gdemo
-SOURCES := $(CURDIR)/src/main.c
+SOURCES := src/main.c
 
 include ../../sdk/make/application.mk

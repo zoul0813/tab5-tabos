@@ -6,9 +6,12 @@ ifndef APP_NAME
 $(error APP_NAME must be set before including application.mk)
 endif
 
-APP_DIR ?= $(CURDIR)
-SDK_ROOT ?= $(abspath $(APP_DIR)/../../sdk)
-PROJECT_ROOT ?= $(abspath $(SDK_ROOT)/..)
+# Keep paths in Make's dependency graph relative. GNU Make treats whitespace as
+# a separator in target and prerequisite names, so absolute paths derived from
+# CURDIR break when the repository lives below a directory containing spaces.
+APP_DIR ?= .
+SDK_ROOT ?= ../../sdk
+PROJECT_ROOT ?= ../..
 BUILD_DIR ?= $(PROJECT_ROOT)/build/apps/$(APP_NAME)
 OUTPUT ?= $(BUILD_DIR)/$(APP_NAME)
 UNSTRIPPED ?= $(BUILD_DIR)/$(APP_NAME).elf
@@ -60,22 +63,22 @@ build: $(OUTPUT)
 ifndef TABOS_CUSTOM_BUILD
 $(UNSTRIPPED): $(SOURCES) $(TABOS_RUNTIME_SOURCES) $(SDK_ROOT)/linker/app-riscv32.ld $(TABOS_APPLICATION_MAKEFILE)
 	@mkdir -p $(dir $@)
-	$(CC) $(TABOS_CPPFLAGS) $(TABOS_CFLAGS) $(TABOS_LDFLAGS) -o $@ $(TABOS_RUNTIME_SOURCES) $(SOURCES)
+	$(CC) $(TABOS_CPPFLAGS) $(TABOS_CFLAGS) $(TABOS_LDFLAGS) -o "$@" $(TABOS_RUNTIME_SOURCES) $(SOURCES)
 
 clean:
-	rm -rf $(BUILD_DIR)
+	rm -rf "$(BUILD_DIR)"
 endif
 
 $(OUTPUT): $(UNSTRIPPED)
-	$(STRIP) --strip-unneeded $< -o $@
-	$(SIZE) $@
+	$(STRIP) --strip-unneeded "$<" -o "$@"
+	$(SIZE) "$@"
 
 install: $(OUTPUT)
 	@mkdir -p $(dir $(INSTALL_PATH))
-	cp $(OUTPUT) $(INSTALL_PATH)
+	cp "$(OUTPUT)" "$(INSTALL_PATH)"
 
 size: $(OUTPUT)
-	$(SIZE) $(OUTPUT)
+	$(SIZE) "$(OUTPUT)"
 
 metadata: $(OUTPUT)
-	$(READELF) -n $(OUTPUT)
+	$(READELF) -n "$(OUTPUT)"

@@ -1,18 +1,18 @@
 APP_NAME := tester
 
-SOURCES := $(CURDIR)/src/main.c \
-           $(CURDIR)/src/harness.c \
-           $(CURDIR)/src/tests/arguments.c \
-           $(CURDIR)/src/tests/stdio.c \
-           $(CURDIR)/src/tests/heap.c \
-           $(CURDIR)/src/tests/filesystem.c \
-           $(CURDIR)/src/tests/input.c \
-           $(CURDIR)/src/tests/process.c \
-           $(CURDIR)/src/tests/runtime.c \
-           $(CURDIR)/src/tests/device.c \
-           $(CURDIR)/src/tests/battery.c \
-           $(CURDIR)/src/tests/audio.c \
-           $(CURDIR)/src/tests/network.c \
-           $(CURDIR)/src/tests/graphics.c
+SOURCES := src/main.c \
+           src/harness.c \
+           src/tests/arguments.c \
+           src/tests/stdio.c \
+           src/tests/heap.c \
+           src/tests/filesystem.c \
+           src/tests/input.c \
+           src/tests/process.c \
+           src/tests/runtime.c \
+           src/tests/device.c \
+           src/tests/battery.c \
+           src/tests/audio.c \
+           src/tests/network.c \
+           src/tests/graphics.c
 
 include ../../sdk/make/application.mk

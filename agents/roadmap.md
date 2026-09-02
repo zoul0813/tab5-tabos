@@ -94,6 +94,7 @@
 - [x] Install and activate project-local ESP-IDF v5.4.4 through `./tools/tabos`.
 - [x] Provide `tools/flash.sh [debug|release]`, defaulting to Debug.
 - [x] Provide Tab5 serial monitoring through `./tools/tabos tab5 [debug|release] monitor`.
+- [x] Support application builds from repository paths containing spaces.
 - [x] Keep generated build output and local tool state ignored by Git.
 - [x] Centralize project identity and common strings under `config/`.
 - [x] Document repository structure and supported commands for users under `docs/`.

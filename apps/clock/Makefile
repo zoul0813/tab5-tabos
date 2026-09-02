@@ -1,5 +1,5 @@
 APP_NAME := clock
-SOURCES := $(CURDIR)/src/main.c \
-           $(CURDIR)/src/render.c
+SOURCES := src/main.c \
+           src/render.c
 
 include ../../sdk/make/application.mk

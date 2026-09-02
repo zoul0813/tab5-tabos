@@ -4,7 +4,7 @@ APP_NAME := doom
 TABOS_APP_HEAP_BYTES := 8388608
 TABOS_APP_STACK_BYTES := 65536
 TABOS_CUSTOM_BUILD := 1
-APP_DIR := $(CURDIR)
+APP_DIR := .
 
 include ../../sdk/make/application.mk
 

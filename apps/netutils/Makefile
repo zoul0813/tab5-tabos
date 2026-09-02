@@ -24,13 +24,13 @@ clean:
 else
 
 APP_NAME := $(PROGRAM)
-APP_DIR := $(CURDIR)
-PROJECT_ROOT := $(abspath $(CURDIR)/../..)
+APP_DIR := .
+PROJECT_ROOT := ../..
 BUILD_DIR := $(PROJECT_ROOT)/build/apps/netutils/$(PROGRAM)
 OUTPUT := $(BUILD_DIR)/$(PROGRAM)
 UNSTRIPPED := $(BUILD_DIR)/$(PROGRAM).elf
 INSTALL_PATH := $(PROJECT_ROOT)/.local/rootfs/T/bin/$(PROGRAM)
-SOURCES := $(CURDIR)/src/$(PROGRAM)/main.c
+SOURCES := $(APP_DIR)/src/$(PROGRAM)/main.c
 
 include ../../sdk/make/application.mk
 
