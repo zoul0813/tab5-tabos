@@ -52,7 +52,7 @@ int main(void)
     }
 
     tabos_device_info_t device;
-    if (device_registry_count() != 7U || !device_registry_find(TABOS_DEVICE_NAME_DISPLAY, &device) ||
+    if (device_registry_count() != 8U || !device_registry_find(TABOS_DEVICE_NAME_DISPLAY, &device) ||
         device.device_class != TABOS_DEVICE_CLASS_DISPLAY || device.state != TABOS_DEVICE_READY ||
         !device_registry_find(TABOS_DEVICE_NAME_KEYBOARD, &device) ||
         device.device_class != TABOS_DEVICE_CLASS_KEYBOARD || !device_registry_find(TABOS_DEVICE_NAME_RTC, &device) ||
@@ -69,6 +69,9 @@ int main(void)
         !device_registry_find(TABOS_DEVICE_NAME_TOUCH, &device) || device.device_class != TABOS_DEVICE_CLASS_POINTER ||
         device.state != TABOS_DEVICE_READY ||
         device.features != (TABOS_DEVICE_FEATURE_POINTER_TOUCH | TABOS_DEVICE_FEATURE_POINTER_MULTICONTACT) ||
+        !device_registry_find(TABOS_DEVICE_NAME_CAMERA, &device) || device.device_class != TABOS_DEVICE_CLASS_CAMERA ||
+        device.state != TABOS_DEVICE_READY ||
+        device.features != (TABOS_DEVICE_FEATURE_CAMERA_CAPTURE | TABOS_DEVICE_FEATURE_CAMERA_RAW) ||
         !device_registry_find(TABOS_DEVICE_NAME_WIFI, &device) || device.device_class != TABOS_DEVICE_CLASS_NETWORK ||
         device.state != TABOS_DEVICE_OFFLINE) {
         return 1;

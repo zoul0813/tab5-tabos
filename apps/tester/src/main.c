@@ -136,6 +136,7 @@ int main(int argc, char** argv)
         {             "Battery integration",    tester_test_battery},
         {               "Audio integration",      tester_test_audio},
         {             "Pointer integration",    tester_test_pointer},
+        {              "Camera integration",     tester_test_camera},
         {              "TCP/UDP networking",    tester_test_network},
         {             "Fullscreen graphics",   tester_test_graphics},
     };

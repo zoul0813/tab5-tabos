@@ -78,6 +78,28 @@ tabos_enable_warnings(tabos_pointer_service)
 tabos_enable_sanitizers(tabos_pointer_service)
 add_test(NAME unit.pointer_service COMMAND tabos_pointer_service)
 
+add_executable(tabos_camera_service unit/camera_service.c ${TABOS_TEST_PLATFORM_FAKES})
+target_include_directories(tabos_camera_service PRIVATE
+    "${TABOS_ROOT}/camera/include"
+    "${TABOS_ROOT}/platform/include"
+    "${TABOS_ROOT}/sdk/include"
+    "${CMAKE_CURRENT_LIST_DIR}/fakes"
+)
+target_link_libraries(tabos_camera_service PRIVATE tabos_core)
+tabos_enable_warnings(tabos_camera_service)
+tabos_enable_sanitizers(tabos_camera_service)
+add_test(NAME unit.camera_service COMMAND tabos_camera_service)
+
+add_executable(tabos_sdk_camera
+    unit/sdk_camera.c
+    "${TABOS_ROOT}/sdk/lib/camera.c"
+    "${TABOS_ROOT}/sdk/lib/wait.c"
+)
+target_include_directories(tabos_sdk_camera PRIVATE "${TABOS_ROOT}/sdk/include")
+tabos_enable_warnings(tabos_sdk_camera)
+tabos_enable_sanitizers(tabos_sdk_camera)
+add_test(NAME unit.sdk_camera COMMAND tabos_sdk_camera)
+
 add_executable(tabos_sdk_pointer
     unit/sdk_pointer.c
     "${TABOS_ROOT}/sdk/lib/pointer.c"

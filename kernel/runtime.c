@@ -12,6 +12,7 @@
 #include <tabos/internal/input.h>
 #include <tabos/internal/network.h>
 #include <tabos/internal/pointer.h>
+#include <tabos/internal/camera.h>
 #include <tabos/internal/terminal.h>
 #include <tabos/internal/wall_clock.h>
 
@@ -205,7 +206,17 @@ bool kernel_runtime_start(bool launch_startup_application)
         return false;
     }
 
+    if (!camera_service_init()) {
+        pointer_service_shutdown();
+        display_shutdown();
+        audio_service_shutdown();
+        network_service_shutdown();
+        filesystem_shutdown();
+        return false;
+    }
+
     if (!hardware_devices_init()) {
+        camera_service_shutdown();
         pointer_service_shutdown();
         display_shutdown();
         audio_service_shutdown();
@@ -299,6 +310,7 @@ bool kernel_runtime_start(bool launch_startup_application)
     kernel_boot_report_write_serial(&boot_report);
     if (!render_boot_report()) {
         hardware_devices_shutdown();
+        camera_service_shutdown();
         pointer_service_shutdown();
         display_shutdown();
         audio_service_shutdown();
@@ -310,6 +322,7 @@ bool kernel_runtime_start(bool launch_startup_application)
     if (!console_init(&terminal)) {
         terminal_shutdown(&terminal);
         hardware_devices_shutdown();
+        camera_service_shutdown();
         pointer_service_shutdown();
         display_shutdown();
         audio_service_shutdown();
@@ -323,6 +336,7 @@ bool kernel_runtime_start(bool launch_startup_application)
         console_shutdown();
         terminal_shutdown(&terminal);
         hardware_devices_shutdown();
+        camera_service_shutdown();
         pointer_service_shutdown();
         display_shutdown();
         audio_service_shutdown();
@@ -346,6 +360,7 @@ bool kernel_runtime_start(bool launch_startup_application)
         terminal_shutdown(&terminal);
         runtime_started = false;
         hardware_devices_shutdown();
+        camera_service_shutdown();
         pointer_service_shutdown();
         display_shutdown();
         audio_service_shutdown();
@@ -365,6 +380,7 @@ void kernel_runtime_update(void)
     console_update();
     network_service_update();
     platform_pointer_update();
+    platform_camera_update();
     hardware_devices_update();
     kernel_application_system_update();
 }
@@ -376,6 +392,7 @@ void kernel_runtime_shutdown(void)
         console_shutdown();
         terminal_shutdown(&terminal);
         hardware_devices_shutdown();
+        camera_service_shutdown();
         pointer_service_shutdown();
         display_shutdown();
         runtime_started = false;

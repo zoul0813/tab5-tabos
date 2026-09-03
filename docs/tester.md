@@ -17,6 +17,7 @@ Tests are separate modules under `apps/tester/src/tests/`. The current modules c
 - RTC calendar, Unix time, `time()`, `gettimeofday()`, and realtime/monotonic clocks
 - battery registry state, telemetry validity, signed power consistency, and unchanged charger controls
 - audio registry state, capabilities, process-owned playback/capture streams, waits, volume,
+- camera discovery, copied capabilities, RAW8 stream/frame leases, bounded copying, waits, and stale cleanup,
   routes, nonblocking reads, status, and stale handles
 - pointer registry state, process-owned streams, nonblocking reads, waits, stale handles,
   and leaked-resource cleanup

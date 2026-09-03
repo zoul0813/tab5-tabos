@@ -89,6 +89,14 @@ removal, and queue resets cancel active contacts. SDL mouse contact 0 and SDL to
 contacts share this contract; Tab5 controller handles remain below the platform boundary.
 The contact ceiling defaults to five and is build-configurable for future hardware.
 
+Camera capture follows the same platform boundary. Applications configure process-owned
+streams and receive metadata plus opaque generation-tagged leases; the kernel retains
+frame storage and exposes bounded copying only. Three-slot stream pools never overwrite
+leased frames, replace the oldest ready unleased frame for slow consumers, and count
+drops. Close or process teardown reclaims buffers and leaked leases. Host supplies
+deterministic RAW8 fixtures. Tab5 SC2356 detection stays below the platform boundary;
+raw hardware delivery, preview conversion, and encoding remain later Phase 6 work.
+
 ### Generic wait sources [DECIDED]
 
 Asynchronous application waits use opaque, generation-tagged `tabos_wait_source_t`
@@ -101,7 +109,8 @@ cancelled and wakes native workers before disposing parent resources, so a later
 cannot receive stale completions. Sockets expose sources through
 `tabos_socket_wait_source()` and device lifecycle subscriptions through
 `tabos_device_subscription_wait_source()`, and pointer streams through
-`tabos_pointer_wait_source()`. A type-indexed internal adapter table supplies
+`tabos_pointer_wait_source()`, and camera streams through `tabos_camera_wait_source()`.
+A type-indexed internal adapter table supplies
 per-source event validation and readiness translation so future services can join without
 adding service-specific wait transports.
 

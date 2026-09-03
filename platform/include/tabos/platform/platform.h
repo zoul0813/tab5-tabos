@@ -7,6 +7,7 @@
 
 #include <tabos/internal/elf_api.h>
 #include <tabos/pointer.h>
+#include <tabos/camera.h>
 
 enum {
     TABOS_DISPLAY_WIDTH  = 1280,
@@ -21,6 +22,20 @@ typedef struct platform_mutex platform_mutex_t;
 typedef void (*platform_audio_render_fn)(int16_t* stereo, size_t frames);
 typedef void (*platform_audio_capture_fn)(const int16_t* samples, size_t frames, uint32_t channels);
 typedef void (*platform_audio_error_fn)(int error);
+typedef void (*platform_camera_frame_fn)(const void* data, size_t size, uint32_t width, uint32_t height,
+                                         uint32_t stride_bytes, uint32_t format, uint64_t timestamp_ms);
+typedef void (*platform_camera_error_fn)(int error);
+
+typedef struct {
+        const char* driver;
+        uint32_t formats;
+        uint32_t max_width;
+        uint32_t max_height;
+        uint32_t max_fps;
+        bool detected;
+        bool ready;
+        int error;
+} platform_camera_info_t;
 
 typedef struct {
         const char* driver;
@@ -167,6 +182,11 @@ bool platform_audio_set_sample_rate(uint32_t sample_rate);
 bool platform_pointer_init(const char** driver, int* error);
 void platform_pointer_update(void);
 void platform_pointer_shutdown(void);
+bool platform_camera_init(platform_camera_frame_fn frame, platform_camera_error_fn error, platform_camera_info_t* info);
+bool platform_camera_start(const tabos_camera_config_t* config);
+void platform_camera_stop(void);
+void platform_camera_update(void);
+void platform_camera_shutdown(void);
 bool platform_network_operations_init(void);
 void platform_network_operations_shutdown(void);
 bool platform_network_socket_operations_init(void);

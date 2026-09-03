@@ -672,6 +672,57 @@ void platform_pointer_shutdown(void)
 {
 }
 
+static platform_camera_frame_fn fake_camera_frame;
+static platform_camera_error_fn fake_camera_error;
+
+bool platform_camera_init(platform_camera_frame_fn frame, platform_camera_error_fn error, platform_camera_info_t* info)
+{
+    fake_camera_frame = frame;
+    fake_camera_error = error;
+    *info             = (platform_camera_info_t) {.driver     = "fake camera",
+                                                  .formats    = TABOS_CAMERA_FORMAT_FLAG_RAW8,
+                                                  .max_width  = 8U,
+                                                  .max_height = 8U,
+                                                  .max_fps    = 30U,
+                                                  .detected   = true,
+                                                  .ready      = true};
+    return true;
+}
+
+bool platform_camera_start(const tabos_camera_config_t* config)
+{
+    return config != NULL;
+}
+
+void platform_camera_stop(void)
+{
+}
+
+void platform_camera_update(void)
+{
+}
+
+void platform_camera_shutdown(void)
+{
+    fake_camera_frame = NULL;
+    fake_camera_error = NULL;
+}
+
+void test_platform_camera_frame(const void* data, size_t size, uint32_t width, uint32_t height, uint32_t stride_bytes,
+                                uint64_t timestamp_ms)
+{
+    if (fake_camera_frame != NULL) {
+        fake_camera_frame(data, size, width, height, stride_bytes, TABOS_CAMERA_FORMAT_RAW8, timestamp_ms);
+    }
+}
+
+void test_platform_camera_error(int error)
+{
+    if (fake_camera_error != NULL) {
+        fake_camera_error(error);
+    }
+}
+
 platform_mutex_t* platform_mutex_create(void)
 {
     return calloc(1U, sizeof(platform_mutex_t));

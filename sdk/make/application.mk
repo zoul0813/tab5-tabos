@@ -47,6 +47,7 @@ TABOS_RUNTIME_SOURCES := $(SDK_ROOT)/crt/crt0.c $(SDK_ROOT)/crt/metadata.S $(SDK
                          $(SDK_ROOT)/lib/input.c \
                          $(SDK_ROOT)/lib/network.c \
                          $(SDK_ROOT)/lib/wait.c \
+                         $(SDK_ROOT)/lib/camera.c \
                          $(SDK_ROOT)/lib/tls.c \
                          $(SDK_ROOT)/lib/battery.c \
                          $(SDK_ROOT)/lib/audio.c \

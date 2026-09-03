@@ -527,6 +527,16 @@ Tab5 supports GT911 and ST712x-family controllers behind the platform boundary; 
 contact 0 and native touch contacts provide the host equivalent. Gestures and window
 routing remain deferred to future GUI clients.
 
+### Current implementation: camera capture foundation
+
+The public `<tabos/camera.h>` API exposes configured process-owned capture streams with
+copied metadata and frame bytes. Kernel-owned three-slot pools issue opaque
+generation-tagged leases, preserve leased frames, replace the oldest unleased frame for
+slow consumers, and count drops. Wait sources expose readable, error, and hangup state;
+process teardown reclaims leaked leases. Host supplies deterministic RAW8 fixtures. Tab5
+detects and registers the SC2356 through its platform backend; physical raw delivery,
+preview, JPEG, and H.264 remain later Phase 6 work.
+
 ### Current implementation: keyboard input
 
 The public `<tabos/input.h>` API exposes physical key-down/key-up events, modifiers,

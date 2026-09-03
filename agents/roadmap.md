@@ -517,8 +517,10 @@ but is not a substitute for this execution path.
   generic waits, foreground focus cancellation, SDL mouse/touch input, Tab5 GT911/ST712x
   backends, `touchtest`, and automated host coverage.
 - [ ] Validate pointer orientation and input on physical ILI9881C/GT911, ST7123, and ST7121 revisions.
+- [x] Add camera capture foundation: SC2356 discovery, process-owned streams, bounded
+  kernel frame pools, opaque leases, generic waits, cleanup, and deterministic host RAW8 fixtures.
+- [ ] Deliver Tab5 raw frames, RGB preview, camera utility, and later encoding stages.
 - [ ] Add USB host/OTG service beyond keyboard support.
-- [ ] Add camera service when application needs justify it.
 - [ ] Add supported sensor APIs.
 - [x] Add initial device/system information API.
 

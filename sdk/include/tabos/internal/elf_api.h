@@ -6,10 +6,11 @@
 #include <tabos/device.h>
 #include <tabos/audio.h>
 #include <tabos/pointer.h>
+#include <tabos/camera.h>
 
 #include <stdint.h>
 
-#define TABOS_ELF_API_VERSION  19U
+#define TABOS_ELF_API_VERSION  20U
 #define TABOS_ELF_EXEC_PENDING (-2147483647 - 1)
 
 enum {
@@ -189,6 +190,13 @@ typedef struct {
         int (*pointer_close)(int stream);
         int (*pointer_read)(int stream, tabos_pointer_event_t* event);
         int (*pointer_wait_source)(int stream);
+        int (*camera_info)(tabos_device_id_t device_id, tabos_camera_info_t* info);
+        int (*camera_open)(const tabos_camera_config_t* config);
+        int (*camera_close)(int stream);
+        int (*camera_acquire)(int stream, tabos_camera_frame_t* frame);
+        int (*camera_copy)(int stream, tabos_camera_lease_t lease, uint32_t offset, void* buffer, uint32_t capacity);
+        int (*camera_release)(int stream, tabos_camera_lease_t lease);
+        int (*camera_wait_source)(int stream);
 } tabos_elf_api_t;
 
 typedef int (*tabos_elf_entry_fn)(const tabos_elf_api_t* api, int argc, const char* const* argv);

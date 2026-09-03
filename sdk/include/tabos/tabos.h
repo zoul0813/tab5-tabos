@@ -3,6 +3,7 @@
 
 #include <tabos/application.h>
 #include <tabos/audio.h>
+#include <tabos/camera.h>
 #include <tabos/console.h>
 #include <tabos/filesystem.h>
 #include <tabos/graphics.h>

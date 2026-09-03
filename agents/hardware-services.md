@@ -234,15 +234,15 @@ documentation pass.
 
 ### Capture foundation
 
-- [ ] Detect SC2356 and register `camera0`.
-- [ ] Add `<tabos/camera.h>` for formats, configuration, stream lifecycle, frame acquisition,
+- [x] Detect SC2356 and register `camera0`.
+- [x] Add `<tabos/camera.h>` for formats, configuration, stream lifecycle, frame acquisition,
   metadata, copying, and release.
-- [ ] Use kernel-owned bounded frame pools and opaque generation-tagged leases.
-- [ ] Never expose native DMA, ISP, or frame-buffer pointers to applications.
-- [ ] Require explicit frame release and reclaim leaked leases on process exit.
-- [ ] Drop the oldest unleased frame for slow consumers and increment a drop counter.
-- [ ] Expose frame readiness, error, and hangup through generic waits.
-- [ ] Add deterministic host frame fixtures.
+- [x] Use kernel-owned bounded frame pools and opaque generation-tagged leases.
+- [x] Never expose native DMA, ISP, or frame-buffer pointers to applications.
+- [x] Require explicit frame release and reclaim leaked leases on process exit.
+- [x] Drop the oldest unleased frame for slow consumers and increment a drop counter.
+- [x] Expose frame readiness, error, and hangup through generic waits.
+- [x] Add deterministic host frame fixtures.
 
 ### Formats and tools
 

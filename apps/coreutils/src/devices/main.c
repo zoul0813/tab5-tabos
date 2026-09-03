@@ -60,7 +60,8 @@ static void print_features(tabos_device_features_t features)
         TABOS_DEVICE_FEATURE_NETWORK_WIFI | TABOS_DEVICE_FEATURE_AUDIO_PLAYBACK | TABOS_DEVICE_FEATURE_AUDIO_CAPTURE |
         TABOS_DEVICE_FEATURE_AUDIO_SPEAKER | TABOS_DEVICE_FEATURE_AUDIO_HEADPHONE |
         TABOS_DEVICE_FEATURE_AUDIO_MICROPHONE | TABOS_DEVICE_FEATURE_AUDIO_AEC | TABOS_DEVICE_FEATURE_POINTER_TOUCH |
-        TABOS_DEVICE_FEATURE_POINTER_MULTICONTACT | TABOS_DEVICE_FEATURE_POINTER_PRESSURE;
+        TABOS_DEVICE_FEATURE_POINTER_MULTICONTACT | TABOS_DEVICE_FEATURE_POINTER_PRESSURE |
+        TABOS_DEVICE_FEATURE_CAMERA_CAPTURE | TABOS_DEVICE_FEATURE_CAMERA_RAW;
     bool printed = false;
     fputs("   features: ", stdout);
     print_feature(&printed, features, TABOS_DEVICE_FEATURE_DISPLAY_FRAMEBUFFER, "framebuffer");
@@ -79,6 +80,8 @@ static void print_features(tabos_device_features_t features)
     print_feature(&printed, features, TABOS_DEVICE_FEATURE_POINTER_TOUCH, "touch");
     print_feature(&printed, features, TABOS_DEVICE_FEATURE_POINTER_MULTICONTACT, "multicontact");
     print_feature(&printed, features, TABOS_DEVICE_FEATURE_POINTER_PRESSURE, "pressure");
+    print_feature(&printed, features, TABOS_DEVICE_FEATURE_CAMERA_CAPTURE, "capture");
+    print_feature(&printed, features, TABOS_DEVICE_FEATURE_CAMERA_RAW, "raw");
     const tabos_device_features_t unknown = features & ~known;
     if (unknown != 0U) {
         printf("%s0x%" PRIx64, printed ? ", " : "", unknown);

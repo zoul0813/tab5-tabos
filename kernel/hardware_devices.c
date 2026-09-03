@@ -1,5 +1,6 @@
 #include <tabos/internal/hardware_devices.h>
 #include <tabos/internal/audio.h>
+#include <tabos/internal/camera.h>
 
 #include <tabos/device.h>
 #include <tabos/filesystem.h>
@@ -15,7 +16,8 @@ static tabos_device_id_t rtc_device     = TABOS_DEVICE_ID_INVALID;
 static tabos_device_id_t battery_device = TABOS_DEVICE_ID_INVALID;
 static tabos_device_id_t audio_device   = TABOS_DEVICE_ID_INVALID;
 static tabos_device_id_t pointer_device = TABOS_DEVICE_ID_INVALID;
-static tabos_device_id_t registered_devices[8];
+static tabos_device_id_t camera_device  = TABOS_DEVICE_ID_INVALID;
+static tabos_device_id_t registered_devices[9];
 static size_t registered_device_count;
 static bool initialized;
 
@@ -160,6 +162,20 @@ bool hardware_devices_init(void)
         }
         pointer_service_set_device_id(pointer_device);
     }
+    tabos_camera_info_t camera_info;
+    const char* camera_driver = NULL;
+    bool camera_ready         = false;
+    int camera_error          = 0;
+    if (camera_service_info(&camera_info, &camera_driver, &camera_ready, &camera_error)) {
+        if (!register_device(
+                TABOS_DEVICE_NAME_CAMERA, camera_driver != NULL ? camera_driver : "camera", TABOS_DEVICE_CLASS_CAMERA,
+                camera_error != 0 ? TABOS_DEVICE_FAULT : (camera_ready ? TABOS_DEVICE_READY : TABOS_DEVICE_OFFLINE),
+                TABOS_DEVICE_FEATURE_CAMERA_CAPTURE | TABOS_DEVICE_FEATURE_CAMERA_RAW, camera_error, &camera_device)) {
+            hardware_devices_shutdown();
+            return false;
+        }
+        camera_service_set_device_id(camera_device);
+    }
     network_status_t network_status;
     if (diagnostics.network_present && network_service_status(&network_status) &&
         !register_device(TABOS_DEVICE_NAME_WIFI, diagnostics.network_name, TABOS_DEVICE_CLASS_NETWORK,
@@ -219,4 +235,5 @@ void hardware_devices_shutdown(void)
     battery_device = TABOS_DEVICE_ID_INVALID;
     audio_device   = TABOS_DEVICE_ID_INVALID;
     pointer_device = TABOS_DEVICE_ID_INVALID;
+    camera_device  = TABOS_DEVICE_ID_INVALID;
 }
