@@ -178,10 +178,12 @@ multi-contact IDs, logical coordinates, foreground-only reads, generic wait read
 focus cancellation, bounded-queue reset, device removal, stale handles, and process
 cleanup. Physical validation must still confirm orientation on all three Tab5 revisions.
 
-Camera-foundation validation uses deterministic RAW8 frames and covers bounded pool
+Camera-foundation validation uses deterministic frames and covers bounded pool
 exhaustion, oldest-unleased replacement, drop accounting, opaque lease generation,
 foreign/stale rejection, copied frame bytes, wait readiness/error/hangup, and process
-cleanup. Physical SC2356 frame delivery and preview remain later Phase 6 validation.
+cleanup. macOS simulator RAW8, RGB565, fullscreen preview, JPEG, and H.264 utility paths
+have been manually verified. Physical SC2356 frame delivery and all Tab5 format,
+performance, and responsiveness checks remain Phase 6 validation work.
 
 ---
 

@@ -680,7 +680,7 @@ bool platform_camera_init(platform_camera_frame_fn frame, platform_camera_error_
     fake_camera_frame = frame;
     fake_camera_error = error;
     *info             = (platform_camera_info_t) {.driver     = "fake camera",
-                                                  .formats    = TABOS_CAMERA_FORMAT_FLAG_RAW8,
+                                                  .formats    = TABOS_CAMERA_FORMAT_FLAG_RAW8 | TABOS_CAMERA_FORMAT_FLAG_JPEG,
                                                   .max_width  = 8U,
                                                   .max_height = 8U,
                                                   .max_fps    = 30U,
@@ -713,6 +713,14 @@ void test_platform_camera_frame(const void* data, size_t size, uint32_t width, u
 {
     if (fake_camera_frame != NULL) {
         fake_camera_frame(data, size, width, height, stride_bytes, TABOS_CAMERA_FORMAT_RAW8, timestamp_ms);
+    }
+}
+
+void test_platform_camera_encoded_frame(const void* data, size_t size, uint32_t width, uint32_t height, uint32_t format,
+                                        uint64_t timestamp_ms)
+{
+    if (fake_camera_frame != NULL) {
+        fake_camera_frame(data, size, width, height, 0U, format, timestamp_ms);
     }
 }
 

@@ -425,9 +425,19 @@ target_include_directories(tabos_rv32_execution PRIVATE
     "${TABOS_ROOT}/loader/include"
     "${TABOS_ROOT}/platform/include"
 )
-target_link_libraries(tabos_rv32_execution PRIVATE
-    tabos_core tabos_platform_host SDL3::SDL3
-)
+if(TABOS_TARGET STREQUAL "linux")
+    # tabos_core consumes the platform contract while the host backend calls
+    # back into portable services. GNU ld needs both static archives rescanned
+    # when this focused executable does not otherwise pull every host object in.
+    target_link_libraries(tabos_rv32_execution PRIVATE
+        "-Wl,--start-group" tabos_core tabos_platform_host "-Wl,--end-group"
+        SDL3::SDL3
+    )
+else()
+    target_link_libraries(tabos_rv32_execution PRIVATE
+        tabos_core tabos_platform_host SDL3::SDL3
+    )
+endif()
 tabos_enable_warnings(tabos_rv32_execution)
 tabos_enable_sanitizers(tabos_rv32_execution)
 

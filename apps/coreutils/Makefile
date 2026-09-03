@@ -1,6 +1,6 @@
 # Small independently loaded command-line utilities.
 
-PROGRAMS := ls mkdir rmdir cp rm mv cat hexdump date reboot shutdown wc battery devices audiotest touchtest
+PROGRAMS := ls mkdir rmdir cp rm mv cat hexdump date reboot shutdown wc battery devices audiotest touchtest cameratest
 
 ifeq ($(strip $(PROGRAM)),)
 
@@ -31,6 +31,10 @@ OUTPUT := $(BUILD_DIR)/$(PROGRAM)
 UNSTRIPPED := $(BUILD_DIR)/$(PROGRAM).elf
 INSTALL_PATH := $(PROJECT_ROOT)/.local/rootfs/T/bin/$(PROGRAM)
 SOURCES := $(APP_DIR)/src/$(PROGRAM)/main.c
+
+ifeq ($(PROGRAM),cameratest)
+TABOS_APP_HEAP_BYTES := 3145728
+endif
 
 include ../../sdk/make/application.mk
 

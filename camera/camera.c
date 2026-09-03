@@ -20,6 +20,7 @@ enum {
 
 typedef struct {
         uint8_t* data;
+        size_t capacity;
         size_t size;
         uint32_t generation;
         tabos_camera_frame_t metadata;
@@ -172,7 +173,11 @@ tabos_camera_stream_t camera_service_open(const void* owner, const tabos_camera_
     if (config->width > SIZE_MAX / config->height) {
         return -TABOS_EINVAL;
     }
-    const size_t capacity = (size_t) config->width * config->height;
+    const size_t pixels = (size_t) config->width * config->height;
+    if (pixels > SIZE_MAX / 2U) {
+        return -TABOS_EINVAL;
+    }
+    const size_t capacity = pixels * 2U;
     platform_mutex_lock(camera_mutex);
     if (open_count > 0U) {
         platform_mutex_unlock(camera_mutex);
@@ -199,7 +204,8 @@ tabos_camera_stream_t camera_service_open(const void* owner, const tabos_camera_
         const uint32_t generation = next_generation(stream->generation, CAMERA_STREAM_GENERATION_MAX);
         *stream = (camera_stream_t) {.owner = owner, .config = *config, .generation = generation, .open = true};
         for (size_t frame = 0U; frame < CAMERA_FRAME_CAPACITY; ++frame) {
-            stream->frames[frame].data = allocations[frame];
+            stream->frames[frame].data     = allocations[frame];
+            stream->frames[frame].capacity = capacity;
         }
         if (!platform_camera_start(config)) {
             free_stream(stream);
@@ -365,8 +371,9 @@ void camera_service_submit(const void* data, size_t size, uint32_t width, uint32
         if (!stream->open || stream->faulted || stream->hangup) {
             continue;
         }
+        const bool packed = format == TABOS_CAMERA_FORMAT_RAW8 || format == TABOS_CAMERA_FORMAT_RGB565;
         if (format != (uint32_t) stream->config.format || width != stream->config.width ||
-            height != stream->config.height || stride_bytes == 0U) {
+            height != stream->config.height || (packed && stride_bytes == 0U)) {
             continue;
         }
         camera_frame_slot_t* selected = NULL;
@@ -390,8 +397,7 @@ void camera_service_submit(const void* data, size_t size, uint32_t width, uint32
             }
             ++stream->drops;
         }
-        const size_t expected = (size_t) stream->config.width * stream->config.height;
-        const size_t bytes    = size < expected ? size : expected;
+        const size_t bytes = size < selected->capacity ? size : selected->capacity;
         memcpy(selected->data, data, bytes);
         selected->size     = bytes;
         selected->ready    = true;

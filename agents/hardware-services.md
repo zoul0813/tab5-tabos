@@ -246,11 +246,11 @@ documentation pass.
 
 ### Formats and tools
 
-- [ ] Deliver bounded raw capture first.
-- [ ] Add RGB preview conversion and fullscreen preview validation.
-- [ ] Add JPEG encoding after raw/preview cleanup and throughput tests pass.
-- [ ] Add H.264 only after raw and JPEG paths meet memory and service-responsiveness requirements.
-- [ ] Add `cameratest` to `apps/coreutils` for detection, still capture, preview,
+- [x] Deliver bounded Tab5 RAW8 capture through CSI RGB565 luminance conversion.
+- [x] Add Tab5 RGB565 capture for fullscreen preview.
+- [x] Add Tab5 hardware JPEG encoding from captured RGB565 frames.
+- [x] Add Tab5 hardware H.264 encoding from captured YUV420 frames.
+- [x] Add `cameratest` to `apps/coreutils` for detection, still capture, preview,
   file output, and dropped-frame reporting.
 
 ### Phase 6 validation
@@ -260,7 +260,14 @@ documentation pass.
 - [ ] Validate physical capture, preview, JPEG, and optional H.264 without starving input,
   audio, networking, storage, or display service work.
 - [ ] Record memory use, frame rate, conversion time, encoding time, and dropped frames.
-- [ ] Update camera/media API and utility documentation.
+- [x] Update camera/media API and utility documentation.
+
+Host validation status: macOS simulator discovery, RAW8 and RGB565 still capture,
+fullscreen preview, JPEG output, and H.264 recording have been manually verified.
+Tab5 implements RAW8, RGB565, hardware JPEG, and hardware H.264 paths. Physical image,
+orientation, RAW8/RGB565/H.264 formats, throughput, memory, and service-responsiveness checks remain unverified.
+Tab5 JPEG capture, SD-card output, Mac decoding, and image contents are physically verified.
+Tab5 fullscreen RGB565 preview, automatic exposure, and low-light image quality are physically verified.
 
 ## Phase 7: Expansion and Industrial I/O
 

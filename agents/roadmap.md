@@ -519,7 +519,11 @@ but is not a substitute for this execution path.
 - [ ] Validate pointer orientation and input on physical ILI9881C/GT911, ST7123, and ST7121 revisions.
 - [x] Add camera capture foundation: SC2356 discovery, process-owned streams, bounded
   kernel frame pools, opaque leases, generic waits, cleanup, and deterministic host RAW8 fixtures.
-- [ ] Deliver Tab5 raw frames, RGB preview, camera utility, and later encoding stages.
+- [x] Implement Tab5 CSI capture, RAW8 luminance conversion, RGB565 preview frames,
+  hardware JPEG encoding, and hardware H.264 encoding.
+- [ ] Physically validate Tab5 raw frames, RGB preview, camera utility, encoding stages,
+  memory use, throughput, and service responsiveness; equivalent macOS simulator paths
+  are manually verified.
 - [ ] Add USB host/OTG service beyond keyboard support.
 - [ ] Add supported sensor APIs.
 - [x] Add initial device/system information API.

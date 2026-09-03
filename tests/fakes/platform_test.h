@@ -20,6 +20,8 @@ void test_platform_audio_error(int error);
 uint32_t test_platform_audio_sample_rate(void);
 void test_platform_camera_frame(const void* data, size_t size, uint32_t width, uint32_t height, uint32_t stride_bytes,
                                 uint64_t timestamp_ms);
+void test_platform_camera_encoded_frame(const void* data, size_t size, uint32_t width, uint32_t height, uint32_t format,
+                                        uint64_t timestamp_ms);
 void test_platform_camera_error(int error);
 
 #endif

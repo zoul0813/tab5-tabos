@@ -25,7 +25,7 @@ int main(void)
     camera_service_set_device_id(42U);
     tabos_camera_info_t info;
     expect(camera_service_info(&info, NULL, NULL, NULL) && info.device_id == 42U &&
-               info.formats == TABOS_CAMERA_FORMAT_FLAG_RAW8,
+               info.formats == (TABOS_CAMERA_FORMAT_FLAG_RAW8 | TABOS_CAMERA_FORMAT_FLAG_JPEG),
            "reports copied camera capabilities");
     const tabos_camera_config_t config = {
         .device_id = 42U, .format = TABOS_CAMERA_FORMAT_RAW8, .width = 4U, .height = 2U, .fps = 10U};
@@ -66,11 +66,21 @@ int main(void)
     const tabos_camera_stream_t reused = camera_service_open(&owner_a, &config);
     expect(reused != stream && camera_service_close(&owner_a, stream) == -TABOS_EBADF,
            "generation rejects stale stream after reuse");
+    expect(camera_service_close(&owner_a, reused) == 0, "closes reused raw stream");
+    const tabos_camera_config_t jpeg_config = {
+        .device_id = 42U, .format = TABOS_CAMERA_FORMAT_JPEG, .width = 4U, .height = 2U, .fps = 10U};
+    const tabos_camera_stream_t encoded = camera_service_open(&owner_a, &jpeg_config);
+    const uint8_t jpeg[]                = {0xffU, 0xd8U, 0xffU, 0xd9U};
+    test_platform_camera_encoded_frame(jpeg, sizeof(jpeg), 4U, 2U, TABOS_CAMERA_FORMAT_JPEG, 300U);
+    expect(encoded != TABOS_CAMERA_STREAM_INVALID && camera_service_acquire(&owner_a, encoded, &frame) == 0 &&
+               frame.stride_bytes == 0U && frame.size_bytes == sizeof(jpeg),
+           "accepts variable-size encoded frame with zero stride");
+    expect(camera_service_release(&owner_a, encoded, frame.lease) == 0, "releases encoded frame");
     test_platform_camera_error(TABOS_EIO);
-    expect(camera_service_poll(&owner_a, reused, TABOS_WAIT_ERROR, &events) == 0 && events == TABOS_WAIT_ERROR,
+    expect(camera_service_poll(&owner_a, encoded, TABOS_WAIT_ERROR, &events) == 0 && events == TABOS_WAIT_ERROR,
            "backend fault reports wait error");
     camera_service_remove_device();
-    expect(camera_service_poll(&owner_a, reused, TABOS_WAIT_HANGUP, &events) == 0 && events == TABOS_WAIT_HANGUP,
+    expect(camera_service_poll(&owner_a, encoded, TABOS_WAIT_HANGUP, &events) == 0 && events == TABOS_WAIT_HANGUP,
            "device removal reports hangup");
     camera_service_close_owner(&owner_a);
     camera_service_shutdown();
