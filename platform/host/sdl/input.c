@@ -114,6 +114,9 @@ static tabos_key_t input_key(SDL_Scancode scancode)
 
 static void dispatch_event(const SDL_Event* event)
 {
+    if (host_pointer_event(event)) {
+        return;
+    }
     if (event->type == SDL_EVENT_QUIT) {
         host_request_quit();
         return;

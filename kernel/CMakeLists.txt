@@ -12,6 +12,7 @@ idf_component_register(
         "${TABOS_ROOT}/input/include"
         "${TABOS_ROOT}/loader/include"
         "${TABOS_ROOT}/net/include"
+        "${TABOS_ROOT}/pointer/include"
         "${CMAKE_CURRENT_LIST_DIR}/include"
         "${TABOS_ROOT}/sdk/include"
         "${TABOS_ROOT}/time/include"

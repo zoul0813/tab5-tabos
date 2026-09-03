@@ -43,20 +43,16 @@ int main(void)
         return 1;
     }
 
+    bool launch_startup_application = true;
 #if TABOS_ENABLE_SHELL_STARTUP
-    if (kernel_runtime_start()) {
-        return 1;
-    }
-    kernel_runtime_shutdown();
-    return 0;
-#else
-    if (!kernel_runtime_start()) {
-        return 1;
-    }
+    launch_startup_application = false;
 #endif
+    if (!kernel_runtime_start(launch_startup_application)) {
+        return 1;
+    }
 
     tabos_device_info_t device;
-    if (device_registry_count() != 6U || !device_registry_find(TABOS_DEVICE_NAME_DISPLAY, &device) ||
+    if (device_registry_count() != 7U || !device_registry_find(TABOS_DEVICE_NAME_DISPLAY, &device) ||
         device.device_class != TABOS_DEVICE_CLASS_DISPLAY || device.state != TABOS_DEVICE_READY ||
         !device_registry_find(TABOS_DEVICE_NAME_KEYBOARD, &device) ||
         device.device_class != TABOS_DEVICE_CLASS_KEYBOARD || !device_registry_find(TABOS_DEVICE_NAME_RTC, &device) ||
@@ -70,6 +66,9 @@ int main(void)
         device.features != (TABOS_DEVICE_FEATURE_AUDIO_PLAYBACK | TABOS_DEVICE_FEATURE_AUDIO_CAPTURE |
                             TABOS_DEVICE_FEATURE_AUDIO_SPEAKER | TABOS_DEVICE_FEATURE_AUDIO_HEADPHONE |
                             TABOS_DEVICE_FEATURE_AUDIO_MICROPHONE) ||
+        !device_registry_find(TABOS_DEVICE_NAME_TOUCH, &device) || device.device_class != TABOS_DEVICE_CLASS_POINTER ||
+        device.state != TABOS_DEVICE_READY ||
+        device.features != (TABOS_DEVICE_FEATURE_POINTER_TOUCH | TABOS_DEVICE_FEATURE_POINTER_MULTICONTACT) ||
         !device_registry_find(TABOS_DEVICE_NAME_WIFI, &device) || device.device_class != TABOS_DEVICE_CLASS_NETWORK ||
         device.state != TABOS_DEVICE_OFFLINE) {
         return 1;

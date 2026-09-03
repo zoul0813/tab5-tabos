@@ -11,6 +11,7 @@
 #include <tabos/internal/hardware_devices.h>
 #include <tabos/internal/input.h>
 #include <tabos/internal/network.h>
+#include <tabos/internal/pointer.h>
 #include <tabos/internal/terminal.h>
 #include <tabos/internal/wall_clock.h>
 
@@ -163,7 +164,7 @@ platform_system_action_t kernel_runtime_take_system_action(void)
                                                                memory_order_acq_rel);
 }
 
-bool kernel_runtime_start(void)
+bool kernel_runtime_start(bool launch_startup_application)
 {
     if (!runtime_initialized) {
         return false;
@@ -196,7 +197,16 @@ bool kernel_runtime_start(void)
         return false;
     }
 
+    if (!pointer_service_init()) {
+        display_shutdown();
+        audio_service_shutdown();
+        network_service_shutdown();
+        filesystem_shutdown();
+        return false;
+    }
+
     if (!hardware_devices_init()) {
+        pointer_service_shutdown();
         display_shutdown();
         audio_service_shutdown();
         network_service_shutdown();
@@ -289,6 +299,7 @@ bool kernel_runtime_start(void)
     kernel_boot_report_write_serial(&boot_report);
     if (!render_boot_report()) {
         hardware_devices_shutdown();
+        pointer_service_shutdown();
         display_shutdown();
         audio_service_shutdown();
         network_service_shutdown();
@@ -299,6 +310,7 @@ bool kernel_runtime_start(void)
     if (!console_init(&terminal)) {
         terminal_shutdown(&terminal);
         hardware_devices_shutdown();
+        pointer_service_shutdown();
         display_shutdown();
         audio_service_shutdown();
         network_service_shutdown();
@@ -311,6 +323,7 @@ bool kernel_runtime_start(void)
         console_shutdown();
         terminal_shutdown(&terminal);
         hardware_devices_shutdown();
+        pointer_service_shutdown();
         display_shutdown();
         audio_service_shutdown();
         network_service_shutdown();
@@ -318,6 +331,9 @@ bool kernel_runtime_start(void)
         return false;
     }
     runtime_started = true;
+    if (!launch_startup_application) {
+        return true;
+    }
 #if TABOS_ENABLE_SHELL_STARTUP
     const tabos_app_result_t startup_result = tabos_app_launch_path(TABOS_SHELL_PATH);
 #else
@@ -330,6 +346,7 @@ bool kernel_runtime_start(void)
         terminal_shutdown(&terminal);
         runtime_started = false;
         hardware_devices_shutdown();
+        pointer_service_shutdown();
         display_shutdown();
         audio_service_shutdown();
         network_service_shutdown();
@@ -347,6 +364,7 @@ void kernel_runtime_update(void)
     input_update();
     console_update();
     network_service_update();
+    platform_pointer_update();
     hardware_devices_update();
     kernel_application_system_update();
 }
@@ -358,6 +376,7 @@ void kernel_runtime_shutdown(void)
         console_shutdown();
         terminal_shutdown(&terminal);
         hardware_devices_shutdown();
+        pointer_service_shutdown();
         display_shutdown();
         runtime_started = false;
         boot_report     = (kernel_boot_report_t) {0};

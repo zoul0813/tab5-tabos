@@ -23,6 +23,10 @@ The filesystem module uses `T:/tabos-tester/` temporarily and removes it before 
 The input module briefly enables nonblocking stdin and consumes any input already queued
 for the process.
 
+The pointer module validates `touch0` discovery and stream/wait-source lifecycle when a
+pointer backend is available. Failed-child cleanup also covers a deliberately leaked
+pointer stream.
+
 The networking module validates zero and finite waits; mixed socket/device sources;
 stable item ordering; stale and foreign handles; and process cleanup. Backend component
 tests validate cancellable infinite waits without risking an unrecoverable application hang. When Wi-Fi

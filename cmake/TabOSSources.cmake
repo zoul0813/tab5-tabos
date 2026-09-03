@@ -26,6 +26,7 @@ set(TABOS_CORE_SOURCES
     "${TABOS_ROOT}/net/config.c"
     "${TABOS_ROOT}/net/network.c"
     "${TABOS_ROOT}/audio/audio.c"
+    "${TABOS_ROOT}/pointer/pointer.c"
     "${TABOS_ROOT}/loader/elf_loader.c"
     "${TABOS_ROOT}/loader/elf_application.c"
 )
@@ -53,6 +54,7 @@ set(TABOS_HOST_PLATFORM_SOURCES
     "${TABOS_ROOT}/platform/host/sdl/clock.c"
     "${TABOS_ROOT}/platform/host/sdl/mutex.c"
     "${TABOS_ROOT}/platform/host/sdl/input.c"
+    "${TABOS_ROOT}/platform/host/sdl/pointer.c"
     "${TABOS_ROOT}/platform/host/sdl/display.c"
     "${TABOS_ROOT}/platform/host/sdl/audio.c"
     "${TABOS_ROOT}/platform/host/sdl/executable.c"
@@ -70,6 +72,7 @@ set(TABOS_ESP32P4_PLATFORM_SOURCES
     "${TABOS_ROOT}/platform/esp32p4/rtc.c"
     "${TABOS_ROOT}/platform/esp32p4/mutex.c"
     "${TABOS_ROOT}/platform/esp32p4/keyboard.c"
+    "${TABOS_ROOT}/platform/esp32p4/pointer.c"
     "${TABOS_ROOT}/platform/esp32p4/usb_storage.c"
     "${TABOS_ROOT}/platform/esp32p4/display.c"
     "${TABOS_ROOT}/platform/esp32p4/pie.c"

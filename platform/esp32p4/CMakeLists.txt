@@ -8,6 +8,7 @@ idf_component_register(
         "${CMAKE_CURRENT_LIST_DIR}/include"
     PRIV_INCLUDE_DIRS
         "${TABOS_ROOT}/input/include"
+        "${TABOS_ROOT}/pointer/include"
         "${TABOS_ROOT}/sdk/include"
         "${TABOS_ROOT}/time/include"
         "${CMAKE_BINARY_DIR}/generated"

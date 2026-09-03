@@ -518,11 +518,14 @@ Input events should eventually cover:
 
 The keyboard-first philosophy means reliable low-latency keyboard behavior has priority even though the Tab5 is also a touchscreen device.
 
-### Decision: touch input is deferred
+### Current implementation: touch and pointer input
 
-Touch is not part of the initial terminal interface. Do not prioritize a general touch driver, touch kernel events, host pointer emulation, or touch-facing application API while building the boot console, terminal, keyboard path, and shell. Touch support belongs later with the GUI/windowing system and application input API.
-
-The current ST712x touch-controller access exists only to identify the attached display revision. Keep that narrow probe separate from future kernel touch/input support.
+The public `<tabos/pointer.h>` API exposes process-owned bounded streams of down, move,
+up, and cancel events in logical 1280x720 display coordinates. Only the foreground process
+may consume them. Focus changes, device loss, and queue resets cancel active contacts.
+Tab5 supports GT911 and ST712x-family controllers behind the platform boundary; SDL mouse
+contact 0 and native touch contacts provide the host equivalent. Gestures and window
+routing remain deferred to future GUI clients.
 
 ### Current implementation: keyboard input
 

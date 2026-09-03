@@ -1,5 +1,7 @@
 # Hardware Services Milestone
 
+[Milestone Docs](milestone-hardware-services.md)
+
 ## Goal
 
 Move existing and future TabOS hardware drivers behind one portable, discoverable,
@@ -213,20 +215,20 @@ documentation pass.
 
 ## Phase 5: Touch and Pointer
 
-- [ ] Register detected GT911, ST7123, or ST7121 touch hardware as `touch0`.
-- [ ] Add `<tabos/pointer.h>` with down, move, up, and cancel events.
-- [ ] Include device ID, contact ID, logical 1280x720 coordinates, buttons, and optional normalized pressure.
-- [ ] Normalize rotation and controller-specific coordinates inside the Tab5 backend.
-- [ ] Support bounded multi-contact state and queues.
-- [ ] Map SDL mouse to contact 0 and SDL touch contacts to stable contact IDs.
-- [ ] Restrict pointer consumption to the foreground process through existing focus ownership.
-- [ ] Expose pointer readiness through generic waits.
-- [ ] Cancel active contacts when focus changes, device disappears, or queue state must reset.
-- [ ] Add `touchtest` to `apps/coreutils`.
-- [ ] Test synthetic host mouse/touch input, focus ownership, multi-contact behavior,
+- [x] Register detected GT911, ST7123, or ST7121 touch hardware as `touch0`.
+- [x] Add `<tabos/pointer.h>` with down, move, up, and cancel events.
+- [x] Include device ID, contact ID, logical 1280x720 coordinates, buttons, and optional normalized pressure.
+- [x] Normalize rotation and controller-specific coordinates inside the Tab5 backend.
+- [x] Support bounded multi-contact state and queues.
+- [x] Map SDL mouse to contact 0 and SDL touch contacts to stable contact IDs.
+- [x] Restrict pointer consumption to the foreground process through existing focus ownership.
+- [x] Expose pointer readiness through generic waits.
+- [x] Cancel active contacts when focus changes, device disappears, or queue state must reset.
+- [x] Add `touchtest` to `apps/coreutils`.
+- [x] Test synthetic host mouse/touch input, focus ownership, multi-contact behavior,
   overflow, cancellation, waits, stale sources, and cleanup.
 - [ ] Physically validate coordinate orientation and input on ILI9881C/GT911, ST7123, and ST7121 revisions.
-- [ ] Update pointer/input and utility documentation.
+- [x] Update pointer/input and utility documentation.
 
 ## Phase 6: Camera and Media Pipeline
 

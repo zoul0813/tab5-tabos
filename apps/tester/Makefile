@@ -12,6 +12,7 @@ SOURCES := src/main.c \
            src/tests/device.c \
            src/tests/battery.c \
            src/tests/audio.c \
+           src/tests/pointer.c \
            src/tests/network.c \
            src/tests/graphics.c
 

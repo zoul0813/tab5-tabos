@@ -82,6 +82,13 @@ failures likewise move `battery0` to fault, and successful retries restore ready
 Battery status carries explicit per-field validity; signed current and power are positive
 while discharging and negative while charging.
 
+Detected touch hardware is registered as `touch0`. The process-owned pointer service
+normalizes platform coordinates into the logical 1280x720 display space and supplies
+bounded multi-contact event queues only to the foreground owner. Focus changes, device
+removal, and queue resets cancel active contacts. SDL mouse contact 0 and SDL touch
+contacts share this contract; Tab5 controller handles remain below the platform boundary.
+The contact ceiling defaults to five and is build-configurable for future hardware.
+
 ### Generic wait sources [DECIDED]
 
 Asynchronous application waits use opaque, generation-tagged `tabos_wait_source_t`
@@ -93,7 +100,8 @@ finite monotonic millisecond deadlines, and infinite waits. Process teardown mar
 cancelled and wakes native workers before disposing parent resources, so a later process
 cannot receive stale completions. Sockets expose sources through
 `tabos_socket_wait_source()` and device lifecycle subscriptions through
-`tabos_device_subscription_wait_source()`. A type-indexed internal adapter table supplies
+`tabos_device_subscription_wait_source()`, and pointer streams through
+`tabos_pointer_wait_source()`. A type-indexed internal adapter table supplies
 per-source event validation and readiness translation so future services can join without
 adding service-specific wait transports.
 
@@ -649,7 +657,11 @@ A generic input event model should eventually support:
 
 Keyboard latency and reliability have priority because TabOS is intended to support a keyboard-first workflow.
 
-Touch input is intentionally deferred until the future GUI/windowing and application-input work. Initial terminal and shell milestones require keyboard support, not touch. Current ST712x I2C access in the display backend is hardware-revision detection only and must not be mistaken for a general touch subsystem.
+Pointer input uses a separate public `<tabos/pointer.h>` stream API with down, move, up,
+and cancel events. Events carry boot-local device and stable contact IDs, logical display
+coordinates, buttons, and optional normalized pressure. Consumption follows existing
+foreground process ownership. Gesture recognition and window routing remain future
+clients of this service rather than kernel pointer semantics.
 
 Keyboard input now uses a public platform-neutral event queue with key-down, key-up,
 modifier, repeat, and CP437 text semantics. Filesystem ELF applications access raw events

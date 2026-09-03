@@ -27,12 +27,14 @@ TABOS_APP_HEAP_BYTES ?= 262144
 TABOS_APP_STACK_BYTES ?= 16384
 TABOS_APP_CAPABILITIES ?= 1
 TABOS_APP_ABI_VERSION ?= 3
+TABOS_POINTER_MAX_CONTACTS ?= 5
 
 TABOS_CPPFLAGS := -I$(SDK_ROOT)/include -I$(APP_DIR)/include -DTABOS_APPLICATION=1
 TABOS_CPPFLAGS += -DTABOS_APP_HEAP_BYTES=$(TABOS_APP_HEAP_BYTES)
 TABOS_CPPFLAGS += -DTABOS_APP_STACK_BYTES=$(TABOS_APP_STACK_BYTES)
 TABOS_CPPFLAGS += -DTABOS_APP_CAPABILITIES=$(TABOS_APP_CAPABILITIES)
 TABOS_CPPFLAGS += -DTABOS_APP_ABI_VERSION=$(TABOS_APP_ABI_VERSION)
+TABOS_CPPFLAGS += -DTABOS_POINTER_MAX_CONTACTS=$(TABOS_POINTER_MAX_CONTACTS)
 TABOS_CFLAGS := -march=rv32i_zicsr_zifencei -mabi=ilp32 -Os
 TABOS_CFLAGS += -std=c17 -fno-pic -mno-relax -msmall-data-limit=0
 TABOS_CFLAGS += -ffunction-sections -fdata-sections
@@ -48,6 +50,7 @@ TABOS_RUNTIME_SOURCES := $(SDK_ROOT)/crt/crt0.c $(SDK_ROOT)/crt/metadata.S $(SDK
                          $(SDK_ROOT)/lib/tls.c \
                          $(SDK_ROOT)/lib/battery.c \
                          $(SDK_ROOT)/lib/audio.c \
+                         $(SDK_ROOT)/lib/pointer.c \
                          $(SDK_ROOT)/lib/clock.c \
                          $(SDK_ROOT)/lib/reboot.c \
                          $(SDK_ROOT)/lib/runtime.c \

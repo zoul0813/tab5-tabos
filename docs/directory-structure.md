@@ -28,6 +28,7 @@ tabos/
 ├── fs/                  Portable filesystem subsystem
 ├── graphics/            Portable framebuffer and graphics subsystem
 ├── input/               Portable input-event subsystem
+├── pointer/             Portable touch/pointer stream service
 ├── kernel/              Portable runtime, application lifecycle, registry, and service core
 ├── loader/              Experimental ELF validation, loading, and lifecycle adapter
 ├── net/                 Portable networking subsystem

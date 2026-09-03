@@ -513,6 +513,10 @@ but is not a substitute for this execution path.
 - [x] Add RTC and wall-clock service with live `rtc0` fault/ready reporting; physical restart-retention validation remains.
 - [x] Add validated battery telemetry fields, charger controls, and live `battery0` fault/ready reporting;
   physical telemetry, charger, external-power, and shutdown validation remains.
+- [x] Add the process-owned pointer service, `touch0` discovery, logical coordinates,
+  generic waits, foreground focus cancellation, SDL mouse/touch input, Tab5 GT911/ST712x
+  backends, `touchtest`, and automated host coverage.
+- [ ] Validate pointer orientation and input on physical ILI9881C/GT911, ST7123, and ST7121 revisions.
 - [ ] Add USB host/OTG service beyond keyboard support.
 - [ ] Add camera service when application needs justify it.
 - [ ] Add supported sensor APIs.

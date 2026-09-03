@@ -20,6 +20,7 @@ make -C apps/coreutils shutdown
 make -C apps/coreutils battery
 make -C apps/coreutils devices
 make -C apps/coreutils audiotest
+make -C apps/coreutils touchtest
 ```
 
 Use `build-ls`, `build-mkdir`, or `build-date` to compile without installing. Runnable
@@ -42,3 +43,7 @@ nonzero last error.
 `audiotest` reports audio capabilities and exercises tone playback, microphone level,
 loopback, speaker/headphone routing, and deliberate buffer underrun/overrun accounting.
 See `docs/audio.md` for commands and stream behavior.
+
+`touchtest` prints down, move, up, and cancel events from `touch0`, including logical
+coordinates, contact IDs, buttons, and pressure when available. Press Q or Escape to
+quit. See `docs/pointer.md` for stream behavior.

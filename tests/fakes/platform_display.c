@@ -228,14 +228,14 @@ bool platform_audio_init(platform_audio_render_fn render, platform_audio_capture
     fake_audio_capture = capture;
     fake_audio_error   = error;
     *info              = (platform_audio_info_t) {
-                     .driver           = "fake-audio",
-                     .features         = TABOS_AUDIO_FEATURE_PLAYBACK | TABOS_AUDIO_FEATURE_CAPTURE,
-                     .routes           = TABOS_AUDIO_ROUTE_SPEAKER | TABOS_AUDIO_ROUTE_HEADPHONE | TABOS_AUDIO_ROUTE_MICROPHONE,
-                     .capture_channels = 4U,
-                     .sample_rates     = TABOS_AUDIO_RATES_ALL,
+                     .driver              = "fake-audio",
+                     .features            = TABOS_AUDIO_FEATURE_PLAYBACK | TABOS_AUDIO_FEATURE_CAPTURE,
+                     .routes              = TABOS_AUDIO_ROUTE_SPEAKER | TABOS_AUDIO_ROUTE_HEADPHONE | TABOS_AUDIO_ROUTE_MICROPHONE,
+                     .capture_channels    = 4U,
+                     .sample_rates        = TABOS_AUDIO_RATES_ALL,
                      .default_sample_rate = TABOS_AUDIO_DEFAULT_SAMPLE_RATE,
-                     .detected         = true,
-                     .ready            = true,
+                     .detected            = true,
+                     .ready               = true,
     };
     fake_audio_sample_rate = TABOS_AUDIO_DEFAULT_SAMPLE_RATE;
     return true;
@@ -267,11 +267,8 @@ bool platform_audio_set_sample_rate(uint32_t sample_rate)
         case TABOS_AUDIO_SAMPLE_RATE_44100:
         case TABOS_AUDIO_SAMPLE_RATE_48000:
         case TABOS_AUDIO_SAMPLE_RATE_88200:
-        case TABOS_AUDIO_SAMPLE_RATE_96000:
-            fake_audio_sample_rate = sample_rate;
-            return true;
-        default:
-            return false;
+        case TABOS_AUDIO_SAMPLE_RATE_96000: fake_audio_sample_rate = sample_rate; return true;
+        default: return false;
     }
 }
 
@@ -653,6 +650,25 @@ void test_platform_advance_time_ms(uint64_t elapsed_ms)
 }
 
 void platform_input_wait(void)
+{
+}
+
+bool platform_pointer_init(const char** driver, int* error)
+{
+    if (driver != NULL) {
+        *driver = "fake pointer";
+    }
+    if (error != NULL) {
+        *error = 0;
+    }
+    return true;
+}
+
+void platform_pointer_update(void)
+{
+}
+
+void platform_pointer_shutdown(void)
 {
 }
 

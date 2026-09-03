@@ -8,6 +8,15 @@ msc_mount=${TABOS_MSC_MOUNT:-}
 make_arguments=
 with_doom=false
 
+if [ -z "${TABOS_POINTER_MAX_CONTACTS:-}" ] && [ -f "$project_root/.local/tabos.config" ]; then
+    configured_pointer_contacts=$(awk -F= '$1 == "TABOS_POINTER_MAX_CONTACTS" { print $2; exit }' \
+        "$project_root/.local/tabos.config")
+    if [ -n "$configured_pointer_contacts" ]; then
+        TABOS_POINTER_MAX_CONTACTS=$configured_pointer_contacts
+        export TABOS_POINTER_MAX_CONTACTS
+    fi
+fi
+
 for argument in "$@"; do
     case "$argument" in
         --msc)

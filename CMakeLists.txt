@@ -5,10 +5,13 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/config/Display.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/config/Font.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/config/Filesystem.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/config/Input.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/config/Pointer.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/config/Console.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/config/Acceleration.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/config/Loader.cmake")
 project(${TABOS_CMAKE_PROJECT_NAME} VERSION ${TABOS_PROJECT_VERSION} LANGUAGES C ASM)
+
+add_compile_definitions(TABOS_POINTER_MAX_CONTACTS=${TABOS_POINTER_MAX_CONTACTS})
 
 set(TABOS_GENERATED_INCLUDE_DIR "${CMAKE_BINARY_DIR}/generated")
 set(TABOS_GENERATED_FONT_FILE "${CMAKE_BINARY_DIR}/generated/font.bin")
@@ -119,6 +122,7 @@ target_include_directories(tabos_core
         "${TABOS_ROOT}/kernel/include"
         "${TABOS_ROOT}/loader/include"
         "${TABOS_ROOT}/net/include"
+        "${TABOS_ROOT}/pointer/include"
         "${TABOS_ROOT}/platform/include"
         "${TABOS_ROOT}/time/include"
         "${TABOS_GENERATED_INCLUDE_DIR}"
@@ -136,6 +140,7 @@ target_include_directories(tabos_platform_host
     PUBLIC "${TABOS_ROOT}/platform/include"
     PRIVATE
         "${TABOS_ROOT}/input/include"
+        "${TABOS_ROOT}/pointer/include"
         "${TABOS_ROOT}/sdk/include"
         "${TABOS_ROOT}/time/include"
         "${TABOS_GENERATED_INCLUDE_DIR}"

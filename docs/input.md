@@ -1,6 +1,7 @@
 # Keyboard Input
 
-TabOS provides one portable keyboard event path across Tab5, macOS, and Linux. Touch and pointer events remain deferred.
+TabOS provides one portable keyboard event path across Tab5, macOS, and Linux. Touch
+and pointer input uses separate process-owned streams described in `docs/pointer.md`.
 
 ## Public API
 

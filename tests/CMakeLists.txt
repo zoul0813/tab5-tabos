@@ -66,6 +66,41 @@ tabos_enable_warnings(tabos_sdk_audio)
 tabos_enable_sanitizers(tabos_sdk_audio)
 add_test(NAME unit.sdk_audio COMMAND tabos_sdk_audio)
 
+add_executable(tabos_pointer_service unit/pointer_service.c ${TABOS_TEST_PLATFORM_FAKES})
+target_include_directories(tabos_pointer_service PRIVATE
+    "${TABOS_ROOT}/pointer/include"
+    "${TABOS_ROOT}/platform/include"
+    "${TABOS_ROOT}/sdk/include"
+    "${TABOS_GENERATED_INCLUDE_DIR}"
+)
+target_link_libraries(tabos_pointer_service PRIVATE tabos_core)
+tabos_enable_warnings(tabos_pointer_service)
+tabos_enable_sanitizers(tabos_pointer_service)
+add_test(NAME unit.pointer_service COMMAND tabos_pointer_service)
+
+add_executable(tabos_sdk_pointer
+    unit/sdk_pointer.c
+    "${TABOS_ROOT}/sdk/lib/pointer.c"
+    "${TABOS_ROOT}/sdk/lib/wait.c"
+)
+target_include_directories(tabos_sdk_pointer PRIVATE "${TABOS_ROOT}/sdk/include")
+tabos_enable_warnings(tabos_sdk_pointer)
+tabos_enable_sanitizers(tabos_sdk_pointer)
+add_test(NAME unit.sdk_pointer COMMAND tabos_sdk_pointer)
+
+add_executable(tabos_host_pointer unit/host_pointer.c)
+target_include_directories(tabos_host_pointer PRIVATE
+    "${TABOS_ROOT}/platform/host/sdl"
+    "${TABOS_ROOT}/pointer/include"
+    "${TABOS_ROOT}/platform/include"
+    "${TABOS_ROOT}/sdk/include"
+    "${TABOS_GENERATED_INCLUDE_DIR}"
+)
+target_link_libraries(tabos_host_pointer PRIVATE tabos_core tabos_platform_host SDL3::SDL3)
+tabos_enable_warnings(tabos_host_pointer)
+tabos_enable_sanitizers(tabos_host_pointer)
+add_test(NAME unit.host_pointer COMMAND tabos_host_pointer)
+
 add_executable(tabos_raster unit/raster.c ${TABOS_TEST_PLATFORM_FAKES})
 target_include_directories(tabos_raster PRIVATE
     "${TABOS_ROOT}/graphics/include"

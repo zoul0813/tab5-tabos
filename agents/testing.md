@@ -173,6 +173,11 @@ readiness, stale and foreign handles, interrupted waits, and leaked-source proce
 online Wi-Fi, a nested tester child disconnects and reconnects the network so the retained
 parent can verify `wifi0` lifecycle readiness without a test-only device mutation API.
 
+Pointer validation injects synthetic SDL mouse and touch events and covers stable
+multi-contact IDs, logical coordinates, foreground-only reads, generic wait readiness,
+focus cancellation, bounded-queue reset, device removal, stale handles, and process
+cleanup. Physical validation must still confirm orientation on all three Tab5 revisions.
+
 ---
 
 ## 4. Target Definitions
@@ -459,13 +464,19 @@ Hardware-specific tests are still required for the real STM32 keyboard controlle
 
 ## 9. Touch and Pointer Simulation
 
-This section describes eventual GUI/input testing, not current implementation priority. Touch and host pointer-to-touch mapping are deferred until the windowing system and application touch API. Terminal, keyboard, and shell work should not wait for touch support.
+Touch and host pointer input now share the public pointer stream service. GUI gestures and
+window-level routing remain deferred; terminal, keyboard, and shell behavior do not depend
+on pointer input.
 
 Current keyboard coverage includes host tests for HID-to-text translation, key/text event ordering, queue overflow policy, and runtime bootstrap with a fake keyboard platform. SDL3 and the Tab5 I2C backend feed the same public queue. Hardware validation must confirm that boot diagnostics show `TAB5 KEYBOARD FW ...; HID MODE`; missing keyboard must remain a warning rather than preventing boot. Builds configured with `TABOS_ENABLE_KEYBOARD_DIAGNOSTICS=ON` also log every normalized key/text event without consuming the queue; this flag defaults off. USB HID keyboards on Tab5 are not yet supported.
 
 Console tests cover exclusive foreground acquisition, background and stale-session rejection, rejected-read non-consumption, cursor pixels and blink phase, clearing, history ring overflow, Page Up/Down/Home/End navigation, automatic return to live output, and scale reflow with retained cells. Timer tests cover one-shot, repeating, late-poll skipping, and cancellation behavior with fake monotonic time. Manual validation must verify shell opt-in consumes Page Up/Down/Home/End and Tab5 Ctrl+Arrow equivalents, a disabled mode delivers those events to the application, children inherit by value, and returning to the parent restores its unchanged mode. `TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP=ON` provides manual cross-target keyboard-to-framebuffer validation and defaults off. Diagnostic application is not shell.
 
 Application lifecycle tests cover descriptor validation, duplicate rejection, registry lookup, startup failure cleanup, PID metadata, process-table retention, PID 0→1→2 nesting, blocked-parent state, console focus transfer, reverse-order status unwind, root-exit panic transition, and shutdown cleanup. Runtime smoke test verifies configured `console-test` remains PID 0 after Ctrl+Q reports completion. Same portable lifecycle code compiles into host and Tab5; host executes deterministic tests while Tab5 cross-build verifies target compatibility.
+
+Host integration smoke tests initialize and exercise the runtime without launching
+the configured startup application. They must not depend on separately installed
+filesystem application artifacts such as `T:/bin/shell`.
 
 The C runtime test matrix must use the same independently built applications on
 host and Tab5. Cover `main(argc, argv)`, return-to-exit status, descriptors

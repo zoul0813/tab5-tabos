@@ -13,6 +13,7 @@ CONFIG_DEFAULTS = {
     "TABOS_HOST_ROOTFS": ".local/rootfs",
     "TABOS_FILESYSTEM_MAX_FILES": "32",
     "TABOS_FILESYSTEM_MAX_DIRECTORIES": "8",
+    "TABOS_POINTER_MAX_CONTACTS": "5",
     "TABOS_FONT_FILE": "graphics/blueterm.f12",
     "TABOS_FONT_GLYPH_WIDTH": "8",
     "TABOS_FONT_GLYPH_HEIGHT": "12",
@@ -46,6 +47,8 @@ def validate_project_config(config: dict[str, str]) -> None:
     if not re.fullmatch(r"(?:[1-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])",
                         config["TABOS_FILESYSTEM_MAX_DIRECTORIES"]):
         fail("TABOS_FILESYSTEM_MAX_DIRECTORIES must be an integer from 1 through 255")
+    if not re.fullmatch(r"(?:[1-9]|[12][0-9]|3[0-2])", config["TABOS_POINTER_MAX_CONTACTS"]):
+        fail("TABOS_POINTER_MAX_CONTACTS must be an integer from 1 through 32")
     if not config["TABOS_ELF_STARTUP_PATH"]:
         fail("TABOS_ELF_STARTUP_PATH must not be empty")
     if not config["TABOS_SHELL_PATH"]:
@@ -158,6 +161,9 @@ def command_config(_args: argparse.Namespace) -> None:
         config["TABOS_FILESYSTEM_MAX_DIRECTORIES"] = prompt_integer(
             "Maximum open directories", config["TABOS_FILESYSTEM_MAX_DIRECTORIES"], 1, 255
         )
+        config["TABOS_POINTER_MAX_CONTACTS"] = prompt_integer(
+            "Maximum pointer contacts", config["TABOS_POINTER_MAX_CONTACTS"], 1, 32
+        )
         config["TABOS_ELF_STARTUP_PATH"] = prompt_text(
             "Filesystem-backed ELF startup path", config["TABOS_ELF_STARTUP_PATH"]
         )
@@ -230,6 +236,7 @@ def project_cmake_arguments(target: str) -> list[str]:
         f"-DTABOS_HOST_ROOTFS={host_rootfs}",
         f"-DTABOS_FILESYSTEM_MAX_FILES={config['TABOS_FILESYSTEM_MAX_FILES']}",
         f"-DTABOS_FILESYSTEM_MAX_DIRECTORIES={config['TABOS_FILESYSTEM_MAX_DIRECTORIES']}",
+        f"-DTABOS_POINTER_MAX_CONTACTS={config['TABOS_POINTER_MAX_CONTACTS']}",
         f"-DTABOS_FONT_FILE={font_path}",
         f"-DTABOS_FONT_GLYPH_WIDTH={config['TABOS_FONT_GLYPH_WIDTH']}",
         f"-DTABOS_FONT_GLYPH_HEIGHT={config['TABOS_FONT_GLYPH_HEIGHT']}",

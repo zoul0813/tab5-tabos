@@ -105,7 +105,11 @@ static _Thread_local uint32_t host_rv32_active_ram_size;
     X(AUDIO_SET_ROUTE, 332U)                 \
     X(AUDIO_STATUS, 336U)                    \
     X(AUDIO_WAIT_SOURCE, 340U)               \
-    X(AUDIO_FLUSH, 344U)
+    X(AUDIO_FLUSH, 344U)                     \
+    X(POINTER_OPEN, 348U)                    \
+    X(POINTER_CLOSE, 352U)                   \
+    X(POINTER_READ, 356U)                    \
+    X(POINTER_WAIT_SOURCE, 360U)
 
 enum {
 #define HOST_RV32_GATE_INDEX(name, api_offset) HOST_RV32_GATE_INDEX_##name,
@@ -840,7 +844,7 @@ platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* cont
             context->state.regs[10] = (uint32_t) context->api.wait(items, item_count, context->state.regs[12]);
             current_user_data       = NULL;
             context->state.pc       = context->state.regs[1];
-            continue;
+            return PLATFORM_RISCV32_YIELDED;
         }
         if (context->state.pc == HOST_RV32_BATTERY_STATUS) {
             tabos_elf_battery_status_t* status =
@@ -941,6 +945,34 @@ platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* cont
             }
             current_user_data = NULL;
             context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_POINTER_OPEN || context->state.pc == HOST_RV32_POINTER_CLOSE ||
+            context->state.pc == HOST_RV32_POINTER_WAIT_SOURCE) {
+            current_user_data = context->user_data;
+            if (context->state.pc == HOST_RV32_POINTER_OPEN && context->api.pointer_open != NULL) {
+                context->state.regs[10] = (uint32_t) context->api.pointer_open(context->state.regs[10]);
+            } else if (context->state.pc == HOST_RV32_POINTER_CLOSE && context->api.pointer_close != NULL) {
+                context->state.regs[10] = (uint32_t) context->api.pointer_close((int) context->state.regs[10]);
+            } else if (context->state.pc == HOST_RV32_POINTER_WAIT_SOURCE && context->api.pointer_wait_source != NULL) {
+                context->state.regs[10] = (uint32_t) context->api.pointer_wait_source((int) context->state.regs[10]);
+            } else {
+                current_user_data = NULL;
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data = NULL;
+            context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_POINTER_READ) {
+            tabos_pointer_event_t* event = guest_buffer(context->memory, context->state.regs[11], sizeof(*event));
+            if (event == NULL || context->api.pointer_read == NULL) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data       = context->user_data;
+            context->state.regs[10] = (uint32_t) context->api.pointer_read((int) context->state.regs[10], event);
+            current_user_data       = NULL;
+            context->state.pc       = context->state.regs[1];
             continue;
         }
         if (context->state.pc == HOST_RV32_TLS_CONNECT || context->state.pc == HOST_RV32_TLS_CLOSE ||

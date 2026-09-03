@@ -5,10 +5,11 @@
 #include <tabos/input.h>
 #include <tabos/device.h>
 #include <tabos/audio.h>
+#include <tabos/pointer.h>
 
 #include <stdint.h>
 
-#define TABOS_ELF_API_VERSION  18U
+#define TABOS_ELF_API_VERSION  19U
 #define TABOS_ELF_EXEC_PENDING (-2147483647 - 1)
 
 enum {
@@ -184,6 +185,10 @@ typedef struct {
         int (*audio_status)(int stream, tabos_audio_status_t* status);
         int (*audio_wait_source)(int stream);
         int (*audio_flush)(int stream);
+        int (*pointer_open)(tabos_device_id_t device_id);
+        int (*pointer_close)(int stream);
+        int (*pointer_read)(int stream, tabos_pointer_event_t* event);
+        int (*pointer_wait_source)(int stream);
 } tabos_elf_api_t;
 
 typedef int (*tabos_elf_entry_fn)(const tabos_elf_api_t* api, int argc, const char* const* argv);

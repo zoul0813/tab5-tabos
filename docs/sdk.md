@@ -29,11 +29,19 @@ and copied-information types used by the hardware-service registry. Device IDs a
 applications must not decode or persist them across reboot.
 
 Current built-in logical names are `display0`, `keyboard0`, `storage0`, `rtc0`,
-`battery0`, `audio0`, and `wifi0`. TabOS registers only devices detected during startup. Host builds
+`battery0`, `audio0`, `touch0`, and `wifi0`. TabOS registers only devices detected during startup. Host builds
 publish deterministic virtual equivalents. Feature flags describe framebuffer, input,
 removable storage, wall-clock, battery telemetry/control, and Wi-Fi support; flags are
 informational and do not restrict application access. Audio features identify playback,
 capture, speaker, headphone, microphone, and working AEC support.
+
+## Touch and Pointer
+
+`<tabos/pointer.h>` provides process-owned, nonblocking pointer streams with down,
+move, up, and cancel events. Events use logical 1280x720 coordinates and stable active
+contact IDs. `<tabos/wait.h>` exposes readable and hangup readiness. See
+`docs/pointer.md` for ownership, queue, cancellation, host mouse/touch, and Tab5
+coordinate behavior.
 
 ## Audio
 

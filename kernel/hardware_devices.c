@@ -5,6 +5,7 @@
 #include <tabos/filesystem.h>
 #include <tabos/internal/device_registry.h>
 #include <tabos/internal/network.h>
+#include <tabos/internal/pointer.h>
 #include <tabos/platform/platform.h>
 
 #include <errno.h>
@@ -13,7 +14,8 @@ static tabos_device_id_t network_device = TABOS_DEVICE_ID_INVALID;
 static tabos_device_id_t rtc_device     = TABOS_DEVICE_ID_INVALID;
 static tabos_device_id_t battery_device = TABOS_DEVICE_ID_INVALID;
 static tabos_device_id_t audio_device   = TABOS_DEVICE_ID_INVALID;
-static tabos_device_id_t registered_devices[7];
+static tabos_device_id_t pointer_device = TABOS_DEVICE_ID_INVALID;
+static tabos_device_id_t registered_devices[8];
 static size_t registered_device_count;
 static bool initialized;
 
@@ -146,6 +148,18 @@ bool hardware_devices_init(void)
             return false;
         }
     }
+    const char* pointer_driver = NULL;
+    int pointer_error          = 0;
+    if (pointer_service_info(&pointer_driver, &pointer_error)) {
+        if (!register_device(TABOS_DEVICE_NAME_TOUCH, pointer_driver != NULL ? pointer_driver : "touch",
+                             TABOS_DEVICE_CLASS_POINTER, pointer_error == 0 ? TABOS_DEVICE_READY : TABOS_DEVICE_FAULT,
+                             TABOS_DEVICE_FEATURE_POINTER_TOUCH | TABOS_DEVICE_FEATURE_POINTER_MULTICONTACT,
+                             pointer_error, &pointer_device)) {
+            hardware_devices_shutdown();
+            return false;
+        }
+        pointer_service_set_device_id(pointer_device);
+    }
     network_status_t network_status;
     if (diagnostics.network_present && network_service_status(&network_status) &&
         !register_device(TABOS_DEVICE_NAME_WIFI, diagnostics.network_name, TABOS_DEVICE_CLASS_NETWORK,
@@ -204,4 +218,5 @@ void hardware_devices_shutdown(void)
     rtc_device     = TABOS_DEVICE_ID_INVALID;
     battery_device = TABOS_DEVICE_ID_INVALID;
     audio_device   = TABOS_DEVICE_ID_INVALID;
+    pointer_device = TABOS_DEVICE_ID_INVALID;
 }
