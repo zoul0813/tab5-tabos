@@ -29,11 +29,11 @@ Explicitly fetch, build, and install pinned optional DOOM application with:
 ./apps/build.sh --with-doom
 ```
 
-To build and copy the applications to the Tab5 MSC volume, then safely eject
-it after copying:
+To build, install, and copy the applications to the Tab5 MSC volume, then safely
+eject it after copying:
 
 ```sh
-./apps/build.sh build --msc
+./apps/build.sh --msc
 ```
 
 The default mount point is `/Volumes/TAB5`. Use `--msc-mount=/path` or set

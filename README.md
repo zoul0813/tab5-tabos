@@ -8,6 +8,40 @@ Project identity, version, window title, preference names, target display names,
 
 Project documentation starts in [`docs/`](docs/README.md). See the [directory structure guide](docs/directory-structure.md) for repository layout and ownership boundaries.
 
+## First Run on Tab5 Hardware
+
+Default configuration starts `T:/bin/shell`; running the interactive configurator is
+not required. For a new Tab5 checkout:
+
+```sh
+./tools/tabos setup
+./tools/tabos tab5 build
+./tools/tabos tab5 flash
+```
+
+After flashing, enter MSC mode: hold the Tab5 Keyboard `Del` key while resetting
+the Tab5. Keep `Del` held until the `TAB5` volume mounts, then run:
+
+```sh
+./apps/build.sh --msc
+```
+
+After the MSC copy finishes and the device restarts, TabOS launches the shell from
+`T:/bin/shell`.
+
+## First Run with the macOS Host Simulator
+
+For the macOS host simulator, no flash or MSC reset is needed:
+
+```sh
+./tools/tabos setup
+./apps/build.sh
+./tools/tabos macos debug run
+```
+
+The application build installs the shell and other default applications under the
+host root filesystem before the simulator starts.
+
 ## Targets
 
 - `tab5`: ESP32-P4 firmware built with ESP-IDF v5.4.4.
@@ -68,9 +102,10 @@ eval "$(./tools/tabos activate-idf)"
 
 The build rejects other ESP-IDF versions until they have been validated deliberately.
 
-## Configure
+## Optional Configuration
 
-Configure TabOS-owned host and device behavior with:
+Defaults provide a working shell-first host and Tab5 system. To override TabOS-owned
+host or device behavior, run:
 
 ```sh
 ./tools/tabos config

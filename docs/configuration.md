@@ -1,6 +1,7 @@
 # Project Configuration
 
-TabOS-owned options are configured through an interactive project command:
+TabOS works without a saved project configuration. Built-in defaults start
+`T:/bin/shell` on both host and Tab5 targets. To override TabOS-owned options, use:
 
 ```sh
 ./tools/tabos config
@@ -13,8 +14,8 @@ cache contents.
 
 Current settings cover:
 
-- host startup application: `none`, `console-test`, `filesystem-test`, `elf-hello`, or `shell`
-- Tab5 startup application: `none`, `console-test`, `filesystem-test`, `elf-hello`, or `shell`
+- host startup application, defaulting to `shell`: `none`, `console-test`, `filesystem-test`, `elf-hello`, or `shell`
+- Tab5 startup application, defaulting to `shell`: `none`, `console-test`, `filesystem-test`, `elf-hello`, or `shell`
 - raw bitmap font file
 - font glyph width, height, and glyph count (1 through 256)
 - terminal font cell width and height

@@ -27,8 +27,8 @@ CONFIG_DEFAULTS = {
     "TABOS_ENABLE_PIE_DIAGNOSTICS": "OFF",
     "TABOS_ELF_STARTUP_PATH": "T:/bin/hello",
     "TABOS_SHELL_PATH": "T:/bin/shell",
-    "TABOS_HOST_STARTUP_APP": "none",
-    "TABOS_TAB5_STARTUP_APP": "none",
+    "TABOS_HOST_STARTUP_APP": "shell",
+    "TABOS_TAB5_STARTUP_APP": "shell",
 }
 
 
@@ -91,11 +91,11 @@ def validate_project_config(config: dict[str, str]) -> None:
     if config["TABOS_HOST_STARTUP_APP"] not in {
         "none", "console-test", "filesystem-test", "elf-hello", "shell"
     }:
-        fail("TABOS_HOST_STARTUP_APP must be none, console-test, filesystem-test, or elf-hello")
+        fail("TABOS_HOST_STARTUP_APP must be none, console-test, filesystem-test, elf-hello, or shell")
     if config["TABOS_TAB5_STARTUP_APP"] not in {
         "none", "console-test", "filesystem-test", "elf-hello", "shell"
     }:
-        fail("TABOS_TAB5_STARTUP_APP must be none, console-test, filesystem-test, or elf-hello")
+        fail("TABOS_TAB5_STARTUP_APP must be none, console-test, filesystem-test, elf-hello, or shell")
 
 
 def load_project_config() -> dict[str, str]:

@@ -65,7 +65,7 @@ default; raw input omits translated text events from raw polling.
 
 ## Diagnostic Application
 
-Select `console-test` as host or Tab5 startup application through `./tools/tabos config` to register and start small interactive diagnostic application after boot. Option defaults to `none`.
+Select `console-test` as host or Tab5 startup application through `./tools/tabos config` to register and start small interactive diagnostic application after boot. Normal startup defaults to `shell`.
 
 Diagnostic application displays a prompt, echoes text through public console API, handles Enter, Tab, and repeating Backspace, protects prompt from deletion, clears screen with Ctrl+L, and navigates history with full-keyboard navigation keys or Tab5 Ctrl+Arrow shortcuts. Ctrl+Q reports completion while diagnostic remains persistent PID 0. Process manager owns its foreground console session. SDL host backend synthesizes normalized text for Enter, Tab, and repeated keys when desktop text input does not provide it. It contains no command parser and is not shell.
 
