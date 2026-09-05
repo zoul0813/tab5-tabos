@@ -5,6 +5,11 @@
 
 ## Sprite and Tile SDK
 
+- `[DECIDED]` Public sprite and tilemap headers document descriptor fields, ownership,
+  coordinates, transforms, defaults, return values, errors, and queued-data lifetime.
+  `docs/tile-assets.md` is the complete developer guide for authoring, building, loading,
+  drawing, animation, metasprites, flags, cells, layers, objects, and cleanup.
+
 - `[DECIDED]` `tabos_sprite_animation_sprite()` returns the sprite ID selected for an
   animation at explicit elapsed milliseconds. The name states the return value;
   `TABOS_SPRITE_NONE` reports invalid input.

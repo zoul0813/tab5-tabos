@@ -183,7 +183,7 @@ Binary formats:
 - [ ] Review: Add an original `tdemo` reference application using a generated sprite animation,
   metasprite, scrolling multilayer map, editable cell, collision flags, and object markers.
   Load binary assets from `T:/data/tdemo/`.
-- [ ] Review: Update graphics/API, SDK/application-build, asset-authoring, and demo documentation.
+- [x] Review: Update graphics/API, SDK/application-build, asset-authoring, and demo documentation.
 - [ ] Review: Record decisions and milestone work in `agents/TABOS_CONTEXT.md`,
   `agents/architecture.md`, `agents/testing.md`, and `agents/roadmap.md`.
 
@@ -350,6 +350,18 @@ Validated working-tree changes based on `7e43d93`:
 - macOS Debug full suite: 44/44 passed with AddressSanitizer/UndefinedBehaviorSanitizer.
   Focused Debug and Release tile and asset-equivalence tests passed. All standard RV32
   applications cross-built successfully.
+
+## Developer Documentation Evidence — 2026-09-05
+
+- Expanded `<tabos/sprite.h>` and `<tabos/tilemap.h>` into standalone public contracts
+  covering every descriptor family, IDs, ownership, coordinates, transforms, defaults,
+  layer behavior, return values, error codes, and queued-source lifetime.
+- Expanded `docs/tile-assets.md` with a complete binary-backed game flow and recipes for
+  sprites, animation, metasprites, flags, collision queries, writable cells, ordered
+  layers, cameras, object markers, properties, generated IDs, Tiled authoring, standalone
+  PNG/GIF assets, build prerequisites, installation, and cleanup.
+- Updated the documentation index. macOS Debug build and five focused runtime, converter,
+  equivalence, and public-header architecture tests passed.
 
 ## Assumptions
 

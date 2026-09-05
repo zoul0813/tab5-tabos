@@ -68,8 +68,9 @@ return tabos_sprite_animation_draw(
     &graphics, &sprites, player.animation, player.x, player.y, elapsed_ms);
 ```
 
-Pause by freezing elapsed time; restart by resetting the actor's start time. The existing
-frame-selection function remains available when the game needs a sprite ID without drawing.
+Pause by freezing elapsed time; restart by resetting the actor's start time.
+`tabos_sprite_animation_sprite()` remains available when the game needs a sprite ID
+without drawing.
 
 `<tabos/tilemap.h>` uses 32-bit `tabos_tile_t`. Zero is empty; low 28 bits hold a
 one-based sprite ID; high bits preserve Tiled horizontal, vertical, and diagonal flips.
@@ -119,13 +120,237 @@ animation clips must be nonempty, frame durations positive, and map/tile dimensi
 positive signed 32-bit coordinates. The map loader rejects the reserved GID bit; checking
 whether a nonempty cell's sprite ID exists in a particular sprite set happens at draw time.
 
+## Game Recipes
+
+Generated names let game code avoid numeric IDs. If the manifest is named `mygame`, a
+Tiled tile named `player`, map named `level`, and layers named `ground` and `foreground`
+produce names like:
+
+```c
+MYGAME_SPRITE_PLAYER
+MYGAME_ANIMATION_PLAYER_WALK
+MYGAME_METASPRITE_PLAYER_SHADOW
+MYGAME_MAP_LEVEL
+MYGAME_LAYER_LEVEL_GROUND
+MYGAME_LAYER_LEVEL_FOREGROUND
+MYGAME_OBJECT_LEVEL_SPAWN
+MYGAME_FLAG_SOLID
+```
+
+The constants-only app header is safe to include with binary-backed assets. This complete
+one-frame program shows loading, world drawing, HUD placement, presentation, and cleanup:
+
+```c
+#include <mygame.h>
+#include <tabos/graphics.h>
+#include <tabos/runtime_time.h>
+#include <tabos/sprite.h>
+#include <tabos/tilemap.h>
+
+int main(void)
+{
+    tabos_graphics_t graphics = {.width = 320U, .height = 180U};
+    tabos_sprite_set_t sprites = {0};
+    tabos_tilemap_t map = {0};
+    if (tabos_graphics_open(&graphics) != 0 ||
+        tabos_sprite_set_load("T:/data/mygame/mygame.tsp", &sprites) != 0 ||
+        tabos_tilemap_load("T:/data/mygame/level.tmap", &map) != 0) {
+        tabos_tilemap_unload(&map);
+        tabos_sprite_set_unload(&sprites);
+        if (graphics.open) {
+            (void) tabos_graphics_close(&graphics);
+        }
+        return 1;
+    }
+
+    const int32_t camera_x = 0;
+    const int32_t camera_y = 0;
+    const int32_t player_x = 80;
+    const int32_t player_y = 68;
+    const uint64_t animation_started_ms = tabos_monotonic_ms();
+    const uint64_t elapsed_ms = tabos_monotonic_ms() - animation_started_ms;
+    const tabos_tilemap_draw_options_t map_draw = {
+        .viewport = {.width = graphics.width, .height = graphics.height},
+        .animation_ms = elapsed_ms,
+    };
+
+    (void) tabos_graphics_clear(&graphics, TABOS_RGB565(8, 18, 30));
+    (void) tabos_graphics_begin_camera(&graphics, camera_x, camera_y);
+    (void) tabos_tilemap_draw_layer(
+        &graphics, &map, MYGAME_LAYER_LEVEL_GROUND, &sprites, &map_draw);
+    (void) tabos_sprite_animation_draw(
+        &graphics, &sprites, MYGAME_ANIMATION_PLAYER_WALK, player_x, player_y, elapsed_ms);
+    (void) tabos_tilemap_draw_layer(
+        &graphics, &map, MYGAME_LAYER_LEVEL_FOREGROUND, &sprites, &map_draw);
+    (void) tabos_graphics_end_camera(&graphics);
+    /* Draw screen-space HUD here. */
+    (void) tabos_graphics_present(&graphics);
+
+    /* After the final present, normally during shutdown: */
+    tabos_tilemap_unload(&map);
+    tabos_sprite_set_unload(&sprites);
+    return tabos_graphics_close(&graphics) == 0 ? 0 : 1;
+}
+```
+
+Check return values in production code. Draw operations may queue source pointers, so
+loaded assets must remain alive and unchanged until `tabos_graphics_present()` completes.
+The [`tdemo` source](../apps/tile-demo/src/main.c) adds a real input/render loop, camera
+movement, a metasprite, object markers, and a writable cell using the same API.
+
+### Draw a Sprite
+
+The position passed to a sprite draw is its pivot position in world coordinates:
+
+```c
+tabos_sprite_draw(&graphics, &sprites, MYGAME_SPRITE_CRATE, x, y);
+
+tabos_sprite_draw_options_t draw = TABOS_SPRITE_DRAW_OPTIONS_DEFAULT;
+draw.width = 32U;
+draw.height = 32U;
+draw.mirror_x = facing_left;
+draw.opacity = 192U;
+draw.clip_enabled = true;
+draw.clip = playfield; /* Screen coordinates. */
+tabos_sprite_draw_ex(&graphics, &sprites, MYGAME_SPRITE_PLAYER, x, y, &draw);
+```
+
+Width and height zero independently select natural post-rotation dimensions. Opacity
+zero draws nothing; 255 is fully opaque. Clips stay in screen coordinates when a camera
+is active.
+
+### Draw a Metasprite
+
+A metasprite combines ordered sprites, useful for shadows, equipment, vehicles, and
+multi-part actors. Define parts in the manifest:
+
+```json
+{
+  "name": "player_shadow",
+  "parts": [
+    {"sprite": "shadow", "x": 2, "y": 0, "opacity": 128},
+    {"sprite": "player", "x": 0, "y": 0},
+    {"sprite": "sword", "x": 7, "y": -6, "rotation": 1}
+  ]
+}
+```
+
+Parts draw in listed order, so the sword appears over the player and both appear over the
+shadow. Offsets are signed world offsets from the metasprite origin. Rotation values are
+the `tabos_graphics_rotation_t` quarter turns `0` through `3`; `mirror_x`, `mirror_y`, and
+`opacity` default to false, false, and 255.
+
+```c
+tabos_metasprite_draw(
+    &graphics,
+    &sprites,
+    MYGAME_METASPRITE_PLAYER_SHADOW,
+    player_x,
+    player_y,
+    facing_left,
+    false,
+    255U);
+```
+
+Overall mirroring reverses part offsets and combines with each part's own mirrors.
+Overall opacity multiplies part opacity. Metasprites intentionally have no overall scale,
+clip, animation state, or arbitrary-angle rotation.
+
+### Read Flags and Edit Cells
+
+Flags are game-defined bits. TabOS stores and returns them but provides no collision
+solver:
+
+```c
+tabos_tile_t tile = TABOS_TILE_EMPTY;
+if (tabos_tilemap_get(&map, MYGAME_LAYER_LEVEL_GROUND, column, row, &tile) == 0 &&
+    tile != TABOS_TILE_EMPTY) {
+    uint32_t sprite = TABOS_TILE_ID(tile);
+    if ((tabos_sprite_flags(&sprites, sprite) & MYGAME_FLAG_SOLID) != 0U) {
+        /* Block movement. */
+    }
+}
+
+tabos_tilemap_set(
+    &map,
+    MYGAME_LAYER_LEVEL_FOREGROUND,
+    column,
+    row,
+    TABOS_TILE(MYGAME_SPRITE_OPEN_DOOR));
+```
+
+`TABOS_TILE()` encodes a normal zero-based sprite ID. OR it with
+`TABOS_TILE_FLIP_HORIZONTAL`, `TABOS_TILE_FLIP_VERTICAL`, or
+`TABOS_TILE_FLIP_DIAGONAL` when needed. `TABOS_TILE_ID()` returns the sprite ID and
+ignores transform bits; for an empty cell it returns `TABOS_SPRITE_NONE`. Cell edits live
+only in memory and are never saved automatically.
+
+### Read Object Markers
+
+Object-layer constants identify a layer index. Object constants preserve Tiled object
+IDs; they are not array indexes. Iterate the selected layer and inspect each marker:
+
+```c
+const tabos_tilemap_layer_t* layer = &map.layers[MYGAME_LAYER_LEVEL_MARKERS];
+if (layer->type != TABOS_TILEMAP_LAYER_OBJECTS) {
+    /* Wrong generated layer constant for this operation. */
+}
+
+for (uint32_t index = 0U; index < layer->object_count; ++index) {
+    const tabos_tilemap_object_t* object = &layer->objects[index];
+    if (object->id == MYGAME_OBJECT_LEVEL_SPAWN) {
+        player_x = object->x;
+        player_y = object->y;
+    }
+    if (object->shape == TABOS_TILEMAP_OBJECT_RECTANGLE) {
+        int32_t damage = 0;
+        if (tabos_tilemap_object_property(object, "damage", &damage) == 0) {
+            /* Create a rectangular damage trigger. */
+        }
+    }
+}
+```
+
+Point, rectangle, and tile objects preserve integral authored position and dimensions.
+Tile objects also expose an encoded `tile` value. `name` is the Tiled object name; `type`
+is its class, falling back to the legacy Tiled type. Missing properties return `ENOENT`.
+Object layers do not render themselves; game code may create entities, triggers, or debug
+markers from them.
+
 ## Authoring
+
+The normal workflow is:
+
+1. Create a finite orthogonal JSON map (`.tmj`) in Tiled.
+2. Use atlas tilesets embedded in the map or stored as JSON `.tsj` files.
+3. Name tiles and animations with the TabOS properties below.
+4. Add tile layers in desired draw order and object layers for markers.
+5. Reference the map from the version-1 manifest.
+6. Run `tabos assets build`, then include its generated app header.
+
+Use integral map and object coordinates and zero tile-layer offsets. Layer visibility and
+opacity are authoring aids; the runtime imports supported layers and game code chooses
+which tile layers to draw.
 
 Run:
 
 ```sh
 ./tools/tabos assets build path/to/manifest.json --output build/assets
 ```
+
+For a manifest named `mygame` with a map named `level`, this produces:
+
+| Output | Application use |
+| --- | --- |
+| `mygame.tsp` | Load all images, sprites, animations, metasprites, and flags. |
+| `level.tmap` | Load the writable map and its ordered tile/object layers. |
+| `mygame.c` | Optional compiled-in descriptors and pixels. |
+| `mygame.h` | Generated-C declarations plus every named ID constant. |
+
+The separate `--header-output` file described below contains only named constants for
+binary-backed applications. `MAP` constants record converter map order; binary maps are
+loaded individually by their `.tmap` path, while layer and object constants are used with
+the loaded map.
 
 For application code that uses generated IDs, also place a public header in the app's
 include directory:
@@ -166,7 +391,8 @@ Application builds preserve this host Python when activating ESP-IDF, so IDF's
 isolated Python environment does not need a second Pillow installation.
 
 Version-1 JSON manifests contain `name`, optional numeric `flags`, and arrays named
-`images`, `animations`, `metasprites`, and `maps`. Example:
+`images`, `animations`, `metasprites`, and `maps`. Paths are relative to the manifest.
+Example:
 
 ```json
 {
@@ -177,6 +403,51 @@ Version-1 JSON manifests contain `name`, optional numeric `flags`, and arrays na
     {"name": "actor", "parts": [{"sprite": "wall", "x": 0, "y": 0}]}
   ],
   "maps": [{"name": "level", "source": "level.tmj"}]
+}
+```
+
+Standalone PNGs may become one full-image sprite or several named regions:
+
+```json
+{
+  "name": "actors",
+  "source": "actors.png",
+  "transparent_rgb": [255, 0, 255],
+  "transparent_tolerance": 8,
+  "sprites": [
+    {
+      "name": "player",
+      "x": 0,
+      "y": 0,
+      "width": 16,
+      "height": 24,
+      "pivot": [8, 24],
+      "flags": ["solid"]
+    }
+  ]
+}
+```
+
+Place this object in the manifest's `images` array. Omit `sprites` to create one sprite
+covering the whole image. Optional `resize: [width, height]` uses nearest-neighbor scaling.
+Optional `color_key` selects an explicit RGB565 transparency key; otherwise transparent
+input receives a deterministic unused key.
+
+An animated GIF image entry generates one full-frame sprite per GIF frame and one
+animation using the image entry's name. Animated GIF entries cannot define multiple
+regions. `durations_ms` may override every frame duration, and `repeat_count` may override
+GIF loop metadata.
+
+Manual animations reference previously imported sprite names:
+
+```json
+{
+  "name": "player_jump",
+  "repeat_count": 1,
+  "frames": [
+    {"sprite": "player_jump_0", "duration_ms": 80},
+    {"sprite": "player_jump_1", "duration_ms": 120}
+  ]
 }
 ```
 
@@ -238,11 +509,24 @@ require their separate checks.
 
 ## Installation
 
-Declare only runtime outputs before including `application.mk`:
+Generate the public ID header before compilation and declare only binary runtime outputs:
 
 ```make
-TABOS_RUNTIME_ASSETS := $(CURDIR)/assets/build/game.tsp \
-                        $(CURDIR)/assets/build/level.tmap
+APP_NAME := mygame
+ASSET_BUILD := $(CURDIR)/../../build/apps/$(APP_NAME)/generated
+ASSET_HEADER := include/mygame.h
+TABOS_RUNTIME_ASSETS := $(ASSET_BUILD)/mygame.tsp $(ASSET_BUILD)/level.tmap
+TABOS_BUILD_PREREQUISITES := $(ASSET_HEADER)
+
+.PHONY: mygame-assets
+mygame-assets: assets/manifest.json assets/level.tmj assets/tiles.tsj assets/tiles.png
+	python3 ../../tools/tabos assets build assets/manifest.json \
+	    --output "$(ASSET_BUILD)" --header-output "$(ASSET_HEADER)"
+
+$(ASSET_HEADER) $(TABOS_RUNTIME_ASSETS): mygame-assets
+	@test -f $@
+
+include ../../sdk/make/application.mk
 ```
 
 Normal installation and `./apps/build.sh --msc` copy those files to
