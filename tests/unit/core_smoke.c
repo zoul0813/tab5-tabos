@@ -77,6 +77,19 @@ int main(void)
         return 1;
     }
 
+    test_platform_keyboard_set_status(false, EIO);
+    kernel_runtime_update();
+    if (!device_registry_find(TABOS_DEVICE_NAME_KEYBOARD, &device) || device.state != TABOS_DEVICE_FAULT ||
+        device.last_error != EIO) {
+        return 1;
+    }
+    test_platform_keyboard_set_status(true, 0);
+    kernel_runtime_update();
+    if (!device_registry_find(TABOS_DEVICE_NAME_KEYBOARD, &device) || device.state != TABOS_DEVICE_READY ||
+        device.last_error != 0) {
+        return 1;
+    }
+
     test_platform_rtc_set_status(false, EIO);
     kernel_runtime_update();
     if (!device_registry_find(TABOS_DEVICE_NAME_RTC, &device) || device.state != TABOS_DEVICE_FAULT ||

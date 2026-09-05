@@ -186,6 +186,7 @@ uint64_t platform_time_ms(void);
 bool platform_wall_clock_get(int64_t* seconds);
 bool platform_wall_clock_set(int64_t seconds);
 bool platform_wall_clock_status(int* error);
+bool platform_keyboard_health(int* error);
 bool platform_network_init(const char* hostname);
 void platform_network_shutdown(void);
 bool platform_network_connect(const char* ssid, const char* password);

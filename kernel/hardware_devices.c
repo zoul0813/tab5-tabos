@@ -11,12 +11,13 @@
 
 #include <errno.h>
 
-static tabos_device_id_t network_device = TABOS_DEVICE_ID_INVALID;
-static tabos_device_id_t rtc_device     = TABOS_DEVICE_ID_INVALID;
-static tabos_device_id_t battery_device = TABOS_DEVICE_ID_INVALID;
-static tabos_device_id_t audio_device   = TABOS_DEVICE_ID_INVALID;
-static tabos_device_id_t pointer_device = TABOS_DEVICE_ID_INVALID;
-static tabos_device_id_t camera_device  = TABOS_DEVICE_ID_INVALID;
+static tabos_device_id_t network_device  = TABOS_DEVICE_ID_INVALID;
+static tabos_device_id_t keyboard_device = TABOS_DEVICE_ID_INVALID;
+static tabos_device_id_t rtc_device      = TABOS_DEVICE_ID_INVALID;
+static tabos_device_id_t battery_device  = TABOS_DEVICE_ID_INVALID;
+static tabos_device_id_t audio_device    = TABOS_DEVICE_ID_INVALID;
+static tabos_device_id_t pointer_device  = TABOS_DEVICE_ID_INVALID;
+static tabos_device_id_t camera_device   = TABOS_DEVICE_ID_INVALID;
 static tabos_device_id_t registered_devices[9];
 static size_t registered_device_count;
 static bool initialized;
@@ -95,7 +96,7 @@ bool hardware_devices_init(void)
     if (diagnostics.keyboard_detected &&
         !register_device(TABOS_DEVICE_NAME_KEYBOARD, diagnostics.keyboard_driver, TABOS_DEVICE_CLASS_KEYBOARD,
                          diagnostics.keyboard_present ? TABOS_DEVICE_READY : TABOS_DEVICE_FAULT,
-                         TABOS_DEVICE_FEATURE_KEYBOARD_INPUT, diagnostics.keyboard_error, NULL)) {
+                         TABOS_DEVICE_FEATURE_KEYBOARD_INPUT, diagnostics.keyboard_error, &keyboard_device)) {
         hardware_devices_shutdown();
         return false;
     }
@@ -193,6 +194,12 @@ void hardware_devices_update(void)
     if (!initialized) {
         return;
     }
+    if (keyboard_device != TABOS_DEVICE_ID_INVALID) {
+        int keyboard_error        = 0;
+        const bool keyboard_ready = platform_keyboard_health(&keyboard_error);
+        (void) device_registry_set_state(keyboard_device, keyboard_ready ? TABOS_DEVICE_READY : TABOS_DEVICE_FAULT,
+                                         keyboard_ready ? 0 : (keyboard_error != 0 ? keyboard_error : EIO));
+    }
     if (rtc_device != TABOS_DEVICE_ID_INVALID) {
         int rtc_error        = 0;
         const bool rtc_ready = platform_wall_clock_status(&rtc_error);
@@ -229,11 +236,12 @@ void hardware_devices_shutdown(void)
         (void) device_registry_remove(registered_devices[registered_device_count]);
         registered_devices[registered_device_count] = TABOS_DEVICE_ID_INVALID;
     }
-    initialized    = false;
-    network_device = TABOS_DEVICE_ID_INVALID;
-    rtc_device     = TABOS_DEVICE_ID_INVALID;
-    battery_device = TABOS_DEVICE_ID_INVALID;
-    audio_device   = TABOS_DEVICE_ID_INVALID;
-    pointer_device = TABOS_DEVICE_ID_INVALID;
-    camera_device  = TABOS_DEVICE_ID_INVALID;
+    initialized     = false;
+    network_device  = TABOS_DEVICE_ID_INVALID;
+    keyboard_device = TABOS_DEVICE_ID_INVALID;
+    rtc_device      = TABOS_DEVICE_ID_INVALID;
+    battery_device  = TABOS_DEVICE_ID_INVALID;
+    audio_device    = TABOS_DEVICE_ID_INVALID;
+    pointer_device  = TABOS_DEVICE_ID_INVALID;
+    camera_device   = TABOS_DEVICE_ID_INVALID;
 }

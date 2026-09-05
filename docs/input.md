@@ -60,7 +60,7 @@ applications.
 
 The Tab5 Keyboard is connected through ExtPort1 using SDA GPIO0, SCL GPIO1, and default I²C address `0x6D`. TabOS uses ESP32-P4 I²C controller 0 at 400 kHz; the Tab5 BSP's internal device bus remains on controller 1.
 
-At platform initialization, TabOS probes the keyboard, reads firmware register `0xFE`, selects Normal mode through register `0x10`, and clears the device event queue. The run loop polls event-count register `0x02` every 10 ms and drains matrix press/release events from register `0x20`. Normal mode preserves independent held state for simultaneous keys; TabOS translates matrix positions into its portable key codes and text events.
+At platform initialization, TabOS probes the keyboard, reads firmware register `0xFE`, selects Normal mode through register `0x10`, and drains boot-time queued events. GPIO50 is configured as the active-low keyboard interrupt and Normal-mode interrupt delivery is enabled through register `0x00`. The ISR only marks work pending and wakes the runtime task. Task context then reads status register `0x01`, drains the event count and matrix press/release data from registers `0x02` and `0x20`, clears status by writing zero to register `0x01`, and rechecks both status and GPIO50 to close the arrival race. Idle runtime updates perform no keyboard I²C traffic. Normal mode preserves independent held state for simultaneous keys; TabOS translates matrix positions into its portable key codes and text events.
 
 Matrix events are normalized into the same physical key, modifier, and text events used by host builds. Current hardware text translation uses a US ANSI mapping. Ctrl or Alt-modified key combinations produce physical key events but no text event.
 
@@ -70,7 +70,7 @@ releases, and held state. Cooked translation also implements keyboard-style one-
 behavior: tapping `Aa` or `Sym` modifies next ordinary key, then clears. Holding either
 modifier applies it until release. Modified key repeats with its cooked text.
 
-Keyboard presence, firmware version, and Normal mode appear in both serial and on-screen boot diagnostics. Missing keyboard hardware is a warning and does not prevent TabOS from booting.
+Keyboard presence, firmware version, and Normal mode appear in both serial and on-screen boot diagnostics. Missing keyboard hardware or interrupt setup failure is a warning and does not prevent TabOS from booting. A runtime keyboard I/O failure marks `keyboard0` faulted in the device registry.
 
 ## Keyboard Diagnostic Monitor
 
@@ -102,8 +102,7 @@ idf.py -C targets/tab5 -B build/tab5-debug \
 ## Current Limits
 
 Only the foreground application can consume input. The shell uses terminal standard
-input, while graphics applications may use raw events. The current Tab5 driver uses
-low-overhead polling; GPIO50 interrupt support can replace polling later without changing
-application code.
+input, while graphics applications may use raw events. The Tab5 keyboard is interrupt-driven
+through GPIO50; the built-in touch controller remains polled.
 
 USB keyboards connected to Tab5 are not supported yet. A future ESP-IDF USB-host HID backend can submit events to the same portable queue and coexist with the I²C keyboard without changing applications.

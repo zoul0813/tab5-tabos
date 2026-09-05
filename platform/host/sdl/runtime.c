@@ -283,6 +283,14 @@ bool platform_battery_health(int* error)
     return true;
 }
 
+bool platform_keyboard_health(int* error)
+{
+    if (error != NULL) {
+        *error = 0;
+    }
+    return true;
+}
+
 int platform_run(platform_update_fn update, platform_deadline_fn next_deadline)
 {
     if (is_headless) {

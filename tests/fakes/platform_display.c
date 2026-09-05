@@ -76,6 +76,8 @@ static unsigned int network_connect_calls;
 static char network_hostname[33];
 static bool fake_rtc_ready = true;
 static int fake_rtc_error;
+static bool fake_keyboard_ready = true;
+static int fake_keyboard_error;
 static bool fake_battery_ready = true;
 static int fake_battery_error;
 static platform_audio_error_fn fake_audio_error;
@@ -161,8 +163,9 @@ bool platform_get_diagnostics(platform_diagnostics_t* diagnostics)
         .memory_free_known  = true,
         .keyboard_name      = "TEST KEYBOARD",
         .keyboard_driver    = "TEST KEYBOARD",
-        .keyboard_present   = true,
+        .keyboard_present   = fake_keyboard_ready,
         .keyboard_detected  = true,
+        .keyboard_error     = fake_keyboard_error,
         .rtc_name           = "TEST RTC",
         .rtc_present        = fake_rtc_ready,
         .rtc_detected       = true,
@@ -217,6 +220,20 @@ bool platform_wall_clock_status(int* error)
         *error = fake_rtc_error;
     }
     return fake_rtc_ready && fake_rtc_error == 0;
+}
+
+bool platform_keyboard_health(int* error)
+{
+    if (error != NULL) {
+        *error = fake_keyboard_error;
+    }
+    return fake_keyboard_ready && fake_keyboard_error == 0;
+}
+
+void test_platform_keyboard_set_status(bool ready, int error)
+{
+    fake_keyboard_ready = ready;
+    fake_keyboard_error = error;
 }
 
 void test_platform_rtc_set_status(bool ready, int error)

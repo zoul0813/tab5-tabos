@@ -153,20 +153,24 @@ headphone-detect poll issue and remain deferred outside Phase 1.
 
 ### Phase 2: Tab5 keyboard interrupt
 
-- [ ] Configure GPIO50 as the active-low keyboard interrupt input.
-- [ ] Enable the Normal-mode interrupt in keyboard register `0x00`.
-- [ ] Install a minimal ISR that notifies task context.
-- [ ] Drain event count and event data over I2C only after task wake.
-- [ ] Read and clear keyboard interrupt status through register `0x01` as required by the
+- [x] Configure GPIO50 as the active-low keyboard interrupt input.
+- [x] Enable the Normal-mode interrupt in keyboard register `0x00`.
+- [x] Install a minimal ISR that notifies task context.
+- [x] Drain event count and event data over I2C only after task wake.
+- [x] Read and clear keyboard interrupt status through register `0x01` as required by the
   controller protocol.
-- [ ] Recheck interrupt level/status after clearing so events arriving during drain or
+- [x] Recheck interrupt level/status after clearing so events arriving during drain or
   clear cannot be lost.
-- [ ] Drain any boot-time queued events before entering normal interrupt-driven operation.
-- [ ] Preserve physical press/release, Sym and Aa/Shift behavior, cooked text, raw input,
+- [x] Drain any boot-time queued events before entering normal interrupt-driven operation.
+- [x] Preserve physical press/release, Sym and Aa/Shift behavior, cooked text, raw input,
   multi-key state, and portable repeat timing.
-- [ ] On shutdown, disable interrupt delivery, wake and stop dependent task work, remove
+- [x] On shutdown, disable interrupt delivery, wake and stop dependent task work, remove
   ISR handler, then release keyboard I2C resources.
-- [ ] Keep missing or failed keyboard nonfatal and accurately reflected in device registry.
+- [x] Keep missing or failed keyboard nonfatal and accurately reflected in device registry.
+
+Physical Tab5 Phase 2 smoke validation passed on 2026-09-05: rapid typing and key
+repeat remained responsive, holding Sym or Aa/Shift while typing preserved modifier
+behavior, and holding Delete during reset still entered USB mass-storage mode.
 
 ### Phase 3: Tab5 touch interrupt
 
@@ -292,11 +296,11 @@ headphone-detect poll issue and remain deferred outside Phase 1.
 
 ### Keyboard
 
-- [ ] One interrupt drains one event and burst queue.
-- [ ] Event arriving during interrupt clear is retained.
-- [ ] Press/release order and independent multi-key state remain correct.
+- [x] One interrupt drains one event and burst queue.
+- [x] Event arriving during interrupt clear is retained.
+- [x] Press/release order and independent multi-key state remain correct.
 - [ ] Cooked/raw mode, Sym, Aa/Shift, modifiers, and text remain correct.
-- [ ] Repeat fires at deadlines without keyboard polling.
+- [x] Repeat fires at deadlines without keyboard polling.
 - [ ] Missing device, I2C failure, ISR setup failure, and teardown are safe.
 
 ### Touch
@@ -331,7 +335,7 @@ headphone-detect poll issue and remain deferred outside Phase 1.
 - [ ] Record baseline runtime wake rate, keyboard I2C transactions, touch I2C transactions,
   idle CPU load, and input latency before conversion.
 - [ ] Measure keyboard press-to-event latency before and after interrupt conversion.
-- [ ] Validate rapid typing, held keys, chords, Sym, Aa/Shift, and event bursts.
+- [x] Validate rapid typing, held keys, chords, Sym, Aa/Shift, and event bursts.
 - [ ] Validate keyboard interrupt recovery after unplug/replug or observed bus fault where
   supported.
 - [ ] Measure touch-down and movement latency before and after conversion.

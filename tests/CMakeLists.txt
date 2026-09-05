@@ -96,6 +96,15 @@ tabos_enable_warnings(tabos_camera_ccm)
 tabos_enable_sanitizers(tabos_camera_ccm)
 add_test(NAME unit.camera_ccm COMMAND tabos_camera_ccm)
 
+add_executable(tabos_keyboard_interrupt
+    unit/keyboard_interrupt.c
+    "${TABOS_ROOT}/platform/esp32p4/keyboard_interrupt.c"
+)
+target_include_directories(tabos_keyboard_interrupt PRIVATE "${TABOS_ROOT}/platform/esp32p4")
+tabos_enable_warnings(tabos_keyboard_interrupt)
+tabos_enable_sanitizers(tabos_keyboard_interrupt)
+add_test(NAME unit.keyboard_interrupt COMMAND tabos_keyboard_interrupt)
+
 add_executable(tabos_sdk_camera
     unit/sdk_camera.c
     "${TABOS_ROOT}/sdk/lib/camera.c"
