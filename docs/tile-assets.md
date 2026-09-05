@@ -14,6 +14,10 @@ Each animation descriptor carries a `trigger_sprite`; tile rendering uses it to
 associate Tiled's animated tile with its frame sequence even when first frame is a
 different tile.
 
+`tabos_sprite_animation_sprite()` returns the sprite ID selected for an animation at an
+explicit elapsed time. It returns `TABOS_SPRITE_NONE` with `errno` set for invalid input.
+Use it when game code needs the selected sprite without drawing it.
+
 `tabos_sprite_animation_draw()` selects and draws a frame in one call, at natural size
 and full opacity. `tabos_sprite_animation_draw_ex()` accepts the existing sprite draw
 options for size, rotation, mirrors, opacity, and clipping. Initialize extended options

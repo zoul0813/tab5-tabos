@@ -183,8 +183,9 @@ int main(int argc, char** argv)
                                         .metasprite_count = 1U};
     tabos_graphics_t graphics        = {.width = 16U, .height = 16U};
     if (tabos_graphics_open(&graphics) != 0 || tabos_sprite_flags(&sprites, 0U) != 4U ||
-        tabos_sprite_animation_frame(&sprites, 0U, 0U) != 0U || tabos_sprite_animation_frame(&sprites, 0U, 10U) != 1U ||
-        tabos_sprite_animation_frame(&sprites, 0U, 60U) != 1U || !transformed_pivots(&graphics, red) ||
+        tabos_sprite_animation_sprite(&sprites, 0U, 0U) != 0U ||
+        tabos_sprite_animation_sprite(&sprites, 0U, 10U) != 1U ||
+        tabos_sprite_animation_sprite(&sprites, 0U, 60U) != 1U || !transformed_pivots(&graphics, red) ||
         tabos_sprite_draw(&graphics, &sprites, 0U, 4, 4) != 0 || graphics.pixels[3U * graphics.width + 4U] != red ||
         tabos_metasprite_draw(&graphics, &sprites, 0U, 8, 8, true, false, 255U) != 0) {
         return 1;

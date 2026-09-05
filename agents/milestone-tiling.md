@@ -61,7 +61,7 @@ Add `<tabos/sprite.h>`:
   drawing to natural size, full opacity, no transforms, and no clipping. Explicitly
   setting opacity to zero remains transparent.
 - [x] Review: Transform the sprite pivot with the image, keeping the requested world position fixed.
-- [ ] Review: `tabos_sprite_animation_frame()` selects a frame from explicit elapsed milliseconds.
+- [x] Review: `tabos_sprite_animation_sprite()` selects a sprite ID from explicit elapsed milliseconds.
   Each clip stores a repeat count: zero repeats forever, while a positive value plays
   that many cycles and then holds its final frame.
 - [x] Review: `tabos_sprite_animation_draw()` and `_ex()` select and draw from explicit elapsed
@@ -340,6 +340,16 @@ Validated working-tree changes based on `7e43d93`:
 - macOS Debug full suite: 44/44 passed with AddressSanitizer/UndefinedBehaviorSanitizer.
   Focused Release tile and asset-equivalence tests passed. All standard RV32 applications
   cross-built successfully. Physical presentation remains open.
+
+## Animation Sprite Selection Evidence — 2026-09-05
+
+- Renamed `tabos_sprite_animation_frame()` to `tabos_sprite_animation_sprite()` so the
+  public name states that it returns a selected sprite ID rather than a frame index.
+- Selection, drawing, and tile-animation paths use the renamed function. Existing boundary,
+  finite-repeat, loop, malformed-descriptor, and `TABOS_SPRITE_NONE` checks retain behavior.
+- macOS Debug full suite: 44/44 passed with AddressSanitizer/UndefinedBehaviorSanitizer.
+  Focused Debug and Release tile and asset-equivalence tests passed. All standard RV32
+  applications cross-built successfully.
 
 ## Assumptions
 

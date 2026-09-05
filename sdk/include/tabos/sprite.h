@@ -84,7 +84,8 @@ typedef struct {
 int tabos_sprite_draw(tabos_graphics_t* graphics, const tabos_sprite_set_t* set, uint32_t sprite, int32_t x, int32_t y);
 int tabos_sprite_draw_ex(tabos_graphics_t* graphics, const tabos_sprite_set_t* set, uint32_t sprite, int32_t x,
                          int32_t y, const tabos_sprite_draw_options_t* options);
-uint32_t tabos_sprite_animation_frame(const tabos_sprite_set_t* set, uint32_t animation, uint64_t elapsed_ms);
+/* Returns the sprite ID selected at elapsed_ms, or TABOS_SPRITE_NONE on error. */
+uint32_t tabos_sprite_animation_sprite(const tabos_sprite_set_t* set, uint32_t animation, uint64_t elapsed_ms);
 /* Elapsed time is measured from this actor's animation start, not the previous frame. */
 int tabos_sprite_animation_draw(tabos_graphics_t* graphics, const tabos_sprite_set_t* set, uint32_t animation,
                                 int32_t x, int32_t y, uint64_t elapsed_ms);

@@ -458,7 +458,7 @@ static void check_animation_errors(tabos_graphics_t* graphics, const tabos_sprit
             frame.sprite = sprites->sprite_count;
         }
         CHECK(tabos_sprite_animation_finished(&invalid, 0U, 0U, &finished) == -1 && errno == EINVAL && finished);
-        CHECK(tabos_sprite_animation_frame(&invalid, 0U, 0U) == TABOS_SPRITE_NONE && errno == EINVAL);
+        CHECK(tabos_sprite_animation_sprite(&invalid, 0U, 0U) == TABOS_SPRITE_NONE && errno == EINVAL);
         CHECK(tabos_sprite_animation_draw(graphics, &invalid, 0U, 0, 0, 0U) == -1 && errno == EINVAL);
     }
     compare_pixels(graphics->pixels, before, "invalid animations leave canvas unchanged");
@@ -496,11 +496,11 @@ int main(int argc, char** argv)
     const uint32_t hold_frames[]  = {2, 2, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1};
     size_t scenes                 = 0U;
     for (size_t i = 0U; i < sizeof(times) / sizeof(times[0]); ++i) {
-        CHECK(tabos_sprite_animation_frame(&loaded, EQUIVALENCE_ANIMATION_CYCLE, times[i]) == cycle_frames[i]);
-        CHECK(tabos_sprite_animation_frame(&loaded, EQUIVALENCE_ANIMATION_HOLD, times[i]) == hold_frames[i]);
-        CHECK(tabos_sprite_animation_frame(&equivalence_sprites, EQUIVALENCE_ANIMATION_CYCLE, times[i]) ==
+        CHECK(tabos_sprite_animation_sprite(&loaded, EQUIVALENCE_ANIMATION_CYCLE, times[i]) == cycle_frames[i]);
+        CHECK(tabos_sprite_animation_sprite(&loaded, EQUIVALENCE_ANIMATION_HOLD, times[i]) == hold_frames[i]);
+        CHECK(tabos_sprite_animation_sprite(&equivalence_sprites, EQUIVALENCE_ANIMATION_CYCLE, times[i]) ==
               cycle_frames[i]);
-        CHECK(tabos_sprite_animation_frame(&equivalence_sprites, EQUIVALENCE_ANIMATION_HOLD, times[i]) ==
+        CHECK(tabos_sprite_animation_sprite(&equivalence_sprites, EQUIVALENCE_ANIMATION_HOLD, times[i]) ==
               hold_frames[i]);
         for (size_t j = 0U; j < sizeof(cameras) / sizeof(cameras[0]); ++j) {
             tabos_color_t expected[PIXELS];

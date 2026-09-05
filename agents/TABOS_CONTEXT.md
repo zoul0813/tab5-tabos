@@ -5,6 +5,10 @@
 
 ## Sprite and Tile SDK
 
+- `[DECIDED]` `tabos_sprite_animation_sprite()` returns the sprite ID selected for an
+  animation at explicit elapsed milliseconds. The name states the return value;
+  `TABOS_SPRITE_NONE` reports invalid input.
+
 - `[DECIDED]` A sprite pivot is a local geometric origin measured from the source
   rectangle's top-left edge. It may lie on an edge or outside the rectangle. Sprite
   transforms move the origin with the image while the requested world position remains

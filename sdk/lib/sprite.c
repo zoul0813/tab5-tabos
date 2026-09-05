@@ -191,7 +191,7 @@ int tabos_sprite_animation_finished(const tabos_sprite_set_t* set, uint32_t anim
     return 0;
 }
 
-uint32_t tabos_sprite_animation_frame(const tabos_sprite_set_t* set, uint32_t animation_id, uint64_t elapsed_ms)
+uint32_t tabos_sprite_animation_sprite(const tabos_sprite_set_t* set, uint32_t animation_id, uint64_t elapsed_ms)
 {
     uint64_t duration                         = 0U;
     const tabos_sprite_animation_t* animation = animation_get(set, animation_id, &duration);
@@ -222,11 +222,11 @@ int tabos_sprite_animation_draw_ex(tabos_graphics_t* graphics, const tabos_sprit
                                    int32_t x, int32_t y, uint64_t elapsed_ms,
                                    const tabos_sprite_draw_options_t* options)
 {
-    const uint32_t frame = tabos_sprite_animation_frame(set, animation, elapsed_ms);
-    if (frame == TABOS_SPRITE_NONE) {
+    const uint32_t sprite = tabos_sprite_animation_sprite(set, animation, elapsed_ms);
+    if (sprite == TABOS_SPRITE_NONE) {
         return -1;
     }
-    return tabos_sprite_draw_ex(graphics, set, frame, x, y, options);
+    return tabos_sprite_draw_ex(graphics, set, sprite, x, y, options);
 }
 
 int tabos_metasprite_draw(tabos_graphics_t* graphics, const tabos_sprite_set_t* set, uint32_t metasprite_id, int32_t x,

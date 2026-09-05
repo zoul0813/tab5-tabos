@@ -58,7 +58,9 @@ Animation convenience coverage checks normal/extended draw pixels, looping versu
 completion boundaries, unchanged completion output on errors, malformed C descriptors,
 restart via elapsed time, and repeat-duration products exceeding 64 bits. Converter tests
 validate Tiled `repeat_count` defaults, finite counts, type/range errors, and rejection on
-nonanimated tiles. The equivalence fixture includes an imported one-shot clip. Maintained
+nonanimated tiles. Sprite-selection checks exercise `tabos_sprite_animation_sprite()` at
+frame and repeat boundaries and verify `TABOS_SPRITE_NONE` on errors. The equivalence
+fixture includes an imported one-shot clip. Maintained
 `tester` checks completion, held final frames, looping, scaled animated draw, and present;
 its device execution remains a separate hardware check.
 

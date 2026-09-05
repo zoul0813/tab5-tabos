@@ -22,6 +22,8 @@
 
 ### Sprite and Tile Graphics
 
+- [x] Rename the animation selector to `tabos_sprite_animation_sprite()` so its sprite-ID return is explicit. macOS Debug 44/44 tests, focused Debug/Release tests, and standard RV32 app builds pass.
+
 - [x] Define sprite pivots as transformable geometric origins, correct quarter-turn origin math, reject coordinate overflow, and add exact rotation/mirror/scale tests. macOS Debug 44/44 tests, focused Release tests, and standard RV32 app builds pass.
 
 - [x] Emit developer-facing generated asset headers into app include directories and migrate tile demo from manual numeric IDs to generated constants. macOS Debug 44/44 tests, focused Debug/Release converter and equivalence tests, and standard RV32 app builds pass.

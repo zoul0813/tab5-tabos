@@ -100,7 +100,7 @@ static uint32_t animated_sprite(const tabos_sprite_set_t* sprites, uint32_t spri
     for (uint32_t index = 0U; index < sprites->animation_count; ++index) {
         const tabos_sprite_animation_t* animation = &sprites->animations[index];
         if (animation->frame_count != 0U && animation->trigger_sprite == sprite) {
-            return tabos_sprite_animation_frame(sprites, index, elapsed_ms);
+            return tabos_sprite_animation_sprite(sprites, index, elapsed_ms);
         }
     }
     return sprite;
