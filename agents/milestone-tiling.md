@@ -54,13 +54,13 @@ Add `<tabos/sprite.h>`:
 - [x] Review: `tabos_sprite_set_t` contains one or more RGB565 images, sprite regions, pivots,
   user flags, animation clips, and metasprites.
 - [x] Review: Sprite IDs remain zero-based. `TABOS_SPRITE_NONE` represents an invalid or missing sprite.
-- [ ] Review: `tabos_sprite_draw()` draws a natural-size sprite at its pivot.
-- [ ] Review: `tabos_sprite_draw_ex()` adds destination size, quarter-turn rotation, mirroring,
+- [x] Review: `tabos_sprite_draw()` draws a natural-size sprite at its pivot.
+- [x] Review: `tabos_sprite_draw_ex()` adds destination size, quarter-turn rotation, mirroring,
   opacity, and an optional clip rectangle.
 - [x] Review: `TABOS_SPRITE_DRAW_OPTIONS_DEFAULT` initializes sprite and animated `_ex`
   drawing to natural size, full opacity, no transforms, and no clipping. Explicitly
   setting opacity to zero remains transparent.
-- [ ] Review: Transform the sprite pivot with the image, keeping the requested world position fixed.
+- [x] Review: Transform the sprite pivot with the image, keeping the requested world position fixed.
 - [ ] Review: `tabos_sprite_animation_frame()` selects a frame from explicit elapsed milliseconds.
   Each clip stores a repeat count: zero repeats forever, while a positive value plays
   that many cycles and then holds its final frame.
@@ -199,7 +199,7 @@ Binary formats:
 - [x] Test binary-loader overflow and invalid offsets, counts, alignment, and GIDs.
 - [x] Inject allocation failures and verify `ENOMEM`, no partial state, and leak-free cleanup.
 - [x] Verify repeated successful load/unload and cleanup after failed loads.
-- [ ] Sprite pixel tests cover clipping, pivots, scale, quarter rotations, mirrors, opacity,
+- [x] Sprite pixel tests cover clipping, pivots, scale, quarter rotations, mirrors, opacity,
   transparency, animation wrap/clamp, metasprite order, and transformed pivots.
 - [ ] Tilemap tests cover get/set, empty cells, every Tiled flip combination, negative camera,
   smooth scrolling, viewport edges, layer ordering, animation time, tile flags, objects,
@@ -327,6 +327,19 @@ Validated working-tree changes based on `7e43d93`:
 - macOS Debug full suite: 44/44 passed with sanitizers. Focused Debug and Release converter
   and asset-equivalence tests passed. All standard RV32 applications cross-built.
 - Physical execution and installation remain covered by separate acceptance items.
+
+## Transformed Pivot Evidence — 2026-09-05
+
+- Defined pivots as local geometric origins measured from the source rectangle's top-left
+  edge, allowing edge and outside-rectangle attachment points. Integer scaling truncates
+  the transformed origin toward zero.
+- Corrected 90-degree and 270-degree origin transforms to match the blit renderer. Added
+  checked arithmetic so unrepresentable destination origins return `EOVERFLOW`.
+- Independent pixel expectations cover all sixteen quarter-turn and mirror combinations,
+  scaling, an outside-rectangle origin, and overflow rejection.
+- macOS Debug full suite: 44/44 passed with AddressSanitizer/UndefinedBehaviorSanitizer.
+  Focused Release tile and asset-equivalence tests passed. All standard RV32 applications
+  cross-built successfully. Physical presentation remains open.
 
 ## Assumptions
 

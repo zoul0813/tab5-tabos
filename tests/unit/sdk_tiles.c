@@ -65,6 +65,88 @@ static bool write_bad_asset(const char* source_path, const char* destination_pat
     return source_closed && destination_closed && written;
 }
 
+static bool rectangle_matches(const tabos_graphics_t* graphics, int32_t x, int32_t y, uint32_t width, uint32_t height,
+                              tabos_color_t color)
+{
+    for (uint32_t row = 0U; row < graphics->height; ++row) {
+        for (uint32_t column = 0U; column < graphics->width; ++column) {
+            const bool inside = column >= (uint32_t) x && column < (uint32_t) x + width && row >= (uint32_t) y &&
+                                row < (uint32_t) y + height;
+            if (graphics->pixels[(size_t) row * graphics->width + column] != (inside ? color : 0U)) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+static bool transformed_pivots(tabos_graphics_t* graphics, tabos_color_t color)
+{
+    const tabos_color_t pixels[]        = {color, color, color, color, color, color};
+    const tabos_sprite_image_t images[] = {
+        {.pixels = pixels, .width = 3U, .height = 2U}
+    };
+    const tabos_sprite_t descriptors[] = {
+        {.width = 3U, .height = 2U, .pivot_x = 1, .pivot_y = 0}
+    };
+    const tabos_sprite_set_t sprites = {
+        .images = images, .image_count = 1U, .sprites = descriptors, .sprite_count = 1U};
+    const struct {
+            tabos_graphics_rotation_t rotation;
+            bool mirror_x;
+            bool mirror_y;
+            int32_t x;
+            int32_t y;
+            uint32_t width;
+            uint32_t height;
+    } cases[] = {
+        {  TABOS_GRAPHICS_ROTATE_0, false, false, 7, 8, 3U, 2U},
+        {  TABOS_GRAPHICS_ROTATE_0, false,  true, 7, 6, 3U, 2U},
+        {  TABOS_GRAPHICS_ROTATE_0,  true, false, 6, 8, 3U, 2U},
+        {  TABOS_GRAPHICS_ROTATE_0,  true,  true, 6, 6, 3U, 2U},
+        { TABOS_GRAPHICS_ROTATE_90, false, false, 8, 6, 2U, 3U},
+        { TABOS_GRAPHICS_ROTATE_90, false,  true, 6, 6, 2U, 3U},
+        { TABOS_GRAPHICS_ROTATE_90,  true, false, 8, 7, 2U, 3U},
+        { TABOS_GRAPHICS_ROTATE_90,  true,  true, 6, 7, 2U, 3U},
+        {TABOS_GRAPHICS_ROTATE_180, false, false, 6, 6, 3U, 2U},
+        {TABOS_GRAPHICS_ROTATE_180, false,  true, 6, 8, 3U, 2U},
+        {TABOS_GRAPHICS_ROTATE_180,  true, false, 7, 6, 3U, 2U},
+        {TABOS_GRAPHICS_ROTATE_180,  true,  true, 7, 8, 3U, 2U},
+        {TABOS_GRAPHICS_ROTATE_270, false, false, 6, 7, 2U, 3U},
+        {TABOS_GRAPHICS_ROTATE_270, false,  true, 8, 7, 2U, 3U},
+        {TABOS_GRAPHICS_ROTATE_270,  true, false, 6, 6, 2U, 3U},
+        {TABOS_GRAPHICS_ROTATE_270,  true,  true, 8, 6, 2U, 3U},
+    };
+    for (size_t index = 0U; index < sizeof(cases) / sizeof(cases[0]); ++index) {
+        tabos_sprite_draw_options_t options = TABOS_SPRITE_DRAW_OPTIONS_DEFAULT;
+        options.rotation                    = cases[index].rotation;
+        options.mirror_x                    = cases[index].mirror_x;
+        options.mirror_y                    = cases[index].mirror_y;
+        if (tabos_graphics_clear(graphics, 0U) != 0 ||
+            tabos_sprite_draw_ex(graphics, &sprites, 0U, 8, 8, &options) != 0 ||
+            !rectangle_matches(graphics, cases[index].x, cases[index].y, cases[index].width, cases[index].height,
+                               color)) {
+            return false;
+        }
+    }
+
+    tabos_sprite_t outside_descriptor  = descriptors[0];
+    outside_descriptor.pivot_x         = -1;
+    outside_descriptor.pivot_y         = 3;
+    tabos_sprite_set_t outside         = sprites;
+    outside.sprites                    = &outside_descriptor;
+    tabos_sprite_draw_options_t scaled = TABOS_SPRITE_DRAW_OPTIONS_DEFAULT;
+    scaled.width                       = 6U;
+    scaled.height                      = 4U;
+    if (tabos_graphics_clear(graphics, 0U) != 0 || tabos_sprite_draw_ex(graphics, &outside, 0U, 4, 8, &scaled) != 0 ||
+        !rectangle_matches(graphics, 6, 2, 6U, 4U, color)) {
+        return false;
+    }
+    outside_descriptor.pivot_x = INT32_MIN;
+    scaled.width               = UINT32_MAX;
+    return tabos_sprite_draw_ex(graphics, &outside, 0U, 4, 8, &scaled) == -1 && errno == EOVERFLOW;
+}
+
 int main(int argc, char** argv)
 {
     const tabos_color_t key             = TABOS_RGB565(255, 0, 255);
@@ -102,7 +184,7 @@ int main(int argc, char** argv)
     tabos_graphics_t graphics        = {.width = 16U, .height = 16U};
     if (tabos_graphics_open(&graphics) != 0 || tabos_sprite_flags(&sprites, 0U) != 4U ||
         tabos_sprite_animation_frame(&sprites, 0U, 0U) != 0U || tabos_sprite_animation_frame(&sprites, 0U, 10U) != 1U ||
-        tabos_sprite_animation_frame(&sprites, 0U, 60U) != 1U ||
+        tabos_sprite_animation_frame(&sprites, 0U, 60U) != 1U || !transformed_pivots(&graphics, red) ||
         tabos_sprite_draw(&graphics, &sprites, 0U, 4, 4) != 0 || graphics.pixels[3U * graphics.width + 4U] != red ||
         tabos_metasprite_draw(&graphics, &sprites, 0U, 8, 8, true, false, 255U) != 0) {
         return 1;

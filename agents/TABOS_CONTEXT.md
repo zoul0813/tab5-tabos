@@ -5,6 +5,11 @@
 
 ## Sprite and Tile SDK
 
+- `[DECIDED]` A sprite pivot is a local geometric origin measured from the source
+  rectangle's top-left edge. It may lie on an edge or outside the rectangle. Sprite
+  transforms move the origin with the image while the requested world position remains
+  fixed. Integer scaling truncates the scaled origin toward zero.
+
 - `[DECIDED]` Asset IDs are consumed through generated named constants. Asset builds may
   emit a constants-only developer-facing header into an application's include directory,
   while the build header retains declarations needed by generated C. Generated C and

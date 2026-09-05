@@ -22,6 +22,8 @@
 
 ### Sprite and Tile Graphics
 
+- [x] Define sprite pivots as transformable geometric origins, correct quarter-turn origin math, reject coordinate overflow, and add exact rotation/mirror/scale tests. macOS Debug 44/44 tests, focused Release tests, and standard RV32 app builds pass.
+
 - [x] Emit developer-facing generated asset headers into app include directories and migrate tile demo from manual numeric IDs to generated constants. macOS Debug 44/44 tests, focused Debug/Release converter and equivalence tests, and standard RV32 app builds pass.
 
 - [x] Add canonical extended-draw defaults for natural size, full opacity, no transforms, and no clipping while preserving explicit transparent draws. macOS Debug 44/44 tests, focused Debug/Release tile and equivalence tests, and standard RV32 app builds pass.

@@ -22,6 +22,7 @@ typedef struct {
         int32_t y;
         uint32_t width;
         uint32_t height;
+        /* Local geometric origin; may lie on an edge or outside the sprite rectangle. */
         int32_t pivot_x;
         int32_t pivot_y;
         uint32_t flags;

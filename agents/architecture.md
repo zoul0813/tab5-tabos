@@ -6,6 +6,11 @@
 
 ## Sprite and Tile Layer
 
+`[DECIDED]` Sprite pivots are local geometric origins, including edge and outside-rectangle
+origins. Mirroring occurs in source space before quarter-turn rotation, matching the blit
+renderer. Scaling uses integer division with truncation toward zero; unrepresentable
+destination origins fail with `EOVERFLOW`.
+
 `[DECIDED]` Generated asset ID headers are application source interfaces. Converter may
 write a constants-only header into the app include directory for editor and clean-checkout
 use. The build header retains declarations needed by generated C; generated descriptors

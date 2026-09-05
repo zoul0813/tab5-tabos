@@ -46,32 +46,32 @@ static uint8_t combined_opacity(uint8_t first, uint8_t second)
 }
 
 static void transformed_pivot(const tabos_sprite_t* sprite, const tabos_sprite_draw_options_t* options,
-                              uint32_t* natural_width, uint32_t* natural_height, int32_t* pivot_x, int32_t* pivot_y)
+                              uint32_t* natural_width, uint32_t* natural_height, int64_t* pivot_x, int64_t* pivot_y)
 {
-    int32_t px      = sprite->pivot_x;
-    int32_t py      = sprite->pivot_y;
+    int64_t px      = sprite->pivot_x;
+    int64_t py      = sprite->pivot_y;
     uint32_t width  = sprite->width;
     uint32_t height = sprite->height;
     if (options->mirror_x) {
-        px = (int32_t) width - px;
+        px = width - px;
     }
     if (options->mirror_y) {
-        py = (int32_t) height - py;
+        py = height - py;
     }
     if (options->rotation == TABOS_GRAPHICS_ROTATE_90) {
-        const int32_t old_x      = px;
-        px                       = (int32_t) height - py;
-        py                       = old_x;
+        const int64_t old_x      = px;
+        px                       = py;
+        py                       = width - old_x;
         const uint32_t old_width = width;
         width                    = height;
         height                   = old_width;
     } else if (options->rotation == TABOS_GRAPHICS_ROTATE_180) {
-        px = (int32_t) width - px;
-        py = (int32_t) height - py;
+        px = width - px;
+        py = height - py;
     } else if (options->rotation == TABOS_GRAPHICS_ROTATE_270) {
-        const int32_t old_x      = px;
-        px                       = py;
-        py                       = (int32_t) width - old_x;
+        const int64_t old_x      = px;
+        px                       = height - py;
+        py                       = old_x;
         const uint32_t old_width = width;
         width                    = height;
         height                   = old_width;
@@ -80,6 +80,21 @@ static void transformed_pivot(const tabos_sprite_t* sprite, const tabos_sprite_d
     *natural_height = height;
     *pivot_x        = px;
     *pivot_y        = py;
+}
+
+static bool draw_origin(int32_t coordinate, int64_t pivot, uint32_t size, uint32_t natural_size, int32_t* origin)
+{
+    if ((pivot > 0 && (uint64_t) pivot > (uint64_t) INT64_MAX / size) ||
+        (pivot < 0 && (uint64_t) (-(pivot + 1)) + 1U > (uint64_t) INT64_MAX / size)) {
+        return false;
+    }
+    const int64_t scaled = pivot * size / natural_size;
+    const int64_t result = (int64_t) coordinate - scaled;
+    if (scaled < INT32_MIN || scaled > INT32_MAX || result < INT32_MIN || result > INT32_MAX) {
+        return false;
+    }
+    *origin = (int32_t) result;
+    return true;
 }
 
 int tabos_sprite_draw_ex(tabos_graphics_t* graphics, const tabos_sprite_set_t* set, uint32_t sprite_id, int32_t x,
@@ -97,7 +112,7 @@ int tabos_sprite_draw_ex(tabos_graphics_t* graphics, const tabos_sprite_set_t* s
     }
     const tabos_sprite_image_t* image = &set->images[sprite->image];
     uint32_t natural_width, natural_height;
-    int32_t pivot_x, pivot_y;
+    int64_t pivot_x, pivot_y;
     transformed_pivot(sprite, options, &natural_width, &natural_height, &pivot_x, &pivot_y);
     const uint32_t width  = options->width == 0U ? natural_width : options->width;
     const uint32_t height = options->height == 0U ? natural_height : options->height;
@@ -105,14 +120,18 @@ int tabos_sprite_draw_ex(tabos_graphics_t* graphics, const tabos_sprite_set_t* s
         errno = EINVAL;
         return -1;
     }
-    const int32_t scaled_pivot_x             = (int32_t) ((int64_t) pivot_x * width / natural_width);
-    const int32_t scaled_pivot_y             = (int32_t) ((int64_t) pivot_y * height / natural_height);
+    int32_t destination_x, destination_y;
+    if (!draw_origin(x, pivot_x, width, natural_width, &destination_x) ||
+        !draw_origin(y, pivot_y, height, natural_height, &destination_y)) {
+        errno = EOVERFLOW;
+        return -1;
+    }
     const tabos_graphics_blit_options_t blit = {
         .pixels            = image->pixels,
         .bitmap_width      = image->width,
         .bitmap_height     = image->height,
-        .source            = {         .x = sprite->x,          .y = sprite->y, .width = sprite->width, .height = sprite->height},
-        .destination       = {.x = x - scaled_pivot_x, .y = y - scaled_pivot_y,         .width = width,         .height = height},
+        .source            = {    .x = sprite->x,     .y = sprite->y, .width = sprite->width, .height = sprite->height},
+        .destination       = {.x = destination_x, .y = destination_y,         .width = width,         .height = height},
         .rotation          = options->rotation,
         .mirror_x          = options->mirror_x,
         .mirror_y          = options->mirror_y,

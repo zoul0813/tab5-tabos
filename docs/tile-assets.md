@@ -30,6 +30,13 @@ This initializer works with both sprite and animated `_ex` calls. Setting `opaci
 zero afterward remains an explicit fully transparent draw. A plain `{0}` initializer
 has zero opacity; use the named default whenever default visible drawing is intended.
 
+Sprite pivots are local geometric origins measured from the source rectangle's top-left
+edge. `(0, 0)` is its top-left corner and `(width / 2, height)` is its bottom-center edge.
+Origins may lie outside the sprite for attachment points. Drawing places the transformed
+origin at the requested world coordinate. Mirroring and quarter-turn rotation transform
+the origin with the image. Scaling multiplies it by destination size divided by natural
+size, with integer division truncating toward zero.
+
 Pass elapsed milliseconds since this actor started its current clip, not a frame delta.
 `tabos_sprite_animation_finished()` returns `0` on success and writes a boolean result:
 looping clips never finish; finite clips finish after the final frame's full duration in
@@ -188,9 +195,9 @@ The converter loads maps before manifest animations and metasprites, allowing th
 entries to reference sprites named in TSJ tile properties. Supported TSJ metadata is:
 
 - `name` string tile property: generated sprite name.
-- `pivot_x` and `pivot_y` integer tile properties: local source-pixel anchor. Sprite
-  drawing places this anchor at the requested destination coordinate; `(0, 0)` anchors
-  the top-left, while `(width / 2, height - 1)` anchors near the bottom-center.
+- `pivot_x` and `pivot_y` integer tile properties: local geometric origin. Sprite drawing
+  places this origin at the requested destination coordinate; `(0, 0)` anchors the
+  top-left corner, while `(width / 2, height)` anchors the bottom-center edge.
 - `animation_name` string tile property: name of that tile's Tiled animation.
 - `repeat_count` integer property on an animated tile: `0` loops forever (default),
   `1` plays once, and larger values play that many complete cycles. Values must fit an
