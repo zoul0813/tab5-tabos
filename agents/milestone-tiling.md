@@ -17,10 +17,11 @@
 - [x] Add versioned `.tsp` and `.tmap` loaders.
 - [x] Add PNG/GIF/Tiled conversion and generated C output.
 - [x] Add explicit runtime-asset installation and MSC copying.
-- [x] Add binary-backed `tile-demo` and initial host tests.
+- [x] Add binary-backed `tdemo` and initial host tests.
 - [x] Make imported TMJ/TSJ tilesets authoritative for images, regions, metadata, and tile animations.
 - [x] Add stateless animated draw helpers, completion detection, and Tiled `repeat_count` metadata.
 - [x] Add shared graphics camera and migrate map/sprite/object drawing to world coordinates.
+- [x] Generate an app-facing asset-ID header and migrate `tdemo` from manual IDs.
 
 Implementation evidence: `ec22fed` and `17d7d40`. Existing tests provide partial coverage;
 the detailed review and acceptance items below are not yet fully signed off.
@@ -50,9 +51,9 @@ Extend blit options only for per-operation clipping needed by scrolling viewport
 
 Add `<tabos/sprite.h>`:
 
-- [ ] Review: `tabos_sprite_set_t` contains one or more RGB565 images, sprite regions, pivots,
+- [x] Review: `tabos_sprite_set_t` contains one or more RGB565 images, sprite regions, pivots,
   user flags, animation clips, and metasprites.
-- [ ] Review: Sprite IDs remain zero-based. `TABOS_SPRITE_NONE` represents an invalid or missing sprite.
+- [x] Review: Sprite IDs remain zero-based. `TABOS_SPRITE_NONE` represents an invalid or missing sprite.
 - [ ] Review: `tabos_sprite_draw()` draws a natural-size sprite at its pivot.
 - [ ] Review: `tabos_sprite_draw_ex()` adds destination size, quarter-turn rotation, mirroring,
   opacity, and an optional clip rectangle.
@@ -136,8 +137,9 @@ Add `./tools/tabos assets build <manifest>`:
 - [ ] Review: Imported TMJ/TSJ files remain authoritative for tileset images, regions, tile metadata, and tile animations. Manifests orchestrate outputs and non-Tiled metadata without duplicating imported tiles or images.
 - [ ] Review: Let the manifest define arbitrary sprite regions, pivots, named animations,
   metasprites, and application flags.
-- [ ] Review: Generate sanitized C constants for named sprites, clips, metasprites, maps, layers,
-  objects, and flags. Reject identifier collisions.
+- [x] Review: Generate asset-set-prefixed, sanitized C constants for named sprites, clips,
+  metasprites, maps, layers, objects, and flags. Reject identifier collisions. Allow an
+  constants-only generated public header under the app include directory for normal source use.
 - [ ] Review: Reject infinite or isometric maps, ellipse/text/polygon/polyline/template objects,
   arbitrary object rotation, non-integral object geometry, unsupported properties, and
   malformed GIDs with clear diagnostics.
@@ -178,9 +180,9 @@ Binary formats:
   canvas upscale as one accelerated presentation.
 - [ ] Review: Keep native-mode support functional through queued blits. Add bulk kernel tile submission
   only later if measured API overhead misses the benchmark target.
-- [ ] Review: Add an original `tile-demo` reference application using a generated sprite animation,
+- [ ] Review: Add an original `tdemo` reference application using a generated sprite animation,
   metasprite, scrolling multilayer map, editable cell, collision flags, and object markers.
-  Load binary assets from `T:/data/tile-demo/`.
+  Load binary assets from `T:/data/tdemo/`.
 - [ ] Review: Update graphics/API, SDK/application-build, asset-authoring, and demo documentation.
 - [ ] Review: Record decisions and milestone work in `agents/TABOS_CONTEXT.md`,
   `agents/architecture.md`, `agents/testing.md`, and `agents/roadmap.md`.
@@ -215,7 +217,7 @@ Binary formats:
 
 ### Physical Tab5 Acceptance
 
-- [ ] Verify `tile-demo` rendering, layer order, animation, editable cells, and object markers on physical Tab5.
+- [ ] Verify `tdemo` rendering, layer order, animation, editable cells, and object markers on physical Tab5.
 - [ ] Verify seam-free scrolling and exact viewport clipping, including negative camera positions.
 - [ ] Verify RGB565 color-key transparency and all Tiled transforms on physical Tab5.
 - [ ] Verify repeated load/unload and repeated application launch/exit without resource loss.
@@ -223,7 +225,7 @@ Binary formats:
 
 ### Performance Acceptance
 
-- [ ] Add a repeatable benchmark fixture and timing instrumentation; current `tile-demo` uses a 160x120 canvas and two tile layers, so it does not meet the acceptance workload.
+- [ ] Add a repeatable benchmark fixture and timing instrumentation; current `tdemo` uses a 160x120 canvas and two tile layers, so it does not meet the acceptance workload.
 - [ ] Performance acceptance uses a 320x180 logical canvas, 16x16 tiles, three full visible
   tile layers, and 64 sprites, sustaining the Tab5 panel cadence target of 58 FPS. If frame
   construction, excluding the VSYNC wait, exceeds 12 ms, add one bounded bulk tile-layer
@@ -239,7 +241,7 @@ Validated working-tree changes based on `269d064`:
 - Map files have no sprite-set size. Binary validation checks reserved GID bits; matching sprite IDs to a selected sprite set remains drawing validation.
 - `./tools/tabos macos debug test`: 42/43 tests passed in the sandbox; the remaining `component.network_socket` test passed when rerun outside the sandbox to allow loopback binding. Debug uses AddressSanitizer and UndefinedBehaviorSanitizer; allocator tracking also verifies leak-free loader cleanup.
 - `./tools/tabos macos release build` and focused Release loader/tile/converter tests passed.
-- `./apps/build.sh build` cross-built standard RV32 applications, including `tile-demo`, with ESP-IDF's RISC-V toolchain. Optional DOOM was excluded by the script default. This was a build/staging check, not MSC installation or physical execution.
+- `./apps/build.sh build` cross-built standard RV32 applications, including `tdemo`, with ESP-IDF's RISC-V toolchain. Optional DOOM was excluded by the script default. This was a build/staging check, not MSC installation or physical execution.
 - Generated-C/binary rendering equivalence, native/logical rendering parity, maintained `tester` integration, Linux builds, and physical Tab5 acceptance remain open.
 
 ## Asset Equivalence Evidence — 2026-09-05
@@ -309,6 +311,22 @@ Validated working-tree changes based on `7e43d93`:
   and tile demo, cross-built successfully.
 - This changes no descriptor, binary asset, or private ELF transport layout. Physical
   validation remains recorded by the surrounding milestone checklist.
+
+## Generated App Header Evidence — 2026-09-05
+
+- Added `--header-output` to write developer-facing generated asset IDs into an
+  application include directory. The public header omits declarations
+  for generated C descriptors that binary-backed applications do not link. Generated
+  headers carry a do-not-edit notice; converter tests verify the split and confirm the
+  checked-in `tdemo` header is current.
+- Shared application rules accept explicit build prerequisites. Tile demo regenerates
+  `include/tdemo.h` before compilation while keeping C descriptors and runtime binary
+  assets under build output.
+- Tile demo includes its generated header and uses generated animation, metasprite,
+  sprite, and layer constants. Removed manual ID declarations and applicable raw IDs.
+- macOS Debug full suite: 44/44 passed with sanitizers. Focused Debug and Release converter
+  and asset-equivalence tests passed. All standard RV32 applications cross-built.
+- Physical execution and installation remain covered by separate acceptance items.
 
 ## Assumptions
 

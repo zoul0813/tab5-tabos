@@ -116,6 +116,39 @@ Run:
 ./tools/tabos assets build path/to/manifest.json --output build/assets
 ```
 
+For application code that uses generated IDs, also place a public header in the app's
+include directory:
+
+```sh
+./tools/tabos assets build path/to/manifest.json \
+    --output build/assets \
+    --header-output apps/my-game/include/my-game-assets.h
+```
+
+The output directory still receives matching generated C, header, and binary assets.
+`--header-output` writes a constants-only header at the requested developer-facing path.
+It omits the generated descriptor declarations used only when compiling the generated C
+form. Commit that public header with the application so constants remain available to
+editors and clean source checkouts. It carries a generated-file warning and must be
+regenerated from the manifest/Tiled sources rather than edited by hand.
+
+Generated constants use the asset-set name as collision-safe prefix. Tiled tile `name`
+and `animation_name` string properties, native map/layer/object names, manifest
+metasprite names, and flag names produce constants such as:
+
+```c
+GAME_SPRITE_PLAYER
+GAME_ANIMATION_PLAYER_WALK
+GAME_METASPRITE_PLAYER
+GAME_LAYER_WORLD_FOREGROUND
+GAME_OBJECT_WORLD_SPAWN
+GAME_FLAG_SOLID
+```
+
+Application makefiles can list the public header in `TABOS_BUILD_PREREQUISITES`, ensuring
+asset generation completes before any source that includes it is compiled. Identifier
+collisions after C-name sanitization are rejected.
+
 Converter requires Pillow. Install pinned host dependency with
 `python3 -m pip install -r tools/requirements.txt` when it is not already available.
 Application builds preserve this host Python when activating ESP-IDF, so IDF's

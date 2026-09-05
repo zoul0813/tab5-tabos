@@ -8,11 +8,11 @@
 #include <tabos/tty.h>
 #include <unistd.h>
 
+#include <tdemo.h>
+
 enum {
-    DEMO_WIDTH             = 160,
-    DEMO_HEIGHT            = 120,
-    DEMO_SPRITE_ROBOT_WALK = 0,
-    DEMO_METASPRITE_TREE   = 0,
+    DEMO_WIDTH  = 320,
+    DEMO_HEIGHT = 240,
 };
 
 static void restore_tty(uint32_t mode)
@@ -29,10 +29,9 @@ int main(void)
     tabos_graphics_t graphics  = {.width = DEMO_WIDTH, .height = DEMO_HEIGHT};
     tabos_sprite_set_t sprites = {0};
     tabos_tilemap_t map        = {0};
-    if (tabos_graphics_open(&graphics) != 0 ||
-        tabos_sprite_set_load("T:/data/tile-demo/tile-demo.tsp", &sprites) != 0 ||
-        tabos_tilemap_load("T:/data/tile-demo/world.tmap", &map) != 0) {
-        fprintf(stderr, "tile-demo: load failed (errno %d)\n", errno);
+    if (tabos_graphics_open(&graphics) != 0 || tabos_sprite_set_load("T:/data/tdemo/tdemo.tsp", &sprites) != 0 ||
+        tabos_tilemap_load("T:/data/tdemo/world.tmap", &map) != 0) {
+        fprintf(stderr, "tdemo: load failed (errno %d)\n", errno);
         tabos_tilemap_unload(&map);
         tabos_sprite_set_unload(&sprites);
         if (graphics.open) {
@@ -63,8 +62,9 @@ int main(void)
                 camera_y += 2;
             } else if (event.key == TABOS_KEY_E) {
                 tabos_tile_t tile = 0U;
-                if (tabos_tilemap_get(&map, 1U, 5U, 3U, &tile) == 0) {
-                    (void) tabos_tilemap_set(&map, 1U, 5U, 3U, tile == 0U ? TABOS_TILE(2U) : 0U);
+                if (tabos_tilemap_get(&map, TDEMO_LAYER_WORLD_FOREGROUND, 5U, 3U, &tile) == 0) {
+                    (void) tabos_tilemap_set(&map, TDEMO_LAYER_WORLD_FOREGROUND, 5U, 3U,
+                                             tile == 0U ? TABOS_TILE(TDEMO_SPRITE_WALL) : 0U);
                 }
             }
         }
@@ -75,11 +75,11 @@ int main(void)
         };
         (void) tabos_graphics_clear(&graphics, TABOS_RGB565(8, 18, 30));
         (void) tabos_graphics_begin_camera(&graphics, camera_x, camera_y);
-        (void) tabos_tilemap_draw_layer(&graphics, &map, 0U, &sprites, &draw);
-        (void) tabos_sprite_animation_draw(&graphics, &sprites, DEMO_SPRITE_ROBOT_WALK, 80, 68, elapsed);
-        (void) tabos_metasprite_draw(&graphics, &sprites, DEMO_METASPRITE_TREE, 120, 72, false, false, 255U);
-        (void) tabos_tilemap_draw_layer(&graphics, &map, 1U, &sprites, &draw);
-        const tabos_tilemap_layer_t* markers = &map.layers[2];
+        (void) tabos_tilemap_draw_layer(&graphics, &map, TDEMO_LAYER_WORLD_GROUND, &sprites, &draw);
+        (void) tabos_sprite_animation_draw(&graphics, &sprites, TDEMO_ANIMATION_ROBOT_WALK, 80, 68, elapsed);
+        (void) tabos_metasprite_draw(&graphics, &sprites, TDEMO_METASPRITE_TREE_SHADOW, 120, 72, false, false, 255U);
+        (void) tabos_tilemap_draw_layer(&graphics, &map, TDEMO_LAYER_WORLD_FOREGROUND, &sprites, &draw);
+        const tabos_tilemap_layer_t* markers = &map.layers[TDEMO_LAYER_WORLD_MARKERS];
         for (uint32_t index = 0U; index < markers->object_count; ++index) {
             const tabos_tilemap_object_t* object = &markers->objects[index];
             (void) tabos_graphics_rect(&graphics, object->x, object->y, object->width == 0U ? 2U : object->width,

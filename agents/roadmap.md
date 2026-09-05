@@ -22,6 +22,8 @@
 
 ### Sprite and Tile Graphics
 
+- [x] Emit developer-facing generated asset headers into app include directories and migrate tile demo from manual numeric IDs to generated constants. macOS Debug 44/44 tests, focused Debug/Release converter and equivalence tests, and standard RV32 app builds pass.
+
 - [x] Add canonical extended-draw defaults for natural size, full opacity, no transforms, and no clipping while preserving explicit transparent draws. macOS Debug 44/44 tests, focused Debug/Release tile and equivalence tests, and standard RV32 app builds pass.
 
 - [x] Add shared graphics begin/end camera for primitives, sprites, animations, metasprites, and map layers; remove independent map camera fields and migrate demo to world coordinates. macOS Debug 44/44 and four focused Release tests pass; standard RV32 apps and Tab5 Debug firmware cross-build. Physical execution remains open.
@@ -35,7 +37,7 @@
 - [x] Add validated versioned `.tsp` and `.tmap` loaders.
 - [x] Add deterministic PNG/GIF/Tiled converter and generated C output.
 - [x] Add explicit runtime-asset installation and MSC copying under `T:/data/<app>`.
-- [x] Add original binary-backed `tile-demo` and host tests.
+- [x] Add original binary-backed `tdemo` and host tests.
 - [x] Review binary loaders, reject overlapping sections and invalid descriptors, and add 764 malformed-file, allocation-failure, and cleanup cases; macOS Debug/Release validation and standard RV32 app cross-build pass. See `milestone-tiling.md` for evidence.
 - [x] Validate Debug/Release builds on macOS and Tab5.
 - [ ] Validate Debug/Release builds on Linux.

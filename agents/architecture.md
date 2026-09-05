@@ -6,6 +6,13 @@
 
 ## Sprite and Tile Layer
 
+`[DECIDED]` Generated asset ID headers are application source interfaces. Converter may
+write a constants-only header into the app include directory for editor and clean-checkout
+use. The build header retains declarations needed by generated C; generated descriptors
+and runtime binaries remain build artifacts. Application build prerequisites regenerate
+the app header before compilation. Asset-set-prefixed constants avoid cross-set collisions,
+and post-sanitization collisions fail conversion.
+
 `[DECIDED]` `TABOS_SPRITE_DRAW_OPTIONS_DEFAULT` is the canonical initializer for
 extended sprite and animation draws. It selects natural size, full opacity, no transform,
 and no clip while preserving explicit opacity zero. This is SDK-only and changes no

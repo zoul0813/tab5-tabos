@@ -142,6 +142,6 @@ Run `graphics-demo` to exercise a 320×240 logical canvas automatically scaled 3
 pillarboxing; use E/A/S/D to move, R to rotate, Up/Down to cycle the 16-color VGA
 letterbox palette, and Q to exit. Run
 `graphics-benchmark` to measure 120 queued frames and report active acceleration.
-Run `tile-demo` to exercise binary assets, scrolling layers, transforms, animation,
+Run `tdemo` to exercise binary assets, scrolling layers, transforms, animation,
 metasprites, editable cells, flags, and object markers. Arrow keys scroll, E toggles a
 wall cell, and Q exits.

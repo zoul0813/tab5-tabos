@@ -89,6 +89,7 @@ def parse_args() -> argparse.Namespace:
     assets_build = assets_subparsers.add_parser("build", help="build a versioned JSON asset manifest")
     assets_build.add_argument("manifest", help="path to asset manifest JSON")
     assets_build.add_argument("--output", help="output directory; defaults to build beside manifest")
+    assets_build.add_argument("--header-output", help="also write the generated public header to this path")
     assets_build.set_defaults(handler=command_assets_build)
 
     args = parser.parse_args()

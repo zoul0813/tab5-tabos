@@ -8,6 +8,12 @@
 
 ## Sprite, Tile, and Asset Validation
 
+Converter tests verify developer-facing header output carries its generated-file warning,
+contains generated constants, and omits generated-C declarations and SDK includes. The
+build header retains its generated descriptor declarations. The tile demo cross-build
+must generate its public header before compiling and must reference generated constants
+rather than manual sprite, animation, metasprite, layer, object, or flag IDs.
+
 Default-option tests compare normal sprite and animation draws with their `_ex` forms
 using `TABOS_SPRITE_DRAW_OPTIONS_DEFAULT`. They verify every default field, natural-size
 pixels, full opacity, no transform/clip, and explicit opacity-zero transparency.

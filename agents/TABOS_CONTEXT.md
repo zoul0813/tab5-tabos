@@ -5,6 +5,12 @@
 
 ## Sprite and Tile SDK
 
+- `[DECIDED]` Asset IDs are consumed through generated named constants. Asset builds may
+  emit a constants-only developer-facing header into an application's include directory,
+  while the build header retains declarations needed by generated C. Generated C and
+  runtime binaries remain under build output. The app header is committed, marked
+  generated, regenerated before compilation, and never hand-edited.
+
 - `[DECIDED]` Extended sprite and animation drawing uses
   `TABOS_SPRITE_DRAW_OPTIONS_DEFAULT` for natural size, full opacity, no transforms,
   and no clipping. Games copy the initializer and override only needed fields. Explicit

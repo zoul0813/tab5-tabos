@@ -55,11 +55,14 @@ executable to `T:/bin/doom`. Build and installation never copy or download WAD d
 
 Individual application commands such as `make -C apps/shell` remain available.
 
-`tile-demo` demonstrates sprite/tile APIs and declares generated `.tsp` and `.tmap`
-files with `TABOS_RUNTIME_ASSETS`. Build it with `make -C apps/tile-demo`; run
-`T:/bin/tile-demo` after installation. Edit its source map by opening
+`tdemo` demonstrates sprite/tile APIs and declares generated `.tsp` and `.tmap`
+files with `TABOS_RUNTIME_ASSETS`. Its source lives in `apps/tile-demo`; build it with
+`make -C apps/tile-demo` and run `T:/bin/tdemo` after installation. Edit its source map by opening
 `apps/tile-demo/assets/world.tmj` in Tiled; the map references the external
-`demo.tsj` tileset and `sprites-64.png` image from the same directory.
+`demo.tsj` tileset and `sprites-64.png` image from the same directory. Its build regenerates
+`apps/tile-demo/include/tdemo.h` before compiling. Application code includes this
+developer-facing header and uses generated sprite, animation, metasprite, layer, object,
+and flag constants instead of numeric asset IDs.
 
 Core utilities are grouped under `apps/coreutils/`, but each utility remains a separate
 program. Build one with `make -C apps/coreutils ls` or `make -C apps/coreutils mkdir`.
