@@ -213,6 +213,14 @@ void platform_pointer_shutdown(void)
     mouse_active  = false;
 }
 
+bool platform_pointer_health(int* error)
+{
+    if (error != NULL) {
+        *error = 0;
+    }
+    return pointer_ready;
+}
+
 bool host_pointer_event(const SDL_Event* event)
 {
     if (!pointer_ready || event == NULL) {

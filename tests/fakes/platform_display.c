@@ -720,6 +720,14 @@ void platform_pointer_shutdown(void)
 {
 }
 
+bool platform_pointer_health(int* error)
+{
+    if (error != NULL) {
+        *error = 0;
+    }
+    return true;
+}
+
 static platform_camera_frame_fn fake_camera_frame;
 static platform_camera_error_fn fake_camera_error;
 

@@ -103,6 +103,7 @@ idf.py -C targets/tab5 -B build/tab5-debug \
 
 Only the foreground application can consume input. The shell uses terminal standard
 input, while graphics applications may use raw events. The Tab5 keyboard is interrupt-driven
-through GPIO50; the built-in touch controller remains polled.
+through GPIO50; built-in touch is interrupt-driven through GPIO23 and documented in
+`docs/pointer.md`.
 
 USB keyboards connected to Tab5 are not supported yet. A future ESP-IDF USB-host HID backend can submit events to the same portable queue and coexist with the I²C keyboard without changing applications.

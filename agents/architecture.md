@@ -88,6 +88,10 @@ bounded multi-contact event queues only to the foreground owner. Focus changes, 
 removal, and queue resets cancel active contacts. SDL mouse contact 0 and SDL touch
 contacts share this contract; Tab5 controller handles remain below the platform boundary.
 The contact ceiling defaults to five and is build-configurable for future hardware.
+Tab5 GT911 and ST712x controllers use active-low GPIO23 interrupt callbacks. ISR context
+only records readiness and wakes runtime task; controller I2C reads, contact matching,
+logical rotation, delivery, and fault cancellation remain serialized in task context.
+Idle runtime updates do not read touch controller.
 
 Camera capture follows the same platform boundary. Applications configure process-owned
 streams and receive metadata plus opaque generation-tagged leases; the kernel retains

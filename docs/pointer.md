@@ -20,6 +20,13 @@ orientation. GT911, ST7123, and ST7121-family controllers use the same applicati
 coordinate system. Host mouse input uses contact 0 while a primary button is held;
 SDL touch contacts receive stable IDs for their active lifetime.
 
+Tab5 touch uses active-low GPIO23 interrupts. Controller ISR callbacks only mark input
+ready and wake runtime task. Task context reads I2C reports, matches contacts, and
+rechecks interrupt readiness so an update arriving during report processing is retained.
+Idle runtime updates perform no touch-controller I2C reads. Controller I/O failure
+cancels active contacts, hangs up open streams, and marks `touch0` faulted. Repeated
+controller reports for stationary contact do not produce redundant move events.
+
 ## Streams and Waiting
 
 Find `touch0` with `tabos_device_find()`, then open its ID:
@@ -46,5 +53,5 @@ leaving applications with stuck contacts.
 Run `touchtest` from the shell. It prints event type, contact ID, logical coordinates,
 buttons, and pressure when available. Press Q or Escape to return to the shell.
 
-Physical coordinate validation remains required on ILI9881C/GT911, ST7123, and ST7121
-Tab5 revisions.
+Physical down/move/up, multitouch, rapid-retouch, stationary-contact, and coordinate
+validation remains required on ILI9881C/GT911, ST7123, and ST7121 Tab5 revisions.

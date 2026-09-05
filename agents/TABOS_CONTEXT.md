@@ -79,6 +79,11 @@ The ESP-IDF platform backend must detect these at runtime so one firmware image 
 
 Current implementation uses the Tab5 BSP for ILI9881C and ST7123, and the official `espressif/esp_lcd_st7121` component for ST7121. ILI9881C uses the BSP 1000 Mbps DSI rate; ST7121/ST7123 use the M5Stack reference rate of 965 Mbps. Shared TabOS graphics render at 1280x720 RGB565 and the hardware backend rotates counter-clockwise into the panel's native 720x1280 scanout orientation.
 
+GT911 and ST712x touch input is interrupt-driven through active-low GPIO23. Controller
+callbacks only notify runtime task; I2C report reads, drain/recheck, contact matching,
+rotation, delivery, and deterministic fault/shutdown cancellation run in task context.
+Idle runtime updates perform no touch I2C reads.
+
 The detected display name must remain available through the platform API and reported over serial at info level in both debug and release builds. This information will later feed an on-screen boot driver/hardware list.
 
 ## 3. Operating-System Architecture

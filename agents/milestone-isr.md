@@ -174,19 +174,24 @@ behavior, and holding Delete during reset still entered USB mass-storage mode.
 
 ### Phase 3: Tab5 touch interrupt
 
-- [ ] Configure detected GT911 or ST712x driver with `BSP_LCD_TOUCH_INT` on GPIO23 instead
+- [x] Configure detected GT911 or ST712x driver with `BSP_LCD_TOUCH_INT` on GPIO23 instead
   of `GPIO_NUM_NC`.
-- [ ] Install controller-supported interrupt callback that only notifies task context.
-- [ ] Read touch reports over I2C after notification.
-- [ ] Drain/recheck controller readiness so movement or release arriving during processing
+- [x] Install controller-supported interrupt callback that only notifies task context.
+- [x] Read touch reports over I2C after notification.
+- [x] Drain/recheck controller readiness so movement or release arriving during processing
   cannot be lost.
-- [ ] Preserve contact matching, logical rotation, stable contact IDs, foreground routing,
+- [x] Preserve contact matching, logical rotation, stable contact IDs, foreground routing,
   queue overflow, and cancellation behavior.
 - [ ] Validate down, movement, release, multitouch, rapid retouch, and long stationary
   contact behavior independently for GT911, ST7123, and ST7121 revisions.
-- [ ] Cancel active contacts deterministically if controller faults, disappears, resets,
+- [x] Cancel active contacts deterministically if controller faults, disappears, resets,
   or shuts down.
-- [ ] Remove callback/ISR before deleting touch handle and panel I/O resources.
+- [x] Remove callback/ISR before deleting touch handle and panel I/O resources.
+
+Controller-neutral fake GT911 and ST712x tests cover down, movement, release,
+multitouch contact matching, rapid retouch, stationary-report suppression, arrival during drain,
+bounded rescheduling, I2C fault cancellation, and shutdown cancellation. Physical
+validation remains required independently on GT911, ST7123, and ST7121 hardware.
 
 ### Phase 4: Deadline-driven portable services
 

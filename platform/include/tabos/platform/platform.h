@@ -204,6 +204,7 @@ bool platform_audio_set_sample_rate(uint32_t sample_rate);
 bool platform_pointer_init(const char** driver, int* error);
 void platform_pointer_update(void);
 void platform_pointer_shutdown(void);
+bool platform_pointer_health(int* error);
 bool platform_camera_init(platform_camera_frame_fn frame, platform_camera_error_fn error, platform_camera_info_t* info);
 bool platform_camera_start(const tabos_camera_config_t* config);
 void platform_camera_stop(void);

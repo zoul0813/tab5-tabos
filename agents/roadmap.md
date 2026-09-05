@@ -31,7 +31,11 @@
 - [x] Physical Phase 1 smoke: shell boot, `touchtest`, input/touch/cursor, and application
   lifecycle work without watchdog, crash, or freeze. Intermittent known PI4IO headphone-
   detect read failures remain separately deferred.
-- [ ] Phase 2: convert Tab5 keyboard polling to GPIO50 interrupt-driven wake.
+- [x] Phase 2: convert Tab5 keyboard polling to GPIO50 interrupt-driven wake.
+- [x] Phase 3 implementation: convert Tab5 GT911/ST712x touch reads to GPIO23
+  interrupt-driven wake, with drain/recheck and deterministic cancellation.
+- [ ] Phase 3 hardware validation: verify down/move/up, multitouch, rapid retouch,
+  stationary contact, and orientation on GT911, ST7123, and ST7121 revisions.
 
 ### Hardware Services Phase 6 Validation
 

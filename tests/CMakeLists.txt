@@ -105,6 +105,19 @@ tabos_enable_warnings(tabos_keyboard_interrupt)
 tabos_enable_sanitizers(tabos_keyboard_interrupt)
 add_test(NAME unit.keyboard_interrupt COMMAND tabos_keyboard_interrupt)
 
+add_executable(tabos_touch_interrupt
+    unit/touch_interrupt.c
+    "${TABOS_ROOT}/platform/esp32p4/touch_interrupt.c"
+)
+target_include_directories(tabos_touch_interrupt PRIVATE
+    "${TABOS_ROOT}/platform/esp32p4"
+    "${TABOS_ROOT}/sdk/include"
+    "${TABOS_GENERATED_INCLUDE_DIR}"
+)
+tabos_enable_warnings(tabos_touch_interrupt)
+tabos_enable_sanitizers(tabos_touch_interrupt)
+add_test(NAME unit.touch_interrupt COMMAND tabos_touch_interrupt)
+
 add_executable(tabos_sdk_camera
     unit/sdk_camera.c
     "${TABOS_ROOT}/sdk/lib/camera.c"

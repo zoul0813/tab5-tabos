@@ -190,7 +190,11 @@ parent can verify `wifi0` lifecycle readiness without a test-only device mutatio
 Pointer validation injects synthetic SDL mouse and touch events and covers stable
 multi-contact IDs, logical coordinates, foreground-only reads, generic wait readiness,
 focus cancellation, bounded-queue reset, device removal, stale handles, and process
-cleanup. Physical validation must still confirm orientation on all three Tab5 revisions.
+cleanup. Controller-neutral GT911 and ST712x interrupt fakes cover report drain/recheck,
+stable contact matching, multitouch, rapid retouch, stationary-report suppression, bounded rescheduling,
+fault cancellation, and shutdown cancellation. Physical validation must still confirm
+down/move/up, multitouch, rapid retouch, long stationary contact, and orientation
+independently on GT911, ST7123, and ST7121 Tab5 revisions.
 
 Camera concurrency regression uses real host mutexes and two polling threads while
 streams close and reclaim outstanding leases. Runtime and wait adapters must enter

@@ -218,6 +218,12 @@ void hardware_devices_update(void)
         (void) device_registry_set_state(audio_device, audio_ready ? TABOS_DEVICE_READY : TABOS_DEVICE_FAULT,
                                          audio_ready ? 0 : (audio_error != 0 ? audio_error : EIO));
     }
+    if (pointer_device != TABOS_DEVICE_ID_INVALID) {
+        int pointer_error        = 0;
+        const bool pointer_ready = platform_pointer_health(&pointer_error);
+        (void) device_registry_set_state(pointer_device, pointer_ready ? TABOS_DEVICE_READY : TABOS_DEVICE_FAULT,
+                                         pointer_ready ? 0 : (pointer_error != 0 ? pointer_error : EIO));
+    }
     if (network_device != TABOS_DEVICE_ID_INVALID) {
         network_status_t status;
         if (!network_service_status(&status)) {
