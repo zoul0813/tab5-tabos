@@ -61,7 +61,8 @@ bool network_service_init(void)
         initialized = true;
         return true;
     }
-    if (!platform_network_operations_init() || !platform_network_socket_operations_init() || !platform_tls_operations_init()) {
+    if (!platform_network_operations_init() || !platform_network_socket_operations_init() ||
+        !platform_tls_operations_init()) {
         platform_tls_operations_shutdown();
         platform_network_socket_operations_shutdown();
         platform_network_operations_shutdown();
@@ -120,6 +121,11 @@ void network_service_update(void)
         retry_pending = false;
         (void) start_attempt();
     }
+}
+
+uint64_t network_service_next_deadline(void)
+{
+    return initialized && retry_pending ? retry_at_ms : UINT64_MAX;
 }
 
 void network_service_shutdown(void)

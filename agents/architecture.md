@@ -219,6 +219,23 @@ Application code targets **TabOS**, not ESP-IDF.
 
 TabOS is a multitasking system layered on the SMP scheduler supplied by FreeRTOS.
 
+### Event and deadline wake foundation [DECIDED]
+
+Portable runtime scheduling uses a narrow TabOS-owned readiness bitset and absolute
+monotonic deadlines. Readiness bits are wake hints and may coalesce; authoritative data
+remains in each subsystem queue or state owner. Platform backends provide task-context
+notification, an ISR-safe notification form where supported, indefinite wait, and wait
+until an absolute deadline. Shutdown sets its readiness bit and wakes the runtime before
+platform notification state is released.
+
+The host backend maps the contract to SDL events, including headless operation. Tab5 maps
+it to FreeRTOS direct task notifications; FreeRTOS types remain below the platform
+boundary. Runtime deadline discovery currently combines key repeat, cursor blink,
+network retry, and a 10 ms compatibility deadline for services whose interrupt/completion
+conversion belongs to later ISR-milestone phases. Active host RV32 interpretation keeps
+the runtime immediately runnable for bounded instruction slices. Native Tab5 execution
+does not use that runnable hint because it runs in its own managed task.
+
 A conceptual runtime looks like:
 
 ```text

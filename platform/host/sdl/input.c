@@ -3,6 +3,8 @@
 #include <tabos/internal/input.h>
 #include <tabos/platform/platform.h>
 
+#include <limits.h>
+
 #include <stdio.h>
 #include <string.h>
 
@@ -195,11 +197,28 @@ static void dispatch_event(const SDL_Event* event)
 
 void host_input_update(bool wait)
 {
-    if (host_is_headless()) {
-        return;
-    }
     SDL_Event event;
     if (wait && SDL_WaitEventTimeout(&event, 50)) {
+        dispatch_event(&event);
+    }
+    while (SDL_PollEvent(&event)) {
+        dispatch_event(&event);
+    }
+}
+
+void host_input_wait_until(uint64_t deadline_ms)
+{
+    SDL_Event event;
+    bool received = false;
+    if (deadline_ms == PLATFORM_RUNTIME_DEADLINE_NONE) {
+        received = SDL_WaitEvent(&event);
+    } else {
+        const uint64_t now       = platform_time_ms();
+        const uint64_t remaining = deadline_ms > now ? deadline_ms - now : 0U;
+        const int timeout_ms     = remaining > (uint64_t) INT_MAX ? INT_MAX : (int) remaining;
+        received                 = SDL_WaitEventTimeout(&event, timeout_ms);
+    }
+    if (received) {
         dispatch_event(&event);
     }
     while (SDL_PollEvent(&event)) {

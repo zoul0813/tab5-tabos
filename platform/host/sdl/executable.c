@@ -1340,6 +1340,11 @@ platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* cont
     return PLATFORM_RISCV32_YIELDED;
 }
 
+bool platform_riscv32_requires_runtime_slices(void)
+{
+    return true;
+}
+
 void* platform_riscv32_current_user_data(void)
 {
     return current_user_data;

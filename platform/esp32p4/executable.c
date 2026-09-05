@@ -232,6 +232,11 @@ platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* cont
     return PLATFORM_RISCV32_RETURNED;
 }
 
+bool platform_riscv32_requires_runtime_slices(void)
+{
+    return false;
+}
+
 void platform_riscv32_destroy(platform_riscv32_context_t* context)
 {
     if (context != NULL && atomic_load_explicit(&context->started, memory_order_acquire) && context->task != NULL) {

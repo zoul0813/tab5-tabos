@@ -16,8 +16,26 @@ enum {
 
 typedef uint16_t platform_pixel_t;
 typedef void (*platform_update_fn)(void);
+typedef uint64_t (*platform_deadline_fn)(void);
 typedef struct platform_riscv32_context platform_riscv32_context_t;
 typedef struct platform_mutex platform_mutex_t;
+
+typedef uint32_t platform_runtime_events_t;
+
+enum {
+    PLATFORM_RUNTIME_EVENT_NONE        = 0U,
+    PLATFORM_RUNTIME_EVENT_INPUT       = 1U << 0U,
+    PLATFORM_RUNTIME_EVENT_POINTER     = 1U << 1U,
+    PLATFORM_RUNTIME_EVENT_NETWORK     = 1U << 2U,
+    PLATFORM_RUNTIME_EVENT_CAMERA      = 1U << 3U,
+    PLATFORM_RUNTIME_EVENT_AUDIO       = 1U << 4U,
+    PLATFORM_RUNTIME_EVENT_APPLICATION = 1U << 5U,
+    PLATFORM_RUNTIME_EVENT_DEVICE      = 1U << 6U,
+    PLATFORM_RUNTIME_EVENT_DEADLINE    = 1U << 7U,
+    PLATFORM_RUNTIME_EVENT_SHUTDOWN    = 1U << 8U,
+};
+
+#define PLATFORM_RUNTIME_DEADLINE_NONE UINT64_MAX
 
 typedef void (*platform_audio_render_fn)(int16_t* stereo, size_t frames);
 typedef void (*platform_audio_capture_fn)(const int16_t* samples, size_t frames, uint32_t channels);
@@ -153,9 +171,12 @@ typedef struct {
 } platform_diagnostics_t;
 
 bool platform_init(bool headless);
-int platform_run(platform_update_fn update);
+int platform_run(platform_update_fn update, platform_deadline_fn next_deadline);
 void platform_shutdown(void);
 void platform_stop_run_loop(void);
+void platform_runtime_notify(platform_runtime_events_t events);
+void platform_runtime_notify_from_isr(platform_runtime_events_t events);
+platform_runtime_events_t platform_runtime_wait_until(uint64_t deadline_ms);
 void platform_perform_system_action(platform_system_action_t action);
 const char* platform_name(void);
 const char* platform_display_name(void);
@@ -247,6 +268,7 @@ platform_riscv32_context_t* platform_riscv32_create(const void* entry, const voi
                                                     void* user_data);
 platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* context, unsigned int instruction_budget,
                                                 int* returned_status);
+bool platform_riscv32_requires_runtime_slices(void);
 void platform_riscv32_destroy(platform_riscv32_context_t* context);
 void* platform_riscv32_current_user_data(void);
 void platform_input_wait(void);

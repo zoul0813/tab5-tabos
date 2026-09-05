@@ -132,18 +132,24 @@ ISR code must not:
 
 ### Phase 1: Portable runtime wake and deadline foundation
 
-- [ ] Define a narrow portable runtime-event vocabulary and bitset.
-- [ ] Add platform operations to notify runtime, wait indefinitely, and wait until an
+- [x] Define a narrow portable runtime-event vocabulary and bitset.
+- [x] Add platform operations to notify runtime, wait indefinitely, and wait until an
   absolute monotonic deadline.
-- [ ] Make notification safe from task context and, where supported, ISR context.
-- [ ] Coalesce duplicate readiness bits without losing authoritative queued data.
-- [ ] Define shutdown behavior that wakes every blocked runtime/service task before
+- [x] Make notification safe from task context and, where supported, ISR context.
+- [x] Coalesce duplicate readiness bits without losing authoritative queued data.
+- [x] Define shutdown behavior that wakes every blocked runtime/service task before
   destroying its notification primitive.
-- [ ] Add portable deadline discovery for every service that currently requires periodic
+- [x] Add portable deadline discovery for every service that currently requires periodic
   updates.
-- [ ] Replace fixed run-loop delay with wait-until-event-or-nearest-deadline behavior.
-- [ ] Keep runtime runnable while active host RV32 interpretation requires execution
+- [x] Replace fixed run-loop delay with wait-until-event-or-nearest-deadline behavior.
+- [x] Keep runtime runnable while active host RV32 interpretation requires execution
   slices; block only when no runnable process or ready service work exists.
+
+Physical Tab5 Phase 1 smoke validation passed on 2026-09-05: firmware booted into
+the shell, `touchtest` loaded and ran, input/touch/cursor/application behavior remained
+responsive, and no watchdog, crash, freeze, or other runtime failure was reported.
+Two intermittent PI4IOE5V6408 input-register failures came from the previously recorded
+headphone-detect poll issue and remain deferred outside Phase 1.
 
 ### Phase 2: Tab5 keyboard interrupt
 
@@ -275,14 +281,14 @@ ISR code must not:
 
 ### Runtime foundation
 
-- [ ] Immediate wake from task notification.
-- [ ] Immediate wake from simulated ISR notification.
-- [ ] Wake at exact nearest deadline without early dispatch.
-- [ ] Indefinite block when no event or deadline exists.
-- [ ] Coalesced duplicate notification without lost queued work.
-- [ ] Simultaneous event bits processed fairly and deterministically.
-- [ ] New earlier deadline interrupts an existing longer wait.
-- [ ] Shutdown safely wakes and disposes blocked runtime.
+- [x] Immediate wake from task notification.
+- [x] Immediate wake from simulated ISR notification.
+- [x] Wake at exact nearest deadline without early dispatch.
+- [x] Indefinite block when no event or deadline exists.
+- [x] Coalesced duplicate notification without lost queued work.
+- [x] Simultaneous event bits processed fairly and deterministically.
+- [x] New earlier deadline interrupts an existing longer wait.
+- [x] Shutdown safely wakes and disposes blocked runtime.
 
 ### Keyboard
 

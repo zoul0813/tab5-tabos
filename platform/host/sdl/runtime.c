@@ -6,6 +6,7 @@
 #include <tabos/config/identity.h>
 
 #include <stdio.h>
+#include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -15,6 +16,8 @@ static bool quit_requested;
 static platform_network_status_t network_status;
 static bool host_battery_charging_enabled;
 static bool host_battery_fast_charging_enabled;
+static atomic_uint runtime_events;
+static Uint32 runtime_wake_event;
 
 static char* window_state_path(void)
 {
@@ -114,6 +117,35 @@ void host_request_quit(void)
 void platform_stop_run_loop(void)
 {
     host_request_quit();
+    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_SHUTDOWN);
+}
+
+void platform_runtime_notify(platform_runtime_events_t events)
+{
+    if (events == PLATFORM_RUNTIME_EVENT_NONE) {
+        return;
+    }
+    atomic_fetch_or_explicit(&runtime_events, events, memory_order_release);
+    if (runtime_wake_event != 0U) {
+        SDL_Event event = {.type = runtime_wake_event};
+        (void) SDL_PushEvent(&event);
+    }
+}
+
+void platform_runtime_notify_from_isr(platform_runtime_events_t events)
+{
+    platform_runtime_notify(events);
+}
+
+platform_runtime_events_t platform_runtime_wait_until(uint64_t deadline_ms)
+{
+    platform_runtime_events_t events = atomic_exchange_explicit(&runtime_events, 0U, memory_order_acq_rel);
+    if (events != PLATFORM_RUNTIME_EVENT_NONE) {
+        host_input_update(false);
+        return events;
+    }
+    host_input_wait_until(deadline_ms);
+    return atomic_exchange_explicit(&runtime_events, 0U, memory_order_acq_rel);
 }
 
 void platform_perform_system_action(platform_system_action_t action)
@@ -127,9 +159,17 @@ bool platform_init(bool headless)
     quit_requested                     = false;
     host_battery_charging_enabled      = true;
     host_battery_fast_charging_enabled = false;
-    const SDL_InitFlags flags          = headless ? 0U : SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_AUDIO;
+    atomic_store_explicit(&runtime_events, 0U, memory_order_release);
+    runtime_wake_event        = 0U;
+    const SDL_InitFlags flags = headless ? SDL_INIT_EVENTS : SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_AUDIO;
     if (!SDL_Init(flags)) {
         SDL_Log("SDL initialization failed: %s", SDL_GetError());
+        return false;
+    }
+    runtime_wake_event = SDL_RegisterEvents(1);
+    if (runtime_wake_event == 0U) {
+        SDL_Log("Runtime wake event registration failed: %s", SDL_GetError());
+        SDL_Quit();
         return false;
     }
     if (is_headless) {
@@ -243,7 +283,7 @@ bool platform_battery_health(int* error)
     return true;
 }
 
-int platform_run(platform_update_fn update)
+int platform_run(platform_update_fn update, platform_deadline_fn next_deadline)
 {
     if (is_headless) {
         if (update != NULL) {
@@ -252,18 +292,21 @@ int platform_run(platform_update_fn update)
         return 0;
     }
     while (!quit_requested) {
-        /* Poll input without letting event arrival control emulation speed. */
         host_input_update(false);
         if (update != NULL) {
             update();
         }
-        SDL_Delay(1);
+        if (!quit_requested) {
+            const uint64_t deadline = next_deadline != NULL ? next_deadline() : PLATFORM_RUNTIME_DEADLINE_NONE;
+            (void) platform_runtime_wait_until(deadline);
+        }
     }
     return 0;
 }
 
 void platform_shutdown(void)
 {
+    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_SHUTDOWN);
     platform_display_shutdown();
     if (host_window != NULL) {
         SDL_StopTextInput(host_window);
@@ -272,6 +315,7 @@ void platform_shutdown(void)
         host_window = NULL;
     }
     SDL_Quit();
+    runtime_wake_event = 0U;
 }
 
 const char* platform_name(void)

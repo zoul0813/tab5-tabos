@@ -62,6 +62,7 @@ bool input_submit(const tabos_input_event_t* event)
     if (event->repeat) {
         return true;
     }
+    lock_queue();
     if (event->type == TABOS_INPUT_KEY_DOWN && !modifier_key(event->key)) {
         held_key            = event->key;
         held_modifiers      = event->modifiers;
@@ -79,7 +80,6 @@ bool input_submit(const tabos_input_event_t* event)
         held_text[sizeof(held_text) - 1U] = '\0';
         held_text_modifiers               = event->modifiers;
     }
-    lock_queue();
     if (queue_count == INPUT_QUEUE_CAPACITY) {
         queue_head = (queue_head + 1U) % INPUT_QUEUE_CAPACITY;
         --queue_count;
@@ -88,6 +88,7 @@ bool input_submit(const tabos_input_event_t* event)
     event_queue[tail] = *event;
     ++queue_count;
     unlock_queue();
+    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_INPUT);
     input_diagnostic_log(event);
     return true;
 }
@@ -95,7 +96,9 @@ bool input_submit(const tabos_input_event_t* event)
 void input_update(void)
 {
     const uint64_t now = platform_time_ms();
+    lock_queue();
     if (held_key == TABOS_KEY_UNKNOWN || now < next_repeat_ms) {
+        unlock_queue();
         return;
     }
 
@@ -105,7 +108,6 @@ void input_update(void)
         .modifiers = held_modifiers,
         .repeat    = true,
     };
-    lock_queue();
     if (queue_count == INPUT_QUEUE_CAPACITY) {
         queue_head = (queue_head + 1U) % INPUT_QUEUE_CAPACITY;
         --queue_count;
@@ -113,18 +115,17 @@ void input_update(void)
     size_t tail       = (queue_head + queue_count) % INPUT_QUEUE_CAPACITY;
     event_queue[tail] = key_event;
     ++queue_count;
-    unlock_queue();
-    input_diagnostic_log(&key_event);
 
+    bool text_repeated             = false;
+    tabos_input_event_t text_event = {0};
     if (held_text[0] != '\0') {
-        tabos_input_event_t text_event = {
+        text_event = (tabos_input_event_t) {
             .type      = TABOS_INPUT_TEXT,
             .modifiers = held_text_modifiers,
             .repeat    = true,
         };
         (void) strncpy(text_event.text, held_text, sizeof(text_event.text) - 1U);
         text_event.text[sizeof(text_event.text) - 1U] = '\0';
-        lock_queue();
         if (queue_count == INPUT_QUEUE_CAPACITY) {
             queue_head = (queue_head + 1U) % INPUT_QUEUE_CAPACITY;
             --queue_count;
@@ -132,10 +133,22 @@ void input_update(void)
         tail              = (queue_head + queue_count) % INPUT_QUEUE_CAPACITY;
         event_queue[tail] = text_event;
         ++queue_count;
-        unlock_queue();
-        input_diagnostic_log(&text_event);
+        text_repeated = true;
     }
     next_repeat_ms = now + TABOS_KEY_REPEAT_INTERVAL_MS;
+    unlock_queue();
+    input_diagnostic_log(&key_event);
+    if (text_repeated) {
+        input_diagnostic_log(&text_event);
+    }
+}
+
+uint64_t input_next_deadline(void)
+{
+    lock_queue();
+    const uint64_t deadline = held_key != TABOS_KEY_UNKNOWN ? next_repeat_ms : UINT64_MAX;
+    unlock_queue();
+    return deadline;
 }
 
 static bool pop_event(tabos_input_event_t* event)

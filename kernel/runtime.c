@@ -30,6 +30,10 @@
 #include <stdatomic.h>
 #include <stdio.h>
 
+enum {
+    RUNTIME_COMPATIBILITY_POLL_MS = 10U,
+};
+
 static bool runtime_initialized;
 static bool runtime_started;
 static unsigned int terminal_scale = TABOS_TERMINAL_SCALE;
@@ -43,6 +47,12 @@ static char storage_detail[512];
 static char clock_detail[80];
 static char network_detail[160];
 static atomic_int requested_system_action;
+static uint64_t compatibility_poll_deadline_ms;
+
+static uint64_t earliest_deadline(uint64_t left, uint64_t right)
+{
+    return left < right ? left : right;
+}
 
 static kernel_boot_status_t device_boot_status(tabos_device_state_t state)
 {
@@ -344,7 +354,8 @@ bool kernel_runtime_start(bool launch_startup_application)
         filesystem_shutdown();
         return false;
     }
-    runtime_started = true;
+    runtime_started                = true;
+    compatibility_poll_deadline_ms = platform_time_ms();
     if (!launch_startup_application) {
         return true;
     }
@@ -383,6 +394,24 @@ void kernel_runtime_update(void)
     camera_service_update();
     hardware_devices_update();
     kernel_application_system_update();
+    const uint64_t now = platform_time_ms();
+    compatibility_poll_deadline_ms =
+        UINT64_MAX - now < RUNTIME_COMPATIBILITY_POLL_MS ? UINT64_MAX : now + RUNTIME_COMPATIBILITY_POLL_MS;
+}
+
+uint64_t kernel_runtime_next_deadline(void)
+{
+    if (!runtime_started) {
+        return PLATFORM_RUNTIME_DEADLINE_NONE;
+    }
+    if (kernel_application_system_runnable()) {
+        return platform_time_ms();
+    }
+    uint64_t deadline = compatibility_poll_deadline_ms;
+    deadline          = earliest_deadline(deadline, input_next_deadline());
+    deadline          = earliest_deadline(deadline, console_next_deadline());
+    deadline          = earliest_deadline(deadline, network_service_next_deadline());
+    return deadline;
 }
 
 void kernel_runtime_shutdown(void)
@@ -395,8 +424,9 @@ void kernel_runtime_shutdown(void)
         camera_service_shutdown();
         pointer_service_shutdown();
         display_shutdown();
-        runtime_started = false;
-        boot_report     = (kernel_boot_report_t) {0};
+        runtime_started                = false;
+        boot_report                    = (kernel_boot_report_t) {0};
+        compatibility_poll_deadline_ms = PLATFORM_RUNTIME_DEADLINE_NONE;
     }
 
     audio_service_shutdown();

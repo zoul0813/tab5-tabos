@@ -12,5 +12,6 @@ const char* loader_elf_application_working_directory(const loader_elf_applicatio
 bool loader_elf_application_set_working_directory(loader_elf_application_t* application, const char* working_directory);
 uint32_t loader_elf_application_tty_mode(const loader_elf_application_t* application);
 bool loader_elf_application_set_tty_mode(loader_elf_application_t* application, uint32_t mode);
+bool loader_elf_application_runtime_runnable(const tabos_app_descriptor_t* descriptor, const void* application_data);
 
 #endif

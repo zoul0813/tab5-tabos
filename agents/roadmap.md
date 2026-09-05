@@ -20,6 +20,19 @@
 
 ## Current Work
 
+### Event-Driven Runtime and ISR Milestone
+
+- [x] Phase 1: define portable readiness bits and absolute monotonic deadline contract.
+- [x] Implement coalescing task/ISR notifications and blocking waits on host and Tab5.
+- [x] Aggregate key-repeat, cursor, network-retry, and compatibility polling deadlines.
+- [x] Keep active host RV32 interpretation runnable without spinning for native Tab5 tasks.
+- [x] Add deterministic fake and real headless-SDL runtime wake/deadline tests.
+- [x] Cross-build Phase 1 for Tab5 Debug.
+- [x] Physical Phase 1 smoke: shell boot, `touchtest`, input/touch/cursor, and application
+  lifecycle work without watchdog, crash, or freeze. Intermittent known PI4IO headphone-
+  detect read failures remain separately deferred.
+- [ ] Phase 2: convert Tab5 keyboard polling to GPIO50 interrupt-driven wake.
+
 ### Hardware Services Phase 6 Validation
 
 - [x] Physical RAW8 capture writes 921,600 payload bytes to microSD (operator confirmed).

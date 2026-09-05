@@ -10,6 +10,7 @@ extern SDL_Window* host_window;
 bool host_is_headless(void);
 void host_request_quit(void);
 void host_input_update(bool wait);
+void host_input_wait_until(uint64_t deadline_ms);
 bool host_capture_screenshot(void);
 bool host_pointer_event(const SDL_Event* event);
 

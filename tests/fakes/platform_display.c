@@ -82,6 +82,8 @@ static platform_audio_error_fn fake_audio_error;
 static platform_audio_render_fn fake_audio_render;
 static platform_audio_capture_fn fake_audio_capture;
 static uint32_t fake_audio_sample_rate;
+static platform_runtime_events_t fake_runtime_events;
+static uint64_t fake_runtime_wait_deadline;
 
 bool platform_display_init(platform_framebuffer_t* framebuffer)
 {
@@ -109,6 +111,25 @@ void platform_display_shutdown(void)
 
 void platform_stop_run_loop(void)
 {
+    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_SHUTDOWN);
+}
+
+void platform_runtime_notify(platform_runtime_events_t events)
+{
+    fake_runtime_events |= events;
+}
+
+void platform_runtime_notify_from_isr(platform_runtime_events_t events)
+{
+    platform_runtime_notify(events);
+}
+
+platform_runtime_events_t platform_runtime_wait_until(uint64_t deadline_ms)
+{
+    fake_runtime_wait_deadline             = deadline_ms;
+    const platform_runtime_events_t events = fake_runtime_events;
+    fake_runtime_events                    = PLATFORM_RUNTIME_EVENT_NONE;
+    return events;
 }
 
 void platform_perform_system_action(platform_system_action_t action)
@@ -629,6 +650,11 @@ platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* cont
     return PLATFORM_RISCV32_FAULT;
 }
 
+bool platform_riscv32_requires_runtime_slices(void)
+{
+    return false;
+}
+
 void platform_riscv32_destroy(platform_riscv32_context_t* context)
 {
     (void) context;
@@ -647,6 +673,11 @@ void test_platform_set_time_ms(uint64_t time_ms)
 void test_platform_advance_time_ms(uint64_t elapsed_ms)
 {
     monotonic_ms += elapsed_ms;
+}
+
+uint64_t test_platform_runtime_wait_deadline(void)
+{
+    return fake_runtime_wait_deadline;
 }
 
 void platform_input_wait(void)

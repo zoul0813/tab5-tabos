@@ -178,6 +178,16 @@ void kernel_application_system_update(void)
     }
 }
 
+bool kernel_application_system_runnable(void)
+{
+    if (foreground_process == NULL || foreground_process->state != TABOS_PROCESS_RUNNING ||
+        foreground_process->context.exit_requested) {
+        return false;
+    }
+    return loader_elf_application_runtime_runnable(foreground_process->context.descriptor,
+                                                   foreground_process->context.application_data);
+}
+
 void kernel_application_system_shutdown(void)
 {
     pointer_service_set_foreground_owner(NULL);

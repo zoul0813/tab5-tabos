@@ -32,6 +32,8 @@ static atomic_bool wifi_starting;
 static atomic_int wifi_state;
 static atomic_bool wifi_disconnect_requested;
 static SemaphoreHandle_t wifi_status_mutex;
+static _Atomic(TaskHandle_t) runtime_task;
+static atomic_uint runtime_events;
 static bool wifi_connect_pending;
 static char wifi_ssid[33];
 static char wifi_password[65];
@@ -83,6 +85,8 @@ bool platform_init(bool headless)
 {
     (void) headless;
     atomic_store_explicit(&stop_requested, false, memory_order_release);
+    atomic_store_explicit(&runtime_events, 0U, memory_order_release);
+    atomic_store_explicit(&runtime_task, NULL, memory_order_release);
     hosted_initialized = false;
     if (!platform_usb_port_disable_host_power()) {
         ESP_LOGW(TAG, "Could not place USB-A port in safe unpowered state; continuing normal boot");
@@ -310,26 +314,84 @@ bool platform_network_status(platform_network_status_t* status)
     return true;
 }
 
-int platform_run(platform_update_fn update)
+int platform_run(platform_update_fn update, platform_deadline_fn next_deadline)
 {
     ESP_LOGI(TAG, "Tab5 platform run loop started");
+    atomic_store_explicit(&runtime_task, xTaskGetCurrentTaskHandle(), memory_order_release);
     while (!atomic_load_explicit(&stop_requested, memory_order_acquire)) {
         tab5_keyboard_poll();
         if (update != NULL) {
             update();
         }
-        vTaskDelay(pdMS_TO_TICKS(10));
+        if (!atomic_load_explicit(&stop_requested, memory_order_acquire)) {
+            const uint64_t deadline = next_deadline != NULL ? next_deadline() : PLATFORM_RUNTIME_DEADLINE_NONE;
+            (void) platform_runtime_wait_until(deadline);
+        }
     }
+    atomic_store_explicit(&runtime_task, NULL, memory_order_release);
     return 0;
 }
 
 void platform_stop_run_loop(void)
 {
     atomic_store_explicit(&stop_requested, true, memory_order_release);
+    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_SHUTDOWN);
+}
+
+void platform_runtime_notify(platform_runtime_events_t events)
+{
+    if (events == PLATFORM_RUNTIME_EVENT_NONE) {
+        return;
+    }
+    atomic_fetch_or_explicit(&runtime_events, events, memory_order_release);
+    TaskHandle_t task = atomic_load_explicit(&runtime_task, memory_order_acquire);
+    if (task != NULL) {
+        xTaskNotifyGive(task);
+    }
+}
+
+void platform_runtime_notify_from_isr(platform_runtime_events_t events)
+{
+    if (events == PLATFORM_RUNTIME_EVENT_NONE) {
+        return;
+    }
+    atomic_fetch_or_explicit(&runtime_events, events, memory_order_release);
+    TaskHandle_t task = atomic_load_explicit(&runtime_task, memory_order_acquire);
+    if (task != NULL) {
+        BaseType_t higher_priority_task_woken = pdFALSE;
+        vTaskNotifyGiveFromISR(task, &higher_priority_task_woken);
+        portYIELD_FROM_ISR(higher_priority_task_woken);
+    }
+}
+
+platform_runtime_events_t platform_runtime_wait_until(uint64_t deadline_ms)
+{
+    for (;;) {
+        const platform_runtime_events_t events = atomic_exchange_explicit(&runtime_events, 0U, memory_order_acq_rel);
+        if (events != PLATFORM_RUNTIME_EVENT_NONE) {
+            (void) ulTaskNotifyTake(pdTRUE, 0U);
+            return events;
+        }
+        TickType_t wait_ticks = portMAX_DELAY;
+        if (deadline_ms != PLATFORM_RUNTIME_DEADLINE_NONE) {
+            const uint64_t now = platform_time_ms();
+            if (now >= deadline_ms) {
+                return PLATFORM_RUNTIME_EVENT_NONE;
+            }
+            const uint64_t remaining_ms    = deadline_ms - now;
+            const uint64_t maximum_wait_ms = ((uint64_t) (portMAX_DELAY - 1U) * 1000U) / configTICK_RATE_HZ;
+            wait_ticks = remaining_ms >= maximum_wait_ms ? portMAX_DELAY - 1U : pdMS_TO_TICKS(remaining_ms);
+            if (wait_ticks == 0U) {
+                wait_ticks = 1U;
+            }
+        }
+        (void) ulTaskNotifyTake(pdTRUE, wait_ticks);
+    }
 }
 
 void platform_shutdown(void)
 {
+    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_SHUTDOWN);
     if (hosted_initialized) {
         (void) esp_hosted_deinit();
         hosted_initialized = false;

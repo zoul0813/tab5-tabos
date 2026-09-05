@@ -2500,3 +2500,12 @@ bool loader_elf_application_set_tty_mode(loader_elf_application_t* application, 
     application->tty_mode = mode;
     return true;
 }
+
+bool loader_elf_application_runtime_runnable(const tabos_app_descriptor_t* descriptor, const void* application_data)
+{
+    if (descriptor == NULL || descriptor->update != elf_update || application_data == NULL) {
+        return false;
+    }
+    const loader_elf_application_t* application = application_data;
+    return application->execution != NULL && platform_riscv32_requires_runtime_slices();
+}

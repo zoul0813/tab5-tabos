@@ -137,6 +137,14 @@ The kernel currently constructs one structured boot report and sends it to both 
 
 The public `<tabos/console.h>` API now supplies one cooperative foreground console session. Only current session can write, clear, inspect cursor, navigate scrollback, or read normalized input; rejected reads do not consume events. Terminal controls support newline, carriage return, four-column tabs, destructive backspace, wrapping, clearing, and scrolling. Terminal state is a colored cell ring retaining visible rows plus `TABOS_TERMINAL_SCROLLBACK_LINES` (default 256) history rows. Viewport is separate from live cursor; cursor hides above live output, and new output returns to end. Scrollback shortcuts are process-owned opt-in TTY policy exposed through `ioctl()`: the shell enables Page Up/Down/Home/End and Tab5 Ctrl+Arrow equivalents, children inherit a value copy, and raw-input applications may disable them without changing the retained parent. Runtime scale changes reflow retained hard/soft lines and redraw cells. Cursor blinks at configurable half-period through reusable polling timer service; input/output restores visible phase. Terminal dirty-cell rendering avoids full glyph redraw for ordinary writes and blink changes. Writes still present framebuffer immediately on every target. Optional `TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP` builds a target-neutral echo/test application under `apps/`; it defaults off and is explicitly not shell.
 
+Portable runtime wake foundation carries coalesced TabOS-owned readiness bits and
+absolute monotonic deadlines through the platform boundary. Host uses SDL event waits,
+including headless tests; Tab5 uses FreeRTOS direct task notifications with a separate
+ISR-safe entry point. Runtime deadline discovery combines key repeat, cursor blink,
+network retry, and a temporary 10 ms compatibility deadline for services still awaiting
+later interrupt/completion phases. Host RV32 guests remain runnable through bounded
+interpreter slices, while native Tab5 application tasks do not force runtime spinning.
+
 Portable application foundation defines descriptor and cooperative lifecycle API in
 `<tabos/application.h>`. Fixed-capacity process table exposes PID, parent, and state
 metadata with persistent nested foreground stack. Public cooperative C

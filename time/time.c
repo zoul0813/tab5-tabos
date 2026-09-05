@@ -1,5 +1,7 @@
 #include <tabos/time.h>
 
+#include <tabos/internal/time.h>
+
 #include <tabos/platform/platform.h>
 
 #include <stddef.h>
@@ -33,6 +35,11 @@ void tabos_timer_cancel(tabos_timer_t* timer)
 bool tabos_timer_is_active(const tabos_timer_t* timer)
 {
     return timer != NULL && timer->active;
+}
+
+uint64_t time_timer_deadline(const tabos_timer_t* timer)
+{
+    return tabos_timer_is_active(timer) ? timer->deadline_ms : UINT64_MAX;
 }
 
 bool tabos_timer_poll(tabos_timer_t* timer)

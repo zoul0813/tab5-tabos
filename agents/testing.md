@@ -103,6 +103,20 @@ This should make normal development substantially faster.
 - Info-level serial logging is required in debug and release so detected hardware remains visible during boot.
 - Current host suite has unit, integration, architecture-boundary, and invalid-target tests. Display transforms must remain host-unit-tested.
 
+### Event and deadline runtime validation
+
+Runtime wake tests use both deterministic platform fakes and the real headless SDL
+backend. Coverage must prove duplicate-bit coalescing, simultaneous event preservation,
+task notification, simulated ISR notification, indefinite blocking, no return before an
+absolute monotonic deadline, and shutdown wakeup. Tests must notify a blocked longer wait
+when a producer creates earlier work so the runtime can recompute its nearest deadline.
+
+Platform contract tests must keep SDL and FreeRTOS types below the portable boundary.
+Tab5 cross-builds validate the direct-task-notification and ISR-safe paths; physical
+interrupt phases add hardware timing and teardown validation separately. Until those
+phases complete, tests must preserve the explicit 10 ms compatibility deadline used by
+still-polled services rather than claiming idle polling has ended.
+
 Host builds are especially useful for:
 
 - shell development
