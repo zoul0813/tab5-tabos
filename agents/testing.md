@@ -21,6 +21,17 @@ It fails each loader allocation in turn, checks `ENOMEM` and unchanged destinati
 tracks live allocations and duplicate frees, and repeats load/unload. These host checks
 do not replace RV32 runtime or physical resource-lifetime validation.
 
+`unit.sdk_asset_equivalence` builds both forms through the normal asset converter from
+`tests/fixtures/assets/equivalence.py`. It compiles the generated C and compares every
+public descriptor field, image pixel, cell, object, and property with loaded binaries.
+Named constants have explicit fixture expectations. Two images, multiple tilesets and
+object layers, high-bit flags, signed properties, loop/hold animations, metasprites,
+and all eight Tiled transformations are represented. It compares 79 logical-canvas scene
+pairs across camera and animation boundaries, including an edited map. Independent full
+pixel expectations cover pivots, transparency, clipping, opacity, tile transforms,
+layer order, and metasprite overlap. Native-path parity and RV32 execution remain separate
+acceptance work; the host test does not submit a real display presentation.
+
 Physical Tab5 acceptance must validate 58 FPS panel cadence, seam-free scrolling,
 transform/color-key output, repeated load/unload, and terminal restoration. Measure a
 320×180 canvas with three visible 16×16 layers plus 64 sprites. Add bounded private bulk

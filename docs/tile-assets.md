@@ -97,6 +97,22 @@ Output contains deterministic generated `.c`/`.h`, one `TSP1` `.tsp`, and a `TMP
 `.tmap` per map. Binary tables are little-endian, four-byte aligned, offset/count based,
 and uncompressed.
 
+## Validation
+
+The host test suite compiles generated C and loads binary assets from the same synthetic
+PNG/Tiled fixture. It compares metadata and exact logical-canvas pixels, including
+independent expected colors and layer order. Run it through the normal host workflow:
+
+```sh
+./tools/tabos macos debug test
+# After building, run only the equivalence check:
+ctest --test-dir build/macos-debug -R '^unit.sdk_asset_equivalence$' --output-on-failure
+```
+
+Use the corresponding Linux target and build directory on Linux. This test validates
+asset representation equivalence; native rendering parity and physical display behavior
+require their separate checks.
+
 ## Installation
 
 Declare only runtime outputs before including `application.mk`:

@@ -133,6 +133,26 @@ tabos_enable_warnings(tabos_sdk_asset_loaders)
 tabos_enable_sanitizers(tabos_sdk_asset_loaders)
 add_test(NAME unit.sdk_asset_loaders COMMAND tabos_sdk_asset_loaders)
 
+set(TABOS_EQ_ASSETS "${CMAKE_CURRENT_BINARY_DIR}/equivalence-assets")
+add_custom_command(
+    OUTPUT "${TABOS_EQ_ASSETS}/equivalence.c" "${TABOS_EQ_ASSETS}/equivalence.h"
+        "${TABOS_EQ_ASSETS}/equivalence.tsp" "${TABOS_EQ_ASSETS}/world.tmap"
+    COMMAND "${Python3_EXECUTABLE}" "${TABOS_ROOT}/tests/fixtures/assets/equivalence.py" "${TABOS_EQ_ASSETS}"
+    COMMAND "${Python3_EXECUTABLE}" "${TABOS_ROOT}/tools/tabos" assets build
+        "${TABOS_EQ_ASSETS}/manifest.json" --output "${TABOS_EQ_ASSETS}"
+    DEPENDS "${TABOS_ROOT}/tests/fixtures/assets/equivalence.py"
+        "${TABOS_ROOT}/tools/tabos" "${TABOS_ROOT}/tools/tabos_tools/assets.py"
+    VERBATIM
+)
+add_executable(tabos_sdk_asset_equivalence unit/sdk_asset_equivalence.c
+    "${TABOS_EQ_ASSETS}/equivalence.c"
+    "${TABOS_ROOT}/sdk/lib/graphics.c" "${TABOS_ROOT}/sdk/lib/sprite.c" "${TABOS_ROOT}/sdk/lib/tilemap.c")
+target_include_directories(tabos_sdk_asset_equivalence PRIVATE "${TABOS_ROOT}/sdk/include" "${TABOS_EQ_ASSETS}")
+tabos_enable_warnings(tabos_sdk_asset_equivalence)
+tabos_enable_sanitizers(tabos_sdk_asset_equivalence)
+add_test(NAME unit.sdk_asset_equivalence COMMAND tabos_sdk_asset_equivalence
+    "${TABOS_EQ_ASSETS}/equivalence.tsp" "${TABOS_EQ_ASSETS}/world.tmap")
+
 add_executable(tabos_sdk_input
     unit/sdk_input.c
     "${TABOS_ROOT}/sdk/lib/input.c"

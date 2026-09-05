@@ -143,7 +143,7 @@ Binary formats:
 - [x] Review: `tabos_sprite_set_load()`/`tabos_sprite_set_unload()` and
   `tabos_tilemap_load()`/`tabos_tilemap_unload()` own binary allocations. Unload zeroes
   the destination object.
-- [ ] Review: Generated C and binary forms expose identical IDs and rendering semantics.
+- [x] Review: Generated C and binary forms expose identical IDs and rendering semantics.
 - [x] Review: Modified binary-map cells remain memory-only; do not save them automatically.
 - [ ] Review: Unload only after the final `present()` or graphics close because queued commands retain
   source pointers.
@@ -173,7 +173,7 @@ Binary formats:
   color keys, static and animated GIF input, GIF transparency/disposal, frame timing and
   repeat counts, multiple tilesets, Tiled transforms and animations, object markers,
   identifier collisions, and every rejected feature.
-- [ ] Verify generated-C/binary equivalence for IDs, descriptors, and rendered output.
+- [x] Verify generated-C/binary equivalence for IDs, descriptors, and rendered output.
 - [x] Test binary-loader rejection of bad magic and unsupported versions independently.
 - [x] Test truncated binary assets independently of bad magic.
 - [x] Test binary-loader overflow and invalid offsets, counts, alignment, and GIDs.
@@ -223,6 +223,18 @@ Validated working-tree changes based on `269d064`:
 - `./tools/tabos macos release build` and focused Release loader/tile/converter tests passed.
 - `./apps/build.sh build` cross-built standard RV32 applications, including `tile-demo`, with ESP-IDF's RISC-V toolchain. Optional DOOM was excluded by the script default. This was a build/staging check, not MSC installation or physical execution.
 - Generated-C/binary rendering equivalence, native/logical rendering parity, maintained `tester` integration, Linux builds, and physical Tab5 acceptance remain open.
+
+## Asset Equivalence Evidence — 2026-09-05
+
+Validated working-tree changes based on `132abe8`:
+
+- `unit.sdk_asset_equivalence` generates C and binary output from the same authored PNG/Tiled fixture and compiles the C output as part of the test target.
+- Compares image pixels and all public descriptor fields, named IDs, flags, animation frames/timing/repeat/trigger, metasprite parts, map dimensions, layer order, writable cells, object IDs/geometry/types, and named integer properties.
+- Compares 79 full logical-canvas scene pairs, covering negative/sub-tile/outside-map cameras, animation boundaries and hold/loop behavior, all tile flips, sprite rotations/mirroring/scaling, opacity, clipping, transparency, metasprite overlap, layer interleaving, and a cell edit.
+- Independent full-frame expectations validate known RGB565 colors, pivot placement, clip edges, opacity, tile transformations, and layer/metasprite order. Explicit animation expectations include large elapsed time.
+- macOS Debug full suite: 44/44 passed with AddressSanitizer/UndefinedBehaviorSanitizer enabled; executed outside the sandbox to permit the existing loopback socket test. Focused equivalence test also passed on macOS Release.
+- Generated fixture C compiles for RV32 with strict warnings. No runtime or converter changes were needed.
+- Native/logical rendering parity, real presentation, maintained `tester` integration, Linux execution, and physical Tab5 validation remain open.
 
 ## Assumptions
 
