@@ -318,11 +318,10 @@ def load_manifest(path: Path) -> AssetSet:
         assets.metasprites.append(Metasprite(require_string(entry, "name"), parts))
     assets.constants = {"FLAG": list(flags), "SPRITE": [item.name for item in assets.sprites],
                         "ANIMATION": [item.name for item in assets.animations],
-                        "METASPRITE": [item.name for item in assets.metasprites],
-                        "MAP": [item["name"] for item in assets.maps]}
+                        "METASPRITE": [item.name for item in assets.metasprites]}
     for flag_name, flag_value in flags.items():
         assets.constant_values[("FLAG", flag_name)] = flag_value
-    for kind in ("SPRITE", "ANIMATION", "METASPRITE", "MAP"):
+    for kind in ("SPRITE", "ANIMATION", "METASPRITE"):
         for index, item_name in enumerate(assets.constants[kind]):
             assets.constant_values[(kind, item_name)] = index
     for tiled_map in assets.maps:

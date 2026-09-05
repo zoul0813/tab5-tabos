@@ -138,7 +138,8 @@ Add `./tools/tabos assets build <manifest>`:
 - [ ] Review: Let the manifest define arbitrary sprite regions, pivots, named animations,
   metasprites, and application flags.
 - [x] Review: Generate asset-set-prefixed, sanitized C constants for named sprites, clips,
-  metasprites, maps, layers, objects, and flags. Reject identifier collisions. Allow an
+  metasprites, layers, objects, and flags. Reject identifier collisions. Do not generate
+  map IDs because maps load individually by path and no public API consumes them. Allow a
   constants-only generated public header under the app include directory for normal source use.
 - [ ] Review: Reject infinite or isometric maps, ellipse/text/polygon/polyline/template objects,
   arbitrary object rotation, non-integral object geometry, unsupported properties, and
@@ -324,6 +325,8 @@ Validated working-tree changes based on `7e43d93`:
   assets under build output.
 - Tile demo includes its generated header and uses generated animation, metasprite,
   sprite, and layer constants. Removed manual ID declarations and applicable raw IDs.
+- Removed generated map-ID constants because binary maps load individually by path and no
+  runtime collection or public API consumes a map index.
 - macOS Debug full suite: 44/44 passed with sanitizers. Focused Debug and Release converter
   and asset-equivalence tests passed. All standard RV32 applications cross-built.
 - Physical execution and installation remain covered by separate acceptance items.

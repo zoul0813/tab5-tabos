@@ -27,7 +27,8 @@
   emit a constants-only developer-facing header into an application's include directory,
   while the build header retains declarations needed by generated C. Generated C and
   runtime binaries remain under build output. The app header is committed, marked
-  generated, regenerated before compilation, and never hand-edited.
+  generated, regenerated before compilation, and never hand-edited. Generate constants
+  only for IDs consumed by public APIs; maps load individually by path and have no map ID.
 
 - `[DECIDED]` Extended sprite and animation drawing uses
   `TABOS_SPRITE_DRAW_OPTIONS_DEFAULT` for natural size, full opacity, no transforms,

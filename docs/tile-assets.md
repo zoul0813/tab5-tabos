@@ -130,7 +130,6 @@ produce names like:
 MYGAME_SPRITE_PLAYER
 MYGAME_ANIMATION_PLAYER_WALK
 MYGAME_METASPRITE_PLAYER_SHADOW
-MYGAME_MAP_LEVEL
 MYGAME_LAYER_LEVEL_GROUND
 MYGAME_LAYER_LEVEL_FOREGROUND
 MYGAME_OBJECT_LEVEL_SPAWN
@@ -347,10 +346,10 @@ For a manifest named `mygame` with a map named `level`, this produces:
 | `mygame.c` | Optional compiled-in descriptors and pixels. |
 | `mygame.h` | Generated-C declarations plus every named ID constant. |
 
-The separate `--header-output` file described below contains only named constants for
-binary-backed applications. `MAP` constants record converter map order; binary maps are
-loaded individually by their `.tmap` path, while layer and object constants are used with
-the loaded map.
+The separate `--header-output` file described below contains only named constants used by
+binary-backed applications. Binary maps are loaded individually by their `.tmap` path;
+layer and object constants identify data inside the loaded map. No map-ID constant is
+generated because the runtime has no map collection for such a value to index.
 
 For application code that uses generated IDs, also place a public header in the app's
 include directory:
