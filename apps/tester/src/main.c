@@ -119,6 +119,27 @@ static int run_process_fixture(int argc, char** argv)
 
 int main(int argc, char** argv)
 {
+    if (argc == 2 && strcmp(argv[1], "--camera-leak") == 0) {
+        return tester_camera_leak_fixture();
+    }
+    if (argc == 2 && strcmp(argv[1], "--camera-cleanup") == 0) {
+        tester_context_t context = {.argc = argc, .argv = argv};
+        tester_test_camera_cleanup(&context);
+        printf("Camera cleanup assertions: %u; failures: %u\n", context.assertions, context.failures);
+        return context.failures == 0U ? 0 : 1;
+    }
+    if (argc == 2 && strcmp(argv[1], "--camera-services") == 0) {
+        tester_context_t context = {.argc = argc, .argv = argv};
+        tester_test_camera_services(&context);
+        printf("Camera service assertions: %u; failures: %u\n", context.assertions, context.failures);
+        return context.failures == 0U ? 0 : 1;
+    }
+    if (argc == 2 && strcmp(argv[1], "--camera") == 0) {
+        tester_context_t context = {.argc = argc, .argv = argv};
+        tester_test_camera(&context);
+        printf("Camera assertions: %u; failures: %u\n", context.assertions, context.failures);
+        return context.failures == 0U ? 0 : 1;
+    }
     const int fixture_status = run_process_fixture(argc, argv);
     if (fixture_status >= 0) {
         return fixture_status;

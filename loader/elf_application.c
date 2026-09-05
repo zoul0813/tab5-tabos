@@ -1288,7 +1288,7 @@ static const elf_wait_source_adapter_t elf_wait_source_adapters[ELF_WAIT_SOURCE_
         {
                                   .valid_events = TABOS_WAIT_READABLE | TABOS_WAIT_ERROR | TABOS_WAIT_HANGUP,
                                   .poll         = elf_wait_poll_camera,
-                                  .update       = platform_camera_update,
+                                  .update       = camera_service_update,
                                   },
 };
 

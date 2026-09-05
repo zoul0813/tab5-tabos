@@ -93,7 +93,9 @@ Camera capture follows the same platform boundary. Applications configure proces
 streams and receive metadata plus opaque generation-tagged leases; the kernel retains
 frame storage and exposes bounded copying only. Three-slot stream pools never overwrite
 leased frames, replace the oldest ready unleased frame for slow consumers, and count
-drops. Close or process teardown reclaims buffers and leaked leases. Host supplies
+drops. H.264 instead pauses backend updates until a pool slot is free, preserving encoded
+reference pictures; sensor-side skips are outside the pool-drop count. Close or process
+teardown reclaims buffers and leaked leases. Host supplies
 deterministic RAW8 fixtures. Tab5 SC2356 detection stays below the platform boundary;
 raw hardware delivery, preview conversion, and encoding remain later Phase 6 work.
 

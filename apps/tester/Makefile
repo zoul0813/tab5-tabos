@@ -14,6 +14,7 @@ SOURCES := src/main.c \
            src/tests/audio.c \
            src/tests/pointer.c \
            src/tests/camera.c \
+           src/tests/camera_services.c \
            src/tests/network.c \
            src/tests/graphics.c
 

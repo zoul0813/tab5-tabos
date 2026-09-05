@@ -532,7 +532,9 @@ routing remain deferred to future GUI clients.
 The public `<tabos/camera.h>` API exposes configured process-owned capture streams with
 copied metadata and frame bytes. Kernel-owned three-slot pools issue opaque
 generation-tagged leases, preserve leased frames, replace the oldest unleased frame for
-slow consumers, and count drops. Wait sources expose readable, error, and hangup state;
+slow consumers, and count drops. H.264 pauses backend updates when the pool is full to
+preserve reference pictures; upstream sensor skips are not pool drops.
+Wait sources expose readable, error, and hangup state;
 process teardown reclaims leaked leases. Host supplies deterministic RAW8 fixtures. Tab5
 detects and registers the SC2356 through its platform backend; physical raw delivery,
 preview, JPEG, and H.264 remain later Phase 6 work.

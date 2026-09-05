@@ -1,11 +1,15 @@
 #include <tabos/platform/platform.h>
+#include "camera_ccm.h"
 
 #include <bsp/m5stack_tab5.h>
 #include <driver/jpeg_encode.h>
+#include <driver/isp_ccm.h>
 #include <esp_h264_alloc.h>
 #include <esp_h264_enc_single.h>
 #include <esp_h264_enc_single_hw.h>
 #include <esp_log.h>
+#include <esp_timer.h>
+#include <esp_heap_caps.h>
 #include <esp_video_device.h>
 #include <esp_video_init.h>
 #include <esp_video_ioctl.h>
@@ -13,6 +17,7 @@
 #include <fcntl.h>
 #include <linux/videodev2.h>
 #include <stdlib.h>
+#include <stdatomic.h>
 #include <string.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
@@ -46,6 +51,40 @@ static bool initialized;
 static bool streaming;
 static uint32_t consecutive_capture_errors;
 static bool dequeue_warning_logged;
+static uint64_t capture_started_us;
+static uint64_t conversion_us;
+static uint64_t encoding_us;
+static uint32_t measured_frames;
+static uint32_t dequeue_misses;
+static uint64_t last_dequeue_us;
+
+// Apply hardware bounds after esp_video folds white-balance gains into columns.
+// Operate on a copy; vendor state and already-valid matrices remain unchanged.
+esp_err_t __real_esp_isp_ccm_configure(isp_proc_handle_t proc, const esp_isp_ccm_config_t* config);
+esp_err_t __wrap_esp_isp_ccm_configure(isp_proc_handle_t proc, const esp_isp_ccm_config_t* config)
+{
+    static atomic_flag logged           = ATOMIC_FLAG_INIT;
+    static atomic_flag corrected_logged = ATOMIC_FLAG_INIT;
+    esp_isp_ccm_config_t bounded;
+    const esp_isp_ccm_config_t* applied = config;
+    if (proc != NULL && config != NULL) {
+        bounded = *config;
+        if (esp32p4_camera_bound_ccm(bounded.matrix)) {
+            applied = &bounded;
+            if (!atomic_flag_test_and_set(&corrected_logged)) {
+                ESP_LOGW(TAG, "CCM bounded after white balance; neutral response preserved");
+            }
+        }
+    }
+    const esp_err_t result = __real_esp_isp_ccm_configure(proc, applied);
+    if (result != ESP_OK && config != NULL && !atomic_flag_test_and_set(&logged)) {
+        ESP_LOGE(TAG, "CCM rejected: result=%d matrix=[%.6f %.6f %.6f; %.6f %.6f %.6f; %.6f %.6f %.6f]", result,
+                 (double) config->matrix[0][0], (double) config->matrix[0][1], (double) config->matrix[0][2],
+                 (double) config->matrix[1][0], (double) config->matrix[1][1], (double) config->matrix[1][2],
+                 (double) config->matrix[2][0], (double) config->matrix[2][1], (double) config->matrix[2][2]);
+    }
+    return result;
+}
 
 static void report_error(int error)
 {
@@ -213,7 +252,7 @@ bool platform_camera_start(const tabos_camera_config_t* config)
     if (!initialized || streaming || config == NULL) {
         return false;
     }
-    active_config       = *config;
+    active_config = *config;
     if (config->format == TABOS_CAMERA_FORMAT_JPEG && !configure_jpeg()) {
         release_buffers();
         return false;
@@ -225,12 +264,29 @@ bool platform_camera_start(const tabos_camera_config_t* config)
         platform_camera_stop();
         return false;
     }
-    streaming = true;
+    streaming          = true;
+    capture_started_us = (uint64_t) esp_timer_get_time();
+    conversion_us      = 0U;
+    encoding_us        = 0U;
+    measured_frames    = 0U;
+    dequeue_misses     = 0U;
+    last_dequeue_us    = capture_started_us;
+    ESP_LOGI(TAG, "capture start: format=%u %lux%lu@%lu internal_free=%lu psram_free=%lu",
+             (unsigned int) config->format, (unsigned long) config->width, (unsigned long) config->height,
+             (unsigned long) config->fps,
+             (unsigned long) heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+             (unsigned long) heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
     return true;
 }
 
 void platform_camera_stop(void)
 {
+    if (streaming) {
+        const uint64_t elapsed_us = (uint64_t) esp_timer_get_time() - capture_started_us;
+        ESP_LOGI(TAG, "capture stop: frames=%lu elapsed_us=%llu conversion_us=%llu encoding_us=%llu dequeue_misses=%lu",
+                 (unsigned long) measured_frames, (unsigned long long) elapsed_us, (unsigned long long) conversion_us,
+                 (unsigned long long) encoding_us, (unsigned long) dequeue_misses);
+    }
     if (camera_fd >= 0) {
         if (streaming) {
             int type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -254,13 +310,21 @@ void platform_camera_update(void)
     }
     struct v4l2_buffer buffer = {.type = V4L2_BUF_TYPE_VIDEO_CAPTURE, .memory = V4L2_MEMORY_MMAP};
     if (ioctl(camera_fd, VIDIOC_DQBUF, &buffer) != 0) {
-        if (!dequeue_warning_logged && errno != EAGAIN && errno != ETIMEDOUT) {
-            ESP_LOGW(TAG, "transient camera dequeue failure: errno=%d", errno);
+        const int error = errno;
+        ++dequeue_misses;
+        // Pinned esp_video returns ESP_FAIL for a timed-out ready semaphore;
+        // its VFS maps that to EPERM. Do not warn on each ordinary 10 ms wait.
+        // EPERM can also cover preprocessing errors, so retain a prolonged-stall warning.
+        const bool empty_wait     = error == EAGAIN || error == ETIMEDOUT || error == EPERM;
+        const uint64_t stalled_us = (uint64_t) esp_timer_get_time() - last_dequeue_us;
+        if (!dequeue_warning_logged && (!empty_wait || stalled_us >= 2000000U)) {
+            ESP_LOGW(TAG, "camera dequeue stalled: errno=%d elapsed_us=%llu", error, (unsigned long long) stalled_us);
             dequeue_warning_logged = true;
         }
         return;
     }
     dequeue_warning_logged = false;
+    last_dequeue_us        = (uint64_t) esp_timer_get_time();
     if (buffer.index >= CAMERA_BUFFER_COUNT) {
         ESP_LOGE(TAG, "invalid dequeued buffer: index=%lu flags=0x%08lx bytes=%lu", (unsigned long) buffer.index,
                  (unsigned long) buffer.flags, (unsigned long) buffer.bytesused);
@@ -276,8 +340,10 @@ void platform_camera_update(void)
             report_error(EIO);
         }
     } else if ((buffer.flags & V4L2_BUF_FLAG_DONE) != 0U) {
-        consecutive_capture_errors = 0U;
-        const uint64_t timestamp   = platform_time_ms();
+        consecutive_capture_errors           = 0U;
+        const uint64_t timestamp             = platform_time_ms();
+        const uint64_t processing_started_us = (uint64_t) esp_timer_get_time();
+        ++measured_frames;
         if (active_config.format == TABOS_CAMERA_FORMAT_RAW8) {
             const uint16_t* input = buffers[buffer.index].data;
             uint8_t* output       = buffers[buffer.index].data;
@@ -289,6 +355,7 @@ void platform_camera_update(void)
                 const uint32_t blue  = (pixel & 0x1fU) * 255U / 31U;
                 output[index]        = (uint8_t) ((red * 77U + green * 150U + blue * 29U) >> 8U);
             }
+            conversion_us += (uint64_t) esp_timer_get_time() - processing_started_us;
             submit_frame(output, pixels, active_config.width, active_config.height, active_config.width,
                          TABOS_CAMERA_FORMAT_RAW8, timestamp);
         } else if (active_config.format == TABOS_CAMERA_FORMAT_RGB565) {
@@ -304,6 +371,7 @@ void platform_camera_update(void)
             const esp_err_t result =
                 jpeg_encoder_process(jpeg_encoder, &config, buffers[buffer.index].data, buffer.bytesused, jpeg_output,
                                      jpeg_output_size, &encoded_size);
+            encoding_us += (uint64_t) esp_timer_get_time() - processing_started_us;
             if (result == ESP_OK) {
                 submit_frame(jpeg_output, encoded_size, active_config.width, active_config.height, 0U,
                              TABOS_CAMERA_FORMAT_JPEG, timestamp);
@@ -322,7 +390,8 @@ void platform_camera_update(void)
             esp_h264_enc_out_frame_t output = {
                 .raw_data = {.buffer = h264_output, .len = h264_output_size}
             };
-            const esp_h264_err_t result = esp_h264_enc_process(h264_encoder, &input, &output);
+            const esp_h264_err_t result  = esp_h264_enc_process(h264_encoder, &input, &output);
+            encoding_us                 += (uint64_t) esp_timer_get_time() - processing_started_us;
             if (result == ESP_H264_ERR_OK) {
                 submit_frame(h264_output, output.length, active_config.width, active_config.height, 0U,
                              TABOS_CAMERA_FORMAT_H264, timestamp);

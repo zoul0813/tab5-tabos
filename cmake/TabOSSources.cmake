@@ -76,6 +76,7 @@ set(TABOS_ESP32P4_PLATFORM_SOURCES
     "${TABOS_ROOT}/platform/esp32p4/keyboard.c"
     "${TABOS_ROOT}/platform/esp32p4/pointer.c"
     "${TABOS_ROOT}/platform/esp32p4/camera.c"
+    "${TABOS_ROOT}/platform/esp32p4/camera_ccm.c"
     "${TABOS_ROOT}/platform/esp32p4/usb_storage.c"
     "${TABOS_ROOT}/platform/esp32p4/display.c"
     "${TABOS_ROOT}/platform/esp32p4/pie.c"

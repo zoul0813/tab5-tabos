@@ -15,3 +15,6 @@ idf_component_register(
         "${CMAKE_BINARY_DIR}/generated"
     REQUIRES esp_cam_sensor esp_codec_dev esp_driver_i2c esp_driver_i2s esp_driver_jpeg esp_driver_ppa esp_event esp_h264 esp_hosted esp_hw_support esp_lcd esp_lcd_st7121 esp_lcd_touch_gt911 esp_lcd_touch_st7123 esp_mm esp_netif esp_system esp_timer esp_video esp-tls esp_tinyusb esp_wifi esp_wifi_remote fatfs freertos log lwip m5stack_tab5_noglib sdmmc spi_flash vfs
 )
+
+# Bound post-white-balance matrices without modifying managed components.
+target_link_options(${COMPONENT_LIB} INTERFACE "-Wl,--wrap=esp_isp_ccm_configure")

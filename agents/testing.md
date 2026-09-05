@@ -178,6 +178,10 @@ multi-contact IDs, logical coordinates, foreground-only reads, generic wait read
 focus cancellation, bounded-queue reset, device removal, stale handles, and process
 cleanup. Physical validation must still confirm orientation on all three Tab5 revisions.
 
+Camera concurrency regression uses real host mutexes and two polling threads while
+streams close and reclaim outstanding leases. Runtime and wait adapters must enter
+`camera_service_update()` so backend operations serialize with start/stop.
+
 Camera-foundation validation uses deterministic frames and covers bounded pool
 exhaustion, oldest-unleased replacement, drop accounting, opaque lease generation,
 foreign/stale rejection, copied frame bytes, wait readiness/error/hangup, and process

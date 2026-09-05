@@ -90,6 +90,12 @@ tabos_enable_warnings(tabos_camera_service)
 tabos_enable_sanitizers(tabos_camera_service)
 add_test(NAME unit.camera_service COMMAND tabos_camera_service)
 
+add_executable(tabos_camera_ccm unit/camera_ccm.c "${TABOS_ROOT}/platform/esp32p4/camera_ccm.c")
+target_include_directories(tabos_camera_ccm PRIVATE "${TABOS_ROOT}/platform/esp32p4")
+tabos_enable_warnings(tabos_camera_ccm)
+tabos_enable_sanitizers(tabos_camera_ccm)
+add_test(NAME unit.camera_ccm COMMAND tabos_camera_ccm)
+
 add_executable(tabos_sdk_camera
     unit/sdk_camera.c
     "${TABOS_ROOT}/sdk/lib/camera.c"
@@ -545,3 +551,20 @@ add_test(
         "-DTABOS_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/invalid-target"
         -P "${CMAKE_CURRENT_LIST_DIR}/check_invalid_target.cmake"
 )
+
+add_executable(tabos_camera_concurrency
+    component/camera_concurrency.c
+    "${TABOS_ROOT}/camera/camera.c"
+    "${TABOS_ROOT}/platform/host/sdl/mutex.c"
+)
+target_include_directories(tabos_camera_concurrency PRIVATE
+    "${TABOS_ROOT}/camera/include"
+    "${TABOS_ROOT}/platform/include"
+    "${TABOS_ROOT}/sdk/include"
+    "${TABOS_GENERATED_INCLUDE_DIR}"
+)
+target_link_libraries(tabos_camera_concurrency PRIVATE SDL3::SDL3)
+tabos_enable_warnings(tabos_camera_concurrency)
+tabos_enable_sanitizers(tabos_camera_concurrency)
+add_test(NAME component.camera_concurrency COMMAND tabos_camera_concurrency)
+set_tests_properties(component.camera_concurrency PROPERTIES TIMEOUT 15)

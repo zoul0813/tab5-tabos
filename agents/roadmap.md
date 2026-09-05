@@ -20,6 +20,40 @@
 
 ## Current Work
 
+### Hardware Services Phase 6 Validation
+
+- [x] Physical RAW8 capture writes 921,600 payload bytes to microSD (operator confirmed).
+- [x] Physical RGB565 capture writes 1,843,200 bytes with the updated utility.
+- [x] RGB565 rerun writes full payload with no blue flash or capture-time task watchdog.
+- [x] H.264 utility writes 30 frames to SD; reports 16 dropped.
+- [x] Inspect physical H.264 output: 30 coded slices yield only 15 decoded pictures.
+- [x] Preserve H.264 references with pool backpressure; threaded stall regression passes.
+- [x] Re-record and decode H.264: 30 written, zero pool drops, all 30 pictures decode cleanly at 1280x720;
+  measured throughput recorded separately from configured FPS.
+- [x] Operator inspected corrected H.264 playback and reports video looks "ok" (basic visual acceptance).
+- [x] Resolve observed runtime CCM overflow after white balance; physical varied-light validation passes.
+
+- [x] Expand deterministic camera pool/lease/drop tests and add threaded backend lifecycle regression.
+- [x] Serialize camera updates from runtime and application waits with start/stop.
+- [x] Validate expanded maintained tester on Tab5: operator reports 33 camera assertions, zero failures.
+- [x] Physical preview looks acceptable and keyboard `q` exits correctly (operator confirmed).
+- [x] Run expanded maintained camera tester on host: RV32 application exits zero under ASan/UBSan.
+- [x] Full Tab5 SDK tester after preview: operator reports 176 assertions, zero failures.
+- [x] Add opt-in camera/audio/UDP/storage overlap test; real RV32 app passes on host with SDL dummy audio and ASan/UBSan.
+- [x] Physical overlap test: 43 assertions, zero failures; six rounds in 632 ms, longest 155 ms. Capture-time logs show no stack overflow, watchdog, CCM, or I2C errors; transient dequeue warnings remain.
+- [x] Fix overlap tester stack overflow: move 12 KiB buffers to heap; RV32 static frame drops from 12,688 to 400 bytes.
+- [x] Trace ordinary dequeue `EPERM` to pinned video driver's empty ready-wait mapping; count misses and warn on prolonged stalls instead of each timeout.
+- [x] Add first-rejected final CCM matrix diagnostic; Debug/Release builds and architecture checks pass, Debug flashed.
+- [x] Preview/Wi-Fi coexistence: operator reports 44/44 ping replies, average 142.931 ms, peak 1037.393 ms; recurring CCM overflow reproduced.
+- [x] Bound final CCM coefficients while preserving neutral row sums; measured-matrix and edge-case regressions pass.
+- [x] Physical CCM correction/preview pass: correction applied, no CCM rejection or capture-time I2C/watchdog/stall errors; operator reports expected visuals, 48/48 ping replies.
+- [ ] Paused by user (2026-09-05): remaining Phase 6 acceptance gaps are deferred. Preview plus user-triggered snapshot is the validated application workflow; resume only when requested.
+- [x] Physical camera child cleanup: 31 assertions, zero failures, 12 starts/stops without I2C or teardown errors on final firmware.
+- [x] Record RAW8/RGB565/H.264 throughput, timing, memory, drops, and service progress.
+- [x] Inspect supplied still files and record JPEG timing (78.95 ms encoding/backend frame).
+- [ ] Deferred: automatic CLI still readiness, recurring RAW8/RGB565 IO-expander read errors, and image-quality limitations. Snapshot preserves the displayed scene and orientation.
+- [ ] Phase 6 remains paused, not fully complete; deferred items recorded in `hardware-services.md`.
+
 ### RTC and Wall Clock
 
 - [x] Add validated Gregorian calendar and signed Unix-epoch conversion.

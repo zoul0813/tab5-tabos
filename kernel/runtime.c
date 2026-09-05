@@ -380,7 +380,7 @@ void kernel_runtime_update(void)
     console_update();
     network_service_update();
     platform_pointer_update();
-    platform_camera_update();
+    camera_service_update();
     hardware_devices_update();
     kernel_application_system_update();
 }

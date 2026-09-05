@@ -3,24 +3,33 @@
 #include <tabos/graphics.h>
 #include <tabos/input.h>
 #include <tabos/wait.h>
+#include <tabos/runtime_time.h>
 
 #include <errno.h>
+#include <sched.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 enum {
-    CAMERA_WIDTH     = 1280,
-    CAMERA_HEIGHT    = 720,
-    CAMERA_FPS       = 30,
-    FRAME_TIMEOUT_MS = 2000,
-    COPY_BYTES       = 1024,
+    CAMERA_WIDTH      = 1280,
+    CAMERA_HEIGHT     = 720,
+    CAMERA_FPS        = 30,
+    FRAME_TIMEOUT_MS  = 2000,
+    COPY_BYTES        = 4096,
+    WRITE_YIELD_BYTES = 65536,
+    STILL_SETTLE_MS   = 2000,
+    STILL_MIN_FRAMES  = 6,
+    STILL_TIMEOUT_MS  = 10000,
 };
 
 static void usage(FILE* output)
 {
-    fputs("Usage: cameratest [info|capture raw|rgb|jpeg PATH|record h264 PATH [FRAMES]|preview [FRAMES]]\n", output);
+    fputs(
+        "Usage: cameratest [info|capture raw|rgb|jpeg PATH|record h264 PATH [FRAMES]|preview [FRAMES]|snapshot PATH]\n",
+        output);
 }
 
 static const char* state_name(tabos_device_state_t state)
@@ -120,7 +129,8 @@ static int acquire(tabos_camera_stream_t stream, tabos_camera_frame_t* frame)
 static int write_frame(tabos_camera_stream_t stream, const tabos_camera_frame_t* frame, FILE* output)
 {
     uint8_t bytes[COPY_BYTES];
-    uint32_t offset = 0U;
+    uint32_t offset            = 0U;
+    uint32_t bytes_since_yield = 0U;
     while (offset < frame->size_bytes) {
         uint32_t capacity = frame->size_bytes - offset;
         if (capacity > sizeof(bytes)) {
@@ -130,9 +140,45 @@ static int write_frame(tabos_camera_stream_t stream, const tabos_camera_frame_t*
         if (copied <= 0 || fwrite(bytes, 1U, (size_t) copied, output) != (size_t) copied) {
             return -1;
         }
-        offset += (uint32_t) copied;
+        offset            += (uint32_t) copied;
+        bytes_since_yield += (uint32_t) copied;
+        if (bytes_since_yield >= WRITE_YIELD_BYTES) {
+            if (sched_yield() != 0) {
+                return -1;
+            }
+            bytes_since_yield = 0U;
+        }
     }
     return 0;
+}
+
+static int acquire_still(tabos_camera_stream_t stream, tabos_camera_frame_t* frame)
+{
+    const uint64_t started = tabos_monotonic_ms();
+    unsigned int frames    = 0U;
+    puts("cameratest: allowing exposure and white balance to settle...");
+    for (;;) {
+        if (acquire(stream, frame) != 0) {
+            return -1;
+        }
+        ++frames;
+        // Use capture time, not file-writing time or time spent waiting behind a
+        // queued frame. Never apply this discard policy to dependent H.264 pictures.
+        if (frames >= STILL_MIN_FRAMES && frame->timestamp_ms >= started &&
+            frame->timestamp_ms - started >= STILL_SETTLE_MS) {
+            return 0;
+        }
+        if (tabos_camera_release(stream, frame->lease) != 0) {
+            return -1;
+        }
+        if (tabos_monotonic_ms() - started >= STILL_TIMEOUT_MS) {
+            errno = ETIMEDOUT;
+            return -1;
+        }
+        if (sched_yield() != 0) {
+            return -1;
+        }
+    }
 }
 
 static int capture(tabos_camera_format_t format, const char* path)
@@ -143,17 +189,23 @@ static int capture(tabos_camera_format_t format, const char* path)
     }
     tabos_camera_frame_t frame;
     int status = 1;
-    if (acquire(stream, &frame) == 0) {
+    if (acquire_still(stream, &frame) == 0) {
         FILE* output = fopen(path, "wb");
         if (output != NULL) {
             if (format == TABOS_CAMERA_FORMAT_RAW8) {
                 fprintf(output, "P5\n%lu %lu\n255\n", (unsigned long) frame.width, (unsigned long) frame.height);
             }
-            if (write_frame(stream, &frame, output) == 0 && fclose(output) == 0) {
+            const int write_status = write_frame(stream, &frame, output);
+            const int write_error  = errno;
+            const int close_status = fclose(output);
+            if (write_status == 0 && close_status == 0) {
                 printf("wrote %lu bytes to %s; sequence=%lu dropped=%lu\n", (unsigned long) frame.size_bytes, path,
                        (unsigned long) frame.sequence, (unsigned long) frame.dropped_frames);
                 status = 0;
             } else {
+                if (write_status != 0) {
+                    errno = write_error;
+                }
                 fprintf(stderr, "cameratest: write failed: %s\n", strerror(errno));
             }
         } else {
@@ -225,8 +277,11 @@ static int record_h264(const char* path, unsigned int count)
     return status;
 }
 
-static int preview(unsigned int count)
+static int preview(unsigned int count, const char* snapshot_path)
 {
+    if (snapshot_path != NULL) {
+        puts("cameratest: preview snapshot: S saves displayed RGB565 frame; Q/Escape cancels");
+    }
     tabos_camera_config_t config;
     const tabos_camera_stream_t stream = camera_open(TABOS_CAMERA_FORMAT_RGB565, &config);
     if (stream == TABOS_CAMERA_STREAM_INVALID) {
@@ -239,13 +294,22 @@ static int preview(unsigned int count)
         return 1;
     }
     int status = 0;
+    bool saved = false;
     for (unsigned int index = 0U; index < count; ++index) {
         tabos_camera_frame_t frame = {0};
         tabos_input_event_t event;
+        bool save = false;
+        bool quit = false;
         while (tabos_input_poll(&event) > 0) {
             if (event.type == TABOS_INPUT_KEY_DOWN && (event.key == TABOS_KEY_Q || event.key == TABOS_KEY_ESCAPE)) {
-                count = index;
+                quit = true;
             }
+            if (snapshot_path != NULL && event.type == TABOS_INPUT_KEY_DOWN && event.key == TABOS_KEY_S) {
+                save = true;
+            }
+        }
+        if (quit) {
+            break;
         }
         tabos_color_t* pixels   = tabos_graphics_pixels(&graphics);
         const uint32_t capacity = graphics.width * graphics.height * sizeof(*pixels);
@@ -254,6 +318,25 @@ static int preview(unsigned int count)
             tabos_graphics_present(&graphics) != 0) {
             status = 1;
         }
+        if (status == 0 && save) {
+            // Keep this exact displayed frame leased throughout the chunked SD write.
+            FILE* output = fopen(snapshot_path, "wb");
+            if (output == NULL) {
+                status = 1;
+            } else {
+                const int write_status = write_frame(stream, &frame, output);
+                const int write_error  = errno;
+                const int close_status = fclose(output);
+                if (write_status != 0 || close_status != 0) {
+                    if (write_status != 0) {
+                        errno = write_error;
+                    }
+                    status = 1;
+                } else {
+                    saved = true;
+                }
+            }
+        }
         if (frame.lease != TABOS_CAMERA_LEASE_INVALID) {
             (void) tabos_camera_release(stream, frame.lease);
         }
@@ -261,9 +344,17 @@ static int preview(unsigned int count)
             fprintf(stderr, "cameratest: preview frame failed: %s\n", strerror(errno));
             break;
         }
+        if (saved) {
+            break;
+        }
     }
     (void) tabos_graphics_close(&graphics);
     (void) tabos_camera_close(stream);
+    if (saved) {
+        printf("saved displayed RGB565 frame to %s\n", snapshot_path);
+    } else if (snapshot_path != NULL && status == 0) {
+        puts("cameratest: snapshot cancelled; no file written");
+    }
     return status;
 }
 
@@ -292,11 +383,18 @@ int main(int argc, char** argv)
     }
     if (argc == 4 && strcmp(argv[1], "capture") == 0) {
         tabos_camera_format_t format;
-        return parse_format(argv[2], &format) == 0 ? capture(format, argv[3]) : 1;
+        if (parse_format(argv[2], &format) != 0) {
+            fprintf(stderr, "cameratest: unknown capture format: %s\n", argv[2]);
+            return 1;
+        }
+        return capture(format, argv[3]);
     }
     if ((argc == 2 || argc == 3) && strcmp(argv[1], "preview") == 0) {
         unsigned int count;
-        return frame_count(argc == 3 ? argv[2] : NULL, 300U, &count) == 0 ? preview(count) : 1;
+        return frame_count(argc == 3 ? argv[2] : NULL, 300U, &count) == 0 ? preview(count, NULL) : 1;
+    }
+    if (argc == 3 && strcmp(argv[1], "snapshot") == 0) {
+        return preview(UINT32_MAX, argv[2]);
     }
     if ((argc == 4 || argc == 5) && strcmp(argv[1], "record") == 0 && strcmp(argv[2], "h264") == 0) {
         unsigned int count;

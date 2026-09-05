@@ -55,11 +55,39 @@ int main(void)
         uint8_t data[8] = {sequence};
         test_platform_camera_frame(data, sizeof(data), 4U, 2U, 4U, 200U + sequence);
     }
-    expect(camera_service_acquire(&owner_a, stream, &frame) == 0 && frame.dropped_frames > 0U,
+    expect(camera_service_acquire(&owner_a, stream, &frame) == 0 && frame.dropped_frames == 3U,
            "slow consumer drops oldest unleased frames and counts drops");
     uint8_t oldest = 0U;
     expect(camera_service_copy(&owner_a, stream, frame.lease, 0U, &oldest, 1U) == 1 && oldest == 3U,
            "acquire preserves oldest-to-newest order after replacement");
+    tabos_camera_frame_t held[3] = {frame};
+    for (size_t index = 1U; index < 3U; ++index) {
+        expect(camera_service_acquire(&owner_a, stream, &held[index]) == 0, "leases every remaining pool slot");
+    }
+    test_platform_camera_frame(first, sizeof(first), 4U, 2U, 4U, 250U);
+    expect(camera_service_acquire(&owner_a, stream, &frame) == -TABOS_EAGAIN,
+           "exhausted leased pool drops incoming frame");
+    expect(camera_service_poll(&owner_a, stream, TABOS_WAIT_READABLE, &events) == 0 && events == 0U,
+           "leased frames do not remain readable");
+    for (size_t index = 0U; index < 3U; ++index) {
+        uint8_t value = 0U;
+        expect(camera_service_copy(&owner_a, stream, held[index].lease, 0U, &value, 1U) == 1 && value == 3U + index,
+               "pool exhaustion preserves every leased frame");
+    }
+    expect(camera_service_release(&owner_a, stream, held[0].lease) == 0, "frees one exhausted slot");
+    test_platform_camera_frame(first, sizeof(first), 4U, 2U, 4U, 260U);
+    expect(camera_service_acquire(&owner_a, stream, &frame) == 0 && frame.lease != held[0].lease &&
+               frame.dropped_frames == 4U,
+           "reused slot advances lease generation and retains exact drop count");
+    expect(camera_service_copy(&owner_a, stream, held[0].lease, 0U, copied, sizeof(copied)) == -TABOS_EBADF &&
+               camera_service_release(&owner_a, stream, held[0].lease) == -TABOS_EBADF,
+           "stale lease cannot copy or release replacement");
+    expect(camera_service_copy(&owner_a, stream, frame.lease, 6U, copied, sizeof(copied)) == 2 && copied[0] == 6U &&
+               copied[1] == 7U && camera_service_copy(&owner_a, stream, frame.lease, 8U, copied, sizeof(copied)) == 0,
+           "bounded copy clips at frame end");
+    camera_service_close_owner(&owner_b);
+    expect(camera_service_copy(&owner_a, stream, frame.lease, 0U, copied, sizeof(copied)) == sizeof(copied),
+           "foreign owner cleanup preserves active stream");
     camera_service_close_owner(&owner_a);
     expect(camera_service_acquire(&owner_a, stream, &frame) == -TABOS_EBADF,
            "process cleanup reclaims leases and stream");
@@ -80,6 +108,7 @@ int main(void)
     expect(camera_service_poll(&owner_a, encoded, TABOS_WAIT_ERROR, &events) == 0 && events == TABOS_WAIT_ERROR,
            "backend fault reports wait error");
     camera_service_remove_device();
+    expect(camera_service_open(&owner_b, &config) == -TABOS_ENODEV, "unavailable hardware rejects new streams");
     expect(camera_service_poll(&owner_a, encoded, TABOS_WAIT_HANGUP, &events) == 0 && events == TABOS_WAIT_HANGUP,
            "device removal reports hangup");
     camera_service_close_owner(&owner_a);

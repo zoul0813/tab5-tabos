@@ -185,6 +185,9 @@ void platform_pointer_shutdown(void);
 bool platform_camera_init(platform_camera_frame_fn frame, platform_camera_error_fn error, platform_camera_info_t* info);
 bool platform_camera_start(const tabos_camera_config_t* config);
 void platform_camera_stop(void);
+// Called through camera_service_update(), serialized with start/stop. Deliver at
+// most one frame synchronously per call; do not submit frames asynchronously.
+// The service may defer updates while the H.264 pool has no free slot.
 void platform_camera_update(void);
 void platform_camera_shutdown(void);
 bool platform_network_operations_init(void);

@@ -9,6 +9,7 @@
 
 bool camera_service_init(void);
 void camera_service_shutdown(void);
+void camera_service_update(void);
 bool camera_service_info(tabos_camera_info_t* info, const char** driver, bool* ready, int* error);
 void camera_service_set_device_id(tabos_device_id_t device_id);
 tabos_camera_stream_t camera_service_open(const void* owner, const tabos_camera_config_t* config);

@@ -43,6 +43,7 @@ typedef struct {
 static camera_stream_t streams[CAMERA_STREAM_CAPACITY];
 static platform_camera_info_t platform_info;
 static platform_mutex_t* camera_mutex;
+static platform_mutex_t* pipeline_mutex;
 static tabos_device_id_t camera_device_id = TABOS_DEVICE_ID_INVALID;
 static size_t open_count;
 static bool initialized;
@@ -98,6 +99,12 @@ bool camera_service_init(void)
     if (camera_mutex == NULL) {
         return false;
     }
+    pipeline_mutex = platform_mutex_create();
+    if (pipeline_mutex == NULL) {
+        platform_mutex_destroy(camera_mutex);
+        camera_mutex = NULL;
+        return false;
+    }
     initialized = true;
     (void) platform_camera_init(camera_service_submit, camera_service_error, &platform_info);
     return true;
@@ -111,6 +118,8 @@ void camera_service_shutdown(void)
     platform_camera_shutdown();
     camera_service_close_owner(NULL);
     platform_mutex_destroy(camera_mutex);
+    platform_mutex_destroy(pipeline_mutex);
+    pipeline_mutex   = NULL;
     camera_mutex     = NULL;
     platform_info    = (platform_camera_info_t) {0};
     camera_device_id = TABOS_DEVICE_ID_INVALID;
@@ -159,7 +168,7 @@ static void free_stream(camera_stream_t* stream)
     *stream                   = (camera_stream_t) {.generation = generation};
 }
 
-tabos_camera_stream_t camera_service_open(const void* owner, const tabos_camera_config_t* config)
+static tabos_camera_stream_t open_pipeline_locked(const void* owner, const tabos_camera_config_t* config)
 {
     if (!initialized || !platform_info.detected || !platform_info.ready || platform_info.error != 0) {
         return -TABOS_ENODEV;
@@ -221,7 +230,7 @@ tabos_camera_stream_t camera_service_open(const void* owner, const tabos_camera_
     return -TABOS_EMFILE;
 }
 
-int camera_service_close(const void* owner, tabos_camera_stream_t handle)
+static int close_pipeline_locked(const void* owner, tabos_camera_stream_t handle)
 {
     platform_mutex_lock(camera_mutex);
     camera_stream_t* stream = owned_stream(owner, handle);
@@ -343,7 +352,7 @@ int camera_service_poll(const void* owner, tabos_camera_stream_t handle, uint32_
     return 0;
 }
 
-void camera_service_close_owner(const void* owner)
+static void close_owner_pipeline_locked(const void* owner)
 {
     if (!initialized) {
         return;
@@ -384,6 +393,12 @@ void camera_service_submit(const void* data, size_t size, uint32_t width, uint32
             }
         }
         if (selected == NULL) {
+            if (format == TABOS_CAMERA_FORMAT_H264) {
+                // Updates reserve capacity before invoking the synchronous backend.
+                // A producer violating that contract must not corrupt the reference chain.
+                stream->faulted = true;
+                continue;
+            }
             uint32_t oldest = UINT32_MAX;
             for (size_t index = 0U; index < CAMERA_FRAME_CAPACITY; ++index) {
                 if (!stream->frames[index].leased && stream->frames[index].metadata.sequence < oldest) {
@@ -397,7 +412,12 @@ void camera_service_submit(const void* data, size_t size, uint32_t width, uint32
             }
             ++stream->drops;
         }
-        const size_t bytes = size < selected->capacity ? size : selected->capacity;
+        if (size > selected->capacity) {
+            // Partial encoded pictures are not valid frames.
+            stream->faulted = true;
+            continue;
+        }
+        const size_t bytes = size;
         memcpy(selected->data, data, bytes);
         selected->size     = bytes;
         selected->ready    = true;
@@ -422,7 +442,7 @@ void camera_service_error(int error)
     platform_mutex_unlock(camera_mutex);
 }
 
-void camera_service_remove_device(void)
+static void remove_device_pipeline_locked(void)
 {
     if (!initialized) {
         return;
@@ -435,4 +455,64 @@ void camera_service_remove_device(void)
     platform_info.detected = false;
     platform_info.ready    = false;
     platform_mutex_unlock(camera_mutex);
+}
+
+tabos_camera_stream_t camera_service_open(const void* owner, const tabos_camera_config_t* config)
+{
+    platform_mutex_lock(pipeline_mutex);
+    const tabos_camera_stream_t result = open_pipeline_locked(owner, config);
+    platform_mutex_unlock(pipeline_mutex);
+    return result;
+}
+
+int camera_service_close(const void* owner, tabos_camera_stream_t handle)
+{
+    platform_mutex_lock(pipeline_mutex);
+    const int result = close_pipeline_locked(owner, handle);
+    platform_mutex_unlock(pipeline_mutex);
+    return result;
+}
+
+void camera_service_close_owner(const void* owner)
+{
+    platform_mutex_lock(pipeline_mutex);
+    close_owner_pipeline_locked(owner);
+    platform_mutex_unlock(pipeline_mutex);
+}
+
+void camera_service_remove_device(void)
+{
+    platform_mutex_lock(pipeline_mutex);
+    remove_device_pipeline_locked();
+    platform_mutex_unlock(pipeline_mutex);
+}
+
+// Both runtime polling and application waits enter here. Serialize callbacks with
+// start/stop, always taking the pipeline lock before the frame-pool lock.
+void camera_service_update(void)
+{
+    platform_mutex_lock(pipeline_mutex);
+    bool can_update = initialized;
+    platform_mutex_lock(camera_mutex);
+    for (size_t index = 0U; index < CAMERA_STREAM_CAPACITY; ++index) {
+        const camera_stream_t* stream = &streams[index];
+        if (!stream->open || stream->config.format != TABOS_CAMERA_FORMAT_H264) {
+            continue;
+        }
+        can_update = false;
+        if (!stream->faulted && !stream->hangup) {
+            for (size_t frame = 0U; frame < CAMERA_FRAME_CAPACITY; ++frame) {
+                if (!stream->frames[frame].ready && !stream->frames[frame].leased) {
+                    can_update = true;
+                    break;
+                }
+            }
+        }
+        break;
+    }
+    platform_mutex_unlock(camera_mutex);
+    if (can_update) {
+        platform_camera_update();
+    }
+    platform_mutex_unlock(pipeline_mutex);
 }
