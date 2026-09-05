@@ -70,12 +70,12 @@ Add `<tabos/sprite.h>`:
 - [x] Review: `tabos_sprite_animation_finished()` reports completion only after the final
   frame's full duration; loops never finish. Invalid input returns `-1`/`EINVAL` without
   changing the output boolean. Large repeat counts avoid duration-product overflow.
-- [ ] Review: `tabos_metasprite_draw()` draws ordered component sprites with signed offsets,
+- [x] Review: `tabos_metasprite_draw()` draws ordered component sprites with signed offsets,
   per-part transforms, and opacity. Support overall horizontal and vertical mirroring,
   but not arbitrary-angle rotation.
-- [ ] Review: `tabos_sprite_flags()` returns generated 32-bit application-defined flags. The library
+- [x] Review: `tabos_sprite_flags()` returns generated 32-bit application-defined flags. The library
   assigns no collision meaning to them.
-- [ ] Review: Inherit exact RGB565 color-key transparency from the source image. Do not add tinting,
+- [x] Review: Apply exact per-image RGB565 color-key transparency during drawing. Do not add tinting,
   palettes, per-pixel alpha, physics, or entities.
 
 - [x] Review: Shared graphics begin/end camera applies once to sprites, animations,
@@ -145,7 +145,7 @@ Add `./tools/tabos assets build <manifest>`:
   malformed GIDs with clear diagnostics.
 - [ ] Review: Convert opaque PNG and composited GIF pixels exactly like `TABOS_RGB565`. Require
   alpha values of 0 or 255; reject partial alpha.
-- [ ] Review: Select a deterministic unused RGB565 color key automatically when transparency exists.
+- [x] Review: Select a deterministic unused RGB565 color key automatically when transparency exists.
   Allow an explicit manifest key only when no opaque pixel converts to the same value.
 - [ ] Review: Produce deterministic generated `.c`/`.h` descriptors and versioned binary assets from
   the same normalized data.
@@ -362,6 +362,10 @@ Validated working-tree changes based on `7e43d93`:
   PNG/GIF assets, build prerequisites, installation, and cleanup.
 - Updated the documentation index. macOS Debug build and five focused runtime, converter,
   equivalence, and public-header architecture tests passed.
+- Reviewed sprite flags and color-key transparency. Manifest flag names now require unique,
+  nonzero single-bit masks; the guide states how registered and unregistered Tiled properties
+  behave and defines RGB tolerance. Focused converter coverage exercises automatic keys,
+  explicit-key collisions, tolerance boundaries, partial alpha, and invalid flag masks.
 
 ## Assumptions
 

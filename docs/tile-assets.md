@@ -391,8 +391,9 @@ Application builds preserve this host Python when activating ESP-IDF, so IDF's
 isolated Python environment does not need a second Pillow installation.
 
 Version-1 JSON manifests contain `name`, optional numeric `flags`, and arrays named
-`images`, `animations`, `metasprites`, and `maps`. Paths are relative to the manifest.
-Example:
+`images`, `animations`, `metasprites`, and `maps`. Each named flag must be one unique,
+nonzero bit in a 32-bit value. Combine generated flag macros in game code rather than
+assigning multiple bits to one manifest name. Paths are relative to the manifest. Example:
 
 ```json
 {
@@ -431,7 +432,8 @@ Standalone PNGs may become one full-image sprite or several named regions:
 Place this object in the manifest's `images` array. Omit `sprites` to create one sprite
 covering the whole image. Optional `resize: [width, height]` uses nearest-neighbor scaling.
 Optional `color_key` selects an explicit RGB565 transparency key; otherwise transparent
-input receives a deterministic unused key.
+input receives a deterministic unused key. The explicit key is rejected if an opaque
+source pixel converts to the same RGB565 value.
 
 An animated GIF image entry generates one full-frame sprite per GIF frame and one
 animation using the image entry's name. Animated GIF entries cannot define multiple
@@ -456,7 +458,8 @@ become 10 ms unless `durations_ms` overrides them. Alpha must be exactly 0 or 25
 Transparency gets a deterministic unused RGB565 key; explicit `color_key` must not
 collide with opaque pixels. `resize` performs nearest-neighbor import resizing.
 `transparent_rgb` and optional `transparent_tolerance` key deliberately opaque pixel
-art before strict alpha validation.
+art before strict alpha validation. A pixel matches when the absolute difference of each
+red, green, and blue component is at most the tolerance.
 
 Maps may be finite orthogonal Tiled JSON with multiple atlas tilesets, tile/object
 layers, transforms, animations, integer/boolean tile properties, and integer object
@@ -481,6 +484,10 @@ entries to reference sprites named in TSJ tile properties. Supported TSJ metadat
   and applies to animated map tiles as well as explicitly drawn sprites. Define each named
   walk/run/jump clip on its own animated tile.
 - Manifest flag names as boolean/integer tile properties: sprite flag bits.
+- A registered Boolean property sets its flag when true. A registered integer property
+  sets its flag when nonzero. False or zero leaves the flag clear. Other integer/Boolean
+  tile properties may remain in Tiled for editor or game tooling, but the converter ignores
+  them and they are unavailable through the runtime sprite descriptor.
 - Standard tileset `transparentcolor`, plus optional integer tileset property
   `transparent_tolerance` from 0 through 255: color-key preparation.
 

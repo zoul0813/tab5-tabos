@@ -266,7 +266,16 @@ def load_manifest(path: Path) -> AssetSet:
     raw_flags = manifest.get("flags", {})
     if not isinstance(raw_flags, dict):
         fail("flags must be an object")
-    flags = {name: unsigned_32(value, f"flag {name}") for name, value in raw_flags.items()}
+    flags: dict[str, int] = {}
+    used_flag_values: dict[int, str] = {}
+    for name, value in raw_flags.items():
+        flag = unsigned_32(value, f"flag {name}")
+        if flag == 0 or (flag & (flag - 1)) != 0:
+            fail(f"flag {name!r} must be one nonzero 32-bit bit")
+        if flag in used_flag_values:
+            fail(f"flags {used_flag_values[flag]!r} and {name!r} use the same bit")
+        flags[name] = flag
+        used_flag_values[flag] = name
     for entry in manifest.get("images", []):
         if not isinstance(entry, dict):
             fail("each images entry must be an object")

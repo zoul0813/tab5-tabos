@@ -12,7 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
-from tabos_tools.assets import load_manifest, write_c, write_header, write_tsp
+from tabos_tools.assets import load_manifest, rgb565, write_c, write_header, write_tsp
 
 
 def rejected(path: Path) -> bool:
@@ -98,6 +98,49 @@ def main() -> int:
         (root / "partial.json").write_text(json.dumps(partial_manifest), encoding="utf-8")
         if not rejected(root / "partial.json"):
             return 1
+
+        keyed = Image.new("RGBA", (2, 1))
+        keyed.putdata([(0, 0, 0, 255), (7, 8, 9, 0)])
+        keyed.save(root / "keyed.png")
+        keyed_manifest = {
+            "version": 1, "name": "keyed", "images": [{"name": "keyed", "source": "keyed.png"}],
+        }
+        (root / "keyed.json").write_text(json.dumps(keyed_manifest), encoding="utf-8")
+        keyed_assets = load_manifest(root / "keyed.json")
+        if keyed_assets.images[0].key != 1 or keyed_assets.images[0].pixels != [0, 1]:
+            return 1
+
+        collision_key_manifest = {
+            "version": 1, "name": "key_collision",
+            "images": [{"name": "keyed", "source": "keyed.png", "color_key": 0}],
+        }
+        (root / "key-collision.json").write_text(json.dumps(collision_key_manifest), encoding="utf-8")
+        if not rejected(root / "key-collision.json"):
+            return 1
+
+        tolerance = Image.new("RGBA", (3, 1))
+        tolerance.putdata([(100, 100, 100, 255), (109, 90, 105, 255), (111, 100, 100, 255)])
+        tolerance.save(root / "tolerance.png")
+        tolerance_manifest = {
+            "version": 1, "name": "tolerance", "images": [{
+                "name": "tolerance", "source": "tolerance.png",
+                "transparent_rgb": [100, 100, 100], "transparent_tolerance": 10,
+            }],
+        }
+        (root / "tolerance.json").write_text(json.dumps(tolerance_manifest), encoding="utf-8")
+        tolerance_assets = load_manifest(root / "tolerance.json")
+        if (tolerance_assets.images[0].key != 0 or
+                tolerance_assets.images[0].pixels != [0, 0, rgb565(111, 100, 100)]):
+            return 1
+
+        for invalid_flags in ({"zero": 0}, {"combined": 3}, {"solid": 1, "blocking": 1}):
+            invalid_flag_manifest = {
+                "version": 1, "name": "invalid_flags", "flags": invalid_flags,
+                "images": [{"name": "pixel", "source": "opaque.png"}],
+            }
+            (root / "invalid-flags.json").write_text(json.dumps(invalid_flag_manifest), encoding="utf-8")
+            if not rejected(root / "invalid-flags.json"):
+                return 1
 
         collision_manifest = {"version": 1, "name": "collision", "images": [{"name": "sheet", "source": "opaque.png",
             "sprites": [{"name": "foo-bar"}, {"name": "foo_bar"}]}]}

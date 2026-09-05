@@ -5,6 +5,10 @@
 
 ## Sprite and Tile SDK
 
+- `[DECIDED]` Each manifest flag name maps to one unique, nonzero 32-bit bit. Tiled
+  Boolean true or integer nonzero sets a registered flag; zero/false clears it. Other
+  integer/Boolean tile properties are ignored by the runtime converter.
+
 - `[DECIDED]` Public sprite and tilemap headers document descriptor fields, ownership,
   coordinates, transforms, defaults, return values, errors, and queued-data lifetime.
   `docs/tile-assets.md` is the complete developer guide for authoring, building, loading,
