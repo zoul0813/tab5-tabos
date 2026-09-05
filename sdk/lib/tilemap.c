@@ -106,37 +106,58 @@ static uint32_t animated_sprite(const tabos_sprite_set_t* sprites, uint32_t spri
     return sprite;
 }
 
-static int32_t floor_div(int32_t value, uint32_t divisor)
-{
-    int32_t quotient = value / (int32_t) divisor;
-    if (value < 0 && value % (int32_t) divisor != 0) {
-        --quotient;
-    }
-    return quotient;
-}
-
 int tabos_tilemap_draw_layer(tabos_graphics_t* graphics, const tabos_tilemap_t* map, uint32_t layer,
                              const tabos_sprite_set_t* sprites, const tabos_tilemap_draw_options_t* options)
 {
-    if (graphics == NULL || sprites == NULL || options == NULL || !valid_tile_layer(map, layer) ||
-        map->tile_width == 0U || map->tile_height == 0U) {
+    if (graphics == NULL || !graphics->open || sprites == NULL || options == NULL || !valid_tile_layer(map, layer) ||
+        map->tile_width == 0U || map->tile_height == 0U || map->tile_width > INT32_MAX ||
+        map->tile_height > INT32_MAX) {
         errno = EINVAL;
         return -1;
     }
-    const int32_t first_column  = floor_div(options->camera_x, map->tile_width);
-    const int32_t first_row     = floor_div(options->camera_y, map->tile_height);
-    const int64_t camera_right  = (int64_t) options->camera_x + options->viewport.width;
-    const int64_t camera_bottom = (int64_t) options->camera_y + options->viewport.height;
-    const int32_t last_column   = (int32_t) ((camera_right + map->tile_width - 1U) / map->tile_width);
-    const int32_t last_row      = (int32_t) ((camera_bottom + map->tile_height - 1U) / map->tile_height);
-    for (int32_t row = first_row; row < last_row; ++row) {
-        if (row < 0 || row >= (int32_t) map->height) {
-            continue;
-        }
-        for (int32_t column = first_column; column < last_column; ++column) {
-            if (column < 0 || column >= (int32_t) map->width) {
-                continue;
-            }
+    /* Intersect the screen viewport before converting it to world-space cell bounds. */
+    const int64_t left = options->viewport.x > 0 ? options->viewport.x : 0;
+    const int64_t top  = options->viewport.y > 0 ? options->viewport.y : 0;
+    int64_t right      = (int64_t) options->viewport.x + options->viewport.width;
+    int64_t bottom     = (int64_t) options->viewport.y + options->viewport.height;
+    if (right > graphics->width) {
+        right = graphics->width;
+    }
+    if (bottom > graphics->height) {
+        bottom = graphics->height;
+    }
+    if (left >= right || top >= bottom) {
+        return 0;
+    }
+    int64_t world_left         = left + graphics->camera_x;
+    int64_t world_top          = top + graphics->camera_y;
+    const int64_t world_right  = right + graphics->camera_x;
+    const int64_t world_bottom = bottom + graphics->camera_y;
+    if (world_right <= 0 || world_bottom <= 0) {
+        return 0;
+    }
+    if (world_left < 0) {
+        world_left = 0;
+    }
+    if (world_top < 0) {
+        world_top = 0;
+    }
+    const int64_t first_column = world_left / map->tile_width;
+    const int64_t first_row    = world_top / map->tile_height;
+    int64_t last_column        = (world_right + map->tile_width - 1U) / map->tile_width;
+    int64_t last_row           = (world_bottom + map->tile_height - 1U) / map->tile_height;
+    if (last_column > map->width) {
+        last_column = map->width;
+    }
+    if (last_row > map->height) {
+        last_row = map->height;
+    }
+    /* Tile positions are already projected for culling; do not apply the camera twice. */
+    tabos_graphics_t screen = *graphics;
+    screen.camera_x         = 0;
+    screen.camera_y         = 0;
+    for (int64_t row = first_row; row < last_row; ++row) {
+        for (int64_t column = first_column; column < last_column; ++column) {
             const tabos_tile_t tile   = map->layers[layer].cells[(size_t) row * map->width + (uint32_t) column];
             const uint32_t encoded_id = tile & TABOS_TILE_ID_MASK;
             if (encoded_id == 0U) {
@@ -147,7 +168,10 @@ int tabos_tilemap_draw_layer(tabos_graphics_t* graphics, const tabos_tilemap_t* 
                 errno = EINVAL;
                 return -1;
             }
-            sprite                           = animated_sprite(sprites, sprite, options->animation_ms);
+            sprite = animated_sprite(sprites, sprite, options->animation_ms);
+            if (sprite == TABOS_SPRITE_NONE) {
+                return -1;
+            }
             tabos_sprite_draw_options_t draw = {
                 .width        = map->tile_width,
                 .height       = map->tile_height,
@@ -156,8 +180,8 @@ int tabos_tilemap_draw_layer(tabos_graphics_t* graphics, const tabos_tilemap_t* 
                 .clip_enabled = true,
             };
             tile_transform(tile, &draw);
-            const int32_t destination_x = options->viewport.x + column * (int32_t) map->tile_width - options->camera_x;
-            const int32_t destination_y = options->viewport.y + row * (int32_t) map->tile_height - options->camera_y;
+            const int32_t destination_x      = (int32_t) (column * map->tile_width - graphics->camera_x);
+            const int32_t destination_y      = (int32_t) (row * map->tile_height - graphics->camera_y);
             const tabos_sprite_t* descriptor = &sprites->sprites[sprite];
             if (descriptor->image >= sprites->image_count) {
                 errno = EINVAL;
@@ -186,7 +210,7 @@ int tabos_tilemap_draw_layer(tabos_graphics_t* graphics, const tabos_tilemap_t* 
                 .clip              = options->viewport,
                 .clip_enabled      = true,
             };
-            if (tabos_graphics_blit_ex(graphics, &blit) != 0) {
+            if (tabos_graphics_blit_ex(&screen, &blit) != 0) {
                 return -1;
             }
         }

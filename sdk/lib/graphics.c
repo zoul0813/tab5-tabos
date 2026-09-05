@@ -31,6 +31,35 @@ static bool scaled(const tabos_graphics_t* graphics)
     return graphics != NULL && graphics->pixels != NULL;
 }
 
+int tabos_graphics_begin_camera(tabos_graphics_t* graphics, int32_t x, int32_t y)
+{
+    if (!valid(graphics)) {
+        errno = EINVAL;
+        return -1;
+    }
+    graphics->camera_x = x;
+    graphics->camera_y = y;
+    return 0;
+}
+
+int tabos_graphics_end_camera(tabos_graphics_t* graphics)
+{
+    return tabos_graphics_begin_camera(graphics, 0, 0);
+}
+
+static int camera_position(const tabos_graphics_t* graphics, int32_t* x, int32_t* y)
+{
+    const int64_t screen_x = (int64_t) *x - graphics->camera_x;
+    const int64_t screen_y = (int64_t) *y - graphics->camera_y;
+    if (screen_x < INT32_MIN || screen_x > INT32_MAX || screen_y < INT32_MIN || screen_y > INT32_MAX) {
+        errno = ERANGE;
+        return -1;
+    }
+    *x = (int32_t) screen_x;
+    *y = (int32_t) screen_y;
+    return 0;
+}
+
 static bool keyed(tabos_color_t color, tabos_color_t low, tabos_color_t high)
 {
     const unsigned int red   = (color >> 11U) & 0x1fU;
@@ -159,6 +188,9 @@ int tabos_graphics_fill_rect(tabos_graphics_t* graphics, int32_t x, int32_t y, u
         errno = EINVAL;
         return -1;
     }
+    if (camera_position(graphics, &x, &y) != 0) {
+        return -1;
+    }
     if (scaled(graphics)) {
         const int64_t right         = (int64_t) x + width;
         const int64_t bottom        = (int64_t) y + height;
@@ -167,6 +199,9 @@ int tabos_graphics_fill_rect(tabos_graphics_t* graphics, int32_t x, int32_t y, u
         const int32_t clipped_right = right > (int64_t) graphics->width ? (int32_t) graphics->width : (int32_t) right;
         const int32_t clipped_bottom =
             bottom > (int64_t) graphics->height ? (int32_t) graphics->height : (int32_t) bottom;
+        if (left >= clipped_right || top >= clipped_bottom) {
+            return 0;
+        }
         for (int32_t row = top; row < clipped_bottom; ++row) {
             tabos_color_t* destination = graphics->pixels + (size_t) row * graphics->width + (size_t) left;
             for (int32_t column = left; column < clipped_right; ++column) {
@@ -247,6 +282,9 @@ int tabos_graphics_blit(tabos_graphics_t* graphics, int32_t x, int32_t y, uint32
     }
     if (tabos_runtime_api->graphics_blit == NULL) {
         errno = ENOSYS;
+        return -1;
+    }
+    if (camera_position(graphics, &x, &y) != 0) {
         return -1;
     }
     return result(tabos_runtime_api->graphics_blit(x, y, width, height, pixels));
@@ -333,6 +371,11 @@ int tabos_graphics_blit_ex(tabos_graphics_t* graphics, const tabos_graphics_blit
         errno = EINVAL;
         return -1;
     }
+    tabos_graphics_blit_options_t screen = *options;
+    if (camera_position(graphics, &screen.destination.x, &screen.destination.y) != 0) {
+        return -1;
+    }
+    options = &screen;
     if (scaled(graphics)) {
         return scaled_blit(graphics, options);
     }

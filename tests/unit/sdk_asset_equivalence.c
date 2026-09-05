@@ -213,9 +213,8 @@ static void scene(tabos_graphics_t* graphics, const tabos_sprite_set_t* sprites,
                   uint64_t time, int32_t camera)
 {
     CHECK(tabos_graphics_clear(graphics, 0x4208U) == 0);
+    CHECK(tabos_graphics_begin_camera(graphics, camera - 2, -3) == 0);
     const tabos_tilemap_draw_options_t draw = {
-        .camera_x     = camera,
-        .camera_y     = -1,
         .viewport     = {.x = 2, .y = 2, .width = 15U, .height = 7U},
         .animation_ms = time,
     };
@@ -240,6 +239,7 @@ static void scene(tabos_graphics_t* graphics, const tabos_sprite_set_t* sprites,
     }
     CHECK(tabos_metasprite_draw(graphics, sprites, EQUIVALENCE_METASPRITE_ACTOR, 25, 4, camera < 0, camera > 0, 200U) ==
           0);
+    CHECK(tabos_graphics_end_camera(graphics) == 0);
 }
 
 static void known_tiles(tabos_graphics_t* graphics, const tabos_sprite_set_t* sprites, const tabos_tilemap_t* map)
@@ -289,6 +289,77 @@ static void known_compositing(tabos_graphics_t* graphics, const tabos_sprite_set
     expected[11U * WIDTH + 9U]  = 0x07ffU;
     expected[11U * WIDTH + 10U] = 0x07ffU;
     compare_pixels(graphics->pixels, expected, "known layer and metasprite order");
+}
+
+static void camera_content(tabos_graphics_t* graphics, const tabos_sprite_set_t* sprites, const tabos_tilemap_t* map,
+                           tabos_graphics_rect_t viewport)
+{
+    const tabos_tilemap_draw_options_t draw = {.viewport = viewport, .animation_ms = 10U};
+    CHECK(tabos_tilemap_draw_layer(graphics, map, EQUIVALENCE_LAYER_WORLD_GROUND, sprites, &draw) == 0);
+    CHECK(tabos_tilemap_draw_layer(graphics, map, EQUIVALENCE_LAYER_WORLD_FRONT, sprites, &draw) == 0);
+    CHECK(tabos_sprite_draw(graphics, sprites, EQUIVALENCE_SPRITE_QUAD, 5, 8) == 0);
+    CHECK(tabos_sprite_animation_draw(graphics, sprites, EQUIVALENCE_ANIMATION_HOLD, 10, 8, 0U) == 0);
+    CHECK(tabos_metasprite_draw(graphics, sprites, EQUIVALENCE_METASPRITE_ACTOR, 20, 8, false, false, 255U) == 0);
+}
+
+static void check_camera_pixels(tabos_graphics_t* graphics, const tabos_sprite_set_t* sprites,
+                                const tabos_tilemap_t* map)
+{
+    const tabos_graphics_rect_t full = {.width = WIDTH, .height = HEIGHT};
+    tabos_color_t reference[PIXELS];
+    tabos_color_t expected[PIXELS];
+    CHECK(tabos_graphics_clear(graphics, 0U) == 0);
+    camera_content(graphics, sprites, map, full);
+    memcpy(reference, graphics->pixels, sizeof(reference));
+    const int32_t offsets[][2] = {
+        {-3, -2},
+        {-1,  1},
+        { 0,  0},
+        { 1, -1},
+        { 3,  2},
+        {30, 20}
+    };
+    for (size_t i = 0U; i < sizeof(offsets) / sizeof(offsets[0]); ++i) {
+        CHECK(tabos_graphics_begin_camera(graphics, offsets[i][0], offsets[i][1]) == 0);
+        CHECK(tabos_graphics_clear(graphics, 0U) == 0);
+        camera_content(graphics, sprites, map, full);
+        memset(expected, 0, sizeof(expected));
+        for (int32_t y = 0; y < HEIGHT; ++y) {
+            for (int32_t x = 0; x < WIDTH; ++x) {
+                const int32_t world_x = x + offsets[i][0];
+                const int32_t world_y = y + offsets[i][1];
+                if (world_x >= 0 && world_x < WIDTH && world_y >= 0 && world_y < HEIGHT) {
+                    expected[y * WIDTH + x] = reference[world_y * WIDTH + world_x];
+                }
+            }
+        }
+        CHECK(tabos_graphics_end_camera(graphics) == 0);
+        CHECK(tabos_graphics_pixel(graphics, 0, HEIGHT - 1, 0xffffU) == 0);
+        expected[(HEIGHT - 1) * WIDTH] = 0xffffU;
+        compare_pixels(graphics->pixels, expected, "shared camera moves world and leaves HUD fixed");
+    }
+    /* A screen viewport clips the map without relocating its world origin. */
+    CHECK(tabos_graphics_clear(graphics, 0U) == 0);
+    CHECK(tabos_graphics_begin_camera(graphics, -1, -1) == 0);
+    const tabos_tilemap_draw_options_t clipped = {
+        .viewport = {.x = 3, .y = 1, .width = 7U, .height = 2U},
+          .animation_ms = 10U
+    };
+    CHECK(tabos_tilemap_draw_layer(graphics, map, EQUIVALENCE_LAYER_WORLD_GROUND, sprites, &clipped) == 0);
+    CHECK(tabos_tilemap_draw_layer(graphics, map, EQUIVALENCE_LAYER_WORLD_FRONT, sprites, &clipped) == 0);
+    memset(expected, 0, sizeof(expected));
+    for (int32_t y = 1; y < 3; ++y) {
+        for (int32_t x = 3; x < 10; ++x) {
+            expected[y * WIDTH + x] = reference[(y - 1) * WIDTH + x - 1];
+        }
+    }
+    compare_pixels(graphics->pixels, expected, "camera viewport clips without shifting map origin");
+    CHECK(tabos_graphics_begin_camera(graphics, INT32_MAX, INT32_MIN) == 0);
+    CHECK(tabos_graphics_clear(graphics, 0U) == 0);
+    CHECK(tabos_tilemap_draw_layer(graphics, map, EQUIVALENCE_LAYER_WORLD_GROUND, sprites, &clipped) == 0);
+    memset(expected, 0, sizeof(expected));
+    compare_pixels(graphics->pixels, expected, "far outside map remains empty");
+    CHECK(tabos_graphics_end_camera(graphics) == 0);
 }
 
 static void check_completion(const tabos_sprite_set_t* sprites)
@@ -375,6 +446,8 @@ int main(int argc, char** argv)
     check_ids(&loaded, &map);
     tabos_graphics_t graphics = {.width = WIDTH, .height = HEIGHT};
     CHECK(tabos_graphics_open(&graphics) == 0);
+    check_camera_pixels(&graphics, &equivalence_sprites, &equivalence_world);
+    check_camera_pixels(&graphics, &loaded, &map);
     check_completion(&equivalence_sprites);
     check_completion(&loaded);
     check_animation_errors(&graphics, &loaded);

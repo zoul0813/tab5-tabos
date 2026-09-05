@@ -20,6 +20,7 @@
 - [x] Add binary-backed `tile-demo` and initial host tests.
 - [x] Make imported TMJ/TSJ tilesets authoritative for images, regions, metadata, and tile animations.
 - [x] Add stateless animated draw helpers, completion detection, and Tiled `repeat_count` metadata.
+- [x] Add shared graphics camera and migrate map/sprite/object drawing to world coordinates.
 
 Implementation evidence: `ec22fed` and `17d7d40`. Existing tests provide partial coverage;
 the detailed review and acceptance items below are not yet fully signed off.
@@ -73,6 +74,10 @@ Add `<tabos/sprite.h>`:
 - [ ] Review: Inherit exact RGB565 color-key transparency from the source image. Do not add tinting,
   palettes, per-pixel alpha, physics, or entities.
 
+- [x] Review: Shared graphics begin/end camera applies once to sprites, animations,
+  metasprites, primitives, and maps. End restores screen coordinates for HUD drawing;
+  clips/viewports stay in screen space and present preserves the camera.
+
 Add `<tabos/tilemap.h>`:
 
 - [ ] Review: `tabos_tile_t` is 32-bit. Zero means empty; the low 28 bits contain a one-based
@@ -83,7 +88,7 @@ Add `<tabos/tilemap.h>`:
 - [ ] Review: `tabos_tilemap_get()` and `tabos_tilemap_set()` use layer, column, and row coordinates
   and return `ERANGE` outside the map.
 - [ ] Review: `tabos_tilemap_draw_layer()` draws only visible cells from one tile layer. Options
-  contain the pixel camera position, destination viewport, and animation time.
+  contain the screen-space viewport and animation time; the graphics context owns the camera.
 - [ ] Review: Coordinates use a top-left origin, positive X right, and positive Y down. The camera
   supports negative and sub-tile pixel offsets; outside-map cells remain empty.
 - [ ] Review: Clip viewport edges exactly. Keep interior tiles on the normal accelerated path.
@@ -266,6 +271,28 @@ Validated working-tree changes based on `7e43d93`:
 - Updated public asset-authoring/API documentation and project decisions. Broader public
   API review, tester generated-C/binary coverage, native/logical parity, Linux builds,
   physical acceptance, and performance acceptance remain open.
+
+## Shared Camera Evidence — 2026-09-05
+
+- Added `tabos_graphics_begin_camera()` and `tabos_graphics_end_camera()`. Camera state
+  belongs to the SDK graphics context and is resolved before native command submission.
+  Existing source-buffer lifetime rules and private transport layouts are unchanged.
+- Removed separate tilemap camera fields. Viewports now clip screen space without
+  relocating the map origin; documented migration for old nonzero viewport origins.
+  Culling intersects canvas bounds and uses wide intermediate arithmetic for negative
+  and extreme camera offsets. Demo sprite, animation, metasprite, and object drawing
+  now passes world coordinates directly.
+- `unit.sdk_graphics` checks exact pixels for translated primitives and blits, fixed clips,
+  HUD restoration, begin replacement, lifecycle reset, camera-independent clear/present,
+  overflow errors, and native submission coordinates. Asset equivalence checks shared
+  world shifts with both generated C and loaded binary assets, screen-space viewports,
+  and far-outside-map culling, alongside the existing 79 scene pairs.
+- Full macOS Debug build and 44/44 tests passed with sanitizers; four focused Release
+  graphics/tile/loader/equivalence tests passed. Standard RV32 apps and Tab5 Debug firmware
+  cross-built successfully. Maintained tester includes camera/HUD checks but was not
+  executed on target during this change. No installation or physical acceptance claimed.
+- Full native/logical raster parity, Linux builds, physical presentation, and performance
+  acceptance remain open.
 
 ## Assumptions
 

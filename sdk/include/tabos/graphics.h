@@ -23,6 +23,8 @@ typedef struct {
         uint32_t output_height;
         tabos_color_t letterbox_color;
         bool open;
+        int32_t camera_x;
+        int32_t camera_y;
 } tabos_graphics_t;
 
 typedef enum {
@@ -70,6 +72,10 @@ enum {
 };
 
 int tabos_graphics_open(tabos_graphics_t* graphics);
+/* Camera offsets apply to drawing destinations, not clips, clear, raw pixel access, or present.
+ * Begin replaces the current camera; end resets it. There is no camera stack. */
+int tabos_graphics_begin_camera(tabos_graphics_t* graphics, int32_t x, int32_t y);
+int tabos_graphics_end_camera(tabos_graphics_t* graphics);
 tabos_color_t* tabos_graphics_pixels(tabos_graphics_t* graphics);
 int tabos_graphics_set_letterbox_color(tabos_graphics_t* graphics, tabos_color_t color);
 int tabos_graphics_clear(tabos_graphics_t* graphics, tabos_color_t color);

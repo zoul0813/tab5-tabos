@@ -28,7 +28,8 @@ the output boolean unchanged. Missing clips, empty clips, zero-duration frames, 
 invalid frame sprite IDs are rejected, including manually constructed C descriptors.
 
 These helpers allocate no playback state. Each actor owns its clip ID and start time;
-game code chooses transitions. For example, inside a game draw function returning `0`/`-1`:
+game code chooses transitions. For example, inside a game draw function returning `0`/`-1`,
+called between camera begin/end:
 
 ```c
 uint64_t elapsed_ms = now_ms - player.animation_started_ms;
@@ -42,7 +43,7 @@ if (finished) {
     elapsed_ms = 0;
 }
 return tabos_sprite_animation_draw(
-    &graphics, &sprites, player.animation, player.x - camera_x, player.y - camera_y, elapsed_ms);
+    &graphics, &sprites, player.animation, player.x, player.y, elapsed_ms);
 ```
 
 Pause by freezing elapsed time; restart by resetting the actor's start time. The existing
@@ -54,6 +55,33 @@ Use `TABOS_TILE()` and `TABOS_TILE_ID()` with normal zero-based IDs. Maps retain
 tile/object layers. Cells are writable in memory. Applications draw layers individually
 and own collision/gameplay. Object layers expose point, rectangle, and tile markers plus
 named integer properties; they never draw automatically.
+
+Set the shared graphics camera once for the world pass. All sprite variants, metasprites,
+map layers, and primitive object markers then use world coordinates without manual subtraction:
+
+```c
+const tabos_tilemap_draw_options_t draw = {
+    .viewport = {.width = graphics.width, .height = graphics.height},
+    .animation_ms = elapsed_ms,
+};
+tabos_graphics_begin_camera(&graphics, camera_x, camera_y);
+tabos_tilemap_draw_layer(&graphics, &map, GROUND_LAYER, &sprites, &draw);
+tabos_sprite_animation_draw(&graphics, &sprites, player.animation, player.x, player.y, elapsed_ms);
+tabos_tilemap_draw_layer(&graphics, &map, FRONT_LAYER, &sprites, &draw);
+tabos_graphics_end_camera(&graphics);
+/* Draw HUD in screen coordinates, then present. */
+```
+
+`viewport` is a screen-space clip, intersected with canvas bounds before visible-cell
+selection. Empty viewports draw nothing. Maps remain anchored at world `(0, 0)`; sprites
+and maps share the same projection. See [graphics camera semantics](graphics-api.md).
+
+Pre-release API migration: `tabos_tilemap_draw_options_t.camera_x` and `.camera_y` were
+removed. Move those values to `tabos_graphics_begin_camera()` and remove camera subtraction
+from sprite/object drawing. An old nonzero viewport origin also relocated the map;
+the new viewport only clips. To preserve that old map placement, begin the camera at
+`old_camera_x - viewport.x`, `old_camera_y - viewport.y`. Rebuild applications against
+the updated SDK; asset formats and the private ELF call table are unchanged.
 
 Load `.tsp` and `.tmap` files with `tabos_sprite_set_load()` and
 `tabos_tilemap_load()`. Matching unload functions free owned data and zero the object.

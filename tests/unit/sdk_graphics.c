@@ -2,6 +2,18 @@
 #include <tabos/internal/elf_api.h>
 
 #include <stddef.h>
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define CHECK(condition)                                                         \
+    do {                                                                         \
+        if (!(condition)) {                                                      \
+            fprintf(stderr, "camera check line %d: %s\n", __LINE__, #condition); \
+            exit(1);                                                             \
+        }                                                                        \
+    } while (0)
 
 static unsigned int close_count;
 static unsigned int present_count;
@@ -15,6 +27,27 @@ static int32_t expected_y;
 static uint32_t expected_output_width;
 static uint32_t expected_output_height;
 static uint32_t overlay_flags;
+static bool capture_native;
+static tabos_graphics_blit_options_t submitted;
+static unsigned int submitted_count;
+static int32_t submitted_x, submitted_y;
+
+static int graphics_fill_rect(int32_t x, int32_t y, uint32_t width, uint32_t height, uint32_t color)
+{
+    (void) width;
+    (void) height;
+    (void) color;
+    submitted_x = x;
+    submitted_y = y;
+    ++submitted_count;
+    return 0;
+}
+
+static int graphics_blit(int32_t x, int32_t y, uint32_t width, uint32_t height, const uint16_t* pixels)
+{
+    (void) pixels;
+    return graphics_fill_rect(x, y, width, height, 0U);
+}
 
 static int graphics_open(uint32_t* width, uint32_t* height)
 {
@@ -49,6 +82,11 @@ static uint32_t graphics_capabilities(void)
 
 static int graphics_blit_ex(const tabos_graphics_blit_options_t* options)
 {
+    if (capture_native) {
+        submitted = *options;
+        ++submitted_count;
+        return 0;
+    }
     upscale_valid = options != NULL && options->pixels != NULL && options->bitmap_width == expected_width &&
                     options->bitmap_height == expected_height && options->source.width == expected_width &&
                     options->source.height == expected_height && options->destination.x == expected_x &&
@@ -66,6 +104,8 @@ static int graphics_set_overlays(uint32_t flags)
 static const tabos_elf_api_t api = {
     .abi_version           = TABOS_ELF_API_VERSION,
     .graphics_open         = graphics_open,
+    .graphics_fill_rect    = graphics_fill_rect,
+    .graphics_blit         = graphics_blit,
     .graphics_clear        = graphics_clear,
     .graphics_present      = graphics_present,
     .graphics_close        = graphics_close,
@@ -75,6 +115,90 @@ static const tabos_elf_api_t api = {
 };
 
 const tabos_elf_api_t* tabos_runtime_api = &api;
+
+static void check_camera(void)
+{
+    tabos_graphics_t graphics = {.width = 16U, .height = 12U};
+    CHECK(tabos_graphics_begin_camera(NULL, 1, 2) == -1 && errno == EINVAL);
+    CHECK(tabos_graphics_end_camera(&graphics) == -1 && errno == EINVAL);
+    CHECK(tabos_graphics_open(&graphics) == 0);
+    const tabos_color_t pixels[]      = {1U, 2U, 3U, 4U};
+    tabos_color_t expected[16U * 12U] = {0};
+    CHECK(tabos_graphics_begin_camera(&graphics, 10, -5) == 0);
+    CHECK(tabos_graphics_fill_rect(&graphics, 11, -4, 2U, 2U, 7U) == 0);
+    expected[17] = expected[18] = expected[33] = expected[34] = 7U;
+    CHECK(tabos_graphics_pixel(&graphics, 13, -4, 8U) == 0);
+    expected[19] = 8U;
+    CHECK(tabos_graphics_line(&graphics, 14, -4, 15, -3, 9U) == 0);
+    expected[20] = expected[37] = 9U;
+    CHECK(tabos_graphics_rect(&graphics, 16, -4, 3U, 3U, 10U) == 0);
+    expected[22] = expected[23] = expected[24] = expected[38] = expected[40] = 10U;
+    expected[54] = expected[55] = expected[56] = 10U;
+    CHECK(tabos_graphics_blit(&graphics, 10, 0, 2U, 2U, pixels) == 0);
+    expected[80]                             = 1U;
+    expected[81]                             = 2U;
+    expected[96]                             = 3U;
+    expected[97]                             = 4U;
+    const tabos_graphics_blit_options_t blit = {
+        .pixels        = pixels,
+        .bitmap_width  = 2U,
+        .bitmap_height = 2U,
+        .source        = {.width = 2U, .height = 2U},
+        .destination   = {.x = 13, .y = 0, .width = 2U, .height = 2U},
+        .clip          = {.x = 4, .y = 5, .width = 1U, .height = 2U},
+        .clip_enabled  = true,
+        .opacity       = 255U,
+    };
+    CHECK(tabos_graphics_blit_ex(&graphics, &blit) == 0);
+    CHECK(blit.destination.x == 13 && blit.destination.y == 0);
+    expected[84]  = 2U;
+    expected[100] = 4U;
+    CHECK(tabos_graphics_end_camera(&graphics) == 0);
+    CHECK(tabos_graphics_pixel(&graphics, 0, 0, 11U) == 0);
+    expected[0] = 11U;
+    CHECK(memcmp(expected, graphics.pixels, sizeof(expected)) == 0);
+    CHECK(tabos_graphics_begin_camera(&graphics, INT32_MIN, INT32_MAX) == 0);
+    CHECK(tabos_graphics_pixel(&graphics, INT32_MAX, 0, 1U) == -1 && errno == ERANGE);
+    CHECK(tabos_graphics_blit_ex(&graphics, &blit) == -1 && errno == ERANGE);
+    CHECK(memcmp(expected, graphics.pixels, sizeof(expected)) == 0);
+    CHECK(tabos_graphics_begin_camera(&graphics, 2, 3) == 0);
+    CHECK(graphics.camera_x == 2 && graphics.camera_y == 3);
+    CHECK(tabos_graphics_clear(&graphics, 12U) == 0);
+    for (size_t i = 0U; i < sizeof(expected) / sizeof(expected[0]); ++i) {
+        CHECK(graphics.pixels[i] == 12U);
+    }
+    expected_width         = 16U;
+    expected_height        = 12U;
+    expected_x             = 160;
+    expected_y             = 0;
+    expected_output_width  = 960U;
+    expected_output_height = 720U;
+    CHECK(tabos_graphics_present(&graphics) == 0 && upscale_valid);
+    CHECK(graphics.camera_x == 2 && graphics.camera_y == 3);
+    CHECK(tabos_graphics_close(&graphics) == 0);
+    CHECK(graphics.camera_x == 0 && graphics.camera_y == 0);
+
+    capture_native = true;
+    CHECK(tabos_graphics_open(&graphics) == 0);
+    CHECK(tabos_graphics_begin_camera(&graphics, 10, -5) == 0);
+    CHECK(tabos_graphics_pixel(&graphics, 13, 0, 7U) == 0);
+    CHECK(submitted_x == 3 && submitted_y == 5);
+    CHECK(tabos_graphics_blit(&graphics, 13, 0, 2U, 2U, pixels) == 0);
+    CHECK(submitted_x == 3 && submitted_y == 5);
+    CHECK(tabos_graphics_blit_ex(&graphics, &blit) == 0);
+    CHECK(submitted.destination.x == 3 && submitted.destination.y == 5);
+    CHECK(submitted.clip.x == 4 && submitted.clip.y == 5 && submitted.source.x == 0);
+    CHECK(tabos_graphics_end_camera(&graphics) == 0);
+    CHECK(submitted.destination.x == 3 && submitted.destination.y == 5);
+    CHECK(tabos_graphics_blit_ex(&graphics, &blit) == 0);
+    CHECK(submitted.destination.x == 13 && submitted.destination.y == 0);
+    CHECK(tabos_graphics_begin_camera(&graphics, INT32_MIN, 0) == 0);
+    const unsigned int before = submitted_count;
+    CHECK(tabos_graphics_blit(&graphics, INT32_MAX, 0, 2U, 2U, pixels) == -1 && errno == ERANGE);
+    CHECK(tabos_graphics_blit_ex(&graphics, &blit) == -1 && errno == ERANGE);
+    CHECK(submitted_count == before);
+    CHECK(tabos_graphics_close(&graphics) == 0);
+}
 
 int main(void)
 {
@@ -155,5 +279,6 @@ int main(void)
         graphics.scale != 1U || graphics.pixels != NULL || tabos_graphics_close(&graphics) != 0 || close_count != 3U) {
         return 1;
     }
+    check_camera();
     return 0;
 }

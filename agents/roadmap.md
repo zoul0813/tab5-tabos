@@ -22,6 +22,8 @@
 
 ### Sprite and Tile Graphics
 
+- [x] Add shared graphics begin/end camera for primitives, sprites, animations, metasprites, and map layers; remove independent map camera fields and migrate demo to world coordinates. macOS Debug 44/44 and four focused Release tests pass; standard RV32 apps and Tab5 Debug firmware cross-build. Physical execution remains open.
+
 - [x] Add stateless animated draw helpers, completion query, and Tiled repeat metadata. macOS Debug 44/44 tests, four focused Release tests, and standard RV32 application builds pass; maintained tester animation checks still require execution on target.
 
 - [x] Verify generated-C/binary metadata and 79 logical-canvas scene pairs from one fixture, with independent pixel expectations; macOS Debug/Release tests and generated-C RV32 compilation pass.

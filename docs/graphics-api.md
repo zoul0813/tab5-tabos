@@ -17,6 +17,31 @@ tabos_graphics_close(&graphics);
 Coordinates are clipped. Pixel, line, outline rectangle, and filled rectangle helpers
 are available. `tabos_graphics_blit()` copies an RGB565 bitmap.
 
+Use a shared camera for world drawing:
+
+```c
+tabos_graphics_begin_camera(&graphics, camera_x, camera_y);
+/* Draw maps, sprites, animations, metasprites, and primitives in world coordinates. */
+tabos_graphics_fill_rect(&graphics, player.x, player.y, 8, 8, TABOS_RGB565(255, 0, 0));
+tabos_graphics_end_camera(&graphics);
+/* HUD drawing now uses screen coordinates. */
+tabos_graphics_pixel(&graphics, 2, 2, TABOS_RGB565(255, 255, 255));
+```
+
+Camera coordinates identify the world point at canvas `(0, 0)`. Positive camera X
+moves the view right; negative offsets are supported. Translation uses canvas pixels
+in logical mode and physical drawing pixels in native mode. Begin replaces the current
+offset; there is no nesting stack. End resets it to zero and is safe to repeat. Both
+functions require an open context and return `0` or `-1` with `EINVAL`.
+
+Destination coordinates are translated once when each draw call is made. Source image
+rectangles, blit clips, and tilemap viewports remain in screen coordinates. A tilemap
+viewport clips the world; it does not relocate the map origin or affect other draw calls.
+Clear, raw framebuffer access, letterboxing, overlays, and present ignore the camera.
+Present preserves the offset for subsequent frames; open and successful close reset it.
+Ending or replacing the camera does not change commands already submitted. Translating
+a destination outside the signed 32-bit range returns `-1` with `ERANGE`.
+
 Applications request a smaller integer-scaled canvas by initializing `width` and
 `height` before calling `tabos_graphics_open()`:
 

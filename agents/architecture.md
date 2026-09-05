@@ -6,6 +6,13 @@
 
 ## Sprite and Tile Layer
 
+- `[DECIDED]` World drawing uses one SDK graphics-context camera. Begin replaces its
+  offset; end resets to screen coordinates, with no stack. Sprites, animations,
+  metasprites, primitives, and map layers share the offset. Clips/viewports stay in
+  screen coordinates; clear, raw pixels, overlays, and present ignore the camera.
+  Tilemap draw options carry no independent camera, and viewport origin only clips.
+  Camera state is resolved before native submission; no private transport change.
+
 `[DECIDED]` Animated draw helpers and completion queries are stateless SDK operations.
 Game-owned elapsed time controls playback; game code owns transitions and actor state.
 Finite completion follows the last frame's full duration, and completed clips hold their

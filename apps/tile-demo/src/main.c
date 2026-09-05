@@ -70,25 +70,22 @@ int main(void)
         }
         const uint64_t elapsed                  = tabos_monotonic_ms() - started;
         const tabos_tilemap_draw_options_t draw = {
-            .camera_x     = camera_x,
-            .camera_y     = camera_y,
             .viewport     = {.width = DEMO_WIDTH, .height = DEMO_HEIGHT},
             .animation_ms = elapsed,
         };
         (void) tabos_graphics_clear(&graphics, TABOS_RGB565(8, 18, 30));
+        (void) tabos_graphics_begin_camera(&graphics, camera_x, camera_y);
         (void) tabos_tilemap_draw_layer(&graphics, &map, 0U, &sprites, &draw);
-        (void) tabos_sprite_animation_draw(&graphics, &sprites, DEMO_SPRITE_ROBOT_WALK, 80 - camera_x, 68 - camera_y,
-                                           elapsed);
-        (void) tabos_metasprite_draw(&graphics, &sprites, DEMO_METASPRITE_TREE, 120 - camera_x, 72 - camera_y, false,
-                                     false, 255U);
+        (void) tabos_sprite_animation_draw(&graphics, &sprites, DEMO_SPRITE_ROBOT_WALK, 80, 68, elapsed);
+        (void) tabos_metasprite_draw(&graphics, &sprites, DEMO_METASPRITE_TREE, 120, 72, false, false, 255U);
         (void) tabos_tilemap_draw_layer(&graphics, &map, 1U, &sprites, &draw);
         const tabos_tilemap_layer_t* markers = &map.layers[2];
         for (uint32_t index = 0U; index < markers->object_count; ++index) {
             const tabos_tilemap_object_t* object = &markers->objects[index];
-            (void) tabos_graphics_rect(&graphics, object->x - camera_x, object->y - camera_y,
-                                       object->width == 0U ? 2U : object->width,
+            (void) tabos_graphics_rect(&graphics, object->x, object->y, object->width == 0U ? 2U : object->width,
                                        object->height == 0U ? 2U : object->height, TABOS_RGB565(255, 255, 0));
         }
+        (void) tabos_graphics_end_camera(&graphics);
         (void) tabos_graphics_present(&graphics);
         (void) tabos_sleep_ms(16U);
     }

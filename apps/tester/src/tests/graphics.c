@@ -48,6 +48,16 @@ static void test_sprite_animation(tester_context_t* context, tabos_graphics_t* g
                       tabos_graphics_pixels(graphics)[0] == 0xf800U &&
                       tabos_graphics_pixels(graphics)[graphics->width + 1U] == 0xf800U,
                   "extended animated draw scales looped frame");
+    tester_expect(context, tabos_graphics_begin_camera(graphics, 10, -5) == 0, "world camera begins");
+    tester_expect(context,
+                  tabos_sprite_animation_draw(graphics, &sprites, 0U, 10, -5, 30U) == 0 &&
+                      tabos_graphics_pixels(graphics)[0] == 0x001fU,
+                  "animated sprite uses world coordinates");
+    tester_expect(context, tabos_graphics_present(graphics) == 0, "camera does not offset canvas presentation");
+    tester_expect(context, tabos_graphics_end_camera(graphics) == 0, "world camera ends");
+    tester_expect(context,
+                  tabos_graphics_pixel(graphics, 0, 0, 0xffffU) == 0 && tabos_graphics_pixels(graphics)[0] == 0xffffU,
+                  "HUD uses screen coordinates after camera ends");
     tester_expect(context, tabos_graphics_present(graphics) == 0, "animated sprites present");
 }
 

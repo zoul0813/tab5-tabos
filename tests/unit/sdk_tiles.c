@@ -117,9 +117,12 @@ int main(int argc, char** argv)
         .width = 2U, .height = 2U, .tile_width = 2U, .tile_height = 2U, .layers = layers, .layer_count = 1U};
     tabos_tile_t tile                       = 0U;
     const tabos_tilemap_draw_options_t draw = {
-        .camera_x = -1, .camera_y = -1, .viewport = {.width = 5U, .height = 5U},
-                .animation_ms = 10U
+        .viewport = {.width = 5U, .height = 5U},
+          .animation_ms = 10U
     };
+    if (tabos_graphics_begin_camera(&graphics, -1, -1) != 0) {
+        return 1;
+    }
     if (tabos_tilemap_get(&map, 0U, 0U, 0U, &tile) != 0 || tile != TABOS_TILE(0U) ||
         tabos_tilemap_set(&map, 0U, 1U, 0U, TABOS_TILE(1U)) != 0 || tabos_tilemap_get(&map, 0U, 2U, 0U, &tile) != -1 ||
         errno != ERANGE || tabos_tilemap_draw_layer(&graphics, &map, 0U, &sprites, &draw) != 0) {
@@ -161,6 +164,9 @@ int main(int argc, char** argv)
         red,   green, yellow, yellow, green,  blue,   yellow, yellow, blue, red,  green,
         green, red,   green,  yellow, yellow, green,  red,    blue,   blue, red,
     };
+    if (tabos_graphics_begin_camera(&graphics, 0, -8) != 0) {
+        return 1;
+    }
     if (tabos_tilemap_draw_layer(&graphics, &transform_map, 0U, &transform_sprites, &transform_draw) != 0) {
         return 1;
     }

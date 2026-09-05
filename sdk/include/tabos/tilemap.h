@@ -67,8 +67,7 @@ typedef struct {
 } tabos_tilemap_t;
 
 typedef struct {
-        int32_t camera_x;
-        int32_t camera_y;
+        /* Screen-space clip; world origin and camera come from the graphics context. */
         tabos_graphics_rect_t viewport;
         uint64_t animation_ms;
 } tabos_tilemap_draw_options_t;

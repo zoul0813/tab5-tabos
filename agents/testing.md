@@ -8,6 +8,14 @@
 
 ## Sprite, Tile, and Asset Validation
 
+Shared camera checks cover pixel/line/rectangle/blit translation, unchanged source and
+clip rectangles, camera replacement/reset, clear/present independence, overflow rejection,
+and native submission coordinates. Generated-C and binary fixtures verify whole-frame
+world shifts for sprites/animations/metasprites/maps, fixed HUD pixels, clipped viewports,
+and far-outside-map cameras. Native command checks do not replace full native/logical
+raster parity or physical presentation acceptance. Maintained tester checks camera-based
+animated drawing and screen-space HUD restoration; execution on target remains required.
+
 Host tests cover clip behavior, sprite pivots/transparency/animation/metasprites, tile
 get/set/camera/transforms, binary loading and cleanup, deterministic conversion, GIF
 timing/repeat metadata, generated-C compilation, editable TMJ/TSJ metadata, and absence
