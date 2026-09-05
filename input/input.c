@@ -1,4 +1,5 @@
 #include <tabos/internal/input.h>
+#include <tabos/internal/time.h>
 
 #include <tabos/config/input.h>
 #include <tabos/platform/platform.h>
@@ -18,7 +19,7 @@ static tabos_key_t held_key;
 static uint8_t held_modifiers;
 static char held_text[TABOS_INPUT_TEXT_MAX_BYTES + 1U];
 static uint8_t held_text_modifiers;
-static uint64_t next_repeat_ms;
+static tabos_timer_t repeat_timer;
 
 static bool modifier_key(tabos_key_t key)
 {
@@ -44,7 +45,7 @@ void input_init(void)
     held_modifiers      = 0U;
     held_text[0]        = '\0';
     held_text_modifiers = 0U;
-    next_repeat_ms      = 0U;
+    tabos_timer_cancel(&repeat_timer);
     unlock_queue();
 }
 
@@ -68,13 +69,13 @@ bool input_submit(const tabos_input_event_t* event)
         held_modifiers      = event->modifiers;
         held_text[0]        = '\0';
         held_text_modifiers = 0U;
-        next_repeat_ms      = platform_time_ms() + TABOS_KEY_REPEAT_DELAY_MS;
+        tabos_timer_start(&repeat_timer, TABOS_KEY_REPEAT_DELAY_MS, TABOS_KEY_REPEAT_INTERVAL_MS);
     } else if (event->type == TABOS_INPUT_KEY_UP && event->key == held_key) {
         held_key            = TABOS_KEY_UNKNOWN;
         held_modifiers      = 0U;
         held_text[0]        = '\0';
         held_text_modifiers = 0U;
-        next_repeat_ms      = 0U;
+        tabos_timer_cancel(&repeat_timer);
     } else if (event->type == TABOS_INPUT_TEXT && held_key != TABOS_KEY_UNKNOWN) {
         (void) strncpy(held_text, event->text, sizeof(held_text) - 1U);
         held_text[sizeof(held_text) - 1U] = '\0';
@@ -95,9 +96,8 @@ bool input_submit(const tabos_input_event_t* event)
 
 void input_update(void)
 {
-    const uint64_t now = platform_time_ms();
     lock_queue();
-    if (held_key == TABOS_KEY_UNKNOWN || now < next_repeat_ms) {
+    if (held_key == TABOS_KEY_UNKNOWN || !tabos_timer_poll(&repeat_timer)) {
         unlock_queue();
         return;
     }
@@ -135,7 +135,6 @@ void input_update(void)
         ++queue_count;
         text_repeated = true;
     }
-    next_repeat_ms = now + TABOS_KEY_REPEAT_INTERVAL_MS;
     unlock_queue();
     input_diagnostic_log(&key_event);
     if (text_repeated) {
@@ -146,7 +145,7 @@ void input_update(void)
 uint64_t input_next_deadline(void)
 {
     lock_queue();
-    const uint64_t deadline = held_key != TABOS_KEY_UNKNOWN ? next_repeat_ms : UINT64_MAX;
+    const uint64_t deadline = held_key != TABOS_KEY_UNKNOWN ? time_timer_deadline(&repeat_timer) : TIME_DEADLINE_NONE;
     unlock_queue();
     return deadline;
 }

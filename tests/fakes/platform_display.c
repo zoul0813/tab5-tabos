@@ -692,6 +692,11 @@ void test_platform_advance_time_ms(uint64_t elapsed_ms)
     monotonic_ms += elapsed_ms;
 }
 
+uint64_t test_platform_time_ms(void)
+{
+    return monotonic_ms;
+}
+
 uint64_t test_platform_runtime_wait_deadline(void)
 {
     return fake_runtime_wait_deadline;

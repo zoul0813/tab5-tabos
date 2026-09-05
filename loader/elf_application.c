@@ -17,6 +17,7 @@
 #include <tabos/internal/console.h>
 #include <tabos/internal/raster.h>
 #include <tabos/internal/runtime.h>
+#include <tabos/internal/time.h>
 #include <tabos/internal/network.h>
 #include <tabos/internal/network_config.h>
 #include <tabos/platform/platform.h>
@@ -1332,7 +1333,9 @@ static int elf_wait_sources(loader_elf_application_t* application, tabos_elf_wai
         }
     }
 
-    const uint64_t started_ms = platform_time_ms();
+    const bool finite_timeout = timeout_ms != TABOS_WAIT_TIMEOUT_INFINITE;
+    const uint64_t deadline_ms =
+        finite_timeout ? time_deadline_after(platform_time_ms(), timeout_ms) : TIME_DEADLINE_NONE;
     while (true) {
         int ready = 0;
         for (uint32_t type = 0U; type < ELF_WAIT_SOURCE_TYPE_COUNT; ++type) {
@@ -1359,18 +1362,19 @@ static int elf_wait_sources(loader_elf_application_t* application, tabos_elf_wai
             }
         }
 
+        const uint64_t now_ms = platform_time_ms();
+        if (ready == 0 && finite_timeout && now_ms >= deadline_ms) {
+            return 0;
+        }
+
         uint32_t socket_timeout = 0U;
         if (ready == 0 && timeout_ms != 0U) {
             if (!requires_polling) {
-                socket_timeout = timeout_ms;
-            } else if (timeout_ms == TABOS_WAIT_TIMEOUT_INFINITE) {
+                socket_timeout = finite_timeout ? (uint32_t) (deadline_ms - now_ms) : TABOS_WAIT_TIMEOUT_INFINITE;
+            } else if (!finite_timeout) {
                 socket_timeout = ELF_WAIT_POLL_SLICE_MS;
             } else {
-                const uint64_t elapsed = platform_time_ms() - started_ms;
-                if (elapsed >= timeout_ms) {
-                    return 0;
-                }
-                const uint32_t remaining = timeout_ms - (uint32_t) elapsed;
+                const uint32_t remaining = (uint32_t) (deadline_ms - now_ms);
                 socket_timeout           = remaining < ELF_WAIT_POLL_SLICE_MS ? remaining : ELF_WAIT_POLL_SLICE_MS;
             }
         }

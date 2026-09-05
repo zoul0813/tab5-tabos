@@ -36,6 +36,9 @@ Terminal stores character, foreground color, and background color in a cell/hist
 Text wraps at the right edge. Output at the bottom scrolls framebuffer upward by one terminal row. `tabos_console_clear()` clears display and resets cursor to column 0, row 0. `tabos_console_get_cursor()` reports current cell position.
 
 Foreground session shows a blinking inverted-cell cursor. Input and output immediately restore visible phase. Cursor disappears while viewport is above live output and when foreground session is released. `TABOS_CURSOR_BLINK_INTERVAL_MS` in `config/Console.cmake` controls half-period and defaults to 500 milliseconds.
+Blinking uses an exact monotonic deadline. Fullscreen graphics ownership cancels that
+deadline, so hidden console cursor creates no timer wake; leaving fullscreen restarts a
+full blink interval.
 
 ## Scrollback
 

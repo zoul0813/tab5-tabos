@@ -145,9 +145,11 @@ The public `<tabos/console.h>` API now supplies one cooperative foreground conso
 Portable runtime wake foundation carries coalesced TabOS-owned readiness bits and
 absolute monotonic deadlines through the platform boundary. Host uses SDL event waits,
 including headless tests; Tab5 uses FreeRTOS direct task notifications with a separate
-ISR-safe entry point. Runtime deadline discovery combines key repeat, cursor blink,
-network retry, and a temporary 10 ms compatibility deadline for services still awaiting
-later interrupt/completion phases. Host RV32 guests remain runnable through bounded
+ISR-safe entry point. Key repeat, cursor blink, network retry, and finite application
+waits use explicit saturating monotonic deadlines. Late periodic updates run once and
+advance directly to the next future period. Runtime deadline discovery retains a
+temporary 10 ms compatibility deadline for services still awaiting later
+interrupt/completion phases. Host RV32 guests remain runnable through bounded
 interpreter slices, while native Tab5 application tasks do not force runtime spinning.
 
 Portable application foundation defines descriptor and cooperative lifecycle API in

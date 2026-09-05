@@ -195,15 +195,22 @@ validation remains required independently on GT911, ST7123, and ST7121 hardware.
 
 ### Phase 4: Deadline-driven portable services
 
-- [ ] Change key repeat from periodic polling to an explicit next-repeat deadline.
-- [ ] Cancel repeat deadline immediately on matching key release or input reset.
-- [ ] Change cursor blink from periodic polling to an explicit next-blink deadline.
-- [ ] Suppress cursor deadline while fullscreen graphics owns display.
-- [ ] Change network autoconnect retry into an explicit monotonic deadline.
-- [ ] Integrate generic finite-wait deadlines without early wake or busy polling.
-- [ ] Define missed-period behavior: perform one current update and advance to next future
+- [x] Change key repeat from periodic polling to an explicit next-repeat deadline.
+- [x] Cancel repeat deadline immediately on matching key release or input reset.
+- [x] Change cursor blink from periodic polling to an explicit next-blink deadline.
+- [x] Suppress cursor deadline while fullscreen graphics owns display.
+- [x] Change network autoconnect retry into an explicit monotonic deadline.
+- [x] Integrate generic finite-wait deadlines without early wake or busy polling.
+- [x] Define missed-period behavior: perform one current update and advance to next future
   deadline rather than replaying every missed interval.
-- [ ] Handle monotonic saturation and infinite wait without arithmetic wraparound.
+- [x] Handle monotonic saturation and infinite wait without arithmetic wraparound.
+
+Portable timers now reserve `UINT64_MAX` exclusively for no deadline and clamp finite
+deadlines to the latest representable value. Repeating timers emit one expiration after
+a late update and preserve cadence by advancing directly to the next future period.
+Input repeat and network retry use these timers; cursor ownership changes wake runtime
+to add or remove its blink deadline immediately. Generic finite waits calculate one
+absolute monotonic deadline and recompute remaining blocking time after early wakes.
 
 ### Phase 5: Network and device-state notifications
 
@@ -319,7 +326,7 @@ validation remains required independently on GT911, ST7123, and ST7121 hardware.
 ### Services and process lifecycle
 
 - [ ] Wi-Fi/IP transitions update portable state and device registry exactly once.
-- [ ] Network retry fires only at deadline.
+- [x] Network retry fires only at deadline.
 - [ ] Camera worker blocks when idle and wakes for frame, stop, fault, and shutdown.
 - [ ] H.264 backpressure and camera lease behavior remain unchanged.
 - [ ] Native application completion wakes parent and preserves child status.

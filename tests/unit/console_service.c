@@ -36,7 +36,15 @@ int main(void)
     if (!terminal.cursor_visible || display_framebuffer()->pixels[0] != 0xffff) {
         return 1;
     }
-    test_platform_advance_time_ms(TABOS_CURSOR_BLINK_INTERVAL_MS);
+    if (console_next_deadline() != test_platform_time_ms() + TABOS_CURSOR_BLINK_INTERVAL_MS) {
+        return 1;
+    }
+    test_platform_advance_time_ms(TABOS_CURSOR_BLINK_INTERVAL_MS - 1U);
+    console_update();
+    if (!terminal.cursor_phase_visible) {
+        return 1;
+    }
+    test_platform_advance_time_ms(1U);
     console_update();
     if (terminal.cursor_phase_visible) {
         return 1;
@@ -79,7 +87,7 @@ int main(void)
     console_set_graphics_active(true);
     if (!tabos_console_write(&foreground, "graphics-hidden") || tabos_console_page_up(&foreground) ||
         memcmp(graphics_snapshot, framebuffer->pixels, framebuffer_bytes) != 0 || !input_submit(&submitted) ||
-        !tabos_console_poll(&foreground, &received)) {
+        !tabos_console_poll(&foreground, &received) || console_next_deadline() != UINT64_MAX) {
         return 1;
     }
     test_platform_advance_time_ms(TABOS_CURSOR_BLINK_INTERVAL_MS);
@@ -88,12 +96,16 @@ int main(void)
         return 1;
     }
     console_set_graphics_active(false);
+    if (console_next_deadline() != test_platform_time_ms() + TABOS_CURSOR_BLINK_INTERVAL_MS) {
+        return 1;
+    }
     free(graphics_snapshot);
 
     tabos_console_release(&foreground);
-    if (tabos_console_is_foreground(&foreground) || tabos_console_write(&foreground, "stale") ||
-        !tabos_console_acquire(&background) || !tabos_console_clear(&background) ||
-        !tabos_console_get_cursor(&background, &column, &row) || column != 0U || row != 0U) {
+    if (console_next_deadline() != UINT64_MAX || tabos_console_is_foreground(&foreground) ||
+        tabos_console_write(&foreground, "stale") || !tabos_console_acquire(&background) ||
+        !tabos_console_clear(&background) || !tabos_console_get_cursor(&background, &column, &row) || column != 0U ||
+        row != 0U) {
         return 1;
     }
 

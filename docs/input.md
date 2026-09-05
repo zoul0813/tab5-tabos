@@ -40,6 +40,11 @@ cooked text input. Preserve unrelated TTY mode bits when changing policy.
 
 The queue holds 64 events and is protected for host-thread and FreeRTOS-task access. If producers outrun consumers, the oldest event is discarded so current input remains responsive.
 
+Held-key repeat uses an exact monotonic deadline: initial delay starts on key-down and
+matching key-up or input reset cancels it immediately. If runtime handles a repeat late,
+it emits one repeat and schedules the next future interval instead of replaying missed
+events in a burst.
+
 ## Host Backend
 
 SDL3 physical keyboard events become TabOS key-down/key-up events. Representable SDL3

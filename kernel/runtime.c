@@ -14,6 +14,7 @@
 #include <tabos/internal/pointer.h>
 #include <tabos/internal/camera.h>
 #include <tabos/internal/terminal.h>
+#include <tabos/internal/time.h>
 #include <tabos/internal/wall_clock.h>
 
 #include <tabos/terminal.h>
@@ -394,9 +395,8 @@ void kernel_runtime_update(void)
     camera_service_update();
     hardware_devices_update();
     kernel_application_system_update();
-    const uint64_t now = platform_time_ms();
-    compatibility_poll_deadline_ms =
-        UINT64_MAX - now < RUNTIME_COMPATIBILITY_POLL_MS ? UINT64_MAX : now + RUNTIME_COMPATIBILITY_POLL_MS;
+    const uint64_t now             = platform_time_ms();
+    compatibility_poll_deadline_ms = time_deadline_after(now, RUNTIME_COMPATIBILITY_POLL_MS);
 }
 
 uint64_t kernel_runtime_next_deadline(void)

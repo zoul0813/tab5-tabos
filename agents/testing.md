@@ -117,6 +117,13 @@ interrupt phases add hardware timing and teardown validation separately. Until t
 phases complete, tests must preserve the explicit 10 ms compatibility deadline used by
 still-polled services rather than claiming idle polling has ended.
 
+Deadline-service tests use fake monotonic time and must prove exact key-repeat, cursor,
+network-retry, and finite-wait deadlines; no firing one millisecond early; immediate
+cancellation on release, reset, fullscreen ownership, disconnect, and shutdown; one
+update after multiple missed periods; and next-deadline advancement strictly into the
+future. Saturation tests must prove finite additions never wrap into the past and never
+collide with `UINT64_MAX`, which remains the infinite/no-deadline sentinel.
+
 Host builds are especially useful for:
 
 - shell development

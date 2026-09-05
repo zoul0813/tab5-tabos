@@ -36,6 +36,9 @@
   interrupt-driven wake, with drain/recheck and deterministic cancellation.
 - [ ] Phase 3 hardware validation: verify down/move/up, multitouch, rapid retouch,
   stationary contact, and orientation on GT911, ST7123, and ST7121 revisions.
+- [x] Phase 4: drive key repeat, cursor blink, network retry, and finite waits from
+  explicit saturating monotonic deadlines; skip missed-period replay and cancel obsolete
+  deadlines immediately.
 
 ### Hardware Services Phase 6 Validation
 

@@ -234,8 +234,11 @@ platform notification state is released.
 
 The host backend maps the contract to SDL events, including headless operation. Tab5 maps
 it to FreeRTOS direct task notifications; FreeRTOS types remain below the platform
-boundary. Runtime deadline discovery currently combines key repeat, cursor blink,
-network retry, and a 10 ms compatibility deadline for services whose interrupt/completion
+boundary. Key repeat, cursor blink, network retry, and finite waits publish exact
+monotonic deadlines. `UINT64_MAX` means no deadline and finite additions clamp below it;
+late periodic work runs once and advances to the next future period. Cursor ownership
+and network/input changes wake runtime when they add or cancel deadlines. Runtime still
+includes a 10 ms compatibility deadline for services whose interrupt/completion
 conversion belongs to later ISR-milestone phases. Active host RV32 interpretation keeps
 the runtime immediately runnable for bounded instruction slices. Native Tab5 execution
 does not use that runnable hint because it runs in its own managed task.
@@ -738,7 +741,11 @@ input policy. Shell enables scroll keys through the public `ioctl()` wrapper. Ch
 inherit a value copy; a child may disable the mode for raw/game input without changing
 the blocked parent's retained mode. Enabled navigation keys are consumed before stdin.
 
-Portable monotonic time and polling timers live behind platform clock source. Console uses repeating timer for cursor phase; service remains reusable for future runtime scheduling. Terminal tracks dirty visible cells for ordinary text/cursor changes and reserves full redraw for viewport, clear, or resize changes.
+Portable monotonic time and deadline timers live behind platform clock source. Console
+uses a repeating timer for cursor phase and publishes its next deadline to runtime;
+fullscreen graphics cancels that deadline. Late timer polls emit one expiration and skip
+missed intervals without replay. Terminal tracks dirty visible cells for ordinary
+text/cursor changes and reserves full redraw for viewport, clear, or resize changes.
 
 ---
 

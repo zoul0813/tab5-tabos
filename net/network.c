@@ -1,6 +1,7 @@
 #include <tabos/internal/network.h>
 
 #include <tabos/internal/network_config.h>
+#include <tabos/internal/time.h>
 #include <tabos/platform/platform.h>
 
 #include <stdio.h>
@@ -14,9 +15,8 @@ enum {
 static network_status_t current;
 static char password[NETWORK_CONFIG_PASSWORD_MAX + 1U];
 static bool initialized;
-static bool retry_pending;
 static bool retry_suppressed;
-static uint64_t retry_at_ms;
+static tabos_timer_t retry_timer;
 
 static void set_failure(const char* failure)
 {
@@ -48,8 +48,8 @@ bool network_service_init(void)
     if (initialized) {
         return true;
     }
-    current                 = (network_status_t) {.state = NETWORK_STATE_STARTING};
-    retry_pending           = false;
+    current = (network_status_t) {.state = NETWORK_STATE_STARTING};
+    tabos_timer_cancel(&retry_timer);
     retry_suppressed        = false;
     network_config_t config = {
         .name = NETWORK_CONFIG_DEFAULT_NAME,
@@ -100,7 +100,7 @@ void network_service_update(void)
     }
     if (platform_status.state == PLATFORM_NETWORK_ONLINE) {
         current.state = NETWORK_STATE_ONLINE;
-        retry_pending = false;
+        tabos_timer_cancel(&retry_timer);
         (void) snprintf(current.ipv4, sizeof(current.ipv4), "%s", platform_status.ipv4);
         current.signal_dbm = platform_status.signal_dbm;
         return;
@@ -113,19 +113,18 @@ void network_service_update(void)
         const bool was_connecting = current.state == NETWORK_STATE_CONNECTING;
         set_failure(platform_status.failure);
         if (was_connecting && current.attempts < NETWORK_AUTOCONNECT_ATTEMPTS) {
-            retry_pending = true;
-            retry_at_ms   = platform_time_ms() + NETWORK_RETRY_DELAY_MS;
+            tabos_timer_start(&retry_timer, NETWORK_RETRY_DELAY_MS, 0U);
+            platform_runtime_notify(PLATFORM_RUNTIME_EVENT_DEADLINE);
         }
     }
-    if (retry_pending && platform_time_ms() >= retry_at_ms) {
-        retry_pending = false;
+    if (tabos_timer_poll(&retry_timer)) {
         (void) start_attempt();
     }
 }
 
 uint64_t network_service_next_deadline(void)
 {
-    return initialized && retry_pending ? retry_at_ms : UINT64_MAX;
+    return initialized ? time_timer_deadline(&retry_timer) : TIME_DEADLINE_NONE;
 }
 
 void network_service_shutdown(void)
@@ -133,7 +132,7 @@ void network_service_shutdown(void)
     if (!initialized) {
         return;
     }
-    retry_pending = false;
+    tabos_timer_cancel(&retry_timer);
     (void) platform_network_disconnect();
     platform_tls_operations_shutdown();
     platform_network_socket_operations_shutdown();
@@ -156,9 +155,11 @@ bool network_service_connect(const char* ssid, const char* supplied_password, bo
     current.auto_connect = automatic;
     current.attempts     = 0U;
     current.ipv4[0]      = '\0';
-    retry_pending        = false;
-    retry_suppressed     = false;
-    return start_attempt();
+    tabos_timer_cancel(&retry_timer);
+    retry_suppressed   = false;
+    const bool started = start_attempt();
+    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_DEADLINE);
+    return started;
 }
 
 bool network_service_disconnect(void)
@@ -166,9 +167,10 @@ bool network_service_disconnect(void)
     if (!initialized) {
         return false;
     }
-    retry_pending    = false;
+    tabos_timer_cancel(&retry_timer);
     retry_suppressed = true;
     current.state    = NETWORK_STATE_DISCONNECTING;
+    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_DEADLINE);
     if (!platform_network_disconnect()) {
         set_failure("disconnect failed");
         return false;

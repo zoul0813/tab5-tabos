@@ -57,6 +57,10 @@ int main(void)
     if (!input_submit(&held) || !tabos_input_poll(&received)) {
         return 1;
     }
+    const uint64_t first_repeat_ms = test_platform_time_ms() + TABOS_KEY_REPEAT_DELAY_MS;
+    if (input_next_deadline() != first_repeat_ms) {
+        return 1;
+    }
     const tabos_input_event_t held_text = {
         .type = TABOS_INPUT_TEXT,
         .text = "w",
@@ -73,7 +77,16 @@ int main(void)
     input_update();
     if (!tabos_input_poll(&received) || received.type != TABOS_INPUT_KEY_DOWN || received.key != TABOS_KEY_W ||
         !received.repeat || !tabos_input_poll(&received) || received.type != TABOS_INPUT_TEXT ||
-        strcmp(received.text, "w") != 0 || !received.repeat) {
+        strcmp(received.text, "w") != 0 || !received.repeat || tabos_input_poll(&received) ||
+        input_next_deadline() != first_repeat_ms + TABOS_KEY_REPEAT_INTERVAL_MS) {
+        return 1;
+    }
+
+    test_platform_advance_time_ms((TABOS_KEY_REPEAT_INTERVAL_MS * 5U) + 1U);
+    input_update();
+    if (!tabos_input_poll(&received) || received.type != TABOS_INPUT_KEY_DOWN || !received.repeat ||
+        !tabos_input_poll(&received) || received.type != TABOS_INPUT_TEXT || !received.repeat ||
+        tabos_input_poll(&received) || input_next_deadline() <= test_platform_time_ms()) {
         return 1;
     }
 
@@ -81,10 +94,14 @@ int main(void)
         .type = TABOS_INPUT_KEY_UP,
         .key  = TABOS_KEY_W,
     };
-    if (!input_submit(&released) || !tabos_input_poll(&received)) {
+    if (!input_submit(&released) || input_next_deadline() != UINT64_MAX || !tabos_input_poll(&received)) {
         return 1;
     }
     test_platform_advance_time_ms(TABOS_KEY_REPEAT_INTERVAL_MS);
     input_update();
-    return tabos_input_poll(&received) ? 1 : 0;
+    if (tabos_input_poll(&received) || !input_submit(&held) || input_next_deadline() == UINT64_MAX) {
+        return 1;
+    }
+    input_init();
+    return input_next_deadline() == UINT64_MAX ? 0 : 1;
 }
