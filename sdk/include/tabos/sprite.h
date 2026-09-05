@@ -77,6 +77,9 @@ typedef struct {
         bool clip_enabled;
 } tabos_sprite_draw_options_t;
 
+/* Natural size, no transform, full opacity, and no clipping. */
+#define TABOS_SPRITE_DRAW_OPTIONS_DEFAULT ((tabos_sprite_draw_options_t) {.opacity = UINT8_MAX})
+
 int tabos_sprite_draw(tabos_graphics_t* graphics, const tabos_sprite_set_t* set, uint32_t sprite, int32_t x, int32_t y);
 int tabos_sprite_draw_ex(tabos_graphics_t* graphics, const tabos_sprite_set_t* set, uint32_t sprite, int32_t x,
                          int32_t y, const tabos_sprite_draw_options_t* options);

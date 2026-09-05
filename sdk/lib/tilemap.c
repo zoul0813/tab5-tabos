@@ -172,13 +172,11 @@ int tabos_tilemap_draw_layer(tabos_graphics_t* graphics, const tabos_tilemap_t* 
             if (sprite == TABOS_SPRITE_NONE) {
                 return -1;
             }
-            tabos_sprite_draw_options_t draw = {
-                .width        = map->tile_width,
-                .height       = map->tile_height,
-                .opacity      = 255U,
-                .clip         = options->viewport,
-                .clip_enabled = true,
-            };
+            tabos_sprite_draw_options_t draw = TABOS_SPRITE_DRAW_OPTIONS_DEFAULT;
+            draw.width                       = map->tile_width;
+            draw.height                      = map->tile_height;
+            draw.clip                        = options->viewport;
+            draw.clip_enabled                = true;
             tile_transform(tile, &draw);
             const int32_t destination_x      = (int32_t) (column * map->tile_width - graphics->camera_x);
             const int32_t destination_y      = (int32_t) (row * map->tile_height - graphics->camera_y);

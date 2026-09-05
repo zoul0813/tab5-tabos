@@ -16,8 +16,19 @@ different tile.
 
 `tabos_sprite_animation_draw()` selects and draws a frame in one call, at natural size
 and full opacity. `tabos_sprite_animation_draw_ex()` accepts the existing sprite draw
-options for size, rotation, mirrors, opacity, and clipping. Its options still require
-explicit opacity, such as `255` for opaque drawing.
+options for size, rotation, mirrors, opacity, and clipping. Initialize extended options
+with `TABOS_SPRITE_DRAW_OPTIONS_DEFAULT`: natural size, full opacity, no rotation or
+mirroring, and no clipping. Override only fields needed by the draw:
+
+```c
+tabos_sprite_draw_options_t options = TABOS_SPRITE_DRAW_OPTIONS_DEFAULT;
+options.mirror_x = true;
+tabos_sprite_draw_ex(&graphics, &sprites, PLAYER, player.x, player.y, &options);
+```
+
+This initializer works with both sprite and animated `_ex` calls. Setting `opacity` to
+zero afterward remains an explicit fully transparent draw. A plain `{0}` initializer
+has zero opacity; use the named default whenever default visible drawing is intended.
 
 Pass elapsed milliseconds since this actor started its current clip, not a frame delta.
 `tabos_sprite_animation_finished()` returns `0` on success and writes a boolean result:

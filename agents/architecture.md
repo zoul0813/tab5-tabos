@@ -6,6 +6,11 @@
 
 ## Sprite and Tile Layer
 
+`[DECIDED]` `TABOS_SPRITE_DRAW_OPTIONS_DEFAULT` is the canonical initializer for
+extended sprite and animation draws. It selects natural size, full opacity, no transform,
+and no clip while preserving explicit opacity zero. This is SDK-only and changes no
+binary asset or private transport layout.
+
 - `[DECIDED]` World drawing uses one SDK graphics-context camera. Begin replaces its
   offset; end resets to screen coordinates, with no stack. Sprites, animations,
   metasprites, primitives, and map layers share the offset. Clips/viewports stay in

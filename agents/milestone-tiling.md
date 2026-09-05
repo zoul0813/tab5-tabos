@@ -56,6 +56,9 @@ Add `<tabos/sprite.h>`:
 - [ ] Review: `tabos_sprite_draw()` draws a natural-size sprite at its pivot.
 - [ ] Review: `tabos_sprite_draw_ex()` adds destination size, quarter-turn rotation, mirroring,
   opacity, and an optional clip rectangle.
+- [x] Review: `TABOS_SPRITE_DRAW_OPTIONS_DEFAULT` initializes sprite and animated `_ex`
+  drawing to natural size, full opacity, no transforms, and no clipping. Explicitly
+  setting opacity to zero remains transparent.
 - [ ] Review: Transform the sprite pivot with the image, keeping the requested world position fixed.
 - [ ] Review: `tabos_sprite_animation_frame()` selects a frame from explicit elapsed milliseconds.
   Each clip stores a repeat count: zero repeats forever, while a positive value plays
@@ -293,6 +296,19 @@ Validated working-tree changes based on `7e43d93`:
   executed on target during this change. No installation or physical acceptance claimed.
 - Full native/logical raster parity, Linux builds, physical presentation, and performance
   acceptance remain open.
+
+## Extended Draw Defaults Evidence — 2026-09-05
+
+- Added the typed `TABOS_SPRITE_DRAW_OPTIONS_DEFAULT` initializer and used it inside
+  normal sprite/animation helpers, metasprite drawing, tile drawing, and maintained tester.
+- Generated-C and binary-backed sprite sets compare normal draws with default-initialized
+  `_ex` draws pixel for pixel. Tests verify every initialized field and confirm an explicit
+  opacity of zero still draws no pixels.
+- macOS Debug full suite: 44/44 passed with sanitizers. Focused Debug and Release tile and
+  asset-equivalence tests passed. Standard RV32 applications, including maintained tester
+  and tile demo, cross-built successfully.
+- This changes no descriptor, binary asset, or private ELF transport layout. Physical
+  validation remains recorded by the surrounding milestone checklist.
 
 ## Assumptions
 

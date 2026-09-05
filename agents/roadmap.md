@@ -22,6 +22,8 @@
 
 ### Sprite and Tile Graphics
 
+- [x] Add canonical extended-draw defaults for natural size, full opacity, no transforms, and no clipping while preserving explicit transparent draws. macOS Debug 44/44 tests, focused Debug/Release tile and equivalence tests, and standard RV32 app builds pass.
+
 - [x] Add shared graphics begin/end camera for primitives, sprites, animations, metasprites, and map layers; remove independent map camera fields and migrate demo to world coordinates. macOS Debug 44/44 and four focused Release tests pass; standard RV32 apps and Tab5 Debug firmware cross-build. Physical execution remains open.
 
 - [x] Add stateless animated draw helpers, completion query, and Tiled repeat metadata. macOS Debug 44/44 tests, four focused Release tests, and standard RV32 application builds pass; maintained tester animation checks still require execution on target.

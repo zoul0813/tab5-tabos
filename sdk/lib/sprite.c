@@ -128,7 +128,7 @@ int tabos_sprite_draw_ex(tabos_graphics_t* graphics, const tabos_sprite_set_t* s
 
 int tabos_sprite_draw(tabos_graphics_t* graphics, const tabos_sprite_set_t* set, uint32_t sprite, int32_t x, int32_t y)
 {
-    const tabos_sprite_draw_options_t options = {.opacity = 255U};
+    const tabos_sprite_draw_options_t options = TABOS_SPRITE_DRAW_OPTIONS_DEFAULT;
     return tabos_sprite_draw_ex(graphics, set, sprite, x, y, &options);
 }
 
@@ -195,7 +195,7 @@ uint32_t tabos_sprite_animation_frame(const tabos_sprite_set_t* set, uint32_t an
 int tabos_sprite_animation_draw(tabos_graphics_t* graphics, const tabos_sprite_set_t* set, uint32_t animation,
                                 int32_t x, int32_t y, uint64_t elapsed_ms)
 {
-    const tabos_sprite_draw_options_t options = {.opacity = 255U};
+    const tabos_sprite_draw_options_t options = TABOS_SPRITE_DRAW_OPTIONS_DEFAULT;
     return tabos_sprite_animation_draw_ex(graphics, set, animation, x, y, elapsed_ms, &options);
 }
 
@@ -219,15 +219,14 @@ int tabos_metasprite_draw(tabos_graphics_t* graphics, const tabos_sprite_set_t* 
     }
     const tabos_metasprite_t* metasprite = &set->metasprites[metasprite_id];
     for (uint32_t index = 0U; index < metasprite->part_count; ++index) {
-        const tabos_metasprite_part_t* part       = &metasprite->parts[index];
-        const tabos_sprite_draw_options_t options = {
-            .rotation = part->rotation,
-            .mirror_x = part->mirror_x != mirror_x,
-            .mirror_y = part->mirror_y != mirror_y,
-            .opacity  = combined_opacity(part->opacity, opacity),
-        };
-        const int32_t part_x = x + (mirror_x ? -part->x : part->x);
-        const int32_t part_y = y + (mirror_y ? -part->y : part->y);
+        const tabos_metasprite_part_t* part = &metasprite->parts[index];
+        tabos_sprite_draw_options_t options = TABOS_SPRITE_DRAW_OPTIONS_DEFAULT;
+        options.rotation                    = part->rotation;
+        options.mirror_x                    = part->mirror_x != mirror_x;
+        options.mirror_y                    = part->mirror_y != mirror_y;
+        options.opacity                     = combined_opacity(part->opacity, opacity);
+        const int32_t part_x                = x + (mirror_x ? -part->x : part->x);
+        const int32_t part_y                = y + (mirror_y ? -part->y : part->y);
         if (tabos_sprite_draw_ex(graphics, set, part->sprite, part_x, part_y, &options) != 0) {
             return -1;
         }

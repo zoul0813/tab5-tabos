@@ -5,6 +5,11 @@
 
 ## Sprite and Tile SDK
 
+- `[DECIDED]` Extended sprite and animation drawing uses
+  `TABOS_SPRITE_DRAW_OPTIONS_DEFAULT` for natural size, full opacity, no transforms,
+  and no clipping. Games copy the initializer and override only needed fields. Explicit
+  opacity zero remains transparent; plain zero initialization retains zero opacity.
+
 - `[DECIDED]` World drawing uses one SDK graphics-context camera. Begin replaces its
   offset; end resets to screen coordinates, with no stack. Sprites, animations,
   metasprites, primitives, and map layers share the offset. Clips/viewports stay in

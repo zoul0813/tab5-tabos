@@ -8,6 +8,10 @@
 
 ## Sprite, Tile, and Asset Validation
 
+Default-option tests compare normal sprite and animation draws with their `_ex` forms
+using `TABOS_SPRITE_DRAW_OPTIONS_DEFAULT`. They verify every default field, natural-size
+pixels, full opacity, no transform/clip, and explicit opacity-zero transparency.
+
 Shared camera checks cover pixel/line/rectangle/blit translation, unchanged source and
 clip rectangles, camera replacement/reset, clear/present independence, overflow rejection,
 and native submission coordinates. Generated-C and binary fixtures verify whole-frame

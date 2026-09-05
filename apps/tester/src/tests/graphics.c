@@ -42,7 +42,9 @@ static void test_sprite_animation(tester_context_t* context, tabos_graphics_t* g
                   tabos_sprite_animation_draw(graphics, &sprites, 0U, 0, 0, 30U) == 0 &&
                       tabos_graphics_pixels(graphics)[0] == 0x001fU,
                   "animated draw holds final frame after completion");
-    const tabos_sprite_draw_options_t options = {.width = 2U, .height = 2U, .opacity = 255U};
+    tabos_sprite_draw_options_t options = TABOS_SPRITE_DRAW_OPTIONS_DEFAULT;
+    options.width                       = 2U;
+    options.height                      = 2U;
     tester_expect(context,
                   tabos_sprite_animation_draw_ex(graphics, &sprites, 1U, 0, 0, 30U, &options) == 0 &&
                       tabos_graphics_pixels(graphics)[0] == 0xf800U &&

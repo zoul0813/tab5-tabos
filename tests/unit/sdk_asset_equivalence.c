@@ -175,6 +175,37 @@ static void compare_pixels(const tabos_color_t* actual, const tabos_color_t* exp
     }
 }
 
+static void check_default_options(tabos_graphics_t* graphics, const tabos_sprite_set_t* sprites)
+{
+    const tabos_sprite_draw_options_t defaults = TABOS_SPRITE_DRAW_OPTIONS_DEFAULT;
+    CHECK(defaults.width == 0U && defaults.height == 0U && defaults.rotation == TABOS_GRAPHICS_ROTATE_0);
+    CHECK(!defaults.mirror_x && !defaults.mirror_y && defaults.opacity == UINT8_MAX);
+    CHECK(!defaults.clip_enabled && defaults.clip.x == 0 && defaults.clip.y == 0 && defaults.clip.width == 0U &&
+          defaults.clip.height == 0U);
+
+    tabos_color_t expected[PIXELS];
+    CHECK(tabos_graphics_clear(graphics, 0x1234U) == 0);
+    CHECK(tabos_sprite_draw(graphics, sprites, EQUIVALENCE_SPRITE_QUAD, 5, 5) == 0);
+    memcpy(expected, graphics->pixels, sizeof(expected));
+    CHECK(tabos_graphics_clear(graphics, 0x1234U) == 0);
+    CHECK(tabos_sprite_draw_ex(graphics, sprites, EQUIVALENCE_SPRITE_QUAD, 5, 5, &defaults) == 0);
+    compare_pixels(graphics->pixels, expected, "default sprite options match normal draw");
+
+    CHECK(tabos_graphics_clear(graphics, 0x1234U) == 0);
+    CHECK(tabos_sprite_animation_draw(graphics, sprites, EQUIVALENCE_ANIMATION_CYCLE, 5, 5, 10U) == 0);
+    memcpy(expected, graphics->pixels, sizeof(expected));
+    CHECK(tabos_graphics_clear(graphics, 0x1234U) == 0);
+    CHECK(tabos_sprite_animation_draw_ex(graphics, sprites, EQUIVALENCE_ANIMATION_CYCLE, 5, 5, 10U, &defaults) == 0);
+    compare_pixels(graphics->pixels, expected, "default animation options match normal draw");
+
+    tabos_sprite_draw_options_t transparent = TABOS_SPRITE_DRAW_OPTIONS_DEFAULT;
+    transparent.opacity                     = 0U;
+    CHECK(tabos_graphics_clear(graphics, 0x1234U) == 0);
+    memcpy(expected, graphics->pixels, sizeof(expected));
+    CHECK(tabos_sprite_draw_ex(graphics, sprites, EQUIVALENCE_SPRITE_QUAD, 5, 5, &transparent) == 0);
+    compare_pixels(graphics->pixels, expected, "explicit zero opacity remains transparent");
+}
+
 static void known_pixels(tabos_graphics_t* graphics, const tabos_sprite_set_t* sprites)
 {
     tabos_color_t expected[PIXELS] = {0};
@@ -446,6 +477,8 @@ int main(int argc, char** argv)
     check_ids(&loaded, &map);
     tabos_graphics_t graphics = {.width = WIDTH, .height = HEIGHT};
     CHECK(tabos_graphics_open(&graphics) == 0);
+    check_default_options(&graphics, &equivalence_sprites);
+    check_default_options(&graphics, &loaded);
     check_camera_pixels(&graphics, &equivalence_sprites, &equivalence_world);
     check_camera_pixels(&graphics, &loaded, &map);
     check_completion(&equivalence_sprites);
