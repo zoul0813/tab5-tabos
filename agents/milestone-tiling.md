@@ -132,19 +132,19 @@ Add `./tools/tabos assets build <manifest>`:
 
 Binary formats:
 
-- [ ] Review: `.tsp`: little-endian sprite-set file with `TSP1` magic, images, regions, flags,
+- [x] Review: `.tsp`: little-endian sprite-set file with `TSP1` magic, images, regions, flags,
   animations, frames, metasprites, and parts.
-- [ ] Review: `.tmap`: little-endian map file with `TMP1` magic, dimensions, ordered layer metadata,
+- [x] Review: `.tmap`: little-endian map file with `TMP1` magic, dimensions, ordered layer metadata,
   tile cells, simple objects, properties, and a string table.
-- [ ] Review: Store offsets and counts, never pointers. Require four-byte alignment and exact file bounds.
-- [ ] Review: Do not add compression or checksums in v1.
-- [ ] Review: Load each validated asset completely into process-owned memory. Constrain allocation by
+- [x] Review: Store offsets and counts, never pointers. Require four-byte alignment and exact file bounds.
+- [x] Review: Do not add compression or checksums in v1.
+- [x] Review: Load each validated asset completely into process-owned memory. Constrain allocation by
   the application heap and return `ENOMEM` without partial state.
-- [ ] Review: `tabos_sprite_set_load()`/`tabos_sprite_set_unload()` and
+- [x] Review: `tabos_sprite_set_load()`/`tabos_sprite_set_unload()` and
   `tabos_tilemap_load()`/`tabos_tilemap_unload()` own binary allocations. Unload zeroes
   the destination object.
 - [ ] Review: Generated C and binary forms expose identical IDs and rendering semantics.
-- [ ] Review: Modified binary-map cells remain memory-only; do not save them automatically.
+- [x] Review: Modified binary-map cells remain memory-only; do not save them automatically.
 - [ ] Review: Unload only after the final `present()` or graphics close because queued commands retain
   source pointers.
 
@@ -174,11 +174,11 @@ Binary formats:
   repeat counts, multiple tilesets, Tiled transforms and animations, object markers,
   identifier collisions, and every rejected feature.
 - [ ] Verify generated-C/binary equivalence for IDs, descriptors, and rendered output.
-- [ ] Test binary-loader rejection of bad magic and unsupported versions independently.
-- [ ] Test truncated binary assets independently of bad magic.
-- [ ] Test binary-loader overflow and invalid offsets, counts, alignment, and GIDs.
-- [ ] Inject allocation failures and verify `ENOMEM`, no partial state, and leak-free cleanup.
-- [ ] Verify repeated successful load/unload and cleanup after failed loads.
+- [x] Test binary-loader rejection of bad magic and unsupported versions independently.
+- [x] Test truncated binary assets independently of bad magic.
+- [x] Test binary-loader overflow and invalid offsets, counts, alignment, and GIDs.
+- [x] Inject allocation failures and verify `ENOMEM`, no partial state, and leak-free cleanup.
+- [x] Verify repeated successful load/unload and cleanup after failed loads.
 - [ ] Sprite pixel tests cover clipping, pivots, scale, quarter rotations, mirrors, opacity,
   transparency, animation wrap/clamp, metasprite order, and transformed pivots.
 - [ ] Tilemap tests cover get/set, empty cells, every Tiled flip combination, negative camera,
@@ -187,9 +187,10 @@ Binary formats:
 - [ ] Run tests through native and logical canvases; scalar output remains byte-identical
   across host and Tab5 fallback.
 - [ ] Extend the maintained `tester` with generated-C and binary asset coverage.
+
 ### Build Matrix
 
-- [x] Validate macOS Debug and Release builds (recorded in roadmap; not rerun during this checklist conversion).
+- [x] Validate macOS Debug and Release builds (rerun for the loader validation changes; see evidence below).
 - [x] Validate Tab5 Debug and Release builds (recorded in roadmap; not rerun during this checklist conversion).
 - [ ] Validate Linux Debug and Release builds.
 - [ ] Verify all applications build and declared runtime assets install correctly across the target/configuration matrix.
@@ -201,6 +202,7 @@ Binary formats:
 - [ ] Verify RGB565 color-key transparency and all Tiled transforms on physical Tab5.
 - [ ] Verify repeated load/unload and repeated application launch/exit without resource loss.
 - [ ] Verify terminal and input restoration on exit.
+
 ### Performance Acceptance
 
 - [ ] Add a repeatable benchmark fixture and timing instrumentation; current `tile-demo` uses a 160x120 canvas and two tile layers, so it does not meet the acceptance workload.
@@ -208,6 +210,19 @@ Binary formats:
   tile layers, and 64 sprites, sustaining the Tab5 panel cadence target of 58 FPS. If frame
   construction, excluding the VSYNC wait, exceeds 12 ms, add one bounded bulk tile-layer
   private ABI operation while preserving the same public SDK API.
+
+## Loader Review Evidence — 2026-09-05
+
+Validated working-tree changes based on `269d064`:
+
+- `unit.sdk_asset_loaders`: 764 cases pass on macOS Debug and Release, including independently authored valid files, separate corruption/truncation cases, allocation-failure injection, unchanged existing destinations after failure, and repeated cleanup.
+- Fixed acceptance of header/descriptor aliases, writable cells overlapping strings, zero-size sprite regions, empty animations, zero-duration frames, and tile dimensions outside signed coordinate range. Reject malformed files with `EINVAL` and allocation failures with `ENOMEM`.
+- Reviewed table and allocation-size arithmetic; malformed wire counts and dimension products are exercised without huge allocations. Near-address-space native allocation-size overflow remains a code-review check, not a multi-gigabyte runtime fixture.
+- Map files have no sprite-set size. Binary validation checks reserved GID bits; matching sprite IDs to a selected sprite set remains drawing validation.
+- `./tools/tabos macos debug test`: 42/43 tests passed in the sandbox; the remaining `component.network_socket` test passed when rerun outside the sandbox to allow loopback binding. Debug uses AddressSanitizer and UndefinedBehaviorSanitizer; allocator tracking also verifies leak-free loader cleanup.
+- `./tools/tabos macos release build` and focused Release loader/tile/converter tests passed.
+- `./apps/build.sh build` cross-built standard RV32 applications, including `tile-demo`, with ESP-IDF's RISC-V toolchain. Optional DOOM was excluded by the script default. This was a build/staging check, not MSC installation or physical execution.
+- Generated-C/binary rendering equivalence, native/logical rendering parity, maintained `tester` integration, Linux builds, and physical Tab5 acceptance remain open.
 
 ## Assumptions
 

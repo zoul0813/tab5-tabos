@@ -22,7 +22,13 @@ static uint32_t read_u32(const uint8_t* data)
 
 static bool table_valid(uint32_t offset, uint32_t count, uint32_t stride, size_t size)
 {
-    return (offset & 3U) == 0U && offset <= size && count <= (size - offset) / stride;
+    return offset >= TSP_HEADER_SIZE && (offset & 3U) == 0U && offset <= size && count <= (size - offset) / stride;
+}
+
+static bool ranges_overlap(uint32_t first_offset, uint64_t first_size, uint32_t second_offset, uint64_t second_size)
+{
+    return first_size != 0U && second_size != 0U && first_offset < (uint64_t) second_offset + second_size &&
+           second_offset < (uint64_t) first_offset + first_size;
 }
 
 static bool allocation_add(size_t* size, uint32_t count, size_t item_size)
@@ -215,6 +221,11 @@ static int load_file(const char* path, uint8_t** output, size_t* output_size)
         errno = EIO;
         return -1;
     }
+    if ((uint64_t) length < TSP_HEADER_SIZE || (uint64_t) length > UINT32_MAX) {
+        fclose(file);
+        errno = EINVAL;
+        return -1;
+    }
     uint8_t* data = malloc((size_t) length);
     if (data == NULL) {
         fclose(file);
@@ -262,6 +273,14 @@ int tabos_sprite_set_load(const char* path, tabos_sprite_set_t* set)
             errno = EINVAL;
             return -1;
         }
+        for (uint32_t previous = 0U; previous < index; ++previous) {
+            if (ranges_overlap(offsets[index], (uint64_t) counts[index] * strides[index], offsets[previous],
+                               (uint64_t) counts[previous] * strides[previous])) {
+                free(file_data);
+                errno = EINVAL;
+                return -1;
+            }
+        }
     }
     size_t allocation_size      = file_size;
     const bool allocation_valid = allocation_add(&allocation_size, counts[0], sizeof(tabos_sprite_image_t)) &&
@@ -303,6 +322,10 @@ int tabos_sprite_set_load(const char* path, tabos_sprite_set_t* set)
         const uint32_t width = read_u32(record), height = read_u32(record + 4U), pixels = read_u32(record + 8U);
         valid = width != 0U && height != 0U && width <= UINT32_MAX / height &&
                 table_valid(pixels, width * height, sizeof(tabos_color_t), file_size);
+        for (uint32_t table = 0U; table < 6U && valid; ++table) {
+            valid = !ranges_overlap(pixels, (uint64_t) width * height * sizeof(tabos_color_t), offsets[table],
+                                    (uint64_t) counts[table] * strides[table]);
+        }
         images[index] = (tabos_sprite_image_t) {.pixels    = valid ? (const tabos_color_t*) (storage + pixels) : NULL,
                                                 .width     = width,
                                                 .height    = height,
@@ -320,19 +343,20 @@ int tabos_sprite_set_load(const char* path, tabos_sprite_set_t* set)
                                                   .pivot_y = (int32_t) read_u32(record + 24U),
                                                   .flags   = read_u32(record + 28U)};
         valid                 = sprites[index].image < counts[0] && sprites[index].x >= 0 && sprites[index].y >= 0 &&
+                sprites[index].width != 0U && sprites[index].height != 0U &&
                 (uint64_t) (uint32_t) sprites[index].x + sprites[index].width <= images[sprites[index].image].width &&
                 (uint64_t) (uint32_t) sprites[index].y + sprites[index].height <= images[sprites[index].image].height;
     }
     for (uint32_t index = 0U; index < counts[3] && valid; ++index) {
         const uint8_t* record = storage + offsets[3] + (size_t) index * TSP_FRAME_SIZE;
         frames[index] = (tabos_sprite_frame_t) {.sprite = read_u32(record), .duration_ms = read_u32(record + 4U)};
-        valid         = frames[index].sprite < counts[1];
+        valid         = frames[index].sprite < counts[1] && frames[index].duration_ms != 0U;
     }
     for (uint32_t index = 0U; index < counts[2] && valid; ++index) {
         const uint8_t* record = storage + offsets[2] + (size_t) index * TSP_ANIM_SIZE;
         const uint32_t first = read_u32(record), count = read_u32(record + 4U);
         const uint32_t trigger = read_u32(record + 12U);
-        valid                  = first <= counts[3] && count <= counts[3] - first && trigger < counts[1];
+        valid                  = count != 0U && first <= counts[3] && count <= counts[3] - first && trigger < counts[1];
         animations[index]      = (tabos_sprite_animation_t) {
                  .frames         = valid ? frames + first : NULL,
                  .frame_count    = count,
@@ -349,7 +373,7 @@ int tabos_sprite_set_load(const char* path, tabos_sprite_set_t* set)
                                                            .mirror_x = (record[16U] & 1U) != 0U,
                                                            .mirror_y = (record[16U] & 2U) != 0U,
                                                            .opacity  = record[17U]};
-        valid                 = parts[index].sprite < counts[1] && parts[index].rotation <= TABOS_GRAPHICS_ROTATE_270;
+        valid                 = parts[index].sprite < counts[1] && read_u32(record + 12U) <= TABOS_GRAPHICS_ROTATE_270;
     }
     for (uint32_t index = 0U; index < counts[4] && valid; ++index) {
         const uint8_t* record = storage + offsets[4] + (size_t) index * TSP_META_SIZE;

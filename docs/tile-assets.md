@@ -23,6 +23,17 @@ named integer properties; they never draw automatically.
 
 Load `.tsp` and `.tmap` files with `tabos_sprite_set_load()` and
 `tabos_tilemap_load()`. Matching unload functions free owned data and zero the object.
+Initialize the destination to zero and unload a successfully loaded asset before loading
+another into it. Failed loads leave the destination unchanged and release temporary
+allocations. Malformed files return `-1` with `EINVAL`; allocation failures use `ENOMEM`.
+Unload only after the final present completes or graphics closes.
+
+Loaders validate file size, aligned table bounds, non-overlapping descriptor sections,
+references, and terminated strings. Pixel data and writable map cells cannot overlap
+headers or descriptor tables; map cells also cannot overlap strings. Sprite regions and
+animation clips must be nonempty, frame durations positive, and map/tile dimensions fit
+positive signed 32-bit coordinates. The map loader rejects the reserved GID bit; checking
+whether a nonempty cell's sprite ID exists in a particular sprite set happens at draw time.
 
 ## Authoring
 

@@ -116,6 +116,23 @@ add_test(NAME unit.sdk_tiles COMMAND tabos_sdk_tiles
     "${TABOS_TEST_TILE_ASSETS}/tile-demo.tsp" "${TABOS_TEST_TILE_ASSETS}/world.tmap")
 add_test(NAME unit.asset_converter COMMAND "${Python3_EXECUTABLE}" "${TABOS_ROOT}/tests/assets_converter.py")
 
+# Redirect only the loader translation units, leaving the test's allocator real.
+add_library(tabos_test_asset_loaders OBJECT
+    "${TABOS_ROOT}/sdk/lib/sprite.c"
+    "${TABOS_ROOT}/sdk/lib/tilemap.c"
+)
+target_compile_definitions(tabos_test_asset_loaders PRIVATE
+    malloc=test_asset_malloc calloc=test_asset_calloc free=test_asset_free)
+target_include_directories(tabos_test_asset_loaders PRIVATE "${TABOS_ROOT}/sdk/include")
+tabos_enable_warnings(tabos_test_asset_loaders)
+tabos_enable_sanitizers(tabos_test_asset_loaders)
+add_executable(tabos_sdk_asset_loaders unit/sdk_asset_loaders.c)
+target_link_libraries(tabos_sdk_asset_loaders PRIVATE tabos_test_asset_loaders)
+target_include_directories(tabos_sdk_asset_loaders PRIVATE "${TABOS_ROOT}/sdk/include")
+tabos_enable_warnings(tabos_sdk_asset_loaders)
+tabos_enable_sanitizers(tabos_sdk_asset_loaders)
+add_test(NAME unit.sdk_asset_loaders COMMAND tabos_sdk_asset_loaders)
+
 add_executable(tabos_sdk_input
     unit/sdk_input.c
     "${TABOS_ROOT}/sdk/lib/input.c"

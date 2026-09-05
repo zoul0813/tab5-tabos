@@ -13,6 +13,14 @@ get/set/camera/transforms, binary loading and cleanup, deterministic conversion,
 timing/repeat metadata, generated-C compilation, editable TMJ/TSJ metadata, and absence
 of duplicate images or sprites when a manifest imports a Tiled tileset.
 
+`unit.sdk_asset_loaders` uses independently authored wire fixtures and per-translation-unit
+allocator substitution, without adding public SDK hooks. It checks bad magic/version,
+every truncation boundary, mismatched file sizes, table/count/area overflow, invalid
+references, alignment, overlapping sections, reserved GID bits, and terminated strings.
+It fails each loader allocation in turn, checks `ENOMEM` and unchanged destinations,
+tracks live allocations and duplicate frees, and repeats load/unload. These host checks
+do not replace RV32 runtime or physical resource-lifetime validation.
+
 Physical Tab5 acceptance must validate 58 FPS panel cadence, seam-free scrolling,
 transform/color-key output, repeated load/unload, and terminal restoration. Measure a
 320×180 canvas with three visible 16×16 layers plus 64 sprites. Add bounded private bulk

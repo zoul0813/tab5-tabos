@@ -19,7 +19,13 @@ static uint32_t read_u32(const uint8_t* data)
 
 static bool table_valid(uint32_t offset, uint32_t count, uint32_t stride, size_t size)
 {
-    return (offset & 3U) == 0U && offset <= size && count <= (size - offset) / stride;
+    return offset >= TMP_HEADER_SIZE && (offset & 3U) == 0U && offset <= size && count <= (size - offset) / stride;
+}
+
+static bool ranges_overlap(uint32_t first_offset, uint64_t first_size, uint32_t second_offset, uint64_t second_size)
+{
+    return first_size != 0U && second_size != 0U && first_offset < (uint64_t) second_offset + second_size &&
+           second_offset < (uint64_t) first_offset + first_size;
 }
 
 static bool allocation_add(size_t* size, uint32_t count, size_t item_size)
@@ -228,6 +234,11 @@ static int load_file(const char* path, uint8_t** output, size_t* output_size)
         errno = EIO;
         return -1;
     }
+    if ((uint64_t) length < TMP_HEADER_SIZE || (uint64_t) length > UINT32_MAX) {
+        fclose(file);
+        errno = EINVAL;
+        return -1;
+    }
     uint8_t* data = malloc((size_t) length);
     if (data == NULL) {
         fclose(file);
@@ -279,14 +290,27 @@ int tabos_tilemap_load(const char* path, tabos_tilemap_t* map)
     const uint32_t layers_offset = read_u32(file_data + 44U), cells_offset = read_u32(file_data + 48U);
     const uint32_t objects_offset = read_u32(file_data + 52U), properties_offset = read_u32(file_data + 56U);
     const uint32_t strings_offset = read_u32(file_data + 60U);
-    if (width == 0U || height == 0U || width > UINT32_MAX / height || tile_width == 0U || tile_height == 0U ||
+    if (width == 0U || height == 0U || width > INT32_MAX || height > INT32_MAX || width > UINT32_MAX / height ||
+        tile_width == 0U || tile_height == 0U || tile_width > INT32_MAX || tile_height > INT32_MAX ||
         !table_valid(layers_offset, layer_count, TMP_LAYER_SIZE, file_size) ||
         !table_valid(objects_offset, object_count, TMP_OBJECT_SIZE, file_size) ||
         !table_valid(properties_offset, property_count, TMP_PROPERTY_SIZE, file_size) ||
-        !table_valid(strings_offset, strings_size, 1U, file_size) || (cells_offset & 3U) != 0U) {
+        !table_valid(strings_offset, strings_size, 1U, file_size) || !table_valid(cells_offset, 0U, 4U, file_size)) {
         free(file_data);
         errno = EINVAL;
         return -1;
+    }
+    const uint32_t offsets[] = {layers_offset, objects_offset, properties_offset, strings_offset};
+    const uint64_t sizes[]   = {(uint64_t) layer_count * TMP_LAYER_SIZE, (uint64_t) object_count * TMP_OBJECT_SIZE,
+                                (uint64_t) property_count * TMP_PROPERTY_SIZE, strings_size};
+    for (uint32_t index = 0U; index < 4U; ++index) {
+        for (uint32_t previous = 0U; previous < index; ++previous) {
+            if (ranges_overlap(offsets[index], sizes[index], offsets[previous], sizes[previous])) {
+                free(file_data);
+                errno = EINVAL;
+                return -1;
+            }
+        }
     }
     const uint32_t cell_count   = width * height;
     size_t allocation_size      = file_size;
@@ -338,7 +362,7 @@ int tabos_tilemap_load(const char* path, tabos_tilemap_t* map)
                                       .properties     = properties_valid ? properties + first_property : NULL,
                                       .property_count = count};
         valid = objects[index].name != NULL && objects[index].type != NULL &&
-                objects[index].shape <= TABOS_TILEMAP_OBJECT_TILE && properties_valid &&
+                read_u32(record + 12U) <= TABOS_TILEMAP_OBJECT_TILE && properties_valid &&
                 (objects[index].tile & TABOS_TILE_RESERVED) == 0U;
     }
     for (uint32_t index = 0U; index < layer_count && valid; ++index) {
@@ -351,6 +375,10 @@ int tabos_tilemap_load(const char* path, tabos_tilemap_t* map)
             const uint64_t cell_offset = (uint64_t) cells_offset + (uint64_t) first * 4U;
             valid                      = valid && count == cell_count && cell_offset <= UINT32_MAX &&
                     table_valid((uint32_t) cell_offset, count, 4U, file_size);
+            /* Writable cells must not alias validated names or descriptor tables. */
+            for (uint32_t table = 0U; table < 4U && valid; ++table) {
+                valid = !ranges_overlap((uint32_t) cell_offset, (uint64_t) count * 4U, offsets[table], sizes[table]);
+            }
             layers[index].cells = valid ? (tabos_tile_t*) (storage + cell_offset) : NULL;
             for (uint32_t cell = 0U; cell < count && valid; ++cell) {
                 valid = (layers[index].cells[cell] & TABOS_TILE_RESERVED) == 0U;

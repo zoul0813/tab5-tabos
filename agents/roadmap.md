@@ -28,6 +28,7 @@
 - [x] Add deterministic PNG/GIF/Tiled converter and generated C output.
 - [x] Add explicit runtime-asset installation and MSC copying under `T:/data/<app>`.
 - [x] Add original binary-backed `tile-demo` and host tests.
+- [x] Review binary loaders, reject overlapping sections and invalid descriptors, and add 764 malformed-file, allocation-failure, and cleanup cases; macOS Debug/Release validation and standard RV32 app cross-build pass. See `milestone-tiling.md` for evidence.
 - [x] Validate Debug/Release builds on macOS and Tab5.
 - [ ] Validate Debug/Release builds on Linux.
 - [ ] Validate rendering, repeated load/unload, terminal restoration, and performance on physical Tab5.
