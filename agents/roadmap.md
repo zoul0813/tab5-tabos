@@ -22,6 +22,8 @@
 
 ### Sprite and Tile Graphics
 
+- [x] Add stateless animated draw helpers, completion query, and Tiled repeat metadata. macOS Debug 44/44 tests, four focused Release tests, and standard RV32 application builds pass; maintained tester animation checks still require execution on target.
+
 - [x] Verify generated-C/binary metadata and 79 logical-canvas scene pairs from one fixture, with independent pixel expectations; macOS Debug/Release tests and generated-C RV32 compilation pass.
 
 - [x] Add clip rectangles across SDK, private ABI, scalar, SDL, and Tab5 paths.

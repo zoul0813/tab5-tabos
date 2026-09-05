@@ -81,6 +81,16 @@ int tabos_sprite_draw(tabos_graphics_t* graphics, const tabos_sprite_set_t* set,
 int tabos_sprite_draw_ex(tabos_graphics_t* graphics, const tabos_sprite_set_t* set, uint32_t sprite, int32_t x,
                          int32_t y, const tabos_sprite_draw_options_t* options);
 uint32_t tabos_sprite_animation_frame(const tabos_sprite_set_t* set, uint32_t animation, uint64_t elapsed_ms);
+/* Elapsed time is measured from this actor's animation start, not the previous frame. */
+int tabos_sprite_animation_draw(tabos_graphics_t* graphics, const tabos_sprite_set_t* set, uint32_t animation,
+                                int32_t x, int32_t y, uint64_t elapsed_ms);
+int tabos_sprite_animation_draw_ex(tabos_graphics_t* graphics, const tabos_sprite_set_t* set, uint32_t animation,
+                                   int32_t x, int32_t y, uint64_t elapsed_ms,
+                                   const tabos_sprite_draw_options_t* options);
+/* Finite clips finish after the final frame's duration. Loops never finish.
+ * Returns 0/-1 with errno; leaves *finished unchanged on failure. */
+int tabos_sprite_animation_finished(const tabos_sprite_set_t* set, uint32_t animation, uint64_t elapsed_ms,
+                                    bool* finished);
 int tabos_metasprite_draw(tabos_graphics_t* graphics, const tabos_sprite_set_t* set, uint32_t metasprite, int32_t x,
                           int32_t y, bool mirror_x, bool mirror_y, uint8_t opacity);
 uint32_t tabos_sprite_flags(const tabos_sprite_set_t* set, uint32_t sprite);

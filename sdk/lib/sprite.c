@@ -132,23 +132,52 @@ int tabos_sprite_draw(tabos_graphics_t* graphics, const tabos_sprite_set_t* set,
     return tabos_sprite_draw_ex(graphics, set, sprite, x, y, &options);
 }
 
-uint32_t tabos_sprite_animation_frame(const tabos_sprite_set_t* set, uint32_t animation_id, uint64_t elapsed_ms)
+static const tabos_sprite_animation_t* animation_get(const tabos_sprite_set_t* set, uint32_t animation_id,
+                                                     uint64_t* duration)
 {
-    if (set == NULL || animation_id >= set->animation_count) {
+    if (set == NULL || set->animations == NULL || animation_id >= set->animation_count) {
         errno = EINVAL;
-        return TABOS_SPRITE_NONE;
+        return NULL;
     }
     const tabos_sprite_animation_t* animation = &set->animations[animation_id];
     if (animation->frames == NULL || animation->frame_count == 0U) {
         errno = EINVAL;
-        return TABOS_SPRITE_NONE;
+        return NULL;
     }
-    uint64_t duration = 0U;
+    *duration = 0U;
     for (uint32_t index = 0U; index < animation->frame_count; ++index) {
-        duration += animation->frames[index].duration_ms;
+        if (animation->frames[index].duration_ms == 0U || animation->frames[index].sprite >= set->sprite_count) {
+            errno = EINVAL;
+            return NULL;
+        }
+        *duration += animation->frames[index].duration_ms;
     }
-    if (duration == 0U) {
-        return animation->frames[animation->frame_count - 1U].sprite;
+    return animation;
+}
+
+int tabos_sprite_animation_finished(const tabos_sprite_set_t* set, uint32_t animation_id, uint64_t elapsed_ms,
+                                    bool* finished)
+{
+    if (finished == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
+    uint64_t duration                         = 0U;
+    const tabos_sprite_animation_t* animation = animation_get(set, animation_id, &duration);
+    if (animation == NULL) {
+        return -1;
+    }
+    /* Division avoids overflow when total duration times repeat count exceeds UINT64_MAX. */
+    *finished = animation->repeat_count != 0U && elapsed_ms / duration >= animation->repeat_count;
+    return 0;
+}
+
+uint32_t tabos_sprite_animation_frame(const tabos_sprite_set_t* set, uint32_t animation_id, uint64_t elapsed_ms)
+{
+    uint64_t duration                         = 0U;
+    const tabos_sprite_animation_t* animation = animation_get(set, animation_id, &duration);
+    if (animation == NULL) {
+        return TABOS_SPRITE_NONE;
     }
     if (animation->repeat_count != 0U && elapsed_ms / duration >= animation->repeat_count) {
         return animation->frames[animation->frame_count - 1U].sprite;
@@ -161,6 +190,24 @@ uint32_t tabos_sprite_animation_frame(const tabos_sprite_set_t* set, uint32_t an
         position -= animation->frames[index].duration_ms;
     }
     return animation->frames[animation->frame_count - 1U].sprite;
+}
+
+int tabos_sprite_animation_draw(tabos_graphics_t* graphics, const tabos_sprite_set_t* set, uint32_t animation,
+                                int32_t x, int32_t y, uint64_t elapsed_ms)
+{
+    const tabos_sprite_draw_options_t options = {.opacity = 255U};
+    return tabos_sprite_animation_draw_ex(graphics, set, animation, x, y, elapsed_ms, &options);
+}
+
+int tabos_sprite_animation_draw_ex(tabos_graphics_t* graphics, const tabos_sprite_set_t* set, uint32_t animation,
+                                   int32_t x, int32_t y, uint64_t elapsed_ms,
+                                   const tabos_sprite_draw_options_t* options)
+{
+    const uint32_t frame = tabos_sprite_animation_frame(set, animation, elapsed_ms);
+    if (frame == TABOS_SPRITE_NONE) {
+        return -1;
+    }
+    return tabos_sprite_draw_ex(graphics, set, frame, x, y, options);
 }
 
 int tabos_metasprite_draw(tabos_graphics_t* graphics, const tabos_sprite_set_t* set, uint32_t metasprite_id, int32_t x,

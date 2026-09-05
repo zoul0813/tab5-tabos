@@ -39,7 +39,9 @@ def main():
     write_json(root, "accent.tsj", {
         "name": "accent", "image": "accent.png", "tilewidth": 2, "tileheight": 2,
         "columns": 1, "tilecount": 1,
-        "tiles": [{"id": 0, "properties": [prop("name", "accent", "string"), prop("water", 1)]}],
+        "tiles": [{"id": 0, "properties": [prop("name", "accent", "string"), prop("water", 1),
+                                              prop("animation_name", "once", "string"), prop("repeat_count", 1)],
+                   "animation": [{"tileid": 0, "duration": 15}]}],
     })
     transforms = [0, 0x80000000, 0x40000000, 0xc0000000,
                   0x20000000, 0xa0000000, 0x60000000, 0xe0000000]

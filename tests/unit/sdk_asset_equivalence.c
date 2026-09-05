@@ -2,6 +2,7 @@
 
 #include <tabos/internal/elf_api.h>
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -143,14 +144,14 @@ static void check_ids(const tabos_sprite_set_t* sprites, const tabos_tilemap_t* 
 {
     /* Values come from fixture authoring, not from the binary serializer. */
     CHECK(EQUIVALENCE_SPRITE_QUAD == 0U && EQUIVALENCE_SPRITE_KEYED == 1U && EQUIVALENCE_SPRITE_ACCENT == 2U);
-    CHECK(EQUIVALENCE_ANIMATION_CYCLE == 0U && EQUIVALENCE_ANIMATION_HOLD == 1U);
+    CHECK(EQUIVALENCE_ANIMATION_CYCLE == 0U && EQUIVALENCE_ANIMATION_ONCE == 1U && EQUIVALENCE_ANIMATION_HOLD == 2U);
     CHECK(EQUIVALENCE_METASPRITE_ACTOR == 0U && EQUIVALENCE_MAP_WORLD == 0U);
     CHECK(EQUIVALENCE_LAYER_WORLD_GROUND == 0U && EQUIVALENCE_LAYER_WORLD_MARKERS == 1U &&
           EQUIVALENCE_LAYER_WORLD_FRONT == 2U && EQUIVALENCE_LAYER_WORLD_ITEMS == 3U);
     CHECK(EQUIVALENCE_OBJECT_WORLD_SPAWN == 7U && EQUIVALENCE_OBJECT_WORLD_ZONE == 11U &&
           EQUIVALENCE_OBJECT_WORLD_ITEM == 29U);
     CHECK(EQUIVALENCE_FLAG_SOLID == UINT32_C(0x80000000) && EQUIVALENCE_FLAG_WATER == 2U);
-    CHECK(sprites->image_count == 2U && sprites->sprite_count == 3U && sprites->animation_count == 2U &&
+    CHECK(sprites->image_count == 2U && sprites->sprite_count == 3U && sprites->animation_count == 3U &&
           sprites->metasprite_count == 1U && map->layer_count == 4U);
     CHECK(sprites->sprites[EQUIVALENCE_SPRITE_QUAD].flags == EQUIVALENCE_FLAG_SOLID);
     CHECK(sprites->sprites[EQUIVALENCE_SPRITE_ACCENT].flags == EQUIVALENCE_FLAG_WATER);
@@ -183,7 +184,7 @@ static void known_pixels(tabos_graphics_t* graphics, const tabos_sprite_set_t* s
     expected[1U * WIDTH + 2U] = 0x07e0U;
     expected[2U * WIDTH + 1U] = 0x001fU;
     expected[2U * WIDTH + 2U] = 0xffffU;
-    CHECK(tabos_sprite_draw(graphics, sprites, EQUIVALENCE_SPRITE_KEYED, 5, 1) == 0);
+    CHECK(tabos_sprite_animation_draw(graphics, sprites, EQUIVALENCE_ANIMATION_CYCLE, 5, 1, 10U) == 0);
     expected[1U * WIDTH + 6U]                 = 0xffe0U;
     expected[2U * WIDTH + 5U]                 = 0xffe0U;
     expected[2U * WIDTH + 6U]                 = 0xffe0U;
@@ -194,7 +195,7 @@ static void known_pixels(tabos_graphics_t* graphics, const tabos_sprite_set_t* s
         .clip_enabled = true,
         .clip         = {.x = 8, .y = 6, .width = 2U, .height = 2U},
     };
-    CHECK(tabos_sprite_draw_ex(graphics, sprites, EQUIVALENCE_SPRITE_QUAD, 9, 7, &clipped) == 0);
+    CHECK(tabos_sprite_animation_draw_ex(graphics, sprites, EQUIVALENCE_ANIMATION_CYCLE, 9, 7, 0U, &clipped) == 0);
     expected[6U * WIDTH + 8U]                 = 0xf800U;
     expected[6U * WIDTH + 9U]                 = 0x07e0U;
     expected[7U * WIDTH + 8U]                 = 0x001fU;
@@ -219,8 +220,7 @@ static void scene(tabos_graphics_t* graphics, const tabos_sprite_set_t* sprites,
         .animation_ms = time,
     };
     CHECK(tabos_tilemap_draw_layer(graphics, map, EQUIVALENCE_LAYER_WORLD_GROUND, sprites, &draw) == 0);
-    const uint32_t frame = tabos_sprite_animation_frame(sprites, EQUIVALENCE_ANIMATION_HOLD, time);
-    CHECK(tabos_sprite_draw(graphics, sprites, frame, 5, 4) == 0);
+    CHECK(tabos_sprite_animation_draw(graphics, sprites, EQUIVALENCE_ANIMATION_HOLD, 5, 4, time) == 0);
     CHECK(tabos_tilemap_draw_layer(graphics, map, EQUIVALENCE_LAYER_WORLD_FRONT, sprites, &draw) == 0);
     for (uint32_t rotation = 0U; rotation < 4U; ++rotation) {
         for (uint32_t mirror = 0U; mirror < 4U; ++mirror) {
@@ -291,6 +291,77 @@ static void known_compositing(tabos_graphics_t* graphics, const tabos_sprite_set
     compare_pixels(graphics->pixels, expected, "known layer and metasprite order");
 }
 
+static void check_completion(const tabos_sprite_set_t* sprites)
+{
+    const uint64_t times[] = {0U, 14U, 15U, 29U, 39U, 40U, 41U, UINT64_MAX};
+    for (size_t index = 0U; index < sizeof(times) / sizeof(times[0]); ++index) {
+        bool finished = true;
+        CHECK(tabos_sprite_animation_finished(sprites, EQUIVALENCE_ANIMATION_CYCLE, times[index], &finished) == 0);
+        CHECK(!finished);
+        CHECK(tabos_sprite_animation_finished(sprites, EQUIVALENCE_ANIMATION_ONCE, times[index], &finished) == 0);
+        CHECK(finished == (times[index] >= 15U));
+        CHECK(tabos_sprite_animation_finished(sprites, EQUIVALENCE_ANIMATION_HOLD, times[index], &finished) == 0);
+        CHECK(finished == (times[index] >= 40U));
+    }
+    /* A new elapsed time restarts playback; querying/drawing never mutates clip state. */
+    bool finished = true;
+    CHECK(tabos_sprite_animation_finished(sprites, EQUIVALENCE_ANIMATION_ONCE, 0U, &finished) == 0 && !finished);
+
+    const tabos_sprite_frame_t long_frames[] = {
+        {.sprite = 0U, .duration_ms = UINT32_MAX},
+        {.sprite = 1U, .duration_ms = UINT32_MAX}
+    };
+    const tabos_sprite_animation_t long_animation = {
+        .frames       = long_frames,
+        .frame_count  = 2U,
+        .repeat_count = UINT32_MAX,
+    };
+    tabos_sprite_set_t long_set = *sprites;
+    long_set.animations         = &long_animation;
+    long_set.animation_count    = 1U;
+    CHECK(tabos_sprite_animation_finished(&long_set, 0U, UINT64_MAX, &finished) == 0 && !finished);
+}
+
+static void check_animation_errors(tabos_graphics_t* graphics, const tabos_sprite_set_t* sprites)
+{
+    tabos_color_t before[PIXELS];
+    memcpy(before, graphics->pixels, sizeof(before));
+    bool finished = true;
+    CHECK(tabos_sprite_animation_finished(NULL, 0U, 0U, &finished) == -1 && errno == EINVAL && finished);
+    CHECK(tabos_sprite_animation_finished(sprites, UINT32_MAX, 0U, &finished) == -1 && errno == EINVAL && finished);
+    CHECK(tabos_sprite_animation_finished(sprites, 0U, 0U, NULL) == -1 && errno == EINVAL);
+    CHECK(tabos_sprite_animation_draw(graphics, sprites, UINT32_MAX, 0, 0, 0U) == -1 && errno == EINVAL);
+    CHECK(tabos_sprite_animation_draw(NULL, sprites, 0U, 0, 0, 0U) == -1 && errno == EINVAL);
+    CHECK(tabos_sprite_animation_draw_ex(graphics, sprites, 0U, 0, 0, 0U, NULL) == -1 && errno == EINVAL);
+    tabos_sprite_set_t invalid = *sprites;
+    invalid.animations         = NULL;
+    CHECK(tabos_sprite_animation_finished(&invalid, 0U, 0U, &finished) == -1 && errno == EINVAL && finished);
+    CHECK(tabos_sprite_animation_draw(graphics, &invalid, 0U, 0, 0, 0U) == -1 && errno == EINVAL);
+    tabos_sprite_frame_t frame    = {.sprite = 0U, .duration_ms = 10U};
+    tabos_sprite_animation_t clip = {.frames = &frame, .frame_count = 1U, .repeat_count = 1U};
+    invalid.animations            = &clip;
+    invalid.animation_count       = 1U;
+    for (uint32_t index = 0U; index < 4U; ++index) {
+        clip.frames       = &frame;
+        clip.frame_count  = 1U;
+        frame.sprite      = 0U;
+        frame.duration_ms = 10U;
+        if (index == 0U) {
+            clip.frames = NULL;
+        } else if (index == 1U) {
+            clip.frame_count = 0U;
+        } else if (index == 2U) {
+            frame.duration_ms = 0U;
+        } else {
+            frame.sprite = sprites->sprite_count;
+        }
+        CHECK(tabos_sprite_animation_finished(&invalid, 0U, 0U, &finished) == -1 && errno == EINVAL && finished);
+        CHECK(tabos_sprite_animation_frame(&invalid, 0U, 0U) == TABOS_SPRITE_NONE && errno == EINVAL);
+        CHECK(tabos_sprite_animation_draw(graphics, &invalid, 0U, 0, 0, 0U) == -1 && errno == EINVAL);
+    }
+    compare_pixels(graphics->pixels, before, "invalid animations leave canvas unchanged");
+}
+
 int main(int argc, char** argv)
 {
     CHECK(argc == 3);
@@ -304,6 +375,9 @@ int main(int argc, char** argv)
     check_ids(&loaded, &map);
     tabos_graphics_t graphics = {.width = WIDTH, .height = HEIGHT};
     CHECK(tabos_graphics_open(&graphics) == 0);
+    check_completion(&equivalence_sprites);
+    check_completion(&loaded);
+    check_animation_errors(&graphics, &loaded);
     known_pixels(&graphics, &equivalence_sprites);
     known_pixels(&graphics, &loaded);
     known_tiles(&graphics, &equivalence_sprites, &equivalence_world);

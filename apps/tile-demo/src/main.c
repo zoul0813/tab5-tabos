@@ -77,8 +77,8 @@ int main(void)
         };
         (void) tabos_graphics_clear(&graphics, TABOS_RGB565(8, 18, 30));
         (void) tabos_tilemap_draw_layer(&graphics, &map, 0U, &sprites, &draw);
-        const uint32_t robot = tabos_sprite_animation_frame(&sprites, DEMO_SPRITE_ROBOT_WALK, elapsed);
-        (void) tabos_sprite_draw(&graphics, &sprites, robot, 80 - camera_x, 68 - camera_y);
+        (void) tabos_sprite_animation_draw(&graphics, &sprites, DEMO_SPRITE_ROBOT_WALK, 80 - camera_x, 68 - camera_y,
+                                           elapsed);
         (void) tabos_metasprite_draw(&graphics, &sprites, DEMO_METASPRITE_TREE, 120 - camera_x, 72 - camera_y, false,
                                      false, 255U);
         (void) tabos_tilemap_draw_layer(&graphics, &map, 1U, &sprites, &draw);

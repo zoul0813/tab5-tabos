@@ -1,4 +1,4 @@
-APP_NAME := tile-demo
+APP_NAME := tdemo
 .DEFAULT_GOAL := all
 SOURCES := $(CURDIR)/src/main.c
 ASSET_BUILD := $(CURDIR)/../../build/apps/tile-demo/generated

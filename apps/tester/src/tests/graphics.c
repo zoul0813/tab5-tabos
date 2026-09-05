@@ -1,8 +1,55 @@
 #include <tester/test.h>
 
 #include <tabos/graphics.h>
+#include <tabos/sprite.h>
 
 #include <stddef.h>
+
+static void test_sprite_animation(tester_context_t* context, tabos_graphics_t* graphics)
+{
+    static const tabos_color_t pixels[]        = {0xf800U, 0x001fU};
+    static const tabos_sprite_image_t images[] = {
+        {.pixels = pixels, .width = 2U, .height = 1U}
+    };
+    static const tabos_sprite_t regions[] = {
+        {.width = 1U, .height = 1U},
+        {.x = 1, .width = 1U, .height = 1U}
+    };
+    static const tabos_sprite_frame_t frames[] = {
+        {.sprite = 0U, .duration_ms = 10U},
+        {.sprite = 1U, .duration_ms = 20U}
+    };
+    static const tabos_sprite_animation_t clips[] = {
+        {.frames = frames, .frame_count = 2U, .repeat_count = 1U},
+        {.frames = frames, .frame_count = 2U, .repeat_count = 0U},
+    };
+    const tabos_sprite_set_t sprites = {
+        .images          = images,
+        .image_count     = 1U,
+        .sprites         = regions,
+        .sprite_count    = 2U,
+        .animations      = clips,
+        .animation_count = 2U,
+    };
+    bool finished = true;
+    tester_expect(context, tabos_sprite_animation_finished(&sprites, 0U, 29U, &finished) == 0 && !finished,
+                  "one-shot final frame remains active for its full duration");
+    tester_expect(context, tabos_sprite_animation_finished(&sprites, 0U, 30U, &finished) == 0 && finished,
+                  "one-shot completion is observable");
+    tester_expect(context, tabos_sprite_animation_finished(&sprites, 1U, UINT64_MAX, &finished) == 0 && !finished,
+                  "looping animation never finishes");
+    tester_expect(context,
+                  tabos_sprite_animation_draw(graphics, &sprites, 0U, 0, 0, 30U) == 0 &&
+                      tabos_graphics_pixels(graphics)[0] == 0x001fU,
+                  "animated draw holds final frame after completion");
+    const tabos_sprite_draw_options_t options = {.width = 2U, .height = 2U, .opacity = 255U};
+    tester_expect(context,
+                  tabos_sprite_animation_draw_ex(graphics, &sprites, 1U, 0, 0, 30U, &options) == 0 &&
+                      tabos_graphics_pixels(graphics)[0] == 0xf800U &&
+                      tabos_graphics_pixels(graphics)[graphics->width + 1U] == 0xf800U,
+                  "extended animated draw scales looped frame");
+    tester_expect(context, tabos_graphics_present(graphics) == 0, "animated sprites present");
+}
 
 void tester_test_graphics(tester_context_t* context)
 {
@@ -77,5 +124,6 @@ void tester_test_graphics(tester_context_t* context)
                       tabos_graphics_fill_rect(&graphics, 1, 1, 4U, 4U, TABOS_RGB565(255, 0, 0)) == 0 &&
                       tabos_graphics_blit_ex(&graphics, &transformed) == 0 && tabos_graphics_present(&graphics) == 0,
                   "scaled canvas draws and presents");
+    test_sprite_animation(context, &graphics);
     tester_expect(context, tabos_graphics_close(&graphics) == 0, "scaled graphics closes and restores terminal");
 }

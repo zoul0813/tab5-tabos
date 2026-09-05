@@ -6,6 +6,12 @@
 
 ## Sprite and Tile Layer
 
+`[DECIDED]` Animated draw helpers and completion queries are stateless SDK operations.
+Game-owned elapsed time controls playback; game code owns transitions and actor state.
+Finite completion follows the last frame's full duration, and completed clips hold their
+last frame. Tiled `repeat_count` is optional integer metadata on animated tiles, sharing
+existing clip repeat semantics. This adds no binary-format or private-ABI change.
+
 `sdk/lib/sprite.c` and `sdk/lib/tilemap.c` are portable application-side libraries.
 Descriptors may be generated C data or validated process-owned binary data with identical
 IDs and rendering semantics. Applications own gameplay and choose layer draw order.

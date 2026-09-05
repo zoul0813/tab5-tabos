@@ -18,6 +18,8 @@ Tests are separate modules under `apps/tester/src/tests/`. The current modules c
 - battery registry state, telemetry validity, signed power consistency, and unchanged charger controls
 - audio registry state, capabilities, process-owned playback/capture streams, waits, volume,
   routes, nonblocking reads, status, and stale handles
+- graphics and logical-canvas pixels, including one-call animated drawing, scaled animated
+  drawing, one-shot completion at the final frame boundary, and indefinitely looping clips
 
 Build and install into the host root filesystem:
 

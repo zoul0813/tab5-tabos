@@ -32,6 +32,14 @@ pixel expectations cover pivots, transparency, clipping, opacity, tile transform
 layer order, and metasprite overlap. Native-path parity and RV32 execution remain separate
 acceptance work; the host test does not submit a real display presentation.
 
+Animation convenience coverage checks normal/extended draw pixels, looping versus finite
+completion boundaries, unchanged completion output on errors, malformed C descriptors,
+restart via elapsed time, and repeat-duration products exceeding 64 bits. Converter tests
+validate Tiled `repeat_count` defaults, finite counts, type/range errors, and rejection on
+nonanimated tiles. The equivalence fixture includes an imported one-shot clip. Maintained
+`tester` checks completion, held final frames, looping, scaled animated draw, and present;
+its device execution remains a separate hardware check.
+
 Physical Tab5 acceptance must validate 58 FPS panel cadence, seam-free scrolling,
 transform/color-key output, repeated load/unload, and terminal restoration. Measure a
 320×180 canvas with three visible 16×16 layers plus 64 sprites. Add bounded private bulk

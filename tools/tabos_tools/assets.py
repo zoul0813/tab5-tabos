@@ -390,6 +390,7 @@ def load_tiled_map(assets: AssetSet, path: Path, name: str, flags: dict[str, int
         metadata = {integer(item.get("id"), "tile id"): item for item in tileset.get("tiles", [])}
         local_sprite_ids = []
         animation_names: dict[int, str] = {}
+        animation_repeats: dict[int, int] = {}
         for local_id in range(tile_count):
             x = margin + (local_id % columns) * (tw + spacing)
             y = margin + (local_id // columns) * (th + spacing)
@@ -410,6 +411,12 @@ def load_tiled_map(assets: AssetSet, path: Path, name: str, flags: dict[str, int
                         sprite_name = prop["value"]
                     else:
                         animation_names[local_id] = prop["value"]
+                elif prop_name == "repeat_count":
+                    if prop_type != "int":
+                        fail("repeat_count must be an integer property")
+                    if "animation" not in metadata.get(local_id, {}):
+                        fail("repeat_count requires a tile animation")
+                    animation_repeats[local_id] = unsigned_32(prop.get("value"), "repeat_count")
                 elif prop_name in ("pivot_x", "pivot_y"):
                     if prop_type != "int":
                         fail(f"{prop_name} must be an integer property")
@@ -439,7 +446,7 @@ def load_tiled_map(assets: AssetSet, path: Path, name: str, flags: dict[str, int
                 if not frames_out:
                     fail("Tiled animation needs at least one frame")
                 animation_name = animation_names.get(local_id, f"{name}_{tileset_name}_{local_id}")
-                assets.animations.append(Animation(animation_name, frames_out, 0,
+                assets.animations.append(Animation(animation_name, frames_out, animation_repeats.get(local_id, 0),
                                                     local_sprite_ids[local_id]))
     layers = []
     objects = []

@@ -105,12 +105,35 @@ def main() -> int:
         (root / "tiled.json").write_text(json.dumps(tiled_manifest), encoding="utf-8")
         tiled_assets = load_manifest(root / "tiled.json")
         animation = tiled_assets.animations[0]
-        if animation.trigger != 0 or animation.frames != [(1, 50)]:
+        if animation.trigger != 0 or animation.frames != [(1, 50)] or animation.repeat != 0:
             return 1
         write_tsp(tiled_assets, root / "tiled.tsp")
         tiled_data = (root / "tiled.tsp").read_bytes()
         animation_offset = struct.unpack_from("<I", tiled_data, 44)[0]
         if struct.unpack_from("<I", tiled_data, animation_offset + 12)[0] != 0:
+            return 1
+        tile = tiled["tilesets"][0]["tiles"][0]
+        for repeat in (0, 1, 3, 0xffffffff):
+            tile["properties"] = [{"name": "repeat_count", "type": "int", "value": repeat}]
+            (root / "animated.tmj").write_text(json.dumps(tiled), encoding="utf-8")
+            repeated = load_manifest(root / "tiled.json")
+            if repeated.animations[0].repeat != repeat:
+                return 1
+            write_tsp(repeated, root / "tiled.tsp")
+            repeated_data = (root / "tiled.tsp").read_bytes()
+            offset = struct.unpack_from("<I", repeated_data, 44)[0]
+            if struct.unpack_from("<I", repeated_data, offset + 8)[0] != repeat:
+                return 1
+        for kind, value in (("int", -1), ("int", 0x100000000), ("int", True),
+                            ("int", 1.5), ("int", "1"), ("bool", True), ("string", "once")):
+            tile["properties"] = [{"name": "repeat_count", "type": kind, "value": value}]
+            (root / "animated.tmj").write_text(json.dumps(tiled), encoding="utf-8")
+            if not rejected(root / "tiled.json"):
+                return 1
+        tile["properties"] = [{"name": "repeat_count", "type": "int", "value": 1}]
+        del tile["animation"]
+        (root / "animated.tmj").write_text(json.dumps(tiled), encoding="utf-8")
+        if not rejected(root / "tiled.json"):
             return 1
     return 0
 

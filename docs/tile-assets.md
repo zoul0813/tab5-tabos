@@ -14,6 +14,40 @@ Each animation descriptor carries a `trigger_sprite`; tile rendering uses it to
 associate Tiled's animated tile with its frame sequence even when first frame is a
 different tile.
 
+`tabos_sprite_animation_draw()` selects and draws a frame in one call, at natural size
+and full opacity. `tabos_sprite_animation_draw_ex()` accepts the existing sprite draw
+options for size, rotation, mirrors, opacity, and clipping. Its options still require
+explicit opacity, such as `255` for opaque drawing.
+
+Pass elapsed milliseconds since this actor started its current clip, not a frame delta.
+`tabos_sprite_animation_finished()` returns `0` on success and writes a boolean result:
+looping clips never finish; finite clips finish after the final frame's full duration in
+the final cycle. Drawing a completed clip holds its final frame. Completion remains true
+on later queries; it is not a one-time event. Failures return `-1` with `errno` and leave
+the output boolean unchanged. Missing clips, empty clips, zero-duration frames, and
+invalid frame sprite IDs are rejected, including manually constructed C descriptors.
+
+These helpers allocate no playback state. Each actor owns its clip ID and start time;
+game code chooses transitions. For example, inside a game draw function returning `0`/`-1`:
+
+```c
+uint64_t elapsed_ms = now_ms - player.animation_started_ms;
+bool finished = false;
+if (tabos_sprite_animation_finished(&sprites, player.animation, elapsed_ms, &finished) != 0) {
+    return -1;
+}
+if (finished) {
+    player.animation = PLAYER_IDLE; /* Game's generated fallback animation ID. */
+    player.animation_started_ms = now_ms;
+    elapsed_ms = 0;
+}
+return tabos_sprite_animation_draw(
+    &graphics, &sprites, player.animation, player.x - camera_x, player.y - camera_y, elapsed_ms);
+```
+
+Pause by freezing elapsed time; restart by resetting the actor's start time. The existing
+frame-selection function remains available when the game needs a sprite ID without drawing.
+
 `<tabos/tilemap.h>` uses 32-bit `tabos_tile_t`. Zero is empty; low 28 bits hold a
 one-based sprite ID; high bits preserve Tiled horizontal, vertical, and diagonal flips.
 Use `TABOS_TILE()` and `TABOS_TILE_ID()` with normal zero-based IDs. Maps retain ordered
@@ -86,6 +120,12 @@ entries to reference sprites named in TSJ tile properties. Supported TSJ metadat
   drawing places this anchor at the requested destination coordinate; `(0, 0)` anchors
   the top-left, while `(width / 2, height - 1)` anchors near the bottom-center.
 - `animation_name` string tile property: name of that tile's Tiled animation.
+- `repeat_count` integer property on an animated tile: `0` loops forever (default),
+  `1` plays once, and larger values play that many complete cycles. Values must fit an
+  unsigned 32-bit integer; wrong types, negative values, and use on a tile without an
+  animation are rejected. This TabOS property survives both generated C and binary output
+  and applies to animated map tiles as well as explicitly drawn sprites. Define each named
+  walk/run/jump clip on its own animated tile.
 - Manifest flag names as boolean/integer tile properties: sprite flag bits.
 - Standard tileset `transparentcolor`, plus optional integer tileset property
   `transparent_tolerance` from 0 through 255: color-key preparation.

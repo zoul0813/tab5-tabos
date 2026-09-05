@@ -19,6 +19,7 @@
 - [x] Add explicit runtime-asset installation and MSC copying.
 - [x] Add binary-backed `tile-demo` and initial host tests.
 - [x] Make imported TMJ/TSJ tilesets authoritative for images, regions, metadata, and tile animations.
+- [x] Add stateless animated draw helpers, completion detection, and Tiled `repeat_count` metadata.
 
 Implementation evidence: `ec22fed` and `17d7d40`. Existing tests provide partial coverage;
 the detailed review and acceptance items below are not yet fully signed off.
@@ -58,6 +59,12 @@ Add `<tabos/sprite.h>`:
 - [ ] Review: `tabos_sprite_animation_frame()` selects a frame from explicit elapsed milliseconds.
   Each clip stores a repeat count: zero repeats forever, while a positive value plays
   that many cycles and then holds its final frame.
+- [x] Review: `tabos_sprite_animation_draw()` and `_ex()` select and draw from explicit elapsed
+  milliseconds; the basic helper defaults to full opacity. The game owns playback timing
+  and transitions, with no retained player.
+- [x] Review: `tabos_sprite_animation_finished()` reports completion only after the final
+  frame's full duration; loops never finish. Invalid input returns `-1`/`EINVAL` without
+  changing the output boolean. Large repeat counts avoid duration-product overflow.
 - [ ] Review: `tabos_metasprite_draw()` draws ordered component sprites with signed offsets,
   per-part transforms, and opacity. Support overall horizontal and vertical mirroring,
   but not arbitrary-angle rotation.
@@ -113,6 +120,9 @@ Add `./tools/tabos assets build <manifest>`:
   10 ms unless the manifest supplies an explicit duration override.
 - [ ] Review: Support multiple tile and object layers, multiple tilesets, tile flips, Tiled tile
   animations, and integer tile properties.
+- [x] Review: Import animated-tile integer `repeat_count`: zero/default loops indefinitely,
+  one plays once, and positive values count cycles. Preserve it in C and binary output;
+  reject invalid types/ranges and use on nonanimated tiles.
 - [ ] Review: Convert multiple source images into one logical sprite set without requiring physical
   atlas repacking.
 - [ ] Review: Imported TMJ/TSJ files remain authoritative for tileset images, regions, tile metadata, and tile animations. Manifests orchestrate outputs and non-Tiled metadata without duplicating imported tiles or images.
@@ -235,6 +245,27 @@ Validated working-tree changes based on `132abe8`:
 - macOS Debug full suite: 44/44 passed with AddressSanitizer/UndefinedBehaviorSanitizer enabled; executed outside the sandbox to permit the existing loopback socket test. Focused equivalence test also passed on macOS Release.
 - Generated fixture C compiles for RV32 with strict warnings. No runtime or converter changes were needed.
 - Native/logical rendering parity, real presentation, maintained `tester` integration, Linux execution, and physical Tab5 validation remain open.
+
+## Stateless Animation Evidence — 2026-09-05
+
+Validated working-tree changes based on `7e43d93`:
+
+- Added animated draw helpers and a completion query with shared clip validation. Completed
+  finite clips hold their final frame; game code explicitly chooses the next clip and resets
+  elapsed time. No binary format or private ABI changes were needed.
+- Equivalence fixture now imports a Tiled one-shot clip. Both generated C and loaded binary
+  sets verify completion boundaries, indefinite loops, restart, and large elapsed times.
+  Existing independent pixel expectations exercise animated drawing and clipping; invalid
+  calls preserve pixels and completion output. Converter tests cover repeat metadata values,
+  types, bounds, and placement.
+- macOS Debug full suite: 44/44 passed with AddressSanitizer/UndefinedBehaviorSanitizer.
+  Focused Release equivalence, loader, tile, and converter tests: 4/4 passed.
+- Standard RV32 applications cross-built, including the demo and maintained `tester`.
+  The demo uses one-call animation drawing; tester now includes animation drawing and
+  completion checks. This was build/staging validation, not tester execution or installation.
+- Updated public asset-authoring/API documentation and project decisions. Broader public
+  API review, tester generated-C/binary coverage, native/logical parity, Linux builds,
+  physical acceptance, and performance acceptance remain open.
 
 ## Assumptions
 

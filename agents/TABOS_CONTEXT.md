@@ -5,6 +5,12 @@
 
 ## Sprite and Tile SDK
 
+- `[DECIDED]` Animation convenience remains stateless: one-call normal/extended drawing
+  and a completion query consume elapsed time supplied by the game. Actors own clip
+  selection, clocks, pause/restart, and follow-up transitions; no retained player object.
+- `[DECIDED]` Tiled animated-tile `repeat_count` metadata uses zero for indefinite looping
+  (default), one for one-shot playback, and higher values for finite cycle counts.
+
 - `[DECIDED]` Sprites, animations, metasprites, and finite orthogonal tilemaps are
   portable SDK data lowered to `tabos_graphics_blit_ex()`; no retained renderer or
   platform texture handles enter public API.
