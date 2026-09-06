@@ -39,8 +39,16 @@ static bool allocation_add(size_t* size, uint32_t count, size_t item_size)
 
 static bool valid_tile_layer(const tabos_tilemap_t* map, uint32_t layer)
 {
-    return map != NULL && map->layers != NULL && layer < map->layer_count &&
-           map->layers[layer].type == TABOS_TILEMAP_LAYER_TILES && map->layers[layer].cells != NULL;
+    return map != NULL && map->width != 0U && map->height != 0U && map->width <= SIZE_MAX / map->height &&
+           map->layers != NULL && layer < map->layer_count && map->layers[layer].type == TABOS_TILEMAP_LAYER_TILES &&
+           map->layers[layer].cells != NULL;
+}
+
+static bool valid_sprite_set(const tabos_sprite_set_t* sprites)
+{
+    return sprites != NULL && (sprites->image_count == 0U || sprites->images != NULL) &&
+           (sprites->sprite_count == 0U || sprites->sprites != NULL) &&
+           (sprites->animation_count == 0U || sprites->animations != NULL);
 }
 
 int tabos_tilemap_get(const tabos_tilemap_t* map, uint32_t layer, uint32_t column, uint32_t row, tabos_tile_t* tile)
@@ -109,9 +117,9 @@ static uint32_t animated_sprite(const tabos_sprite_set_t* sprites, uint32_t spri
 int tabos_tilemap_draw_layer(tabos_graphics_t* graphics, const tabos_tilemap_t* map, uint32_t layer,
                              const tabos_sprite_set_t* sprites, const tabos_tilemap_draw_options_t* options)
 {
-    if (graphics == NULL || !graphics->open || sprites == NULL || options == NULL || !valid_tile_layer(map, layer) ||
-        map->tile_width == 0U || map->tile_height == 0U || map->tile_width > INT32_MAX ||
-        map->tile_height > INT32_MAX) {
+    if (graphics == NULL || !graphics->open || !valid_sprite_set(sprites) || options == NULL ||
+        !valid_tile_layer(map, layer) || map->tile_width == 0U || map->tile_height == 0U ||
+        map->tile_width > INT32_MAX || map->tile_height > INT32_MAX) {
         errno = EINVAL;
         return -1;
     }
@@ -158,7 +166,11 @@ int tabos_tilemap_draw_layer(tabos_graphics_t* graphics, const tabos_tilemap_t* 
     screen.camera_y         = 0;
     for (int64_t row = first_row; row < last_row; ++row) {
         for (int64_t column = first_column; column < last_column; ++column) {
-            const tabos_tile_t tile   = map->layers[layer].cells[(size_t) row * map->width + (uint32_t) column];
+            const tabos_tile_t tile = map->layers[layer].cells[(size_t) row * map->width + (uint32_t) column];
+            if ((tile & TABOS_TILE_RESERVED) != 0U) {
+                errno = EINVAL;
+                return -1;
+            }
             const uint32_t encoded_id = tile & TABOS_TILE_ID_MASK;
             if (encoded_id == 0U) {
                 continue;

@@ -117,7 +117,8 @@ Extend `tabos_graphics_blit_options_t` with an optional clip rectangle:
 - [x] Review: PPA may render unclipped interior tiles; unsupported clipped boundary operations use
   the pixel-identical fallback.
 
-- [ ] Review: All APIs follow the existing `0`/`-1` plus `errno` convention. Draw calls retain the
+- [x] Review: Fallible action APIs follow the existing `0`/`-1` plus `errno` convention;
+  scalar and pointer queries document their failure sentinels. Draw calls retain the
   existing queued-source lifetime: assets must remain unchanged until
   `tabos_graphics_present()` completes.
 
@@ -171,7 +172,7 @@ Binary formats:
   the destination object.
 - [x] Review: Generated C and binary forms expose identical IDs and rendering semantics.
 - [x] Review: Modified binary-map cells remain memory-only; do not save them automatically.
-- [ ] Review: Unload only after the final `present()` or graphics close because queued commands retain
+- [x] Review: Unload only after the final `present()` or graphics close because queued commands retain
   source pointers.
 
 - [ ] Review: Install binary assets under `T:/data/<app-name>/`. Extend application build rules so each
@@ -390,6 +391,13 @@ Validated working-tree changes based on `7e43d93`:
   modes instead of allowing native errors to surface later from `present()`.
   Eight focused macOS Debug tests, the Tab5 Debug firmware build, and all standard RV32
   application builds pass; the RV32 build exercises the new wire-layout assertions.
+- Audited tiling error and lifetime contracts. Hardened manually constructed descriptors
+  so missing sprite, image, animation, metasprite-part, tile-cell, and property arrays
+  return `EINVAL`; metasprite coordinate overflow returns `EOVERFLOW`; failed output
+  queries remain unchanged. The queued command copies descriptors while retaining source
+  pixel pointers, and both `present()` and graphics close drain the queue before return.
+  Seven focused macOS Debug tests pass with sanitizers, and all standard RV32 applications
+  cross-build with the hardened SDK.
 
 ## Assumptions
 

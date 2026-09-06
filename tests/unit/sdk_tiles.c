@@ -147,6 +147,71 @@ static bool transformed_pivots(tabos_graphics_t* graphics, tabos_color_t color)
     return tabos_sprite_draw_ex(graphics, &outside, 0U, 4, 8, &scaled) == -1 && errno == EOVERFLOW;
 }
 
+static bool invalid_descriptors(tabos_graphics_t* graphics, const tabos_sprite_set_t* sprites,
+                                const tabos_tilemap_t* map, const tabos_tilemap_draw_options_t* draw)
+{
+    tabos_sprite_set_t invalid_sprites = *sprites;
+    invalid_sprites.sprites            = NULL;
+    errno                              = 0;
+    if (tabos_sprite_draw(graphics, &invalid_sprites, 0U, 0, 0) != -1 || errno != EINVAL ||
+        tabos_sprite_flags(&invalid_sprites, 0U) != 0U || errno != EINVAL) {
+        return false;
+    }
+
+    invalid_sprites        = *sprites;
+    invalid_sprites.images = NULL;
+    if (tabos_sprite_draw(graphics, &invalid_sprites, 0U, 0, 0) != -1 || errno != EINVAL) {
+        return false;
+    }
+
+    invalid_sprites             = *sprites;
+    invalid_sprites.metasprites = NULL;
+    if (tabos_metasprite_draw(graphics, &invalid_sprites, 0U, 0, 0, false, false, 255U) != -1 || errno != EINVAL) {
+        return false;
+    }
+    const tabos_metasprite_t missing_parts = {.part_count = 1U};
+    invalid_sprites                        = *sprites;
+    invalid_sprites.metasprites            = &missing_parts;
+    invalid_sprites.metasprite_count       = 1U;
+    if (tabos_metasprite_draw(graphics, &invalid_sprites, 0U, 0, 0, false, false, 255U) != -1 || errno != EINVAL) {
+        return false;
+    }
+
+    const tabos_metasprite_part_t overflow_part  = {.sprite = 0U, .x = 1, .opacity = 255U};
+    const tabos_metasprite_t overflow_metasprite = {.parts = &overflow_part, .part_count = 1U};
+    invalid_sprites                              = *sprites;
+    invalid_sprites.metasprites                  = &overflow_metasprite;
+    invalid_sprites.metasprite_count             = 1U;
+    if (tabos_metasprite_draw(graphics, &invalid_sprites, 0U, INT32_MAX, 0, false, false, 255U) != -1 ||
+        errno != EOVERFLOW) {
+        return false;
+    }
+
+    invalid_sprites            = *sprites;
+    invalid_sprites.animations = NULL;
+    if (tabos_tilemap_draw_layer(graphics, map, 0U, &invalid_sprites, draw) != -1 || errno != EINVAL) {
+        return false;
+    }
+
+    tabos_tilemap_layer_t invalid_layer = map->layers[0];
+    tabos_tilemap_t invalid_map         = *map;
+    invalid_map.layers                  = &invalid_layer;
+    invalid_layer.cells                 = NULL;
+    tabos_tile_t unchanged              = 123U;
+    if (tabos_tilemap_get(&invalid_map, 0U, 0U, 0U, &unchanged) != -1 || errno != EINVAL || unchanged != 123U) {
+        return false;
+    }
+    tabos_tile_t reserved = TABOS_TILE(0U) | TABOS_TILE_RESERVED;
+    invalid_layer         = map->layers[0];
+    invalid_layer.cells   = &reserved;
+    invalid_map.width     = 1U;
+    invalid_map.height    = 1U;
+    if (tabos_tilemap_draw_layer(graphics, &invalid_map, 0U, sprites, draw) != -1 || errno != EINVAL) {
+        return false;
+    }
+    return true;
+}
+
 int main(int argc, char** argv)
 {
     const tabos_color_t key             = TABOS_RGB565(255, 0, 255);
@@ -208,7 +273,8 @@ int main(int argc, char** argv)
     }
     if (tabos_tilemap_get(&map, 0U, 0U, 0U, &tile) != 0 || tile != TABOS_TILE(0U) ||
         tabos_tilemap_set(&map, 0U, 1U, 0U, TABOS_TILE(1U)) != 0 || tabos_tilemap_get(&map, 0U, 2U, 0U, &tile) != -1 ||
-        errno != ERANGE || tabos_tilemap_draw_layer(&graphics, &map, 0U, &sprites, &draw) != 0) {
+        errno != ERANGE || tabos_tilemap_draw_layer(&graphics, &map, 0U, &sprites, &draw) != 0 ||
+        !invalid_descriptors(&graphics, &sprites, &map, &draw)) {
         return 1;
     }
 

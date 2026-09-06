@@ -91,6 +91,7 @@ int tabos_graphics_open(tabos_graphics_t* graphics);
  * Begin replaces the current camera; end resets it. There is no camera stack. */
 int tabos_graphics_begin_camera(tabos_graphics_t* graphics, int32_t x, int32_t y);
 int tabos_graphics_end_camera(tabos_graphics_t* graphics);
+/* Return the logical canvas pixels, or NULL for native or invalid contexts. */
 tabos_color_t* tabos_graphics_pixels(tabos_graphics_t* graphics);
 int tabos_graphics_set_letterbox_color(tabos_graphics_t* graphics, tabos_color_t color);
 int tabos_graphics_clear(tabos_graphics_t* graphics, tabos_color_t color);
@@ -103,6 +104,7 @@ int tabos_graphics_rect(tabos_graphics_t* graphics, int32_t x, int32_t y, uint32
                         tabos_color_t color);
 int tabos_graphics_blit(tabos_graphics_t* graphics, int32_t x, int32_t y, uint32_t width, uint32_t height,
                         const tabos_color_t* pixels);
+/* Return active capability bits, or zero for an invalid/unavailable context. */
 uint32_t tabos_graphics_capabilities(const tabos_graphics_t* graphics);
 /*
  * Draw one transformed bitmap operation. Returns 0 on success, including when

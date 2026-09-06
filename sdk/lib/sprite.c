@@ -100,13 +100,13 @@ static bool draw_origin(int32_t coordinate, int64_t pivot, uint32_t size, uint32
 int tabos_sprite_draw_ex(tabos_graphics_t* graphics, const tabos_sprite_set_t* set, uint32_t sprite_id, int32_t x,
                          int32_t y, const tabos_sprite_draw_options_t* options)
 {
-    if (graphics == NULL || set == NULL || options == NULL || sprite_id >= set->sprite_count ||
+    if (graphics == NULL || set == NULL || set->sprites == NULL || options == NULL || sprite_id >= set->sprite_count ||
         options->rotation > TABOS_GRAPHICS_ROTATE_270) {
         errno = EINVAL;
         return -1;
     }
     const tabos_sprite_t* sprite = &set->sprites[sprite_id];
-    if (sprite->image >= set->image_count) {
+    if (set->images == NULL || sprite->image >= set->image_count) {
         errno = EINVAL;
         return -1;
     }
@@ -232,11 +232,15 @@ int tabos_sprite_animation_draw_ex(tabos_graphics_t* graphics, const tabos_sprit
 int tabos_metasprite_draw(tabos_graphics_t* graphics, const tabos_sprite_set_t* set, uint32_t metasprite_id, int32_t x,
                           int32_t y, bool mirror_x, bool mirror_y, uint8_t opacity)
 {
-    if (graphics == NULL || set == NULL || metasprite_id >= set->metasprite_count) {
+    if (graphics == NULL || set == NULL || set->metasprites == NULL || metasprite_id >= set->metasprite_count) {
         errno = EINVAL;
         return -1;
     }
     const tabos_metasprite_t* metasprite = &set->metasprites[metasprite_id];
+    if (metasprite->part_count != 0U && metasprite->parts == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
     for (uint32_t index = 0U; index < metasprite->part_count; ++index) {
         const tabos_metasprite_part_t* part = &metasprite->parts[index];
         tabos_sprite_draw_options_t options = TABOS_SPRITE_DRAW_OPTIONS_DEFAULT;
@@ -244,9 +248,13 @@ int tabos_metasprite_draw(tabos_graphics_t* graphics, const tabos_sprite_set_t* 
         options.mirror_x                    = part->mirror_x != mirror_x;
         options.mirror_y                    = part->mirror_y != mirror_y;
         options.opacity                     = combined_opacity(part->opacity, opacity);
-        const int32_t part_x                = x + (mirror_x ? -part->x : part->x);
-        const int32_t part_y                = y + (mirror_y ? -part->y : part->y);
-        if (tabos_sprite_draw_ex(graphics, set, part->sprite, part_x, part_y, &options) != 0) {
+        const int64_t part_x                = (int64_t) x + (mirror_x ? -(int64_t) part->x : part->x);
+        const int64_t part_y                = (int64_t) y + (mirror_y ? -(int64_t) part->y : part->y);
+        if (part_x < INT32_MIN || part_x > INT32_MAX || part_y < INT32_MIN || part_y > INT32_MAX) {
+            errno = EOVERFLOW;
+            return -1;
+        }
+        if (tabos_sprite_draw_ex(graphics, set, part->sprite, (int32_t) part_x, (int32_t) part_y, &options) != 0) {
             return -1;
         }
     }
@@ -255,7 +263,7 @@ int tabos_metasprite_draw(tabos_graphics_t* graphics, const tabos_sprite_set_t* 
 
 uint32_t tabos_sprite_flags(const tabos_sprite_set_t* set, uint32_t sprite)
 {
-    if (set == NULL || sprite >= set->sprite_count) {
+    if (set == NULL || set->sprites == NULL || sprite >= set->sprite_count) {
         errno = EINVAL;
         return 0U;
     }

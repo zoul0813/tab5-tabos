@@ -158,11 +158,15 @@ int tabos_sprite_animation_finished(const tabos_sprite_set_t* set, uint32_t anim
  * part offsets and XOR with per-part mirrors. Overall opacity multiplies each
  * part's opacity with nearest-integer rounding. Arbitrary overall rotation and
  * scaling are unsupported.
- * Returns 0 on success or -1 with errno; a failure does not undo earlier parts.
+ * Returns 0 on success or -1 with EINVAL/EOVERFLOW or a graphics error; a
+ * failure does not undo earlier parts.
  */
 int tabos_metasprite_draw(tabos_graphics_t* graphics, const tabos_sprite_set_t* set, uint32_t metasprite, int32_t x,
                           int32_t y, bool mirror_x, bool mirror_y, uint8_t opacity);
-/* Return application flags, or zero with errno=EINVAL for an invalid sprite ID. */
+/*
+ * Return application flags. Zero is valid. Invalid descriptors or sprite IDs
+ * return zero with errno=EINVAL; set errno to zero first when disambiguation matters.
+ */
 uint32_t tabos_sprite_flags(const tabos_sprite_set_t* set, uint32_t sprite);
 /*
  * Load and validate a TSP1 version-1 file into process-owned memory. Initialize

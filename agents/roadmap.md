@@ -52,6 +52,8 @@
   succeed without drawing.
 - [x] Review clip implementation parity through the private ABI, RV32 marshaling, scalar,
   SDL, and Tab5 paths; guard all wire offsets and validate malformed blits consistently.
+- [x] Review tiling API errors, malformed in-memory descriptors, unchanged query outputs,
+  and source-asset lifetime through the `present()`/close queue fences.
 - [x] Add portable sprite, animation, metasprite, tilemap, object, property, and flag APIs.
 - [x] Add validated versioned `.tsp` and `.tmap` loaders.
 - [x] Add deterministic PNG/GIF/Tiled converter and generated C output.
