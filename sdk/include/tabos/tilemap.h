@@ -123,6 +123,12 @@ int tabos_tilemap_set(tabos_tilemap_t* map, uint32_t layer, uint32_t column, uin
 int tabos_tilemap_draw_layer(tabos_graphics_t* graphics, const tabos_tilemap_t* map, uint32_t layer,
                              const tabos_sprite_set_t* sprites, const tabos_tilemap_draw_options_t* options);
 /*
+ * Find an object by its stable Tiled ID in one object layer. Generated OBJECT
+ * constants supply this ID. Returns NULL with errno=EINVAL for an invalid map
+ * or layer and errno=ENOENT when the ID is absent.
+ */
+const tabos_tilemap_object_t* tabos_tilemap_object(const tabos_tilemap_t* map, uint32_t layer, uint32_t object_id);
+/*
  * Find a named signed integer object property. Returns 0 on success or -1 with
  * errno=EINVAL for invalid arguments and errno=ENOENT when absent. Failure
  * leaves *value unchanged.

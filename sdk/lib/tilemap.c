@@ -39,8 +39,8 @@ static bool allocation_add(size_t* size, uint32_t count, size_t item_size)
 
 static bool valid_tile_layer(const tabos_tilemap_t* map, uint32_t layer)
 {
-    return map != NULL && layer < map->layer_count && map->layers[layer].type == TABOS_TILEMAP_LAYER_TILES &&
-           map->layers[layer].cells != NULL;
+    return map != NULL && map->layers != NULL && layer < map->layer_count &&
+           map->layers[layer].type == TABOS_TILEMAP_LAYER_TILES && map->layers[layer].cells != NULL;
 }
 
 int tabos_tilemap_get(const tabos_tilemap_t* map, uint32_t layer, uint32_t column, uint32_t row, tabos_tile_t* tile)
@@ -216,13 +216,36 @@ int tabos_tilemap_draw_layer(tabos_graphics_t* graphics, const tabos_tilemap_t* 
     return 0;
 }
 
+const tabos_tilemap_object_t* tabos_tilemap_object(const tabos_tilemap_t* map, uint32_t layer, uint32_t object_id)
+{
+    if (map == NULL || map->layers == NULL || layer >= map->layer_count ||
+        map->layers[layer].type != TABOS_TILEMAP_LAYER_OBJECTS ||
+        (map->layers[layer].object_count != 0U && map->layers[layer].objects == NULL)) {
+        errno = EINVAL;
+        return NULL;
+    }
+    const tabos_tilemap_layer_t* object_layer = &map->layers[layer];
+    for (uint32_t index = 0U; index < object_layer->object_count; ++index) {
+        if (object_layer->objects[index].id == object_id) {
+            return &object_layer->objects[index];
+        }
+    }
+    errno = ENOENT;
+    return NULL;
+}
+
 int tabos_tilemap_object_property(const tabos_tilemap_object_t* object, const char* name, int32_t* value)
 {
-    if (object == NULL || name == NULL || value == NULL) {
+    if (object == NULL || name == NULL || value == NULL ||
+        (object->property_count != 0U && object->properties == NULL)) {
         errno = EINVAL;
         return -1;
     }
     for (uint32_t index = 0U; index < object->property_count; ++index) {
+        if (object->properties[index].name == NULL) {
+            errno = EINVAL;
+            return -1;
+        }
         if (strcmp(object->properties[index].name, name) == 0) {
             *value = object->properties[index].value;
             return 0;

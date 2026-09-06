@@ -22,6 +22,8 @@
 
 ### Sprite and Tile Graphics
 
+- [x] Add direct object lookup by generated layer and stable Tiled object IDs while retaining descriptor-array iteration for processing every marker.
+
 - [x] Add a tilemap draw-options default for full-canvas drawing at animation time zero while preserving explicit empty-viewport behavior.
 
 - [x] Stop generating unused map-ID constants; maps load individually by path, while generated layer and object constants address data inside each loaded map.

@@ -101,10 +101,12 @@ Add `<tabos/tilemap.h>`:
 - [x] Review: Clip viewport edges exactly. Keep interior tiles on the normal accelerated path.
 - [x] Review: Applications draw layers individually, allowing sprites between background and
   foreground layers.
-- [ ] Review: Object layers expose point, rectangle, and tile markers with integer coordinates,
+- [x] Review: Object layers expose point, rectangle, and tile markers with integer coordinates,
   object ID, name, type, and integer properties. Object layers never render automatically.
-- [ ] Review: `tabos_tilemap_object_property()` performs named integer-property lookup.
-- [ ] Review: Tile flags support application collision queries; do not add a collision solver.
+- [x] Review: `tabos_tilemap_object()` resolves a generated stable Tiled object ID within
+  a generated object-layer index, while applications may iterate the descriptor array.
+- [x] Review: `tabos_tilemap_object_property()` performs named integer-property lookup.
+- [x] Review: Tile flags support application collision queries; do not add a collision solver.
 
 Extend `tabos_graphics_blit_options_t` with an optional clip rectangle:
 
@@ -376,6 +378,8 @@ Validated working-tree changes based on `7e43d93`:
   camera projection, visible-cell selection, and exact screen-space viewport clipping.
   Added a full-canvas default initializer; focused pixel tests cover negative and sub-tile
   cameras, far-outside views, viewport edges, HUD coordinates, transforms, and layer order.
+- `tdemo` uses direct generated-ID lookup for its named spawn position and retains
+  object-layer iteration for processing and drawing every marker.
 
 ## Assumptions
 

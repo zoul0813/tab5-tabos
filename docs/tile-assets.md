@@ -286,7 +286,21 @@ only in memory and are never saved automatically.
 ### Read Object Markers
 
 Object-layer constants identify a layer index. Object constants preserve Tiled object
-IDs; they are not array indexes. Iterate the selected layer and inspect each marker:
+IDs; they are not array indexes. Look up one named marker directly:
+
+```c
+const tabos_tilemap_object_t* spawn = tabos_tilemap_object(
+    &map,
+    MYGAME_LAYER_LEVEL_MARKERS,
+    MYGAME_OBJECT_LEVEL_SPAWN);
+if (spawn != NULL) {
+    player_x = spawn->x;
+    player_y = spawn->y;
+}
+```
+
+An invalid map or non-object layer returns `NULL` with `EINVAL`; a missing object ID
+returns `NULL` with `ENOENT`. Iterate the selected layer when processing every marker:
 
 ```c
 const tabos_tilemap_layer_t* layer = &map.layers[MYGAME_LAYER_LEVEL_MARKERS];
@@ -312,6 +326,7 @@ for (uint32_t index = 0U; index < layer->object_count; ++index) {
 Point, rectangle, and tile objects preserve integral authored position and dimensions.
 Tile objects also expose an encoded `tile` value. `name` is the Tiled object name; `type`
 is its class, falling back to the legacy Tiled type. Missing properties return `ENOENT`.
+Generated object constants work with `tabos_tilemap_object()` and during iteration.
 Object layers do not render themselves; game code may create entities, triggers, or debug
 markers from them.
 

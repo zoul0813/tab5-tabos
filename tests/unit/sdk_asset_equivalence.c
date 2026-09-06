@@ -160,6 +160,15 @@ static void check_ids(const tabos_sprite_set_t* sprites, const tabos_tilemap_t* 
     CHECK(map->layers[EQUIVALENCE_LAYER_WORLD_ITEMS].objects[0].id == EQUIVALENCE_OBJECT_WORLD_ITEM);
     CHECK(map->layers[EQUIVALENCE_LAYER_WORLD_ITEMS].objects[0].tile ==
           (TABOS_TILE(EQUIVALENCE_SPRITE_ACCENT) | UINT32_C(0xa0000000)));
+    const tabos_tilemap_object_t* spawn =
+        tabos_tilemap_object(map, EQUIVALENCE_LAYER_WORLD_MARKERS, EQUIVALENCE_OBJECT_WORLD_SPAWN);
+    CHECK(spawn == &map->layers[EQUIVALENCE_LAYER_WORLD_MARKERS].objects[0]);
+    CHECK(tabos_tilemap_object(map, EQUIVALENCE_LAYER_WORLD_GROUND, EQUIVALENCE_OBJECT_WORLD_SPAWN) == NULL &&
+          errno == EINVAL);
+    CHECK(tabos_tilemap_object(map, EQUIVALENCE_LAYER_WORLD_MARKERS, UINT32_MAX) == NULL && errno == ENOENT);
+    int32_t missing_property = 123;
+    CHECK(tabos_tilemap_object_property(spawn, "missing", &missing_property) == -1 && errno == ENOENT &&
+          missing_property == 123);
     CHECK(sprites->animations[EQUIVALENCE_ANIMATION_CYCLE].trigger_sprite == EQUIVALENCE_SPRITE_KEYED);
     CHECK(sprites->animations[EQUIVALENCE_ANIMATION_CYCLE].frames[0].sprite == EQUIVALENCE_SPRITE_QUAD);
 }

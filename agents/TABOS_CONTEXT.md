@@ -5,6 +5,10 @@
 
 ## Sprite and Tile SDK
 
+- `[DECIDED]` `tabos_tilemap_object()` resolves a generated stable Tiled object ID
+  within a generated object-layer index. Games retain direct array iteration when they
+  need every marker; object layers never render automatically.
+
 - `[DECIDED]` `TABOS_TILEMAP_DRAW_OPTIONS_DEFAULT` draws against the full graphics
   canvas at animation time zero. Games copy it and override only needed fields; an
   explicitly supplied zero-size viewport still draws nothing.

@@ -40,10 +40,22 @@ int main(void)
         restore_tty(tty_mode);
         return 1;
     }
-    bool running     = true;
-    int32_t camera_x = 0;
-    int32_t camera_y = 0;
-    uint64_t started = tabos_monotonic_ms();
+    const tabos_tilemap_object_t* spawn =
+        tabos_tilemap_object(&map, TDEMO_LAYER_WORLD_MARKERS, TDEMO_OBJECT_WORLD_SPAWN);
+    if (spawn == NULL) {
+        fprintf(stderr, "tdemo: spawn lookup failed (errno %d)\n", errno);
+        tabos_tilemap_unload(&map);
+        tabos_sprite_set_unload(&sprites);
+        (void) tabos_graphics_close(&graphics);
+        restore_tty(tty_mode);
+        return 1;
+    }
+    const int32_t robot_x = spawn->x;
+    const int32_t robot_y = spawn->y;
+    bool running          = true;
+    int32_t camera_x      = 0;
+    int32_t camera_y      = 0;
+    uint64_t started      = tabos_monotonic_ms();
     while (running) {
         tabos_input_event_t event;
         while (tabos_input_poll(&event)) {
@@ -74,7 +86,7 @@ int main(void)
         (void) tabos_graphics_clear(&graphics, TABOS_RGB565(8, 18, 30));
         (void) tabos_graphics_begin_camera(&graphics, camera_x, camera_y);
         (void) tabos_tilemap_draw_layer(&graphics, &map, TDEMO_LAYER_WORLD_GROUND, &sprites, &draw);
-        (void) tabos_sprite_animation_draw(&graphics, &sprites, TDEMO_ANIMATION_ROBOT_WALK, 80, 68, elapsed);
+        (void) tabos_sprite_animation_draw(&graphics, &sprites, TDEMO_ANIMATION_ROBOT_WALK, robot_x, robot_y, elapsed);
         (void) tabos_metasprite_draw(&graphics, &sprites, TDEMO_METASPRITE_TREE_SHADOW, 120, 72, false, false, 255U);
         (void) tabos_tilemap_draw_layer(&graphics, &map, TDEMO_LAYER_WORLD_FOREGROUND, &sprites, &draw);
         const tabos_tilemap_layer_t* markers = &map.layers[TDEMO_LAYER_WORLD_MARKERS];
