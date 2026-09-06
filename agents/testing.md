@@ -883,6 +883,11 @@ SDL3 host code should support a headless or noninteractive mode where practical.
 
 CI must not require a person to interact with a visible window.
 
+[DECIDED] The host `--smoke` mode starts runtime services and executes one headless
+update without launching the configured external startup application. This keeps the
+integration smoke independent of locally installed root-filesystem applications while
+normal host and Tab5 startup behavior remains configured and fully exercised elsewhere.
+
 Possible mechanisms include:
 
 - SDL dummy/offscreen video driver

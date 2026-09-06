@@ -44,13 +44,13 @@ int main(void)
     }
 
 #if TABOS_ENABLE_SHELL_STARTUP
-    if (kernel_runtime_start()) {
+    if (kernel_runtime_start(true)) {
         return 1;
     }
     kernel_runtime_shutdown();
     return 0;
 #else
-    if (!kernel_runtime_start()) {
+    if (!kernel_runtime_start(true)) {
         return 1;
     }
 #endif

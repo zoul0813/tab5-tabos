@@ -64,7 +64,7 @@ void app_main(void)
         run_usb_storage_mode();
     }
 
-    if (!kernel_runtime_start()) {
+    if (!kernel_runtime_start(true)) {
         ESP_LOGE(TAG, "%s runtime startup failed", TABOS_SYSTEM_NAME);
         kernel_runtime_shutdown();
         platform_shutdown();

@@ -163,7 +163,7 @@ platform_system_action_t kernel_runtime_take_system_action(void)
                                                                memory_order_acq_rel);
 }
 
-bool kernel_runtime_start(void)
+bool kernel_runtime_start(bool launch_startup_application)
 {
     if (!runtime_initialized) {
         return false;
@@ -318,6 +318,9 @@ bool kernel_runtime_start(void)
         return false;
     }
     runtime_started = true;
+    if (!launch_startup_application) {
+        return true;
+    }
 #if TABOS_ENABLE_SHELL_STARTUP
     const tabos_app_result_t startup_result = tabos_app_launch_path(TABOS_SHELL_PATH);
 #else

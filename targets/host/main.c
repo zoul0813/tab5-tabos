@@ -32,7 +32,7 @@ int main(int argc, char** argv)
             kernel_runtime_shutdown();
             return 1;
         }
-        if (!kernel_runtime_start()) {
+        if (!kernel_runtime_start(!headless)) {
             fprintf(stderr, "%s runtime startup failed\n", TABOS_SYSTEM_NAME);
             kernel_runtime_shutdown();
             platform_shutdown();

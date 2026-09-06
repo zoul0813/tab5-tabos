@@ -573,6 +573,8 @@ but is not a substitute for this execution path.
 
 ## Testing and Release Work
 
+- [x] Make clean-checkout host smoke independent of an installed external shell and expose the POSIX `mkstemp()` declaration under strict Linux C17 builds; fixes all four host failures observed in Actions run 33977985827.
+
 - [x] Enable strict compiler warnings for supported targets.
 - [x] Run host unit tests with AddressSanitizer and UndefinedBehaviorSanitizer where supported.
 - [x] Provide headless host integration smoke test.
