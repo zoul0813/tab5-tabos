@@ -68,11 +68,9 @@ int main(void)
                 }
             }
         }
-        const uint64_t elapsed                  = tabos_monotonic_ms() - started;
-        const tabos_tilemap_draw_options_t draw = {
-            .viewport     = {.width = DEMO_WIDTH, .height = DEMO_HEIGHT},
-            .animation_ms = elapsed,
-        };
+        const uint64_t elapsed            = tabos_monotonic_ms() - started;
+        tabos_tilemap_draw_options_t draw = TABOS_TILEMAP_DRAW_OPTIONS_DEFAULT;
+        draw.animation_ms                 = elapsed;
         (void) tabos_graphics_clear(&graphics, TABOS_RGB565(8, 18, 30));
         (void) tabos_graphics_begin_camera(&graphics, camera_x, camera_y);
         (void) tabos_tilemap_draw_layer(&graphics, &map, TDEMO_LAYER_WORLD_GROUND, &sprites, &draw);

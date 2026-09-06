@@ -22,6 +22,8 @@
 
 ### Sprite and Tile Graphics
 
+- [x] Add a tilemap draw-options default for full-canvas drawing at animation time zero while preserving explicit empty-viewport behavior.
+
 - [x] Stop generating unused map-ID constants; maps load individually by path, while generated layer and object constants address data inside each loaded map.
 
 - [x] Validate manifest flags as unique nonzero single-bit masks; document Tiled flag-property and RGB-tolerance behavior; test automatic/explicit transparency keys, tolerance boundaries, partial alpha, and invalid flag masks.

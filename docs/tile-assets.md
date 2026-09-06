@@ -83,10 +83,8 @@ Set the shared graphics camera once for the world pass. All sprite variants, met
 map layers, and primitive object markers then use world coordinates without manual subtraction:
 
 ```c
-const tabos_tilemap_draw_options_t draw = {
-    .viewport = {.width = graphics.width, .height = graphics.height},
-    .animation_ms = elapsed_ms,
-};
+tabos_tilemap_draw_options_t draw = TABOS_TILEMAP_DRAW_OPTIONS_DEFAULT;
+draw.animation_ms = elapsed_ms;
 tabos_graphics_begin_camera(&graphics, camera_x, camera_y);
 tabos_tilemap_draw_layer(&graphics, &map, GROUND_LAYER, &sprites, &draw);
 tabos_sprite_animation_draw(&graphics, &sprites, player.animation, player.x, player.y, elapsed_ms);
@@ -95,9 +93,12 @@ tabos_graphics_end_camera(&graphics);
 /* Draw HUD in screen coordinates, then present. */
 ```
 
-`viewport` is a screen-space clip, intersected with canvas bounds before visible-cell
-selection. Empty viewports draw nothing. Maps remain anchored at world `(0, 0)`; sprites
-and maps share the same projection. See [graphics camera semantics](graphics-api.md).
+`TABOS_TILEMAP_DRAW_OPTIONS_DEFAULT` uses the full graphics canvas at animation time zero.
+Copy it and override `animation_ms` for the common full-canvas animated case. `viewport`
+is a screen-space clip, intersected with canvas bounds before visible-cell selection.
+An explicitly supplied empty viewport draws nothing. Maps remain anchored at world
+`(0, 0)`; sprites and maps share the same projection. See
+[graphics camera semantics](graphics-api.md).
 
 Pre-release API migration: `tabos_tilemap_draw_options_t.camera_x` and `.camera_y` were
 removed. Move those values to `tabos_graphics_begin_camera()` and remove camera subtraction
@@ -168,10 +169,8 @@ int main(void)
     const int32_t player_y = 68;
     const uint64_t animation_started_ms = tabos_monotonic_ms();
     const uint64_t elapsed_ms = tabos_monotonic_ms() - animation_started_ms;
-    const tabos_tilemap_draw_options_t map_draw = {
-        .viewport = {.width = graphics.width, .height = graphics.height},
-        .animation_ms = elapsed_ms,
-    };
+    tabos_tilemap_draw_options_t map_draw = TABOS_TILEMAP_DRAW_OPTIONS_DEFAULT;
+    map_draw.animation_ms                  = elapsed_ms;
 
     (void) tabos_graphics_clear(&graphics, TABOS_RGB565(8, 18, 30));
     (void) tabos_graphics_begin_camera(&graphics, camera_x, camera_y);

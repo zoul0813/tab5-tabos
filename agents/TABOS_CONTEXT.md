@@ -5,6 +5,10 @@
 
 ## Sprite and Tile SDK
 
+- `[DECIDED]` `TABOS_TILEMAP_DRAW_OPTIONS_DEFAULT` draws against the full graphics
+  canvas at animation time zero. Games copy it and override only needed fields; an
+  explicitly supplied zero-size viewport still draws nothing.
+
 - `[DECIDED]` Each manifest flag name maps to one unique, nonzero 32-bit bit. Tiled
   Boolean true or integer nonzero sets a registered flag; zero/false clears it. Other
   integer/Boolean tile properties are ignored by the runtime converter.

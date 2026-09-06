@@ -239,6 +239,13 @@ int main(int argc, char** argv)
     };
     const tabos_tilemap_t transform_map = {
         .width = 8U, .height = 1U, .tile_width = 2U, .tile_height = 2U, .layers = transform_layers, .layer_count = 1U};
+    const tabos_tilemap_draw_options_t default_draw = TABOS_TILEMAP_DRAW_OPTIONS_DEFAULT;
+    if (default_draw.animation_ms != 0U || tabos_graphics_clear(&graphics, 0U) != 0 ||
+        tabos_graphics_begin_camera(&graphics, 0, 0) != 0 ||
+        tabos_tilemap_draw_layer(&graphics, &transform_map, 0U, &transform_sprites, &default_draw) != 0 ||
+        graphics.pixels[0] != red) {
+        return 1;
+    }
     const tabos_tilemap_draw_options_t transform_draw = {
         .viewport = {.y = 8, .width = 16U, .height = 2U}
     };

@@ -84,19 +84,22 @@ Add `<tabos/sprite.h>`:
 
 Add `<tabos/tilemap.h>`:
 
-- [ ] Review: `tabos_tile_t` is 32-bit. Zero means empty; the low 28 bits contain a one-based
+- [x] Review: `tabos_tile_t` is 32-bit. Zero means empty; the low 28 bits contain a one-based
   sprite ID; the high bits preserve Tiled horizontal, vertical, and diagonal transforms.
-- [ ] Review: Provide encode/decode macros so applications normally use zero-based sprite IDs.
-- [ ] Review: `tabos_tilemap_t` retains ordered tile and object layers, dimensions, a uniform tile
+- [x] Review: Provide encode/decode macros so applications normally use zero-based sprite IDs.
+- [x] Review: `tabos_tilemap_t` retains ordered tile and object layers, dimensions, a uniform tile
   size, and writable cell arrays.
-- [ ] Review: `tabos_tilemap_get()` and `tabos_tilemap_set()` use layer, column, and row coordinates
+- [x] Review: `tabos_tilemap_get()` and `tabos_tilemap_set()` use layer, column, and row coordinates
   and return `ERANGE` outside the map.
-- [ ] Review: `tabos_tilemap_draw_layer()` draws only visible cells from one tile layer. Options
+- [x] Review: `tabos_tilemap_draw_layer()` draws only visible cells from one tile layer. Options
   contain the screen-space viewport and animation time; the graphics context owns the camera.
-- [ ] Review: Coordinates use a top-left origin, positive X right, and positive Y down. The camera
+- [x] Review: `TABOS_TILEMAP_DRAW_OPTIONS_DEFAULT` selects the full graphics canvas at
+  animation time zero; applications copy it and override only needed fields. Explicit
+  zero-size viewports still draw nothing.
+- [x] Review: Coordinates use a top-left origin, positive X right, and positive Y down. The camera
   supports negative and sub-tile pixel offsets; outside-map cells remain empty.
-- [ ] Review: Clip viewport edges exactly. Keep interior tiles on the normal accelerated path.
-- [ ] Review: Applications draw layers individually, allowing sprites between background and
+- [x] Review: Clip viewport edges exactly. Keep interior tiles on the normal accelerated path.
+- [x] Review: Applications draw layers individually, allowing sprites between background and
   foreground layers.
 - [ ] Review: Object layers expose point, rectangle, and tile markers with integer coordinates,
   object ID, name, type, and integer properties. Object layers never render automatically.
@@ -369,6 +372,10 @@ Validated working-tree changes based on `7e43d93`:
   nonzero single-bit masks; the guide states how registered and unregistered Tiled properties
   behave and defines RGB tolerance. Focused converter coverage exercises automatic keys,
   explicit-key collisions, tolerance boundaries, partial alpha, and invalid flag masks.
+- Reviewed tile encoding, map/layer descriptors, writable cells, authored layer order,
+  camera projection, visible-cell selection, and exact screen-space viewport clipping.
+  Added a full-canvas default initializer; focused pixel tests cover negative and sub-tile
+  cameras, far-outside views, viewport edges, HUD coordinates, transforms, and layer order.
 
 ## Assumptions
 

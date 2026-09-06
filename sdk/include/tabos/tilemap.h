@@ -94,6 +94,12 @@ typedef struct {
         uint64_t animation_ms;
 } tabos_tilemap_draw_options_t;
 
+/* Full graphics canvas at animation time zero. Override only fields needed. */
+#define TABOS_TILEMAP_DRAW_OPTIONS_DEFAULT \
+    ((tabos_tilemap_draw_options_t) {      \
+        .viewport = {.width = UINT32_MAX, .height = UINT32_MAX} \
+    })
+
 /*
  * Read a cell by tile-layer index, column, and row. Returns 0 on success or -1
  * with errno=EINVAL for an invalid map/layer/output and errno=ERANGE outside
