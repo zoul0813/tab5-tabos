@@ -247,17 +247,30 @@ coalescing continues to suppress duplicate subscription events.
 
 ### Phase 6: Camera completion path
 
-- [ ] Replace repeated 10 ms camera dequeue attempts with a dedicated capture worker or an
+- [x] Replace repeated 10 ms camera dequeue attempts with a dedicated capture worker or an
   interruptible blocking driver wait.
-- [ ] Wake worker on capture start and stop.
-- [ ] Block until completed buffer, stop request, fault, or bounded watchdog deadline.
-- [ ] Keep I/O, RAW conversion, RGB preview, JPEG encoding, H.264 encoding, and frame-pool
+- [x] Wake worker on capture start and stop.
+- [x] Block until completed buffer, stop request, fault, or bounded watchdog deadline.
+- [x] Keep I/O, RAW conversion, RGB preview, JPEG encoding, H.264 encoding, and frame-pool
   submission in task context.
-- [ ] Preserve H.264 backpressure: do not dequeue when no unleased destination slot can
+- [x] Preserve H.264 backpressure: do not dequeue when no unleased destination slot can
   accept next reference-dependent frame.
-- [ ] Interrupt blocked dequeue during close, device removal, process teardown, and system
+- [x] Interrupt blocked dequeue during close, device removal, process teardown, and system
   shutdown before buffers or mutexes are destroyed.
-- [ ] Retain slow stall diagnostics without turning watchdog deadline into normal polling.
+- [x] Retain slow stall diagnostics without turning watchdog deadline into normal polling.
+
+Host and Tab5 backends now own dedicated capture workers. Frame/error callbacks notify
+runtime, while `kernel_runtime_update()` and camera wait adapters no longer request
+periodic dequeue work. Tab5 blocks in `VIDIOC_DQBUF` with a two-second diagnostic watchdog;
+its worker is pinned to CPU0 to preserve the physically validated V4L2/ISP processing
+context. An unpinned worker produced corrupted gray RGB565 previews even though capture
+completed without driver errors. CPU0-pinned hardware validation produced clear, visible
+`cameratest preview 300` and `cameratest preview 1000` output; RAW capture and the maintained
+tester also completed successfully.
+stop marks capture inactive, stops the V4L2 stream, wakes the worker, and waits for its idle
+acknowledgment before unmapping buffers. H.264 queries kernel pool capacity before dequeue
+and resumes only when lease release signals new capacity. Real host-worker coverage proves
+completion wake, capacity blocking/resume, and joined close; Tab5 Debug cross-build passes.
 
 ### Phase 7: Application and process notifications
 
@@ -346,8 +359,8 @@ coalescing continues to suppress duplicate subscription events.
 
 - [ ] Wi-Fi/IP transitions update portable state and device registry exactly once.
 - [x] Network retry fires only at deadline.
-- [ ] Camera worker blocks when idle and wakes for frame, stop, fault, and shutdown.
-- [ ] H.264 backpressure and camera lease behavior remain unchanged.
+- [x] Camera worker blocks when idle and wakes for frame, stop, fault, and shutdown.
+- [x] H.264 backpressure and camera lease behavior remain unchanged.
 - [ ] Native application completion wakes parent and preserves child status.
 - [ ] Child/grandchild unwind and process-0 panic paths remain correct.
 - [ ] Device events, wait sources, and resource cleanup remain generation-safe.

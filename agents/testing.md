@@ -211,16 +211,17 @@ fault cancellation, and shutdown cancellation. Physical validation must still co
 down/move/up, multitouch, rapid retouch, long stationary contact, and orientation
 independently on GT911, ST7123, and ST7121 Tab5 revisions.
 
-Camera concurrency regression uses real host mutexes and two polling threads while
-streams close and reclaim outstanding leases. Runtime and wait adapters must enter
-`camera_service_update()` so backend operations serialize with start/stop.
+Camera concurrency regression uses real host mutexes and concurrent wake threads while
+streams close and reclaim outstanding leases. Worker wake operations must serialize with
+start/stop. Real host-backend coverage must prove frame completion without runtime polling,
+runtime notification, H.264 capacity blocking, release-driven resume, and joined close.
 
 Camera-foundation validation uses deterministic frames and covers bounded pool
 exhaustion, oldest-unleased replacement, drop accounting, opaque lease generation,
 foreign/stale rejection, copied frame bytes, wait readiness/error/hangup, and process
 cleanup. macOS simulator RAW8, RGB565, fullscreen preview, JPEG, and H.264 utility paths
-have been manually verified. Physical SC2356 frame delivery and all Tab5 format,
-performance, and responsiveness checks remain Phase 6 validation work.
+have been manually verified. Physical SC2356 completion-worker stop, teardown, all-format,
+performance, and responsiveness checks remain required.
 
 ---
 

@@ -555,8 +555,12 @@ slow consumers, and count drops. H.264 pauses backend updates when the pool is f
 preserve reference pictures; upstream sensor skips are not pool drops.
 Wait sources expose readable, error, and hangup state;
 process teardown reclaims leaked leases. Host supplies deterministic RAW8 fixtures. Tab5
-detects and registers the SC2356 through its platform backend; physical raw delivery,
-preview, JPEG, and H.264 remain later Phase 6 work.
+detects and registers the SC2356 through its platform backend. Dedicated host and Tab5
+capture workers deliver completion callbacks and wake runtime without camera polling.
+Tab5 pins its capture worker to CPU0 because physical testing showed corrupted gray RGB565
+preview data when the V4L2/ISP path could migrate between cores. It blocks in dequeue with a
+two-second stall watchdog; stop paths interrupt capture and join the worker before releasing
+buffers. H.264 checks pool capacity before dequeue and resumes only after lease release.
 
 ### Current implementation: keyboard input
 

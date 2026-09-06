@@ -395,7 +395,6 @@ void kernel_runtime_update(void)
     console_update();
     network_service_update();
     platform_pointer_update();
-    camera_service_update();
     hardware_devices_update();
     kernel_application_system_update();
     const uint64_t now             = platform_time_ms();

@@ -40,6 +40,8 @@
 - [x] Phase 4: drive key repeat, cursor blink, network retry, and finite waits from
   explicit saturating monotonic deadlines; skip missed-period replay and cancel obsolete
   deadlines immediately.
+- [x] Phase 6: move host and Tab5 camera capture to completion workers with runtime wake,
+  bounded stall watchdog, joined teardown, and release-driven H.264 backpressure.
 
 ### Hardware Services Phase 6 Validation
 

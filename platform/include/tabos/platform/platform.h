@@ -43,6 +43,7 @@ typedef void (*platform_audio_error_fn)(int error);
 typedef void (*platform_camera_frame_fn)(const void* data, size_t size, uint32_t width, uint32_t height,
                                          uint32_t stride_bytes, uint32_t format, uint64_t timestamp_ms);
 typedef void (*platform_camera_error_fn)(int error);
+typedef bool (*platform_camera_capture_ready_fn)(void);
 typedef void (*platform_network_event_fn)(void);
 
 typedef struct {
@@ -206,13 +207,13 @@ bool platform_pointer_init(const char** driver, int* error);
 void platform_pointer_update(void);
 void platform_pointer_shutdown(void);
 bool platform_pointer_health(int* error);
-bool platform_camera_init(platform_camera_frame_fn frame, platform_camera_error_fn error, platform_camera_info_t* info);
+bool platform_camera_init(platform_camera_frame_fn frame, platform_camera_error_fn error,
+                          platform_camera_capture_ready_fn capture_ready, platform_camera_info_t* info);
 bool platform_camera_start(const tabos_camera_config_t* config);
 void platform_camera_stop(void);
-// Called through camera_service_update(), serialized with start/stop. Deliver at
-// most one frame synchronously per call; do not submit frames asynchronously.
-// The service may defer updates while the H.264 pool has no free slot.
-void platform_camera_update(void);
+// Wake a blocked capture worker after destination capacity or other capture
+// readiness changes. Frame and error callbacks run asynchronously in task context.
+void platform_camera_resume(void);
 void platform_camera_shutdown(void);
 bool platform_network_operations_init(void);
 void platform_network_operations_shutdown(void);

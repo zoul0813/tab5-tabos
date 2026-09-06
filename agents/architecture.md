@@ -100,8 +100,14 @@ leased frames, replace the oldest ready unleased frame for slow consumers, and c
 drops. H.264 instead pauses backend updates until a pool slot is free, preserving encoded
 reference pictures; sensor-side skips are outside the pool-drop count. Close or process
 teardown reclaims buffers and leaked leases. Host supplies
-deterministic RAW8 fixtures. Tab5 SC2356 detection stays below the platform boundary;
-raw hardware delivery, preview conversion, and encoding remain later Phase 6 work.
+deterministic RAW8 fixtures. Host and Tab5 use dedicated capture workers; callbacks wake
+runtime after frame or fault completion. Tab5 camera I/O, RAW conversion, preview
+submission, JPEG encoding, and H.264 encoding remain in worker task context. The Tab5
+worker is pinned to CPU0: physical testing found that allowing this V4L2/ISP path to migrate
+between cores corrupted RGB565 preview data without reporting a driver error. A two-second
+dequeue deadline provides slow stall diagnostics, not normal polling. H.264 capacity is
+checked before dequeue, and lease release wakes a capacity-blocked worker. Stop and
+shutdown join capture work before frame pools, DMA mappings, or mutexes are destroyed.
 
 ### Generic wait sources [DECIDED]
 
@@ -238,8 +244,8 @@ boundary. Key repeat, cursor blink, network retry, and finite waits publish exac
 monotonic deadlines. `UINT64_MAX` means no deadline and finite additions clamp below it;
 late periodic work runs once and advances to the next future period. Cursor ownership
 and network/input changes wake runtime when they add or cancel deadlines. Runtime still
-includes a 10 ms compatibility deadline for services whose interrupt/completion
-conversion belongs to later ISR-milestone phases. Active host RV32 interpretation keeps
+includes a 10 ms compatibility deadline for application-completion work whose conversion
+belongs to a later ISR-milestone phase. Active host RV32 interpretation keeps
 the runtime immediately runnable for bounded instruction slices. Native Tab5 execution
 does not use that runnable hint because it runs in its own managed task.
 

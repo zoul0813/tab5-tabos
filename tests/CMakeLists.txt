@@ -151,6 +151,17 @@ tabos_enable_warnings(tabos_host_pointer)
 tabos_enable_sanitizers(tabos_host_pointer)
 add_test(NAME unit.host_pointer COMMAND tabos_host_pointer)
 
+add_executable(tabos_host_camera_completion unit/host_camera_completion.c)
+target_include_directories(tabos_host_camera_completion PRIVATE
+    "${TABOS_ROOT}/camera/include"
+    "${TABOS_ROOT}/platform/include"
+    "${TABOS_ROOT}/sdk/include"
+)
+target_link_libraries(tabos_host_camera_completion PRIVATE tabos_core tabos_platform_host SDL3::SDL3)
+tabos_enable_warnings(tabos_host_camera_completion)
+tabos_enable_sanitizers(tabos_host_camera_completion)
+add_test(NAME unit.host_camera_completion COMMAND tabos_host_camera_completion)
+
 add_executable(tabos_raster unit/raster.c ${TABOS_TEST_PLATFORM_FAKES})
 target_include_directories(tabos_raster PRIVATE
     "${TABOS_ROOT}/graphics/include"

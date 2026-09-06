@@ -7,6 +7,7 @@
 #include <tabos/wait.h>
 
 static platform_camera_frame_fn submit;
+static platform_camera_capture_ready_fn capture_ready;
 static atomic_int active;
 static atomic_int overlaps;
 static bool streaming;
@@ -29,16 +30,18 @@ static void leave_backend(void)
     atomic_fetch_sub(&active, 1);
 }
 
-bool platform_camera_init(platform_camera_frame_fn frame, platform_camera_error_fn error, platform_camera_info_t* info)
+bool platform_camera_init(platform_camera_frame_fn frame, platform_camera_error_fn error,
+                          platform_camera_capture_ready_fn ready, platform_camera_info_t* info)
 {
     (void) error;
-    submit = frame;
-    *info  = (platform_camera_info_t) {.detected   = true,
-                                       .ready      = true,
-                                       .formats    = TABOS_CAMERA_FORMAT_FLAG_RAW8 | TABOS_CAMERA_FORMAT_FLAG_H264,
-                                       .max_width  = 4U,
-                                       .max_height = 2U,
-                                       .max_fps    = 10U};
+    capture_ready = ready;
+    submit        = frame;
+    *info         = (platform_camera_info_t) {.detected   = true,
+                                              .ready      = true,
+                                              .formats    = TABOS_CAMERA_FORMAT_FLAG_RAW8 | TABOS_CAMERA_FORMAT_FLAG_H264,
+                                              .max_width  = 4U,
+                                              .max_height = 2U,
+                                              .max_fps    = 10U};
     return true;
 }
 
@@ -64,10 +67,10 @@ void platform_camera_stop(void)
     leave_backend();
 }
 
-void platform_camera_update(void)
+void platform_camera_resume(void)
 {
     enter_backend();
-    if (streaming) {
+    if (streaming && capture_ready()) {
         const uint8_t bytes[8] = {++encoded_sequence};
         submit(bytes, sizeof(bytes), 4U, 2U, 4U, active_format, 1U);
     }
@@ -83,7 +86,7 @@ static int update_worker(void* unused)
 {
     (void) unused;
     for (unsigned int index = 0U; index < 100U; ++index) {
-        camera_service_update();
+        camera_service_resume_capture();
     }
     return 0;
 }
@@ -115,14 +118,14 @@ static int test_encoded_backpressure(void)
             ++failures;
         }
     }
-    camera_service_update();
+    camera_service_resume_capture();
     if (encoded_sequence != 3U) {
         ++failures;
     }
     // Acquiring does not free a slot; only release permits another encoded picture.
     for (size_t index = 0U; index < 3U; ++index) {
         (void) camera_service_release(&owner, stream, held[index].lease);
-        camera_service_update();
+        camera_service_resume_capture();
     }
     for (size_t index = 0U; index < 3U; ++index) {
         uint8_t byte = 0U;
@@ -181,7 +184,7 @@ int main(void)
             ++failures;
             break;
         }
-        camera_service_update();
+        camera_service_resume_capture();
         tabos_camera_frame_t frame = {0};
         if (camera_service_acquire(&owner, stream, &frame) != 0) {
             ++failures;

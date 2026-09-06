@@ -13,6 +13,9 @@
 #include <esp_video_device.h>
 #include <esp_video_init.h>
 #include <esp_video_ioctl.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
+#include <freertos/task.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <linux/videodev2.h>
@@ -27,7 +30,11 @@
 enum {
     CAMERA_BUFFER_COUNT = 2,
     CAMERA_JPEG_QUALITY = 80,
-    CAMERA_ERROR_LIMIT  = 30
+    CAMERA_ERROR_LIMIT  = 30,
+    CAMERA_STALL_MS     = 2000,
+    CAMERA_TASK_STACK   = 8192,
+    CAMERA_TASK_PRIO    = 5,
+    CAMERA_TASK_CORE    = 0,
 };
 
 typedef struct {
@@ -39,7 +46,11 @@ static const char* TAG = "tabos-camera";
 static camera_buffer_t buffers[CAMERA_BUFFER_COUNT];
 static platform_camera_frame_fn submit_frame;
 static platform_camera_error_fn submit_error;
+static platform_camera_capture_ready_fn capture_ready;
 static tabos_camera_config_t active_config;
+static TaskHandle_t capture_task;
+static SemaphoreHandle_t capture_idle;
+static SemaphoreHandle_t capture_exited;
 static jpeg_encoder_handle_t jpeg_encoder;
 static uint8_t* jpeg_output;
 static size_t jpeg_output_size;
@@ -49,6 +60,8 @@ static uint32_t h264_output_size;
 static int camera_fd = -1;
 static bool initialized;
 static bool streaming;
+static atomic_bool capture_active;
+static atomic_bool capture_shutdown;
 static uint32_t consecutive_capture_errors;
 static bool dequeue_warning_logged;
 static uint64_t capture_started_us;
@@ -187,7 +200,7 @@ static bool configure_capture(void)
         ESP_LOGE(TAG, "unsupported capture rate %lu fps: errno=%d", (unsigned long) active_config.fps, errno);
         return false;
     }
-    struct timeval timeout = {.tv_sec = 0, .tv_usec = 10000};
+    struct timeval timeout = {.tv_sec = CAMERA_STALL_MS / 1000, .tv_usec = 0};
     if (ioctl(camera_fd, VIDIOC_S_DQBUF_TIMEOUT, &timeout) != 0) {
         ESP_LOGE(TAG, "failed to set dequeue timeout: errno=%d", errno);
         return false;
@@ -224,26 +237,61 @@ static bool configure_capture(void)
     return true;
 }
 
-bool platform_camera_init(platform_camera_frame_fn frame, platform_camera_error_fn error, platform_camera_info_t* info)
+static bool capture_one_frame(void);
+
+static void camera_worker(void* unused)
 {
-    if (frame == NULL || error == NULL || info == NULL) {
+    (void) unused;
+    while (!atomic_load_explicit(&capture_shutdown, memory_order_acquire)) {
+        (void) ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        while (atomic_load_explicit(&capture_active, memory_order_acquire) &&
+               !atomic_load_explicit(&capture_shutdown, memory_order_acquire)) {
+            if (!capture_ready() || !capture_one_frame()) {
+                break;
+            }
+        }
+        (void) xSemaphoreGive(capture_idle);
+    }
+    (void) xSemaphoreGive(capture_exited);
+    vTaskDelete(NULL);
+}
+
+bool platform_camera_init(platform_camera_frame_fn frame, platform_camera_error_fn error,
+                          platform_camera_capture_ready_fn ready, platform_camera_info_t* info)
+{
+    if (frame == NULL || error == NULL || ready == NULL || info == NULL) {
         return false;
     }
     submit_frame           = frame;
     submit_error           = error;
+    capture_ready          = ready;
     const esp_err_t result = bsp_camera_start(NULL);
     initialized            = result == ESP_OK;
-    *info                  = (platform_camera_info_t) {
-                         .driver  = "SC2356 (SC202CS-compatible)",
-                         .formats = TABOS_CAMERA_FORMAT_FLAG_RAW8 | TABOS_CAMERA_FORMAT_FLAG_RGB565 | TABOS_CAMERA_FORMAT_FLAG_JPEG |
+    if (initialized) {
+        capture_idle   = xSemaphoreCreateBinary();
+        capture_exited = xSemaphoreCreateBinary();
+        atomic_store_explicit(&capture_active, false, memory_order_release);
+        atomic_store_explicit(&capture_shutdown, false, memory_order_release);
+        if (capture_idle == NULL || capture_exited == NULL ||
+            xTaskCreatePinnedToCore(camera_worker, "tabos-camera", CAMERA_TASK_STACK, NULL, CAMERA_TASK_PRIO,
+                                    &capture_task, CAMERA_TASK_CORE) != pdPASS) {
+            platform_camera_shutdown();
+        }
+    }
+    *info = (platform_camera_info_t) {
+        .driver  = "SC2356 (SC202CS-compatible)",
+        .formats = TABOS_CAMERA_FORMAT_FLAG_RAW8 | TABOS_CAMERA_FORMAT_FLAG_RGB565 | TABOS_CAMERA_FORMAT_FLAG_JPEG |
                    TABOS_CAMERA_FORMAT_FLAG_H264,
-                         .max_width  = 1600U,
-                         .max_height = 1200U,
-                         .max_fps    = 30U,
-                         .detected   = initialized,
-                         .ready      = initialized,
-                         .error      = initialized ? 0 : result,
+        .max_width  = 1600U,
+        .max_height = 1200U,
+        .max_fps    = 30U,
+        .detected   = initialized,
+        .ready      = initialized,
+        .error      = initialized ? 0 : (result == ESP_OK ? ESP_ERR_NO_MEM : result),
     };
+    if (!initialized) {
+        platform_camera_shutdown();
+    }
     return initialized;
 }
 
@@ -264,7 +312,9 @@ bool platform_camera_start(const tabos_camera_config_t* config)
         platform_camera_stop();
         return false;
     }
-    streaming          = true;
+    while (xSemaphoreTake(capture_idle, 0U) == pdTRUE) {}
+    streaming = true;
+    atomic_store_explicit(&capture_active, true, memory_order_release);
     capture_started_us = (uint64_t) esp_timer_get_time();
     conversion_us      = 0U;
     encoding_us        = 0U;
@@ -276,11 +326,13 @@ bool platform_camera_start(const tabos_camera_config_t* config)
              (unsigned long) config->fps,
              (unsigned long) heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
              (unsigned long) heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+    xTaskNotifyGive(capture_task);
     return true;
 }
 
 void platform_camera_stop(void)
 {
+    const bool was_active = atomic_exchange_explicit(&capture_active, false, memory_order_acq_rel);
     if (streaming) {
         const uint64_t elapsed_us = (uint64_t) esp_timer_get_time() - capture_started_us;
         ESP_LOGI(TAG, "capture stop: frames=%lu elapsed_us=%llu conversion_us=%llu encoding_us=%llu dequeue_misses=%lu",
@@ -288,9 +340,11 @@ void platform_camera_stop(void)
                  (unsigned long long) encoding_us, (unsigned long) dequeue_misses);
     }
     if (camera_fd >= 0) {
-        if (streaming) {
+        if (was_active) {
             int type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
             (void) ioctl(camera_fd, VIDIOC_STREAMOFF, &type);
+            xTaskNotifyGive(capture_task);
+            (void) xSemaphoreTake(capture_idle, portMAX_DELAY);
         }
         release_buffers();
         (void) close(camera_fd);
@@ -303,25 +357,33 @@ void platform_camera_stop(void)
     dequeue_warning_logged     = false;
 }
 
-void platform_camera_update(void)
+static bool capture_one_frame(void)
 {
-    if (!streaming) {
-        return;
+    if (!atomic_load_explicit(&capture_active, memory_order_acquire)) {
+        return false;
     }
-    struct v4l2_buffer buffer = {.type = V4L2_BUF_TYPE_VIDEO_CAPTURE, .memory = V4L2_MEMORY_MMAP};
+    struct v4l2_buffer buffer      = {.type = V4L2_BUF_TYPE_VIDEO_CAPTURE, .memory = V4L2_MEMORY_MMAP};
+    const uint64_t wait_started_us = (uint64_t) esp_timer_get_time();
     if (ioctl(camera_fd, VIDIOC_DQBUF, &buffer) != 0) {
         const int error = errno;
+        if (!atomic_load_explicit(&capture_active, memory_order_acquire)) {
+            return false;
+        }
         ++dequeue_misses;
-        // Pinned esp_video returns ESP_FAIL for a timed-out ready semaphore;
-        // its VFS maps that to EPERM. Do not warn on each ordinary 10 ms wait.
-        // EPERM can also cover preprocessing errors, so retain a prolonged-stall warning.
+        // Pinned esp_video maps a timed-out ready semaphore to EPERM. Keep
+        // timeout as a slow watchdog, never a normal frame polling interval.
         const bool empty_wait     = error == EAGAIN || error == ETIMEDOUT || error == EPERM;
         const uint64_t stalled_us = (uint64_t) esp_timer_get_time() - last_dequeue_us;
-        if (!dequeue_warning_logged && (!empty_wait || stalled_us >= 2000000U)) {
+        if (!dequeue_warning_logged && (!empty_wait || stalled_us >= (uint64_t) CAMERA_STALL_MS * 1000U)) {
             ESP_LOGW(TAG, "camera dequeue stalled: errno=%d elapsed_us=%llu", error, (unsigned long long) stalled_us);
             dequeue_warning_logged = true;
         }
-        return;
+        const uint64_t wait_us = (uint64_t) esp_timer_get_time() - wait_started_us;
+        if (empty_wait && wait_us < (uint64_t) CAMERA_STALL_MS * 1000U) {
+            const uint64_t remaining_ms = ((uint64_t) CAMERA_STALL_MS * 1000U - wait_us + 999U) / 1000U;
+            (void) ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(remaining_ms));
+        }
+        return atomic_load_explicit(&capture_active, memory_order_acquire);
     }
     dequeue_warning_logged = false;
     last_dequeue_us        = (uint64_t) esp_timer_get_time();
@@ -400,21 +462,48 @@ void platform_camera_update(void)
             }
         }
     }
+    if (!atomic_load_explicit(&capture_active, memory_order_acquire)) {
+        return false;
+    }
     if (ioctl(camera_fd, VIDIOC_QBUF, &buffer) != 0) {
         ESP_LOGE(TAG, "failed to requeue buffer %lu: flags=0x%08lx errno=%d", (unsigned long) buffer.index,
                  (unsigned long) buffer.flags, errno);
         report_error(EIO);
+    }
+    return true;
+}
+
+void platform_camera_resume(void)
+{
+    if (capture_task != NULL) {
+        (void) xSemaphoreTake(capture_idle, 0U);
+        xTaskNotifyGive(capture_task);
     }
 }
 
 void platform_camera_shutdown(void)
 {
     platform_camera_stop();
+    if (capture_task != NULL) {
+        atomic_store_explicit(&capture_shutdown, true, memory_order_release);
+        xTaskNotifyGive(capture_task);
+        (void) xSemaphoreTake(capture_exited, portMAX_DELAY);
+        capture_task = NULL;
+    }
+    if (capture_idle != NULL) {
+        vSemaphoreDelete(capture_idle);
+        capture_idle = NULL;
+    }
+    if (capture_exited != NULL) {
+        vSemaphoreDelete(capture_exited);
+        capture_exited = NULL;
+    }
     if (initialized) {
         (void) esp_video_deinit();
         (void) bsp_feature_enable(BSP_FEATURE_CAMERA, false);
         initialized = false;
     }
-    submit_frame = NULL;
-    submit_error = NULL;
+    submit_frame  = NULL;
+    submit_error  = NULL;
+    capture_ready = NULL;
 }

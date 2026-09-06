@@ -15,6 +15,8 @@ Host builds provide deterministic 64x48 RAW8 frames at up to 10 FPS. Pixel value
 `(x + y + frame_sequence) & 0xff`, making capture tests reproducible. Tab5 detects and
 registers its SC2356-compatible sensor through Espressif camera stack. Physical image
 orientation, output validity, throughput, and responsiveness still require validation.
+Both backends deliver frames from dedicated capture workers and wake application waits
+when a frame or fault is ready; runtime updates do not poll camera hardware.
 The Tab5 `cameratest` utility captures the sensor's native 1280x720 mode at 30 FPS.
 Its application metadata reserves a 3 MiB heap so fullscreen RGB565 preview has room
 for the 1.8 MiB application framebuffer and normal runtime allocations.
@@ -88,6 +90,11 @@ Run preview twice and check that Q/Escape restores the shell promptly. Record au
 network, storage, display, and input progress during capture; passing each service
 before or after capture alone does not prove concurrent responsiveness.
 
+The Tab5 capture worker is pinned to CPU0. Allowing the V4L2/ISP capture path to migrate
+between cores produced grainy gray RGB565 previews without driver errors during Phase 6
+hardware testing. CPU0 affinity restored clear output at both 300-frame and 1000-frame
+preview durations.
+
 Tab5 serial logs report `capture start` with format, dimensions, configured FPS, and
 free internal/PSRAM bytes after allocation. `capture stop` reports processed frame
 count, elapsed microseconds, total RAW8 conversion microseconds, and total encoder
@@ -95,17 +102,18 @@ microseconds. Divide totals by processed frames for average stage time, and mult
 frames by 1,000,000 / elapsed_us for observed throughput including startup. These
 backend counts precede application pool drops; record utility `dropped` output too.
 Zero conversion/encoding time means that stage does not apply to the selected format.
-`dequeue_misses` counts capture polls that return no buffer; it is separate from
-pool drops. The pinned video driver maps its ordinary 10 ms ready-wait timeout to
-`EPERM`. These polls no longer emit individual warnings; two seconds without a
-successful dequeue still emits a stall warning, including for possible preprocessing
-failures sharing that error code. Other dequeue errors warn immediately.
+`dequeue_misses` counts two-second capture watchdog waits that return no buffer; it is
+separate from pool drops. The pinned video driver maps its expired ready wait to `EPERM`.
+Two seconds without a successful dequeue emits one stall warning, including for possible
+preprocessing failures sharing that error code. Other dequeue errors warn immediately.
 Free-memory snapshots exclude allocations made after camera open, such as the preview
 application's graphics buffer; they are not peak-memory measurements.
 
-Capture polling from runtime and application waits shares a pipeline lock with stream
-start/stop. This prevents concurrent dequeue/encode operations and closing DMA buffers
-while a capture update still uses them.
+Capture start wakes a dedicated worker. It blocks in the camera driver until a frame or
+the slow watchdog deadline, then performs conversion, encoding, and frame-pool submission
+in task context. H.264 pool exhaustion blocks before dequeue and frame release wakes the
+worker. Close, process teardown, device removal, and shutdown stop and join capture work
+before DMA buffers and synchronization objects are released.
 
 ## Tab5 Color Tuning and File Writes
 

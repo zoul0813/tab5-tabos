@@ -48,6 +48,28 @@ static tabos_device_id_t camera_device_id = TABOS_DEVICE_ID_INVALID;
 static size_t open_count;
 static bool initialized;
 
+static bool camera_service_capture_ready(void)
+{
+    if (!initialized) {
+        return false;
+    }
+    bool ready = false;
+    platform_mutex_lock(camera_mutex);
+    for (size_t index = 0U; index < CAMERA_STREAM_CAPACITY; ++index) {
+        const camera_stream_t* stream = &streams[index];
+        if (!stream->open || stream->faulted || stream->hangup) {
+            continue;
+        }
+        ready = stream->config.format != TABOS_CAMERA_FORMAT_H264;
+        for (size_t frame = 0U; !ready && frame < CAMERA_FRAME_CAPACITY; ++frame) {
+            ready = !stream->frames[frame].ready && !stream->frames[frame].leased;
+        }
+        break;
+    }
+    platform_mutex_unlock(camera_mutex);
+    return ready;
+}
+
 static uint32_t next_generation(uint32_t generation, uint32_t maximum)
 {
     ++generation;
@@ -106,7 +128,8 @@ bool camera_service_init(void)
         return false;
     }
     initialized = true;
-    (void) platform_camera_init(camera_service_submit, camera_service_error, &platform_info);
+    (void) platform_camera_init(camera_service_submit, camera_service_error, camera_service_capture_ready,
+                                &platform_info);
     return true;
 }
 
@@ -216,14 +239,16 @@ static tabos_camera_stream_t open_pipeline_locked(const void* owner, const tabos
             stream->frames[frame].data     = allocations[frame];
             stream->frames[frame].capacity = capacity;
         }
+        open_count = 1U;
+        platform_mutex_unlock(camera_mutex);
         if (!platform_camera_start(config)) {
+            platform_mutex_lock(camera_mutex);
             free_stream(stream);
+            open_count = 0U;
             platform_mutex_unlock(camera_mutex);
             return -TABOS_EIO;
         }
-        open_count                         = 1U;
         const tabos_camera_stream_t result = stream_handle(index, generation);
-        platform_mutex_unlock(camera_mutex);
         return result;
     }
     platform_mutex_unlock(camera_mutex);
@@ -238,7 +263,10 @@ static int close_pipeline_locked(const void* owner, tabos_camera_stream_t handle
         platform_mutex_unlock(camera_mutex);
         return -TABOS_EBADF;
     }
+    stream->hangup = true;
+    platform_mutex_unlock(camera_mutex);
     platform_camera_stop();
+    platform_mutex_lock(camera_mutex);
     free_stream(stream);
     open_count = 0U;
     platform_mutex_unlock(camera_mutex);
@@ -317,8 +345,12 @@ int camera_service_release(const void* owner, tabos_camera_stream_t handle, tabo
         platform_mutex_unlock(camera_mutex);
         return -TABOS_EBADF;
     }
-    frame->leased = false;
+    frame->leased     = false;
+    const bool resume = stream->config.format == TABOS_CAMERA_FORMAT_H264 && !stream->faulted && !stream->hangup;
     platform_mutex_unlock(camera_mutex);
+    if (resume) {
+        camera_service_resume_capture();
+    }
     return 0;
 }
 
@@ -357,15 +389,18 @@ static void close_owner_pipeline_locked(const void* owner)
     if (!initialized) {
         return;
     }
-    platform_mutex_lock(camera_mutex);
     for (size_t index = 0U; index < CAMERA_STREAM_CAPACITY; ++index) {
+        platform_mutex_lock(camera_mutex);
         if (streams[index].open && (owner == NULL || streams[index].owner == owner)) {
+            streams[index].hangup = true;
+            platform_mutex_unlock(camera_mutex);
             platform_camera_stop();
+            platform_mutex_lock(camera_mutex);
             free_stream(&streams[index]);
             open_count = 0U;
         }
+        platform_mutex_unlock(camera_mutex);
     }
-    platform_mutex_unlock(camera_mutex);
 }
 
 void camera_service_submit(const void* data, size_t size, uint32_t width, uint32_t height, uint32_t stride_bytes,
@@ -374,6 +409,7 @@ void camera_service_submit(const void* data, size_t size, uint32_t width, uint32
     if (!initialized || data == NULL || size == 0U || format >= TABOS_CAMERA_FORMAT_COUNT) {
         return;
     }
+    bool changed = false;
     platform_mutex_lock(camera_mutex);
     for (size_t stream_index = 0U; stream_index < CAMERA_STREAM_CAPACITY; ++stream_index) {
         camera_stream_t* stream = &streams[stream_index];
@@ -394,9 +430,10 @@ void camera_service_submit(const void* data, size_t size, uint32_t width, uint32
         }
         if (selected == NULL) {
             if (format == TABOS_CAMERA_FORMAT_H264) {
-                // Updates reserve capacity before invoking the synchronous backend.
-                // A producer violating that contract must not corrupt the reference chain.
+                // Worker checks capacity before dequeue. A producer violating
+                // that contract must not corrupt the reference chain.
                 stream->faulted = true;
+                changed         = true;
                 continue;
             }
             uint32_t oldest = UINT32_MAX;
@@ -415,6 +452,7 @@ void camera_service_submit(const void* data, size_t size, uint32_t width, uint32
         if (size > selected->capacity) {
             // Partial encoded pictures are not valid frames.
             stream->faulted = true;
+            changed         = true;
             continue;
         }
         const size_t bytes = size;
@@ -428,8 +466,12 @@ void camera_service_submit(const void* data, size_t size, uint32_t width, uint32
                                                      .size_bytes   = (uint32_t) bytes,
                                                      .timestamp_ms = timestamp_ms,
                                                      .sequence     = ++stream->sequence};
+        changed            = true;
     }
     platform_mutex_unlock(camera_mutex);
+    if (changed) {
+        platform_runtime_notify(PLATFORM_RUNTIME_EVENT_CAMERA);
+    }
 }
 
 void camera_service_error(int error)
@@ -449,10 +491,12 @@ static void remove_device_pipeline_locked(void)
         return;
     }
     platform_mutex_lock(camera_mutex);
-    platform_camera_stop();
     for (size_t index = 0U; index < CAMERA_STREAM_CAPACITY; ++index) {
         streams[index].hangup |= streams[index].open;
     }
+    platform_mutex_unlock(camera_mutex);
+    platform_camera_stop();
+    platform_mutex_lock(camera_mutex);
     platform_info.detected = false;
     platform_info.ready    = false;
     platform_mutex_unlock(camera_mutex);
@@ -489,32 +533,11 @@ void camera_service_remove_device(void)
     platform_mutex_unlock(pipeline_mutex);
 }
 
-// Both runtime polling and application waits enter here. Serialize callbacks with
-// start/stop, always taking the pipeline lock before the frame-pool lock.
-void camera_service_update(void)
+// Serialize a capacity wake with start/stop without performing capture work
+// on the caller.
+void camera_service_resume_capture(void)
 {
     platform_mutex_lock(pipeline_mutex);
-    bool can_update = initialized;
-    platform_mutex_lock(camera_mutex);
-    for (size_t index = 0U; index < CAMERA_STREAM_CAPACITY; ++index) {
-        const camera_stream_t* stream = &streams[index];
-        if (!stream->open || stream->config.format != TABOS_CAMERA_FORMAT_H264) {
-            continue;
-        }
-        can_update = false;
-        if (!stream->faulted && !stream->hangup) {
-            for (size_t frame = 0U; frame < CAMERA_FRAME_CAPACITY; ++frame) {
-                if (!stream->frames[frame].ready && !stream->frames[frame].leased) {
-                    can_update = true;
-                    break;
-                }
-            }
-        }
-        break;
-    }
-    platform_mutex_unlock(camera_mutex);
-    if (can_update) {
-        platform_camera_update();
-    }
+    platform_camera_resume();
     platform_mutex_unlock(pipeline_mutex);
 }
