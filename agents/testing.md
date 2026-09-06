@@ -178,6 +178,12 @@ fault, and forced termination. Console tests build against the platform mutex co
 hardware validation remains responsible for detecting task starvation, lock inversion,
 and watchdog regressions under the FreeRTOS implementation.
 
+Lifecycle tests also require application readiness on root/child launch, nested exit,
+and parent restoration. Tab5 validation must prove native return, explicit exit, and
+child execution wake a blocked runtime promptly. Late coalesced application readiness
+must be harmless after process teardown or process-slot reuse. Cleanup must stop native
+execution before releasing process-owned resources.
+
 Host RV32 tests must force multiple instruction-slice yields before child completion and
 verify retained PC, registers, memory, and parent state. Tab5 tests must keep native child
 active while independently proving keyboard polling, timer/cursor updates, display work,

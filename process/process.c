@@ -144,6 +144,7 @@ static void finish_child_process(kernel_process_t* child)
             foreground_process->context.exit_requested = true;
         }
     }
+    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_APPLICATION);
 }
 
 void kernel_application_system_init(void)
@@ -263,6 +264,7 @@ static tabos_app_result_t launch_root_descriptor(const tabos_app_descriptor_t* d
     if (context->exit_requested) {
         panic_root_process(process);
     }
+    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_APPLICATION);
     return TABOS_APP_RESULT_OK;
 }
 
@@ -351,6 +353,8 @@ static tabos_app_result_t launch_child_descriptor(tabos_app_context_t* parent, c
     }
     if (child->context.exit_requested) {
         finish_child_process(child);
+    } else {
+        platform_runtime_notify(PLATFORM_RUNTIME_EVENT_APPLICATION);
     }
     return TABOS_APP_RESULT_OK;
 }
@@ -428,6 +432,7 @@ void tabos_app_request_exit(tabos_app_context_t* context, int exit_status)
         }
         context->exit_requested = true;
         context->exit_status    = exit_status;
+        platform_runtime_notify(PLATFORM_RUNTIME_EVENT_APPLICATION);
     }
 }
 
@@ -440,6 +445,7 @@ void kernel_process_fail(tabos_app_context_t* context, tabos_process_termination
     context->termination_cause = cause;
     context->exit_requested    = true;
     context->exit_status       = exit_status;
+    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_APPLICATION);
 }
 
 bool kernel_process_force_terminate(tabos_process_id_t process_id, int exit_status)

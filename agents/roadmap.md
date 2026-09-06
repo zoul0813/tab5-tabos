@@ -42,6 +42,8 @@
   deadlines immediately.
 - [x] Phase 6: move host and Tab5 camera capture to completion workers with runtime wake,
   bounded stall watchdog, joined teardown, and release-driven H.264 backpressure.
+- [x] Phase 7: notify runtime for native application completion and ELF process work;
+  stop native execution before releasing process-owned resources.
 
 ### Hardware Services Phase 6 Validation
 

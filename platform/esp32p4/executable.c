@@ -52,6 +52,7 @@ static void elf_task_main(void* argument)
     vTaskSetThreadLocalStoragePointer(NULL, 0, context->user_data);
     context->returned_status = context->entry(&context->api, (int) context->argc, context->argv);
     atomic_store_explicit(&context->finished, true, memory_order_release);
+    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_APPLICATION);
     vTaskSuspend(NULL);
 }
 

@@ -274,15 +274,38 @@ completion wake, capacity blocking/resume, and joined close; Tab5 Debug cross-bu
 
 ### Phase 7: Application and process notifications
 
-- [ ] Notify process manager when native application task returns instead of polling its
+- [x] Notify process manager when native application task returns instead of polling its
   `finished` atomic flag every runtime iteration.
-- [ ] Notify runtime for exit request, child-exec request, and other ELF call-gate work that
+- [x] Notify runtime for exit request, child-exec request, and other ELF call-gate work that
   currently waits for next update slice.
-- [ ] Preserve persistent nested foreground process ordering and process-0 panic invariant.
-- [ ] Ensure notification cannot target a destroyed or generation-reused process object.
-- [ ] Wake and join/terminate application work in deterministic cleanup order.
-- [ ] Keep host RV32 interpreter scheduling explicit: runnable guests receive bounded
+- [x] Preserve persistent nested foreground process ordering and process-0 panic invariant.
+- [x] Ensure notification cannot target a destroyed or generation-reused process object.
+- [x] Wake and join/terminate application work in deterministic cleanup order.
+- [x] Keep host RV32 interpreter scheduling explicit: runnable guests receive bounded
   instruction slices; blocked guests do not force periodic runtime wakeups.
+
+Native Tab5 completion, ELF exit requests, ELF child-exec requests, process launch, and
+parent restoration now publish the coalesced application readiness bit. Notifications
+carry no process pointer or generation-sensitive payload; process state remains
+authoritative, so a late coalesced wake cannot address a destroyed or reused slot. ELF
+teardown first cancels blocking waits and terminates the execution context, then releases
+process-owned services, descriptors, heap, and executable image. Host RV32 execution
+retains bounded explicit interpreter slices and does not create a completion worker.
+
+Physical Tab5 validation on 2026-09-06 completed three consecutive full tester runs,
+including child/grandchild execution and reverse-order status propagation, and repeated
+`hello` launches returned promptly to the shell without watchdog or error logs. Rapid
+keyboard input during tester remained queued for the shell because tester stops consuming
+stdin after its nonblocking-input case; this is current controlling-terminal behavior, not
+an application-interrupt mechanism.
+
+An isolated `tester --camera` run still reports the pre-existing combined pool-exhaustion
+assertion intermittently. Capture diagnostics show RAW conversion taking approximately
+154--211 ms per frame while the test allows only 200 ms to prove a dropped frame. Five
+frames complete without dequeue misses or camera errors, consistent with the released slot
+becoming available before another frame can be dropped. Make this camera test
+frame-rate-aware and split replacement, lease-generation, and drop-count diagnostics; this
+is a Phase 6 test follow-up, not a Phase 7 process-notification failure.
 
 ### Phase 8: Central run-loop conversion
 
@@ -361,8 +384,8 @@ completion wake, capacity blocking/resume, and joined close; Tab5 Debug cross-bu
 - [x] Network retry fires only at deadline.
 - [x] Camera worker blocks when idle and wakes for frame, stop, fault, and shutdown.
 - [x] H.264 backpressure and camera lease behavior remain unchanged.
-- [ ] Native application completion wakes parent and preserves child status.
-- [ ] Child/grandchild unwind and process-0 panic paths remain correct.
+- [x] Native application completion wakes parent and preserves child status.
+- [x] Child/grandchild unwind and process-0 panic paths remain correct.
 - [ ] Device events, wait sources, and resource cleanup remain generation-safe.
 
 ### Cross-target validation
@@ -387,7 +410,7 @@ completion wake, capacity blocking/resume, and joined close; Tab5 Debug cross-bu
 - [ ] Confirm idle keyboard and touch produce no periodic I2C traffic.
 - [ ] Validate Wi-Fi connect/disconnect/failure/retry transitions.
 - [ ] Validate camera capture, close, process teardown, and repeated start/stop.
-- [ ] Validate shell, child, and grandchild execution while event-driven services remain
+- [x] Validate shell, child, and grandchild execution while event-driven services remain
   responsive.
 - [ ] Verify watchdog, deadlock, lost-interrupt, duplicate-event, and starvation behavior
   under simultaneous keyboard, touch, network, camera, and application activity.

@@ -267,6 +267,7 @@ static void elf_request_exit(int exit_status)
     }
     atomic_store_explicit(&application->requested_exit_status, exit_status, memory_order_release);
     atomic_store_explicit(&application->exit_requested, true, memory_order_release);
+    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_APPLICATION);
 }
 
 static int elf_console_read(char* buffer, uint32_t capacity)
@@ -2097,6 +2098,7 @@ static int elf_exec(const char* path, uint32_t argc, const char* const* argv)
     application->exec_argc = (size_t) argc;
     atomic_store_explicit(&application->exec_in_flight, true, memory_order_release);
     atomic_store_explicit(&application->exec_requested, true, memory_order_release);
+    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_APPLICATION);
     return TABOS_ELF_EXEC_PENDING;
 }
 
@@ -2341,6 +2343,10 @@ static void elf_release_resources(loader_elf_application_t* application)
         return;
     }
     elf_cancel_wait(application);
+    /* Stop concurrent native execution before releasing any process-owned
+     * object that an application call gate could still access. */
+    platform_riscv32_destroy(application->execution);
+    application->execution = NULL;
     audio_service_close_owner(application);
     pointer_service_close_owner(application);
     camera_service_close_owner(application);
@@ -2386,8 +2392,6 @@ static void elf_release_resources(loader_elf_application_t* application)
             application->tls[index] = (elf_tls_t) {0};
         }
     }
-    platform_riscv32_destroy(application->execution);
-    application->execution = NULL;
     if (socket_operations_suspended) {
         platform_network_socket_operations_resume();
     }

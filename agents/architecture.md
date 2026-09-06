@@ -243,9 +243,12 @@ it to FreeRTOS direct task notifications; FreeRTOS types remain below the platfo
 boundary. Key repeat, cursor blink, network retry, and finite waits publish exact
 monotonic deadlines. `UINT64_MAX` means no deadline and finite additions clamp below it;
 late periodic work runs once and advances to the next future period. Cursor ownership
-and network/input changes wake runtime when they add or cancel deadlines. Runtime still
-includes a 10 ms compatibility deadline for application-completion work whose conversion
-belongs to a later ISR-milestone phase. Active host RV32 interpretation keeps
+and network/input changes wake runtime when they add or cancel deadlines. Native Tab5
+application completion and ELF exit/child-exec requests publish application readiness;
+process launch and parent restoration do likewise. These notifications carry no process
+pointer, so coalesced late wakeups cannot target a destroyed or generation-reused slot.
+Runtime still includes a temporary 10 ms compatibility deadline for services awaiting
+central dispatch conversion. Active host RV32 interpretation keeps
 the runtime immediately runnable for bounded instruction slices. Native Tab5 execution
 does not use that runnable hint because it runs in its own managed task.
 
@@ -307,8 +310,12 @@ Filesystem-backed shell now loads `T:/bin/shell.bin` directly as process 0. Expe
 ELF API provides console input/output, terminal clear, current-directory and directory
 listing operations, child execution, yield, and exit request. Host advances shell through
 retained RV32 interpreter slices. Tab5 platform starts native ELF entry in managed FreeRTOS
-application task and polls completion from runtime task. Shell uses pending child-exec
+application task and receives completion notification in runtime task. Shell uses pending child-exec
 protocol to remain blocked until process manager restores it with child status.
+
+Process teardown cancels blocking application waits and stops the native execution
+context before releasing any process-owned service, descriptor, heap, or executable
+mapping. This prevents cleanup from racing a final application API call.
 
 ELF ABI version 3 entry and nested execution carry bounded `argc`/`argv`. Child loader
 state owns copied arguments for full process lifetime. Tokenization, quoting, and escaping
