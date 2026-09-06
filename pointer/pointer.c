@@ -331,4 +331,5 @@ void pointer_service_remove_device(void)
     }
     detected = false;
     platform_mutex_unlock(pointer_mutex);
+    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_POINTER | PLATFORM_RUNTIME_EVENT_DEVICE);
 }

@@ -151,6 +151,10 @@ advance directly to the next future period. Runtime deadline discovery retains a
 temporary 10 ms compatibility deadline for services still awaiting later
 interrupt/completion phases. Host RV32 guests remain runnable through bounded
 interpreter slices, while native Tab5 application tasks do not force runtime spinning.
+ESP-IDF Wi-Fi/IP and host-simulated network changes now wake runtime through a platform
+callback; portable network status is copied only after that notification. Device health
+uses immediate service notifications where available and a 60-second audit for keyboard,
+RTC, battery, and storage drivers that cannot report changes.
 
 Portable application foundation defines descriptor and cooperative lifecycle API in
 `<tabos/application.h>`. Fixed-capacity process table exposes PID, parent, and state

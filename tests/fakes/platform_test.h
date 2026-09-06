@@ -13,6 +13,7 @@ const char* test_platform_last_log(void);
 void test_platform_clear_log(void);
 void test_platform_network_set_state(platform_network_state_t state, const char* failure);
 unsigned int test_platform_network_connect_calls(void);
+unsigned int test_platform_network_status_calls(void);
 const char* test_platform_network_hostname(void);
 void test_platform_keyboard_set_status(bool ready, int error);
 void test_platform_rtc_set_status(bool ready, int error);

@@ -78,12 +78,14 @@ int main(void)
     }
 
     test_platform_keyboard_set_status(false, EIO);
+    test_platform_advance_time_ms(60000U);
     kernel_runtime_update();
     if (!device_registry_find(TABOS_DEVICE_NAME_KEYBOARD, &device) || device.state != TABOS_DEVICE_FAULT ||
         device.last_error != EIO) {
         return 1;
     }
     test_platform_keyboard_set_status(true, 0);
+    test_platform_advance_time_ms(60000U);
     kernel_runtime_update();
     if (!device_registry_find(TABOS_DEVICE_NAME_KEYBOARD, &device) || device.state != TABOS_DEVICE_READY ||
         device.last_error != 0) {
@@ -91,12 +93,14 @@ int main(void)
     }
 
     test_platform_rtc_set_status(false, EIO);
+    test_platform_advance_time_ms(60000U);
     kernel_runtime_update();
     if (!device_registry_find(TABOS_DEVICE_NAME_RTC, &device) || device.state != TABOS_DEVICE_FAULT ||
         device.last_error != EIO) {
         return 1;
     }
     test_platform_rtc_set_status(true, 0);
+    test_platform_advance_time_ms(60000U);
     kernel_runtime_update();
     if (!device_registry_find(TABOS_DEVICE_NAME_RTC, &device) || device.state != TABOS_DEVICE_READY ||
         device.last_error != 0) {
@@ -104,12 +108,14 @@ int main(void)
     }
 
     test_platform_battery_set_status(false, EIO);
+    test_platform_advance_time_ms(60000U);
     kernel_runtime_update();
     if (!device_registry_find(TABOS_DEVICE_NAME_BATTERY, &device) || device.state != TABOS_DEVICE_FAULT ||
         device.last_error != EIO) {
         return 1;
     }
     test_platform_battery_set_status(true, 0);
+    test_platform_advance_time_ms(60000U);
     kernel_runtime_update();
     if (!device_registry_find(TABOS_DEVICE_NAME_BATTERY, &device) || device.state != TABOS_DEVICE_READY ||
         device.last_error != 0) {
@@ -120,6 +126,20 @@ int main(void)
     kernel_runtime_update();
     if (!device_registry_find(TABOS_DEVICE_NAME_WIFI, &device) || device.state != TABOS_DEVICE_READY ||
         device.last_error != 0) {
+        return 1;
+    }
+
+    test_platform_audio_error(EIO);
+    kernel_runtime_update();
+    if (!device_registry_find(TABOS_DEVICE_NAME_AUDIO, &device) || device.state != TABOS_DEVICE_FAULT ||
+        device.last_error != EIO) {
+        return 1;
+    }
+
+    test_platform_camera_error(EIO);
+    kernel_runtime_update();
+    if (!device_registry_find(TABOS_DEVICE_NAME_CAMERA, &device) || device.state != TABOS_DEVICE_FAULT ||
+        device.last_error != EIO) {
         return 1;
     }
 

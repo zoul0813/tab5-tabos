@@ -72,7 +72,9 @@ static platform_pixel_t pixels[TABOS_DISPLAY_WIDTH * TABOS_DISPLAY_HEIGHT];
 static uint64_t monotonic_ms;
 static char last_log[256];
 static platform_network_status_t fake_network;
+static platform_network_event_fn fake_network_event;
 static unsigned int network_connect_calls;
+static unsigned int network_status_calls;
 static char network_hostname[33];
 static bool fake_rtc_ready = true;
 static int fake_rtc_error;
@@ -336,17 +338,23 @@ void test_platform_audio_error(int error)
     }
 }
 
-bool platform_network_init(const char* hostname)
+bool platform_network_init(const char* hostname, platform_network_event_fn event)
 {
+    fake_network_event    = event;
     fake_network          = (platform_network_status_t) {.state = PLATFORM_NETWORK_OFFLINE};
     network_connect_calls = 0U;
+    network_status_calls  = 0U;
     (void) snprintf(network_hostname, sizeof(network_hostname), "%s", hostname != NULL ? hostname : "");
+    if (fake_network_event != NULL) {
+        fake_network_event();
+    }
     return true;
 }
 
 void platform_network_shutdown(void)
 {
-    fake_network = (platform_network_status_t) {0};
+    fake_network       = (platform_network_status_t) {0};
+    fake_network_event = NULL;
 }
 
 bool platform_network_connect(const char* ssid, const char* password)
@@ -358,12 +366,18 @@ bool platform_network_connect(const char* ssid, const char* password)
     ++network_connect_calls;
     fake_network.state = PLATFORM_NETWORK_CONNECTING;
     (void) snprintf(fake_network.ssid, sizeof(fake_network.ssid), "%s", ssid);
+    if (fake_network_event != NULL) {
+        fake_network_event();
+    }
     return true;
 }
 
 bool platform_network_disconnect(void)
 {
     fake_network.state = PLATFORM_NETWORK_OFFLINE;
+    if (fake_network_event != NULL) {
+        fake_network_event();
+    }
     return true;
 }
 
@@ -372,6 +386,7 @@ bool platform_network_status(platform_network_status_t* status)
     if (status == NULL) {
         return false;
     }
+    ++network_status_calls;
     *status = fake_network;
     return true;
 }
@@ -597,11 +612,19 @@ void test_platform_network_set_state(platform_network_state_t state, const char*
         (void) snprintf(fake_network.ipv4, sizeof(fake_network.ipv4), "192.0.2.10");
         fake_network.signal_dbm = -42;
     }
+    if (fake_network_event != NULL) {
+        fake_network_event();
+    }
 }
 
 unsigned int test_platform_network_connect_calls(void)
 {
     return network_connect_calls;
+}
+
+unsigned int test_platform_network_status_calls(void)
+{
+    return network_status_calls;
 }
 
 const char* test_platform_network_hostname(void)

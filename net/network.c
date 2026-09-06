@@ -5,6 +5,7 @@
 #include <tabos/platform/platform.h>
 
 #include <stdio.h>
+#include <stdatomic.h>
 #include <string.h>
 
 enum {
@@ -17,6 +18,13 @@ static char password[NETWORK_CONFIG_PASSWORD_MAX + 1U];
 static bool initialized;
 static bool retry_suppressed;
 static tabos_timer_t retry_timer;
+static atomic_bool status_pending;
+
+static void network_event(void)
+{
+    atomic_store_explicit(&status_pending, true, memory_order_release);
+    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_NETWORK);
+}
 
 static void set_failure(const char* failure)
 {
@@ -56,7 +64,7 @@ bool network_service_init(void)
     };
     const network_config_result_t result = network_config_load(&config);
     (void) snprintf(current.hostname, sizeof(current.hostname), "%s", config.name);
-    if (!platform_network_init(config.name)) {
+    if (!platform_network_init(config.name, network_event)) {
         set_failure("network backend unavailable");
         initialized = true;
         return true;
@@ -93,28 +101,27 @@ void network_service_update(void)
     if (!initialized) {
         return;
     }
-    platform_network_status_t platform_status;
-    if (!platform_network_status(&platform_status)) {
-        set_failure("network status unavailable");
-        return;
-    }
-    if (platform_status.state == PLATFORM_NETWORK_ONLINE) {
-        current.state = NETWORK_STATE_ONLINE;
-        tabos_timer_cancel(&retry_timer);
-        (void) snprintf(current.ipv4, sizeof(current.ipv4), "%s", platform_status.ipv4);
-        current.signal_dbm = platform_status.signal_dbm;
-        return;
-    }
-    if (platform_status.state == PLATFORM_NETWORK_CONNECTING) {
-        current.state = NETWORK_STATE_CONNECTING;
-        return;
-    }
-    if (platform_status.state == PLATFORM_NETWORK_FAILED && !retry_suppressed) {
-        const bool was_connecting = current.state == NETWORK_STATE_CONNECTING;
-        set_failure(platform_status.failure);
-        if (was_connecting && current.attempts < NETWORK_AUTOCONNECT_ATTEMPTS) {
-            tabos_timer_start(&retry_timer, NETWORK_RETRY_DELAY_MS, 0U);
-            platform_runtime_notify(PLATFORM_RUNTIME_EVENT_DEADLINE);
+    if (atomic_exchange_explicit(&status_pending, false, memory_order_acq_rel)) {
+        platform_network_status_t platform_status;
+        if (!platform_network_status(&platform_status)) {
+            set_failure("network status unavailable");
+        } else if (platform_status.state == PLATFORM_NETWORK_ONLINE) {
+            current.state = NETWORK_STATE_ONLINE;
+            tabos_timer_cancel(&retry_timer);
+            (void) snprintf(current.ipv4, sizeof(current.ipv4), "%s", platform_status.ipv4);
+            current.signal_dbm = platform_status.signal_dbm;
+        } else if (platform_status.state == PLATFORM_NETWORK_CONNECTING) {
+            current.state = NETWORK_STATE_CONNECTING;
+        } else if (platform_status.state == PLATFORM_NETWORK_FAILED && !retry_suppressed) {
+            const bool was_connecting = current.state == NETWORK_STATE_CONNECTING;
+            set_failure(platform_status.failure);
+            if (was_connecting && current.attempts < NETWORK_AUTOCONNECT_ATTEMPTS) {
+                tabos_timer_start(&retry_timer, NETWORK_RETRY_DELAY_MS, 0U);
+                platform_runtime_notify(PLATFORM_RUNTIME_EVENT_DEADLINE);
+            }
+        } else if (platform_status.state == PLATFORM_NETWORK_OFFLINE && !retry_suppressed) {
+            current.state   = NETWORK_STATE_OFFLINE;
+            current.ipv4[0] = '\0';
         }
     }
     if (tabos_timer_poll(&retry_timer)) {
@@ -139,7 +146,8 @@ void network_service_shutdown(void)
     platform_network_operations_shutdown();
     platform_network_shutdown();
     memset(password, 0, sizeof(password));
-    current     = (network_status_t) {0};
+    current = (network_status_t) {0};
+    atomic_store_explicit(&status_pending, false, memory_order_release);
     initialized = false;
 }
 

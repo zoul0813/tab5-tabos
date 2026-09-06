@@ -42,6 +42,11 @@ bool platform_camera_init(platform_camera_frame_fn frame, platform_camera_error_
     return true;
 }
 
+void platform_runtime_notify(platform_runtime_events_t events)
+{
+    (void) events;
+}
+
 bool platform_camera_start(const tabos_camera_config_t* requested)
 {
     enter_backend();

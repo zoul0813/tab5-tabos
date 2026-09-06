@@ -1,4 +1,5 @@
 #include <tabos/internal/display.h>
+#include <tabos/internal/network.h>
 #include <tabos/battery.h>
 
 #include <string.h>
@@ -19,7 +20,7 @@ static bool display_initialized;
 static uint32_t overlay_flags = TABOS_GRAPHICS_OVERLAY_ALL;
 static uint64_t overlay_refresh_at;
 static platform_battery_status_t overlay_battery;
-static platform_network_status_t overlay_network;
+static network_status_t overlay_network;
 static platform_pixel_t overlay_saved[OVERLAY_WIDTH * OVERLAY_HEIGHT];
 
 static const uint8_t digits[10][DIGIT_HEIGHT] = {
@@ -118,7 +119,7 @@ static void draw_charging_bolt(int x, int y)
 static int draw_wifi(int x, int y, platform_pixel_t color)
 {
     unsigned int bars = 4U;
-    if (overlay_network.state == PLATFORM_NETWORK_ONLINE) {
+    if (overlay_network.state == NETWORK_STATE_ONLINE) {
         if (overlay_network.signal_dbm <= -80) {
             bars = 1U;
         } else if (overlay_network.signal_dbm <= -67) {
@@ -143,9 +144,9 @@ static void refresh_overlay(void)
         return;
     }
     overlay_battery = (platform_battery_status_t) {0};
-    overlay_network = (platform_network_status_t) {0};
+    overlay_network = (network_status_t) {0};
     (void) platform_battery_status(&overlay_battery);
-    (void) platform_network_status(&overlay_network);
+    (void) network_service_status(&overlay_network);
     overlay_refresh_at = now + OVERLAY_REFRESH_MS;
 }
 
@@ -160,8 +161,8 @@ static bool present_with_overlay(bool graphics)
                                   overlay_battery.charge_state == TABOS_BATTERY_STATE_DISCHARGING);
     const bool wifi_visible =
         (overlay_flags & TABOS_GRAPHICS_OVERLAY_WIFI) != 0U &&
-        (overlay_network.state == PLATFORM_NETWORK_ONLINE || overlay_network.state == PLATFORM_NETWORK_STARTING ||
-         overlay_network.state == PLATFORM_NETWORK_CONNECTING);
+        (overlay_network.state == NETWORK_STATE_ONLINE || overlay_network.state == NETWORK_STATE_STARTING ||
+         overlay_network.state == NETWORK_STATE_CONNECTING);
     if (!battery_visible && !wifi_visible) {
         return graphics ? platform_graphics_present(&framebuffer) : platform_display_present(&framebuffer);
     }
@@ -190,7 +191,7 @@ static bool present_with_overlay(bool graphics)
     if (wifi_visible) {
         x -= 30;
         const platform_pixel_t color =
-            overlay_network.state == PLATFORM_NETWORK_ONLINE ? white : TABOS_RGB565(112, 112, 112);
+            overlay_network.state == NETWORK_STATE_ONLINE ? white : TABOS_RGB565(112, 112, 112);
         (void) draw_wifi(x, top + 3, color);
     }
     const bool result = graphics ? platform_graphics_present(&framebuffer) : platform_display_present(&framebuffer);

@@ -750,6 +750,14 @@ fullscreen graphics cancels that deadline. Late timer polls emit one expiration 
 missed intervals without replay. Terminal tracks dirty visible cells for ordinary
 text/cursor changes and reserves full redraw for viewport, clear, or resize changes.
 
+Network backends expose a callback that only marks status dirty and wakes runtime.
+Portable network service copies platform status in runtime context after notification;
+idle updates perform no backend status read. ESP-IDF Wi-Fi/IP callbacks and host state
+changes use same path. Registry synchronization reads in-memory audio, pointer, camera,
+and network service state, while keyboard, RTC, battery, and storage use one 60-second
+health audit because current drivers lack change callbacks. Registry itself coalesces
+unchanged state, preserving one subscription event per transition.
+
 ---
 
 ## 11. Graphics Architecture

@@ -116,6 +116,9 @@ Tab5 cross-builds validate the direct-task-notification and ISR-safe paths; phys
 interrupt phases add hardware timing and teardown validation separately. Until those
 phases complete, tests must preserve the explicit 10 ms compatibility deadline used by
 still-polled services rather than claiming idle polling has ended.
+Network-service tests count platform status reads and prove idle runtime updates perform
+none; one coalesced backend transition causes one copied status read. Core smoke tests
+advance fake monotonic time to exercise the 60-second hardware-health audit explicitly.
 
 Deadline-service tests use fake monotonic time and must prove exact key-repeat, cursor,
 network-retry, and finite-wait deadlines; no firing one millisecond early; immediate

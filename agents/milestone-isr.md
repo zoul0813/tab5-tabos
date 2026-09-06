@@ -193,6 +193,13 @@ multitouch contact matching, rapid retouch, stationary-report suppression, arriv
 bounded rescheduling, I2C fault cancellation, and shutdown cancellation. Physical
 validation remains required independently on GT911, ST7123, and ST7121 hardware.
 
+ST7121 boot currently emits
+`gpio_install_isr_service(...): GPIO isr service already installed` after keyboard
+initialization installs the shared ESP-IDF GPIO ISR service first. Touch remains
+functional because GPIO23 attaches to the existing service, but ownership should be
+centralized or made explicitly idempotent so later peripheral initialization does not
+attempt a duplicate global service install or emit an error-level boot message.
+
 ### Phase 4: Deadline-driven portable services
 
 - [x] Change key repeat from periodic polling to an explicit next-repeat deadline.
@@ -218,17 +225,25 @@ still only set readiness and never acquire it.
 
 ### Phase 5: Network and device-state notifications
 
-- [ ] Propagate ESP-IDF Wi-Fi/IP events into portable network service immediately.
-- [ ] Notify runtime when host network simulation changes state.
-- [ ] Remove unconditional `platform_network_status()` polling from every runtime update.
-- [ ] Preserve bounded autoconnect attempts and retry delays.
-- [ ] Make RTC, battery, audio, pointer, camera, storage, and Wi-Fi registry state update
+- [x] Propagate ESP-IDF Wi-Fi/IP events into portable network service immediately.
+- [x] Notify runtime when host network simulation changes state.
+- [x] Remove unconditional `platform_network_status()` polling from every runtime update.
+- [x] Preserve bounded autoconnect attempts and retry delays.
+- [x] Make RTC, battery, audio, pointer, camera, storage, and Wi-Fi registry state update
   when owning service health changes.
-- [ ] Remove unconditional full hardware-health scans from every runtime update.
-- [ ] Add optional low-rate health audit only where hardware cannot report failures and
+- [x] Remove unconditional full hardware-health scans from every runtime update.
+- [x] Add optional low-rate health audit only where hardware cannot report failures and
   on-demand operations cannot observe them.
-- [ ] Ensure state changes still produce exactly one device-subscription event per actual
+- [x] Ensure state changes still produce exactly one device-subscription event per actual
   transition.
+
+Network backends now publish coalesced change notifications that wake runtime; portable
+network service reads backend status only after notification and retains deadline-driven,
+three-attempt autoconnect behavior. Audio, pointer, and camera faults wake device-state
+synchronization immediately. In-memory service states are synchronized without hardware
+I/O on each runtime pass. Keyboard, RTC, battery, and mounted-storage health—whose current
+drivers lack change callbacks—use one 60-second audit deadline. Registry transition
+coalescing continues to suppress duplicate subscription events.
 
 ### Phase 6: Camera completion path
 

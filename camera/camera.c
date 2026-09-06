@@ -440,6 +440,7 @@ void camera_service_error(int error)
         streams[index].faulted |= streams[index].open;
     }
     platform_mutex_unlock(camera_mutex);
+    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_CAMERA | PLATFORM_RUNTIME_EVENT_DEVICE);
 }
 
 static void remove_device_pipeline_locked(void)
@@ -455,6 +456,7 @@ static void remove_device_pipeline_locked(void)
     platform_info.detected = false;
     platform_info.ready    = false;
     platform_mutex_unlock(camera_mutex);
+    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_CAMERA | PLATFORM_RUNTIME_EVENT_DEVICE);
 }
 
 tabos_camera_stream_t camera_service_open(const void* owner, const tabos_camera_config_t* config)

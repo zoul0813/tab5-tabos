@@ -25,11 +25,19 @@ int main(void)
     expect(network_service_status(&status) && status.state == NETWORK_STATE_OFFLINE &&
                strcmp(status.hostname, "TabOS") == 0,
            "starts offline with default hostname");
+    network_service_update();
+    const unsigned int initial_status_calls = test_platform_network_status_calls();
+    network_service_update();
+    network_service_update();
+    expect(test_platform_network_status_calls() == initial_status_calls,
+           "idle updates do not poll platform network status");
 
     expect(network_service_connect("test-network", "secret", false), "explicit connect starts");
     expect(test_platform_network_connect_calls() == 1U, "first attempt issued");
     test_platform_network_set_state(PLATFORM_NETWORK_FAILED, "test failure");
     network_service_update();
+    expect(test_platform_network_status_calls() == initial_status_calls + 1U,
+           "network notification causes one platform status read");
     const uint64_t first_retry_ms = test_platform_time_ms() + 1000U;
     expect(network_service_next_deadline() == first_retry_ms, "retry publishes exact deadline");
     test_platform_advance_time_ms(999U);

@@ -414,6 +414,7 @@ uint64_t kernel_runtime_next_deadline(void)
     deadline          = earliest_deadline(deadline, input_next_deadline());
     deadline          = earliest_deadline(deadline, console_next_deadline());
     deadline          = earliest_deadline(deadline, network_service_next_deadline());
+    deadline          = earliest_deadline(deadline, hardware_devices_next_deadline());
     return deadline;
 }
 

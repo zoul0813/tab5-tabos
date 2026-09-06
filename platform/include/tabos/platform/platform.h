@@ -43,6 +43,7 @@ typedef void (*platform_audio_error_fn)(int error);
 typedef void (*platform_camera_frame_fn)(const void* data, size_t size, uint32_t width, uint32_t height,
                                          uint32_t stride_bytes, uint32_t format, uint64_t timestamp_ms);
 typedef void (*platform_camera_error_fn)(int error);
+typedef void (*platform_network_event_fn)(void);
 
 typedef struct {
         const char* driver;
@@ -187,7 +188,7 @@ bool platform_wall_clock_get(int64_t* seconds);
 bool platform_wall_clock_set(int64_t seconds);
 bool platform_wall_clock_status(int* error);
 bool platform_keyboard_health(int* error);
-bool platform_network_init(const char* hostname);
+bool platform_network_init(const char* hostname, platform_network_event_fn event);
 void platform_network_shutdown(void);
 bool platform_network_connect(const char* ssid, const char* password);
 bool platform_network_disconnect(void);

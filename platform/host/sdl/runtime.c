@@ -14,6 +14,7 @@ SDL_Window* host_window;
 static bool is_headless;
 static bool quit_requested;
 static platform_network_status_t network_status;
+static platform_network_event_fn network_event_callback;
 static bool host_battery_charging_enabled;
 static bool host_battery_fast_charging_enabled;
 static atomic_uint runtime_events;
@@ -198,16 +199,21 @@ bool platform_init(bool headless)
     return true;
 }
 
-bool platform_network_init(const char* hostname)
+bool platform_network_init(const char* hostname, platform_network_event_fn event)
 {
     (void) hostname;
-    network_status = (platform_network_status_t) {.state = PLATFORM_NETWORK_OFFLINE};
+    network_event_callback = event;
+    network_status         = (platform_network_status_t) {.state = PLATFORM_NETWORK_OFFLINE};
+    if (network_event_callback != NULL) {
+        network_event_callback();
+    }
     return true;
 }
 
 void platform_network_shutdown(void)
 {
-    network_status = (platform_network_status_t) {0};
+    network_status         = (platform_network_status_t) {0};
+    network_event_callback = NULL;
 }
 
 bool platform_network_connect(const char* ssid, const char* password)
@@ -222,6 +228,9 @@ bool platform_network_connect(const char* ssid, const char* password)
     };
     (void) snprintf(network_status.ssid, sizeof(network_status.ssid), "%s", ssid);
     (void) snprintf(network_status.ipv4, sizeof(network_status.ipv4), "127.0.0.1");
+    if (network_event_callback != NULL) {
+        network_event_callback();
+    }
     return true;
 }
 
@@ -229,6 +238,9 @@ bool platform_network_disconnect(void)
 {
     network_status.state   = PLATFORM_NETWORK_OFFLINE;
     network_status.ipv4[0] = '\0';
+    if (network_event_callback != NULL) {
+        network_event_callback();
+    }
     return true;
 }
 

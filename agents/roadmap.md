@@ -32,6 +32,7 @@
   lifecycle work without watchdog, crash, or freeze. Intermittent known PI4IO headphone-
   detect read failures remain separately deferred.
 - [x] Phase 2: convert Tab5 keyboard polling to GPIO50 interrupt-driven wake.
+- [x] Phase 5: convert network and device state to notifications plus low-rate health audit.
 - [x] Phase 3 implementation: convert Tab5 GT911/ST712x touch reads to GPIO23
   interrupt-driven wake, with drain/recheck and deterministic cancellation.
 - [ ] Phase 3 hardware validation: verify down/move/up, multitouch, rapid retouch,
@@ -619,6 +620,9 @@ but is not a substitute for this execution path.
 
 ## Maintenance and Technical Debt
 
+- [ ] Centralize or make idempotent Tab5 GPIO ISR-service installation. Keyboard may
+  install the shared ESP-IDF service before ST7121 touch initialization, currently
+  producing a benign `GPIO isr service already installed` error-level boot message.
 - [x] Migrate existing generic `tab_*` and internal-only `tabos_*` symbols to decided
   layer/subsystem prefixes without changing public `tabos_*` ABI.
 - [x] Rename portable platform contract from `tab_platform_*` to `platform_*`.
