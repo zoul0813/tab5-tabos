@@ -41,6 +41,21 @@ typedef struct {
         uint32_t height;
 } tabos_graphics_rect_t;
 
+/*
+ * Extended RGB565 bitmap draw. Source coordinates address pixels within the
+ * bitmap. Destination coordinates are world coordinates translated by the
+ * current camera. Rotation is clockwise in quarter turns; mirroring applies
+ * after rotation. Opacity ranges from transparent (0) to opaque (255), and an
+ * enabled color key skips the inclusive low-through-high RGB565 range.
+ *
+ * The optional clip is a half-open screen-space rectangle: [x, x + width) by
+ * [y, y + height). Drawing uses the intersection of the destination, clip, and
+ * graphics canvas. Set clip_enabled=false, including by omitting both new clip
+ * members from an initializer, to preserve unclipped behavior. An enabled clip
+ * with zero width or height, or one outside the canvas, succeeds without drawing.
+ *
+ * Keep pixels valid and unchanged until tabos_graphics_present() returns.
+ */
 typedef struct {
         const tabos_color_t* pixels;
         uint32_t bitmap_width;
@@ -89,7 +104,14 @@ int tabos_graphics_rect(tabos_graphics_t* graphics, int32_t x, int32_t y, uint32
 int tabos_graphics_blit(tabos_graphics_t* graphics, int32_t x, int32_t y, uint32_t width, uint32_t height,
                         const tabos_color_t* pixels);
 uint32_t tabos_graphics_capabilities(const tabos_graphics_t* graphics);
+/*
+ * Draw one transformed bitmap operation. Returns 0 on success, including when
+ * clipping leaves no pixels, or -1 with errno set. Invalid contexts, pointers,
+ * rectangles, or rotations use EINVAL; camera translation overflow uses ERANGE;
+ * an unavailable runtime operation uses ENOSYS.
+ */
 int tabos_graphics_blit_ex(tabos_graphics_t* graphics, const tabos_graphics_blit_options_t* options);
+/* Completes queued draws; source pixels may be changed or released after return. */
 int tabos_graphics_present(tabos_graphics_t* graphics);
 int tabos_graphics_set_overlays(tabos_graphics_t* graphics, uint32_t flags);
 int tabos_graphics_close(tabos_graphics_t* graphics);

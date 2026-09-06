@@ -85,10 +85,14 @@ Closing or terminating an application restores both overlays.
 
 `tabos_graphics_blit_ex()` adds source and destination rectangles, nearest-neighbor
 scaling, quarter-turn rotation, mirroring, uniform opacity, an inclusive RGB565
-color-key range, and an optional destination clip rectangle. Zero-initialized clip
-fields disable clipping; an enabled empty clip draws nothing successfully. RGB565 has
-no per-pixel alpha channel. Assets therefore use exact color-key transparency and may
-blend the whole operation with `opacity`. Query portable behavior and active acceleration with
+color-key range, and an optional destination clip rectangle. A clip is half-open in
+screen coordinates: its left and top edges are included, while `x + width` and
+`y + height` are excluded. TabOS draws the intersection of the destination, clip, and
+canvas. This makes negative clips, clips extending beyond the canvas, and fully outside
+clips safe. Zero-initialized clip fields disable clipping; an enabled empty or fully
+outside clip draws nothing successfully. RGB565 has no per-pixel alpha channel. Assets
+therefore use exact color-key transparency and may blend the whole operation with
+`opacity`. Query portable behavior and active acceleration with
 `tabos_graphics_capabilities()`.
 
 `<tabos/sprite.h>` and `<tabos/tilemap.h>` provide portable sprites, explicit-time

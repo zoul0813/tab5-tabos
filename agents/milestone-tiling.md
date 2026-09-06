@@ -110,9 +110,9 @@ Add `<tabos/tilemap.h>`:
 
 Extend `tabos_graphics_blit_options_t` with an optional clip rectangle:
 
-- [ ] Review: Zero-initialized options preserve current behavior.
-- [ ] Review: Intersect the clip rectangle with framebuffer bounds.
-- [ ] Review: An empty clip succeeds without drawing.
+- [x] Review: Zero-initialized options preserve current behavior.
+- [x] Review: Intersect the clip rectangle with framebuffer bounds.
+- [x] Review: An empty clip succeeds without drawing.
 - [ ] Review: Update the private ABI layout, RV32 marshaling, scalar renderer, SDL host, and Tab5 paths.
 - [ ] Review: PPA may render unclipped interior tiles; unsupported clipped boundary operations use
   the pixel-identical fallback.
@@ -380,6 +380,9 @@ Validated working-tree changes based on `7e43d93`:
   cameras, far-outside views, viewport edges, HUD coordinates, transforms, and layer order.
 - `tdemo` uses direct generated-ID lookup for its named spawn position and retains
   object-layer iteration for processing and drawing every marker.
+- Public graphics documentation defines clips as half-open screen-space rectangles.
+  Focused SDK tests cover omitted/disabled clips, negative and oversized clips intersected
+  with the canvas, and enabled empty or fully outside clips that succeed without drawing.
 
 ## Assumptions
 

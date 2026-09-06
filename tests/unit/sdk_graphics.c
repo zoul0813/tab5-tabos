@@ -116,6 +116,51 @@ static const tabos_elf_api_t api = {
 
 const tabos_elf_api_t* tabos_runtime_api = &api;
 
+static void check_blit_clips(void)
+{
+    tabos_graphics_t graphics = {.width = 4U, .height = 4U};
+    CHECK(tabos_graphics_open(&graphics) == 0);
+    const tabos_color_t pixels[]       = {1U, 2U, 3U, 4U};
+    tabos_graphics_blit_options_t blit = {
+        .pixels        = pixels,
+        .bitmap_width  = 2U,
+        .bitmap_height = 2U,
+        .source        = {.width = 2U, .height = 2U},
+        .destination   = {.x = 1, .y = 1, .width = 2U, .height = 2U},
+        .opacity       = 255U,
+    };
+
+    CHECK(tabos_graphics_blit_ex(&graphics, &blit) == 0);
+    CHECK(graphics.pixels[5] == 1U && graphics.pixels[6] == 2U && graphics.pixels[9] == 3U &&
+          graphics.pixels[10] == 4U);
+
+    memset(graphics.pixels, 0, 4U * 4U * sizeof(*graphics.pixels));
+    blit.destination  = (tabos_graphics_rect_t) {.x = 0, .y = 0, .width = 2U, .height = 2U};
+    blit.clip         = (tabos_graphics_rect_t) {.x = -1, .y = -1, .width = 2U, .height = 2U};
+    blit.clip_enabled = true;
+    CHECK(tabos_graphics_blit_ex(&graphics, &blit) == 0);
+    CHECK(graphics.pixels[0] == 1U && graphics.pixels[1] == 0U && graphics.pixels[4] == 0U);
+
+    memset(graphics.pixels, 0, 4U * 4U * sizeof(*graphics.pixels));
+    blit.destination = (tabos_graphics_rect_t) {.x = 3, .y = 3, .width = 2U, .height = 2U};
+    blit.clip        = (tabos_graphics_rect_t) {.x = 3, .y = 3, .width = UINT32_MAX, .height = UINT32_MAX};
+    CHECK(tabos_graphics_blit_ex(&graphics, &blit) == 0);
+    CHECK(graphics.pixels[15] == 1U);
+
+    memset(graphics.pixels, 0, 4U * 4U * sizeof(*graphics.pixels));
+    blit.destination = (tabos_graphics_rect_t) {.x = 1, .y = 1, .width = 2U, .height = 2U};
+    blit.clip        = (tabos_graphics_rect_t) {.x = 1, .y = 1, .width = 0U, .height = 2U};
+    CHECK(tabos_graphics_blit_ex(&graphics, &blit) == 0);
+    blit.clip = (tabos_graphics_rect_t) {.x = 1, .y = 1, .width = 2U, .height = 0U};
+    CHECK(tabos_graphics_blit_ex(&graphics, &blit) == 0);
+    blit.clip = (tabos_graphics_rect_t) {.x = 8, .y = 8, .width = 2U, .height = 2U};
+    CHECK(tabos_graphics_blit_ex(&graphics, &blit) == 0);
+    for (size_t index = 0U; index < 16U; ++index) {
+        CHECK(graphics.pixels[index] == 0U);
+    }
+    CHECK(tabos_graphics_close(&graphics) == 0);
+}
+
 static void check_camera(void)
 {
     tabos_graphics_t graphics = {.width = 16U, .height = 12U};
@@ -280,5 +325,6 @@ int main(void)
         return 1;
     }
     check_camera();
+    check_blit_clips();
     return 0;
 }

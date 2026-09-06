@@ -47,6 +47,9 @@
 - [x] Verify generated-C/binary metadata and 79 logical-canvas scene pairs from one fixture, with independent pixel expectations; macOS Debug/Release tests and generated-C RV32 compilation pass.
 
 - [x] Add clip rectangles across SDK, private ABI, scalar, SDL, and Tab5 paths.
+- [x] Review the public clip contract: disabled clips preserve existing draws; clips are
+  half-open screen-space rectangles intersected with the canvas; empty and outside clips
+  succeed without drawing.
 - [x] Add portable sprite, animation, metasprite, tilemap, object, property, and flag APIs.
 - [x] Add validated versioned `.tsp` and `.tmap` loaders.
 - [x] Add deterministic PNG/GIF/Tiled converter and generated C output.
