@@ -183,7 +183,7 @@ Binary formats:
 
 ## Implementation and Documentation Review
 
-- [ ] Review: Implement sprite, animation, metasprite, tilemap, and binary parsing as portable SDK code.
+- [x] Review: Implement sprite, animation, metasprite, tilemap, and binary parsing as portable SDK code.
   Add no SDL, ESP-IDF, FreeRTOS, PPA, or PIE types to the public API.
 - [ ] Review: Use logical-canvas software drawing for normal tile games. Keep the existing final
   canvas upscale as one accelerated presentation.
@@ -535,6 +535,21 @@ Validated working-tree changes based on `7e43d93`:
   an empty declaration, and the regression test begins with an intentionally stale asset.
 - Tile demo build inputs and generated outputs now use relative Make paths, matching the shared
   application build contract and preserving builds when the repository path contains spaces.
+
+## Portable SDK Evidence — 2026-09-06
+
+- Public sprite and tilemap headers depend only on standard C headers and portable TabOS graphics
+  descriptors. They expose no SDL, ESP-IDF, FreeRTOS, PPA, PIE, native handle, or platform backend
+  type. Platform acceleration remains behind `tabos_graphics_blit_ex()` and presentation.
+- `sdk/lib/sprite.c` and `sdk/lib/tilemap.c` implement drawing, animation, metasprites, map access,
+  object/property queries, and TSP1/TMP1 parsing with standard C, portable graphics, libc file I/O,
+  allocation, and errno. The same source files compile in host tests and every RV32 application.
+- The architecture boundary test previously scanned public SDK headers but omitted SDK library
+  sources and checked forbidden includes without checking leaked type names. It now scans `sdk/lib`,
+  rejects common platform include families, and separately rejects SDL, ESP-IDF, FreeRTOS, PPA, and
+  PIE type names in every public SDK header.
+- The strengthened architecture test passes on macOS Debug and Release. Focused SDK tests and all
+  standard RV32 applications compile successfully with the shared portable implementation.
 
 ## Assumptions
 

@@ -60,6 +60,11 @@ pixel expectations cover pivots, transparency, clipping, opacity, tile transform
 layer order, and metasprite overlap. Native-path parity and RV32 execution remain separate
 acceptance work; the host test does not submit a real display presentation.
 
+`architecture.portable_header_boundary` scans both public SDK headers and portable SDK library
+sources for SDL, ESP-IDF, FreeRTOS, driver/HAL/SOC, and private ESP include leakage. Public headers
+also reject platform type names, including SDL, ESP-IDF, FreeRTOS handles, PPA, and PIE. Host SDK
+tests and RV32 applications compile the same `sdk/lib/sprite.c` and `sdk/lib/tilemap.c` sources.
+
 Animation convenience coverage checks normal/extended draw pixels, looping versus finite
 completion boundaries, unchanged completion output on errors, malformed C descriptors,
 restart via elapsed time, and repeat-duration products exceeding 64 bits. Converter tests

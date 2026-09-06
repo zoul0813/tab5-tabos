@@ -22,6 +22,9 @@
 
 ### Sprite and Tile Graphics
 
+- [x] Verify sprite, animation, metasprite, tilemap, and binary loading remain portable SDK code;
+  extend architecture guards across SDK sources and reject platform types in public headers.
+
 - [x] Verify declared runtime-asset staging, rootfs installation, and MSC inputs; clear stale staging
   for empty declarations, preserve application-created data, and keep tdemo paths space-safe.
 
