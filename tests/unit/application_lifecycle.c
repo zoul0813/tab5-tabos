@@ -193,7 +193,9 @@ static const tabos_app_descriptor_t panic_app = {
 
 int main(void)
 {
-    input_init();
+    if (!input_init()) {
+        return 1;
+    }
     if (!display_init()) {
         return 1;
     }

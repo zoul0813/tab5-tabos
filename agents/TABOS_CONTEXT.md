@@ -558,12 +558,14 @@ preview, JPEG, and H.264 remain later Phase 6 work.
 
 The public `<tabos/input.h>` API exposes physical key-down/key-up events, modifiers,
 repeat state, CP437 text events, and polling/waiting through a thread-safe 64-event queue.
+Queue and repeat state use the platform mutex abstraction; Tab5 therefore uses priority
+inheritance rather than a task-level spinlock that could starve its runtime owner.
 Loaded ELF applications receive this raw API through ABI v6. Terminal stdin preserves
 ANSI arrow sequences; raw and terminal reads share one foreground queue and an application
 must choose one. SDL3 supplies host physical/text events. Tab5 uses ExtPort1 I2C controller
 0 on GPIO0/GPIO1, probes address `0x6D`, reports firmware register `0xFE`, and reads HID-mode
-reports. It polls at 10 ms; GPIO50 interrupt support is a later optimization that must not
-change public semantics. Tab5 text translation is currently US ANSI. Missing keyboard
+reports. GPIO50 interrupt delivery wakes runtime task context, where queued reports are
+drained over I2C. Tab5 text translation is currently US ANSI. Missing keyboard
 hardware is a boot warning, not a fatal initialization error. Optional CMake flag
 `TABOS_ENABLE_KEYBOARD_DIAGNOSTICS` logs normalized events without consuming them and
 defaults off. USB HID keyboards on Tab5 are a future backend; they should coexist with the

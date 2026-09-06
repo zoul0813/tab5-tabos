@@ -691,6 +691,9 @@ A generic input event model should eventually support:
 - system shortcuts
 
 Keyboard latency and reliability have priority because TabOS is intended to support a keyboard-first workflow.
+Portable input queue and repeat state use the platform mutex abstraction. Tab5 uses a
+priority-inheriting FreeRTOS mutex because application and runtime tasks can contend on
+one core; task-level atomic spinning is forbidden for this queue.
 
 Pointer input uses a separate public `<tabos/pointer.h>` stream API with down, move, up,
 and cancel events. Events carry boot-local device and stable contact IDs, logical display

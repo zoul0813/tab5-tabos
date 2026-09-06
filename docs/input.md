@@ -38,7 +38,11 @@ Set `TABOS_TTY_MODE_RAW_INPUT` through `TABOS_TTY_SET_MODE` when physical key
 events are required; raw polling omits translated text events. Clear that bit for
 cooked text input. Preserve unrelated TTY mode bits when changing policy.
 
-The queue holds 64 events and is protected for host-thread and FreeRTOS-task access. If producers outrun consumers, the oldest event is discarded so current input remains responsive.
+The queue holds 64 events and is protected for host-thread and FreeRTOS-task access by
+the platform mutex abstraction. Tab5 uses a priority-inheriting FreeRTOS mutex, so an
+application waiting for input cannot spin and starve the runtime task that owns the
+queue. If producers outrun consumers, the oldest event is discarded so current input
+remains responsive.
 
 Held-key repeat uses an exact monotonic deadline: initial delay starts on key-down and
 matching key-up or input reset cancels it immediately. If runtime handles a repeat late,

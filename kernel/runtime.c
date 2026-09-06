@@ -151,8 +151,11 @@ bool kernel_runtime_init(void)
     if (!device_registry_init()) {
         return false;
     }
+    if (!input_init()) {
+        device_registry_shutdown();
+        return false;
+    }
     runtime_initialized = true;
-    input_init();
     return true;
 }
 

@@ -4,7 +4,6 @@
 #include <tabos/config/input.h>
 #include <tabos/platform/platform.h>
 
-#include <stdatomic.h>
 #include <string.h>
 
 enum {
@@ -14,31 +13,41 @@ enum {
 static tabos_input_event_t event_queue[INPUT_QUEUE_CAPACITY];
 static size_t queue_head;
 static size_t queue_count;
-static atomic_flag queue_lock = ATOMIC_FLAG_INIT;
 static tabos_key_t held_key;
 static uint8_t held_modifiers;
 static char held_text[TABOS_INPUT_TEXT_MAX_BYTES + 1U];
 static uint8_t held_text_modifiers;
 static tabos_timer_t repeat_timer;
+static platform_mutex_t* queue_mutex;
 
 static bool modifier_key(tabos_key_t key)
 {
     return key >= TABOS_KEY_CTRL && key <= TABOS_KEY_SYM;
 }
 
-static void lock_queue(void)
+static bool lock_queue(void)
 {
-    while (atomic_flag_test_and_set_explicit(&queue_lock, memory_order_acquire)) {}
+    if (queue_mutex == NULL) {
+        return false;
+    }
+    platform_mutex_lock(queue_mutex);
+    return true;
 }
 
 static void unlock_queue(void)
 {
-    atomic_flag_clear_explicit(&queue_lock, memory_order_release);
+    platform_mutex_unlock(queue_mutex);
 }
 
-void input_init(void)
+bool input_init(void)
 {
-    lock_queue();
+    if (queue_mutex == NULL) {
+        queue_mutex = platform_mutex_create();
+        if (queue_mutex == NULL) {
+            return false;
+        }
+    }
+    (void) lock_queue();
     queue_head          = 0U;
     queue_count         = 0U;
     held_key            = TABOS_KEY_UNKNOWN;
@@ -47,11 +56,24 @@ void input_init(void)
     held_text_modifiers = 0U;
     tabos_timer_cancel(&repeat_timer);
     unlock_queue();
+    return true;
 }
 
 void input_shutdown(void)
 {
-    input_init();
+    if (!lock_queue()) {
+        return;
+    }
+    queue_head          = 0U;
+    queue_count         = 0U;
+    held_key            = TABOS_KEY_UNKNOWN;
+    held_modifiers      = 0U;
+    held_text[0]        = '\0';
+    held_text_modifiers = 0U;
+    tabos_timer_cancel(&repeat_timer);
+    unlock_queue();
+    platform_mutex_destroy(queue_mutex);
+    queue_mutex = NULL;
 }
 
 bool input_submit(const tabos_input_event_t* event)
@@ -63,7 +85,9 @@ bool input_submit(const tabos_input_event_t* event)
     if (event->repeat) {
         return true;
     }
-    lock_queue();
+    if (!lock_queue()) {
+        return false;
+    }
     if (event->type == TABOS_INPUT_KEY_DOWN && !modifier_key(event->key)) {
         held_key            = event->key;
         held_modifiers      = event->modifiers;
@@ -96,7 +120,9 @@ bool input_submit(const tabos_input_event_t* event)
 
 void input_update(void)
 {
-    lock_queue();
+    if (!lock_queue()) {
+        return;
+    }
     if (held_key == TABOS_KEY_UNKNOWN || !tabos_timer_poll(&repeat_timer)) {
         unlock_queue();
         return;
@@ -144,7 +170,9 @@ void input_update(void)
 
 uint64_t input_next_deadline(void)
 {
-    lock_queue();
+    if (!lock_queue()) {
+        return TIME_DEADLINE_NONE;
+    }
     const uint64_t deadline = held_key != TABOS_KEY_UNKNOWN ? time_timer_deadline(&repeat_timer) : TIME_DEADLINE_NONE;
     unlock_queue();
     return deadline;
@@ -152,10 +180,9 @@ uint64_t input_next_deadline(void)
 
 static bool pop_event(tabos_input_event_t* event)
 {
-    if (event == NULL) {
+    if (event == NULL || !lock_queue()) {
         return false;
     }
-    lock_queue();
     if (queue_count == 0U) {
         unlock_queue();
         return false;

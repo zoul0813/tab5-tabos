@@ -7,7 +7,7 @@
 
 #include <tabos/input.h>
 
-void input_init(void);
+bool input_init(void);
 void input_shutdown(void);
 void input_update(void);
 uint64_t input_next_deadline(void);

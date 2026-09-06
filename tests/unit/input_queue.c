@@ -16,7 +16,9 @@ int main(void)
         return 1;
     }
 
-    input_init();
+    if (!input_init()) {
+        return 1;
+    }
     const tabos_input_event_t key = {
         .type = TABOS_INPUT_KEY_DOWN,
         .key  = TABOS_KEY_A,
@@ -49,7 +51,9 @@ int main(void)
         return 1;
     }
 
-    input_init();
+    if (!input_init()) {
+        return 1;
+    }
     const tabos_input_event_t held = {
         .type = TABOS_INPUT_KEY_DOWN,
         .key  = TABOS_KEY_W,
@@ -102,6 +106,9 @@ int main(void)
     if (tabos_input_poll(&received) || !input_submit(&held) || input_next_deadline() == UINT64_MAX) {
         return 1;
     }
-    input_init();
-    return input_next_deadline() == UINT64_MAX ? 0 : 1;
+    if (!input_init() || input_next_deadline() != UINT64_MAX) {
+        return 1;
+    }
+    input_shutdown();
+    return 0;
 }

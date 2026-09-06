@@ -211,6 +211,10 @@ a late update and preserve cadence by advancing directly to the next future peri
 Input repeat and network retry use these timers; cursor ownership changes wake runtime
 to add or remove its blink deadline immediately. Generic finite waits calculate one
 absolute monotonic deadline and recompute remaining blocking time after early wakes.
+Physical Tab5 testing exposed application-task starvation when the input consumer spun
+on an atomic queue lock while the runtime producer was preempted on the same core. Input
+queue and repeat state now use the priority-inheriting platform mutex; keyboard ISRs
+still only set readiness and never acquire it.
 
 ### Phase 5: Network and device-state notifications
 

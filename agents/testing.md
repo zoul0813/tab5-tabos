@@ -124,6 +124,11 @@ update after multiple missed periods; and next-deadline advancement strictly int
 future. Saturation tests must prove finite additions never wrap into the past and never
 collide with `UINT64_MAX`, which remains the infinite/no-deadline sentinel.
 
+Input concurrency validation must exercise runtime production and application
+consumption from separate tasks. Queue synchronization must block/yield through the
+platform mutex rather than spin while another schedulable task owns the queue; physical
+Tab5 idle testing must show no `IDLE0` watchdog report in `lock_queue`.
+
 Host builds are especially useful for:
 
 - shell development
