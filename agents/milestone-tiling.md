@@ -187,7 +187,7 @@ Binary formats:
   Add no SDL, ESP-IDF, FreeRTOS, PPA, or PIE types to the public API.
 - [x] Review: Use logical-canvas software drawing for normal tile games. Keep the existing final
   canvas upscale as one accelerated presentation.
-- [ ] Review: Keep native-mode support functional through queued blits. Add bulk kernel tile submission
+- [x] Review: Keep native-mode support functional through queued blits. Add bulk kernel tile submission
   only later if measured API overhead misses the benchmark target.
 - [ ] Review: Add an original `tdemo` reference application using a generated sprite animation,
   metasprite, scrolling multilayer map, editable cell, collision flags, and object markers.
@@ -566,6 +566,22 @@ Validated working-tree changes based on `7e43d93`:
 - Existing tile pixel tests cover maps, sprites, animations, metasprites, camera movement, clipping,
   transparency, and all transforms inside logical memory. Focused graphics and tile tests pass on
   macOS Debug and Release; standard RV32 applications compile the same path.
+
+## Native Tile Submission Evidence — 2026-09-06
+
+- Native graphics mode retains no SDK canvas and lowers sprite, animation, metasprite, and tilemap
+  draws into the same public extended-blit descriptor used by the runtime queue. A new regression
+  checks source rectangles, scaled pivot placement, camera projection, clipping, RGB565 color keys,
+  opacity, and every Tiled transform in submitted descriptors.
+- The regression submits 100 blits in one frame, exceeding the runtime queue's 64-command capacity,
+  and verifies that native presentation adds no logical-canvas upload. Runtime review confirms that
+  each enqueue copies the full descriptor, retains the documented source-pixel pointer, drains the
+  oldest command when capacity is reached, and drains all remaining work before present or close.
+- Queue execution attempts the platform blitter first and retains scalar rasterization as the
+  fallback. No bulk tile API is needed before the measured performance benchmark shows per-blit API
+  overhead missing its target.
+- The full macOS Debug suite passes 45/45 with sanitizers. Focused native graphics and tile tests pass
+  on macOS Release.
 
 ## Assumptions
 

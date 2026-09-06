@@ -8,6 +8,7 @@
 static unsigned int platform_blit_count;
 static unsigned int platform_present_count;
 static tabos_graphics_blit_options_t platform_blit;
+static tabos_graphics_blit_options_t platform_blits[128];
 
 static int graphics_open(uint32_t* width, uint32_t* height)
 {
@@ -30,6 +31,9 @@ static int graphics_present(void)
 static int graphics_blit_ex(const tabos_graphics_blit_options_t* options)
 {
     platform_blit = *options;
+    if (platform_blit_count < sizeof(platform_blits) / sizeof(platform_blits[0])) {
+        platform_blits[platform_blit_count] = *options;
+    }
     ++platform_blit_count;
     return 0;
 }
@@ -218,6 +222,90 @@ static bool invalid_descriptors(tabos_graphics_t* graphics, const tabos_sprite_s
     return true;
 }
 
+static bool native_submission(const tabos_sprite_set_t* sprites)
+{
+    tabos_graphics_t graphics = {0};
+    platform_blit_count       = 0U;
+    platform_present_count    = 0U;
+    if (tabos_graphics_open(&graphics) != 0 || graphics.pixels != NULL || graphics.width != 32U ||
+        graphics.height != 32U || tabos_graphics_begin_camera(&graphics, 3, 4) != 0) {
+        return false;
+    }
+
+    tabos_sprite_draw_options_t draw = TABOS_SPRITE_DRAW_OPTIONS_DEFAULT;
+    draw.width                       = 4U;
+    draw.height                      = 6U;
+    draw.rotation                    = TABOS_GRAPHICS_ROTATE_90;
+    draw.mirror_x                    = true;
+    draw.mirror_y                    = true;
+    draw.opacity                     = 123U;
+    draw.clip                        = (tabos_graphics_rect_t) {.x = 1, .y = 2, .width = 20U, .height = 18U};
+    draw.clip_enabled                = true;
+    if (tabos_sprite_draw_ex(&graphics, sprites, 0U, 10, 11, &draw) != 0 || platform_blit_count != 1U) {
+        return false;
+    }
+    const tabos_graphics_blit_options_t* submitted = &platform_blits[0];
+    if (submitted->pixels != sprites->images[0].pixels || submitted->bitmap_width != 2U ||
+        submitted->bitmap_height != 2U || submitted->source.x != 0 || submitted->source.y != 0 ||
+        submitted->source.width != 2U || submitted->source.height != 2U || submitted->destination.x != 5 ||
+        submitted->destination.y != 4 || submitted->destination.width != 4U || submitted->destination.height != 6U ||
+        submitted->rotation != TABOS_GRAPHICS_ROTATE_90 || !submitted->mirror_x || !submitted->mirror_y ||
+        submitted->opacity != 123U || !submitted->color_key_enabled ||
+        submitted->color_key_low != sprites->images[0].color_key ||
+        submitted->color_key_high != sprites->images[0].color_key || !submitted->clip_enabled ||
+        submitted->clip.x != 1 || submitted->clip.y != 2 || submitted->clip.width != 20U ||
+        submitted->clip.height != 18U) {
+        return false;
+    }
+
+    if (tabos_sprite_animation_draw(&graphics, sprites, 0U, 12, 13, 10U) != 0 ||
+        tabos_metasprite_draw(&graphics, sprites, 0U, 20, 20, false, false, 200U) != 0 || platform_blit_count != 4U ||
+        platform_blits[1].destination.x != 8 || platform_blits[1].destination.y != 8 ||
+        platform_blits[2].opacity != 200U || platform_blits[3].destination.x != 18 ||
+        platform_blits[3].destination.y != 15 || platform_blits[3].opacity != 100U ||
+        tabos_graphics_end_camera(&graphics) != 0) {
+        return false;
+    }
+
+    tabos_tile_t cells[96];
+    for (size_t index = 0U; index < sizeof(cells) / sizeof(cells[0]); ++index) {
+        cells[index] = TABOS_TILE(0U);
+    }
+    cells[1]                    |= TABOS_TILE_FLIP_HORIZONTAL;
+    cells[2]                    |= TABOS_TILE_FLIP_VERTICAL;
+    cells[3]                    |= TABOS_TILE_FLIP_HORIZONTAL | TABOS_TILE_FLIP_VERTICAL;
+    cells[4]                    |= TABOS_TILE_FLIP_DIAGONAL;
+    cells[5]                    |= TABOS_TILE_FLIP_DIAGONAL | TABOS_TILE_FLIP_HORIZONTAL;
+    cells[6]                    |= TABOS_TILE_FLIP_DIAGONAL | TABOS_TILE_FLIP_VERTICAL;
+    cells[7]                    |= TABOS_TILE_FLIP_DIAGONAL | TABOS_TILE_FLIP_HORIZONTAL | TABOS_TILE_FLIP_VERTICAL;
+    tabos_tilemap_layer_t layer  = {.name = "native", .type = TABOS_TILEMAP_LAYER_TILES, .cells = cells};
+    const tabos_tilemap_t map    = {
+           .width = 12U, .height = 8U, .tile_width = 1U, .tile_height = 1U, .layers = &layer, .layer_count = 1U};
+    const tabos_tilemap_draw_options_t map_draw = {
+        .viewport     = {.width = 12U, .height = 8U},
+        .animation_ms = 10U,
+    };
+    if (tabos_tilemap_draw_layer(&graphics, &map, 0U, sprites, &map_draw) != 0 || platform_blit_count != 100U) {
+        return false;
+    }
+    const tabos_graphics_blit_options_t* first_tile = &platform_blits[4];
+    const tabos_graphics_blit_options_t* last_tile  = &platform_blits[99];
+    if (first_tile->source.x != sprites->sprites[1].x || first_tile->source.y != sprites->sprites[1].y ||
+        first_tile->destination.x != 0 || first_tile->destination.y != 0 || first_tile->destination.width != 1U ||
+        first_tile->destination.height != 1U || !first_tile->clip_enabled || first_tile->clip.width != 12U ||
+        first_tile->clip.height != 8U || !platform_blits[5].mirror_x || !platform_blits[6].mirror_y ||
+        !platform_blits[7].mirror_x || !platform_blits[7].mirror_y ||
+        platform_blits[8].rotation != TABOS_GRAPHICS_ROTATE_90 || !platform_blits[8].mirror_x ||
+        platform_blits[9].rotation != TABOS_GRAPHICS_ROTATE_270 ||
+        platform_blits[10].rotation != TABOS_GRAPHICS_ROTATE_90 ||
+        platform_blits[11].rotation != TABOS_GRAPHICS_ROTATE_90 || !platform_blits[11].mirror_y ||
+        last_tile->destination.x != 11 || last_tile->destination.y != 7 || tabos_graphics_present(&graphics) != 0 ||
+        platform_blit_count != 100U || platform_present_count != 1U || tabos_graphics_close(&graphics) != 0) {
+        return false;
+    }
+    return true;
+}
+
 int main(int argc, char** argv)
 {
     const tabos_color_t key             = TABOS_RGB565(255, 0, 255);
@@ -347,6 +435,9 @@ int main(int argc, char** argv)
         platform_blit.source.height != 16U || platform_blit.destination.x != 0 || platform_blit.destination.y != 0 ||
         platform_blit.destination.width != 32U || platform_blit.destination.height != 32U ||
         platform_blit.opacity != 255U || tabos_graphics_close(&graphics) != 0) {
+        return 1;
+    }
+    if (!native_submission(&sprites)) {
         return 1;
     }
     if (argc == 3) {
