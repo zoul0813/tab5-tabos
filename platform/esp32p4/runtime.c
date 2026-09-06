@@ -332,14 +332,15 @@ int platform_run(platform_update_fn update, platform_deadline_fn next_deadline)
 {
     ESP_LOGI(TAG, "Tab5 platform run loop started");
     atomic_store_explicit(&runtime_task, xTaskGetCurrentTaskHandle(), memory_order_release);
+    uint64_t deadline                = platform_time_ms();
+    platform_runtime_events_t events = platform_runtime_wait_until(deadline);
     while (!atomic_load_explicit(&stop_requested, memory_order_acquire)) {
-        tab5_keyboard_poll();
         if (update != NULL) {
-            update();
+            update(events);
         }
         if (!atomic_load_explicit(&stop_requested, memory_order_acquire)) {
-            const uint64_t deadline = next_deadline != NULL ? next_deadline() : PLATFORM_RUNTIME_DEADLINE_NONE;
-            (void) platform_runtime_wait_until(deadline);
+            deadline = next_deadline != NULL ? next_deadline() : PLATFORM_RUNTIME_DEADLINE_NONE;
+            events   = platform_runtime_wait_until(deadline);
         }
     }
     atomic_store_explicit(&runtime_task, NULL, memory_order_release);
@@ -381,17 +382,17 @@ void platform_runtime_notify_from_isr(platform_runtime_events_t events)
 platform_runtime_events_t platform_runtime_wait_until(uint64_t deadline_ms)
 {
     for (;;) {
-        const platform_runtime_events_t events = atomic_exchange_explicit(&runtime_events, 0U, memory_order_acq_rel);
+        platform_runtime_events_t events = atomic_exchange_explicit(&runtime_events, 0U, memory_order_acq_rel);
+        const uint64_t now               = platform_time_ms();
+        if (deadline_ms != PLATFORM_RUNTIME_DEADLINE_NONE && now >= deadline_ms) {
+            events |= PLATFORM_RUNTIME_EVENT_DEADLINE;
+        }
         if (events != PLATFORM_RUNTIME_EVENT_NONE) {
             (void) ulTaskNotifyTake(pdTRUE, 0U);
             return events;
         }
         TickType_t wait_ticks = portMAX_DELAY;
         if (deadline_ms != PLATFORM_RUNTIME_DEADLINE_NONE) {
-            const uint64_t now = platform_time_ms();
-            if (now >= deadline_ms) {
-                return PLATFORM_RUNTIME_EVENT_NONE;
-            }
             const uint64_t remaining_ms    = deadline_ms - now;
             const uint64_t maximum_wait_ms = ((uint64_t) (portMAX_DELAY - 1U) * 1000U) / configTICK_RATE_HZ;
             wait_ticks = remaining_ms >= maximum_wait_ms ? portMAX_DELAY - 1U : pdMS_TO_TICKS(remaining_ms);

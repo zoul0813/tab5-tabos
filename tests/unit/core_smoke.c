@@ -77,16 +77,33 @@ int main(void)
         return 1;
     }
 
+    const unsigned int idle_network_status_calls = test_platform_network_status_calls();
+    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_NONE);
+    if (test_platform_network_status_calls() != idle_network_status_calls ||
+        test_platform_keyboard_update_calls() != 0U || test_platform_pointer_update_calls() != 0U) {
+        return 1;
+    }
+    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_INPUT);
+    if (test_platform_network_status_calls() != idle_network_status_calls ||
+        test_platform_keyboard_update_calls() != 1U || test_platform_pointer_update_calls() != 0U) {
+        return 1;
+    }
+    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_POINTER);
+    if (test_platform_network_status_calls() != idle_network_status_calls ||
+        test_platform_keyboard_update_calls() != 1U || test_platform_pointer_update_calls() != 1U) {
+        return 1;
+    }
+
     test_platform_keyboard_set_status(false, EIO);
     test_platform_advance_time_ms(60000U);
-    kernel_runtime_update();
+    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_DEADLINE);
     if (!device_registry_find(TABOS_DEVICE_NAME_KEYBOARD, &device) || device.state != TABOS_DEVICE_FAULT ||
         device.last_error != EIO) {
         return 1;
     }
     test_platform_keyboard_set_status(true, 0);
     test_platform_advance_time_ms(60000U);
-    kernel_runtime_update();
+    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_DEADLINE);
     if (!device_registry_find(TABOS_DEVICE_NAME_KEYBOARD, &device) || device.state != TABOS_DEVICE_READY ||
         device.last_error != 0) {
         return 1;
@@ -94,14 +111,14 @@ int main(void)
 
     test_platform_rtc_set_status(false, EIO);
     test_platform_advance_time_ms(60000U);
-    kernel_runtime_update();
+    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_DEADLINE);
     if (!device_registry_find(TABOS_DEVICE_NAME_RTC, &device) || device.state != TABOS_DEVICE_FAULT ||
         device.last_error != EIO) {
         return 1;
     }
     test_platform_rtc_set_status(true, 0);
     test_platform_advance_time_ms(60000U);
-    kernel_runtime_update();
+    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_DEADLINE);
     if (!device_registry_find(TABOS_DEVICE_NAME_RTC, &device) || device.state != TABOS_DEVICE_READY ||
         device.last_error != 0) {
         return 1;
@@ -109,35 +126,35 @@ int main(void)
 
     test_platform_battery_set_status(false, EIO);
     test_platform_advance_time_ms(60000U);
-    kernel_runtime_update();
+    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_DEADLINE);
     if (!device_registry_find(TABOS_DEVICE_NAME_BATTERY, &device) || device.state != TABOS_DEVICE_FAULT ||
         device.last_error != EIO) {
         return 1;
     }
     test_platform_battery_set_status(true, 0);
     test_platform_advance_time_ms(60000U);
-    kernel_runtime_update();
+    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_DEADLINE);
     if (!device_registry_find(TABOS_DEVICE_NAME_BATTERY, &device) || device.state != TABOS_DEVICE_READY ||
         device.last_error != 0) {
         return 1;
     }
 
     test_platform_network_set_state(PLATFORM_NETWORK_ONLINE, NULL);
-    kernel_runtime_update();
+    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_NETWORK);
     if (!device_registry_find(TABOS_DEVICE_NAME_WIFI, &device) || device.state != TABOS_DEVICE_READY ||
         device.last_error != 0) {
         return 1;
     }
 
     test_platform_audio_error(EIO);
-    kernel_runtime_update();
+    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_DEVICE);
     if (!device_registry_find(TABOS_DEVICE_NAME_AUDIO, &device) || device.state != TABOS_DEVICE_FAULT ||
         device.last_error != EIO) {
         return 1;
     }
 
     test_platform_camera_error(EIO);
-    kernel_runtime_update();
+    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_DEVICE);
     if (!device_registry_find(TABOS_DEVICE_NAME_CAMERA, &device) || device.state != TABOS_DEVICE_FAULT ||
         device.last_error != EIO) {
         return 1;
@@ -156,7 +173,7 @@ int main(void)
     if (!input_submit(&exit_event)) {
         return 1;
     }
-    kernel_runtime_update();
+    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_INPUT);
     int exit_status = -1;
     if (!tabos_app_is_running() || tabos_process_count() != 1U || tabos_process_system_panicked() ||
         !tabos_app_last_exit_status(&exit_status) || exit_status != 0) {

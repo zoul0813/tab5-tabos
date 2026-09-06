@@ -240,17 +240,21 @@ platform notification state is released.
 
 The host backend maps the contract to SDL events, including headless operation. Tab5 maps
 it to FreeRTOS direct task notifications; FreeRTOS types remain below the platform
-boundary. Key repeat, cursor blink, network retry, and finite waits publish exact
-monotonic deadlines. `UINT64_MAX` means no deadline and finite additions clamp below it;
-late periodic work runs once and advances to the next future period. Cursor ownership
-and network/input changes wake runtime when they add or cancel deadlines. Native Tab5
-application completion and ELF exit/child-exec requests publish application readiness;
-process launch and parent restoration do likewise. These notifications carry no process
-pointer, so coalesced late wakeups cannot target a destroyed or generation-reused slot.
-Runtime still includes a temporary 10 ms compatibility deadline for services awaiting
-central dispatch conversion. Active host RV32 interpretation keeps
-the runtime immediately runnable for bounded instruction slices. Native Tab5 execution
-does not use that runnable hint because it runs in its own managed task.
+boundary. Each blocking wait returns its coalesced readiness bitset to the portable
+dispatcher. The dispatcher runs only named event owners and expired deadline owners,
+once each in deterministic order per bounded pass, then the platform recomputes the
+nearest deadline before blocking again. Key repeat, cursor blink, network retry, and
+finite waits publish exact monotonic deadlines. `UINT64_MAX` means no deadline and finite
+additions clamp below it; late periodic work runs once and advances to the next future
+period. Cursor ownership and network/input changes wake runtime when they add or cancel
+deadlines. Native Tab5 application completion and ELF exit/child-exec requests publish
+application readiness; process launch and parent restoration do likewise. These
+notifications carry no process pointer, so coalesced late wakeups cannot target a
+destroyed or generation-reused slot. No compatibility tick remains. Active host RV32
+interpretation keeps the runtime immediately runnable for bounded instruction slices.
+Native Tab5 execution does not use that runnable hint because it runs in its own managed
+task. Debug builds count wake bits and expired deadline owners; reporting piggybacks on
+the existing health audit rather than creating another periodic deadline.
 
 A conceptual runtime looks like:
 

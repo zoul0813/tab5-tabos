@@ -143,10 +143,18 @@ platform_runtime_events_t platform_runtime_wait_until(uint64_t deadline_ms)
     platform_runtime_events_t events = atomic_exchange_explicit(&runtime_events, 0U, memory_order_acq_rel);
     if (events != PLATFORM_RUNTIME_EVENT_NONE) {
         host_input_update(false);
+        events |= atomic_exchange_explicit(&runtime_events, 0U, memory_order_acq_rel);
+        if (deadline_ms != PLATFORM_RUNTIME_DEADLINE_NONE && platform_time_ms() >= deadline_ms) {
+            events |= PLATFORM_RUNTIME_EVENT_DEADLINE;
+        }
         return events;
     }
     host_input_wait_until(deadline_ms);
-    return atomic_exchange_explicit(&runtime_events, 0U, memory_order_acq_rel);
+    events = atomic_exchange_explicit(&runtime_events, 0U, memory_order_acq_rel);
+    if (deadline_ms != PLATFORM_RUNTIME_DEADLINE_NONE && platform_time_ms() >= deadline_ms) {
+        events |= PLATFORM_RUNTIME_EVENT_DEADLINE;
+    }
+    return events;
 }
 
 void platform_perform_system_action(platform_system_action_t action)
@@ -303,22 +311,29 @@ bool platform_keyboard_health(int* error)
     return true;
 }
 
+void platform_keyboard_update(void)
+{
+}
+
 int platform_run(platform_update_fn update, platform_deadline_fn next_deadline)
 {
     if (is_headless) {
+        const uint64_t deadline          = platform_time_ms();
+        platform_runtime_events_t events = platform_runtime_wait_until(deadline);
         if (update != NULL) {
-            update();
+            update(events);
         }
         return 0;
     }
+    uint64_t deadline                = platform_time_ms();
+    platform_runtime_events_t events = platform_runtime_wait_until(deadline);
     while (!quit_requested) {
-        host_input_update(false);
         if (update != NULL) {
-            update();
+            update(events);
         }
         if (!quit_requested) {
-            const uint64_t deadline = next_deadline != NULL ? next_deadline() : PLATFORM_RUNTIME_DEADLINE_NONE;
-            (void) platform_runtime_wait_until(deadline);
+            deadline = next_deadline != NULL ? next_deadline() : PLATFORM_RUNTIME_DEADLINE_NONE;
+            events   = platform_runtime_wait_until(deadline);
         }
     }
     return 0;

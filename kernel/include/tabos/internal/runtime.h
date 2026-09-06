@@ -8,7 +8,7 @@
 
 bool kernel_runtime_init(void);
 bool kernel_runtime_start(bool launch_startup_application);
-void kernel_runtime_update(void);
+void kernel_runtime_update(platform_runtime_events_t events);
 uint64_t kernel_runtime_next_deadline(void);
 void kernel_runtime_shutdown(void);
 bool kernel_runtime_request_system_action(platform_system_action_t action);

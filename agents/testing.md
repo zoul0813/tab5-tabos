@@ -113,9 +113,10 @@ when a producer creates earlier work so the runtime can recompute its nearest de
 
 Platform contract tests must keep SDL and FreeRTOS types below the portable boundary.
 Tab5 cross-builds validate the direct-task-notification and ISR-safe paths; physical
-interrupt phases add hardware timing and teardown validation separately. Until those
-phases complete, tests must preserve the explicit 10 ms compatibility deadline used by
-still-polled services rather than claiming idle polling has ended.
+interrupt phases add hardware timing and teardown validation separately. Central-dispatch
+tests must prove an idle or unrelated event does not poll keyboard or network state, and
+an input event invokes the keyboard backend exactly once per bounded dispatch. No 10 ms
+compatibility deadline remains.
 Network-service tests count platform status reads and prove idle runtime updates perform
 none; one coalesced backend transition causes one copied status read. Core smoke tests
 advance fake monotonic time to exercise the 60-second hardware-health audit explicitly.

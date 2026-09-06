@@ -3,8 +3,8 @@
 #include <tabos/internal/application.h>
 #include <tabos/internal/audio.h>
 #include <tabos/internal/boot_report.h>
-#include <tabos/internal/diagnostic_apps.h>
 #include <tabos/internal/console.h>
+#include <tabos/internal/diagnostic_apps.h>
 #include <tabos/internal/display.h>
 #include <tabos/internal/device_registry.h>
 #include <tabos/internal/filesystem.h>
@@ -31,10 +31,6 @@
 #include <stdatomic.h>
 #include <stdio.h>
 
-enum {
-    RUNTIME_COMPATIBILITY_POLL_MS = 10U,
-};
-
 static bool runtime_initialized;
 static bool runtime_started;
 static unsigned int terminal_scale = TABOS_TERMINAL_SCALE;
@@ -48,12 +44,66 @@ static char storage_detail[512];
 static char clock_detail[80];
 static char network_detail[160];
 static atomic_int requested_system_action;
-static uint64_t compatibility_poll_deadline_ms;
+
+#ifndef NDEBUG
+typedef struct {
+        uint64_t total;
+        uint64_t input;
+        uint64_t pointer;
+        uint64_t network;
+        uint64_t camera;
+        uint64_t audio;
+        uint64_t application;
+        uint64_t device;
+        uint64_t deadline;
+        uint64_t input_deadline;
+        uint64_t console_deadline;
+        uint64_t network_deadline;
+        uint64_t health_deadline;
+        uint64_t application_slice;
+} runtime_wake_counts_t;
+
+static runtime_wake_counts_t wake_counts;
+#endif
 
 static uint64_t earliest_deadline(uint64_t left, uint64_t right)
 {
     return left < right ? left : right;
 }
+
+static bool deadline_ready(uint64_t deadline, uint64_t now)
+{
+    return deadline != PLATFORM_RUNTIME_DEADLINE_NONE && deadline <= now;
+}
+
+#ifndef NDEBUG
+static void record_wake(platform_runtime_events_t events)
+{
+    ++wake_counts.total;
+    wake_counts.input       += (events & PLATFORM_RUNTIME_EVENT_INPUT) != 0U ? 1U : 0U;
+    wake_counts.pointer     += (events & PLATFORM_RUNTIME_EVENT_POINTER) != 0U ? 1U : 0U;
+    wake_counts.network     += (events & PLATFORM_RUNTIME_EVENT_NETWORK) != 0U ? 1U : 0U;
+    wake_counts.camera      += (events & PLATFORM_RUNTIME_EVENT_CAMERA) != 0U ? 1U : 0U;
+    wake_counts.audio       += (events & PLATFORM_RUNTIME_EVENT_AUDIO) != 0U ? 1U : 0U;
+    wake_counts.application += (events & PLATFORM_RUNTIME_EVENT_APPLICATION) != 0U ? 1U : 0U;
+    wake_counts.device      += (events & PLATFORM_RUNTIME_EVENT_DEVICE) != 0U ? 1U : 0U;
+    wake_counts.deadline    += (events & PLATFORM_RUNTIME_EVENT_DEADLINE) != 0U ? 1U : 0U;
+}
+
+static void log_wake_counts(void)
+{
+    char message[384];
+    (void) snprintf(message, sizeof(message),
+                    "Runtime wakes: total=%" PRIu64 " input=%" PRIu64 " pointer=%" PRIu64 " network=%" PRIu64
+                    " camera=%" PRIu64 " audio=%" PRIu64 " application=%" PRIu64 " device=%" PRIu64 " deadline=%" PRIu64
+                    " [input=%" PRIu64 " console=%" PRIu64 " network=%" PRIu64 " health=%" PRIu64 " app=%" PRIu64 "]",
+                    wake_counts.total, wake_counts.input, wake_counts.pointer, wake_counts.network, wake_counts.camera,
+                    wake_counts.audio, wake_counts.application, wake_counts.device, wake_counts.deadline,
+                    wake_counts.input_deadline, wake_counts.console_deadline, wake_counts.network_deadline,
+                    wake_counts.health_deadline, wake_counts.application_slice);
+    platform_log(message);
+}
+#endif
 
 static kernel_boot_status_t device_boot_status(tabos_device_state_t state)
 {
@@ -358,8 +408,10 @@ bool kernel_runtime_start(bool launch_startup_application)
         filesystem_shutdown();
         return false;
     }
-    runtime_started                = true;
-    compatibility_poll_deadline_ms = platform_time_ms();
+    runtime_started = true;
+#ifndef NDEBUG
+    wake_counts = (runtime_wake_counts_t) {0};
+#endif
     if (!launch_startup_application) {
         return true;
     }
@@ -386,19 +438,73 @@ bool kernel_runtime_start(bool launch_startup_application)
     return true;
 }
 
-void kernel_runtime_update(void)
+void kernel_runtime_update(platform_runtime_events_t events)
 {
     if (!runtime_started) {
         return;
     }
-    input_update();
-    console_update();
-    network_service_update();
-    platform_pointer_update();
-    hardware_devices_update();
-    kernel_application_system_update();
-    const uint64_t now             = platform_time_ms();
-    compatibility_poll_deadline_ms = time_deadline_after(now, RUNTIME_COMPATIBILITY_POLL_MS);
+#ifndef NDEBUG
+    record_wake(events);
+#endif
+
+    bool application_ready   = (events & (PLATFORM_RUNTIME_EVENT_APPLICATION | PLATFORM_RUNTIME_EVENT_INPUT)) != 0U;
+    bool network_ready       = (events & PLATFORM_RUNTIME_EVENT_NETWORK) != 0U;
+    bool device_ready        = (events & PLATFORM_RUNTIME_EVENT_DEVICE) != 0U;
+    const bool deadline_wake = (events & PLATFORM_RUNTIME_EVENT_DEADLINE) != 0U;
+
+    if ((events & PLATFORM_RUNTIME_EVENT_INPUT) != 0U) {
+        platform_keyboard_update();
+    }
+    if ((events & PLATFORM_RUNTIME_EVENT_POINTER) != 0U) {
+        platform_pointer_update();
+    }
+
+    const uint64_t now = platform_time_ms();
+    if (deadline_wake && deadline_ready(input_next_deadline(), now)) {
+        input_update();
+        application_ready = true;
+#ifndef NDEBUG
+        ++wake_counts.input_deadline;
+#endif
+    }
+    if (deadline_wake && deadline_ready(console_next_deadline(), now)) {
+        console_update();
+#ifndef NDEBUG
+        ++wake_counts.console_deadline;
+#endif
+    }
+    if (deadline_wake && deadline_ready(network_service_next_deadline(), now)) {
+        network_ready = true;
+#ifndef NDEBUG
+        ++wake_counts.network_deadline;
+#endif
+    }
+    const bool health_deadline_ready = deadline_wake && deadline_ready(hardware_devices_next_deadline(), now);
+    if (health_deadline_ready) {
+        device_ready = true;
+#ifndef NDEBUG
+        ++wake_counts.health_deadline;
+#endif
+    }
+
+    if (network_ready) {
+        network_service_update();
+        device_ready = true;
+    }
+    if (device_ready) {
+        hardware_devices_update();
+    }
+    if (application_ready || kernel_application_system_runnable()) {
+        kernel_application_system_update();
+#ifndef NDEBUG
+        ++wake_counts.application_slice;
+#endif
+    }
+#ifndef NDEBUG
+    if (health_deadline_ready) {
+        log_wake_counts();
+    }
+#endif
 }
 
 uint64_t kernel_runtime_next_deadline(void)
@@ -409,8 +515,7 @@ uint64_t kernel_runtime_next_deadline(void)
     if (kernel_application_system_runnable()) {
         return platform_time_ms();
     }
-    uint64_t deadline = compatibility_poll_deadline_ms;
-    deadline          = earliest_deadline(deadline, input_next_deadline());
+    uint64_t deadline = input_next_deadline();
     deadline          = earliest_deadline(deadline, console_next_deadline());
     deadline          = earliest_deadline(deadline, network_service_next_deadline());
     deadline          = earliest_deadline(deadline, hardware_devices_next_deadline());
@@ -427,9 +532,8 @@ void kernel_runtime_shutdown(void)
         camera_service_shutdown();
         pointer_service_shutdown();
         display_shutdown();
-        runtime_started                = false;
-        boot_report                    = (kernel_boot_report_t) {0};
-        compatibility_poll_deadline_ms = PLATFORM_RUNTIME_DEADLINE_NONE;
+        runtime_started = false;
+        boot_report     = (kernel_boot_report_t) {0};
     }
 
     audio_service_shutdown();

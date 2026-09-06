@@ -80,6 +80,8 @@ static bool fake_rtc_ready = true;
 static int fake_rtc_error;
 static bool fake_keyboard_ready = true;
 static int fake_keyboard_error;
+static unsigned int keyboard_update_calls;
+static unsigned int pointer_update_calls;
 static bool fake_battery_ready = true;
 static int fake_battery_error;
 static platform_audio_error_fn fake_audio_error;
@@ -130,9 +132,12 @@ void platform_runtime_notify_from_isr(platform_runtime_events_t events)
 
 platform_runtime_events_t platform_runtime_wait_until(uint64_t deadline_ms)
 {
-    fake_runtime_wait_deadline             = deadline_ms;
-    const platform_runtime_events_t events = fake_runtime_events;
-    fake_runtime_events                    = PLATFORM_RUNTIME_EVENT_NONE;
+    fake_runtime_wait_deadline       = deadline_ms;
+    platform_runtime_events_t events = fake_runtime_events;
+    fake_runtime_events              = PLATFORM_RUNTIME_EVENT_NONE;
+    if (deadline_ms != PLATFORM_RUNTIME_DEADLINE_NONE && monotonic_ms >= deadline_ms) {
+        events |= PLATFORM_RUNTIME_EVENT_DEADLINE;
+    }
     return events;
 }
 
@@ -230,6 +235,16 @@ bool platform_keyboard_health(int* error)
         *error = fake_keyboard_error;
     }
     return fake_keyboard_ready && fake_keyboard_error == 0;
+}
+
+void platform_keyboard_update(void)
+{
+    ++keyboard_update_calls;
+}
+
+unsigned int test_platform_keyboard_update_calls(void)
+{
+    return keyboard_update_calls;
 }
 
 void test_platform_keyboard_set_status(bool ready, int error)
@@ -742,6 +757,12 @@ bool platform_pointer_init(const char** driver, int* error)
 
 void platform_pointer_update(void)
 {
+    ++pointer_update_calls;
+}
+
+unsigned int test_platform_pointer_update_calls(void)
+{
+    return pointer_update_calls;
 }
 
 void platform_pointer_shutdown(void)

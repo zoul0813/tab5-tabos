@@ -454,6 +454,11 @@ void tab5_keyboard_poll(void)
     }
 }
 
+void platform_keyboard_update(void)
+{
+    tab5_keyboard_poll();
+}
+
 const char* tab5_keyboard_name(void)
 {
     return keyboard_name;

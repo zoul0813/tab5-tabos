@@ -309,18 +309,32 @@ is a Phase 6 test follow-up, not a Phase 7 process-notification failure.
 
 ### Phase 8: Central run-loop conversion
 
-- [ ] Remove direct keyboard polling from Tab5 `platform_run()`.
-- [ ] Remove unconditional touch, network, camera, hardware-health, and application-
+- [x] Remove direct keyboard polling from Tab5 `platform_run()`.
+- [x] Remove unconditional touch, network, camera, hardware-health, and application-
   completion polling from `kernel_runtime_update()`.
-- [ ] Dispatch only services whose event bits or deadlines are ready.
-- [ ] Recompute nearest deadline after each dispatch because callbacks may add, cancel, or
+- [x] Dispatch only services whose event bits or deadlines are ready.
+- [x] Recompute nearest deadline after each dispatch because callbacks may add, cancel, or
   shorten deadlines.
-- [ ] Prevent starvation when interrupts arrive continuously by bounding work per dispatch
+- [x] Prevent starvation when interrupts arrive continuously by bounding work per dispatch
   before checking other ready sources.
-- [ ] Preserve prompt input, cursor, networking, display, filesystem, camera, and process
+- [x] Preserve prompt input, cursor, networking, display, filesystem, camera, and process
   progress while foreground native application remains active.
-- [ ] Record wake counts by source in debug diagnostics so remaining periodic wakeups can
+- [x] Record wake counts by source in debug diagnostics so remaining periodic wakeups can
   be found and measured.
+
+The platform run-loop callback now receives the coalesced readiness bits returned by the
+blocking wait. Timeout returns are converted into explicit deadline readiness, and the
+portable dispatcher invokes each event or expired-deadline owner at most once per pass in
+deterministic order. Tab5 keyboard and touch controller drains remain bounded; host RV32
+execution retains one bounded interpreter slice before the next wait. The temporary 10 ms
+compatibility deadline is removed. Debug builds report cumulative event-source and
+deadline-owner wake counts whenever the existing 60-second hardware-health audit runs,
+without adding a diagnostic timer or periodic wake.
+
+Tab5 validation exposed and fixed a producer-routing regression: the touch ISR and its
+bounded re-notification paths now post `PLATFORM_RUNTIME_EVENT_POINTER`, matching the
+central dispatcher's pointer service route. Posting the legacy input bit woke only the
+keyboard path and left touch reports pending indefinitely.
 
 ## Host Design
 

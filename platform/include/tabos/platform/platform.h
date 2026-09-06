@@ -15,12 +15,12 @@ enum {
 };
 
 typedef uint16_t platform_pixel_t;
-typedef void (*platform_update_fn)(void);
-typedef uint64_t (*platform_deadline_fn)(void);
 typedef struct platform_riscv32_context platform_riscv32_context_t;
 typedef struct platform_mutex platform_mutex_t;
 
 typedef uint32_t platform_runtime_events_t;
+typedef void (*platform_update_fn)(platform_runtime_events_t events);
+typedef uint64_t (*platform_deadline_fn)(void);
 
 enum {
     PLATFORM_RUNTIME_EVENT_NONE        = 0U,
@@ -178,6 +178,8 @@ void platform_shutdown(void);
 void platform_stop_run_loop(void);
 void platform_runtime_notify(platform_runtime_events_t events);
 void platform_runtime_notify_from_isr(platform_runtime_events_t events);
+// Returns coalesced readiness and includes DEADLINE when the absolute deadline
+// is reached, including a wake that also carries other ready sources.
 platform_runtime_events_t platform_runtime_wait_until(uint64_t deadline_ms);
 void platform_perform_system_action(platform_system_action_t action);
 const char* platform_name(void);
@@ -188,6 +190,7 @@ uint64_t platform_time_ms(void);
 bool platform_wall_clock_get(int64_t* seconds);
 bool platform_wall_clock_set(int64_t seconds);
 bool platform_wall_clock_status(int* error);
+void platform_keyboard_update(void);
 bool platform_keyboard_health(int* error);
 bool platform_network_init(const char* hostname, platform_network_event_fn event);
 void platform_network_shutdown(void);

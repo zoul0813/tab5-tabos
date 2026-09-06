@@ -96,7 +96,7 @@ static void IRAM_ATTR touch_interrupt(esp_lcd_touch_handle_t handle)
 {
     (void) handle;
     atomic_store_explicit(&touch_interrupt_pending, true, memory_order_release);
-    platform_runtime_notify_from_isr(PLATFORM_RUNTIME_EVENT_INPUT);
+    platform_runtime_notify_from_isr(PLATFORM_RUNTIME_EVENT_POINTER);
 }
 
 static void touch_interrupt_disable(void)
@@ -183,7 +183,7 @@ bool platform_pointer_init(const char** driver, int* error)
     if (atomic_load_explicit(&touch_interrupt_pending, memory_order_acquire) ||
         gpio_get_level(BSP_LCD_TOUCH_INT) == 0) {
         atomic_store_explicit(&touch_interrupt_pending, true, memory_order_release);
-        platform_runtime_notify(PLATFORM_RUNTIME_EVENT_INPUT);
+        platform_runtime_notify(PLATFORM_RUNTIME_EVENT_POINTER);
     }
     ESP_LOGI(TAG, "Touch controller initialized: %s", gt911 ? "GT911" : "ST712x");
     return true;
@@ -207,7 +207,7 @@ void platform_pointer_update(void)
     }
     if (still_pending || atomic_exchange_explicit(&touch_interrupt_pending, false, memory_order_acq_rel)) {
         atomic_store_explicit(&touch_interrupt_pending, true, memory_order_release);
-        platform_runtime_notify(PLATFORM_RUNTIME_EVENT_INPUT);
+        platform_runtime_notify(PLATFORM_RUNTIME_EVENT_POINTER);
     }
 }
 

@@ -31,9 +31,13 @@ int main(void)
     platform_runtime_notify(PLATFORM_RUNTIME_EVENT_INPUT);
     assert(platform_runtime_wait_until(PLATFORM_RUNTIME_DEADLINE_NONE) == PLATFORM_RUNTIME_EVENT_INPUT);
 
+    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_INPUT);
+    assert(platform_runtime_wait_until(platform_time_ms()) ==
+           (PLATFORM_RUNTIME_EVENT_INPUT | PLATFORM_RUNTIME_EVENT_DEADLINE));
+
     const uint64_t deadline = platform_time_ms() + 20U;
     (void) deadline;
-    assert(platform_runtime_wait_until(deadline) == PLATFORM_RUNTIME_EVENT_NONE);
+    assert(platform_runtime_wait_until(deadline) == PLATFORM_RUNTIME_EVENT_DEADLINE);
     assert(platform_time_ms() >= deadline);
 
     const delayed_notification_t notification = {

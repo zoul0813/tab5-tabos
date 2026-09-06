@@ -44,6 +44,8 @@
   bounded stall watchdog, joined teardown, and release-driven H.264 backpressure.
 - [x] Phase 7: notify runtime for native application completion and ELF process work;
   stop native execution before releasing process-owned resources.
+- [x] Phase 8: pass wake bits into one bounded central dispatcher, remove the 10 ms
+  compatibility deadline, and record debug wake counts without adding a timer.
 
 ### Hardware Services Phase 6 Validation
 
