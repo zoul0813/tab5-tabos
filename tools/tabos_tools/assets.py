@@ -88,9 +88,10 @@ def check_names(groups: dict[str, list[str]]) -> None:
 
 
 def parse_key(value: Any) -> int:
-    if isinstance(value, int) and 0 <= value <= 0xFFFF:
+    if isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= 0xFFFF:
         return value
-    if isinstance(value, list) and len(value) == 3 and all(isinstance(item, int) and 0 <= item <= 255 for item in value):
+    if (isinstance(value, list) and len(value) == 3 and
+            all(isinstance(item, int) and not isinstance(item, bool) and 0 <= item <= 255 for item in value)):
         return rgb565(*value)
     fail("color_key must be an RGB565 integer or [red, green, blue]")
 
@@ -115,7 +116,7 @@ def convert_pixels(rgba: list[tuple[int, int, int, int]], explicit_key: Any = No
     return [key if alpha == 0 else rgb565(red, green, blue) for red, green, blue, alpha in rgba], key
 
 
-def open_frames(path: Path) -> tuple[list[tuple[int, int, list[tuple[int, int, int, int]], int]], int]:
+def open_frames(path: Path, accepted_formats: set[str]) -> tuple[list[tuple[int, int, list[tuple[int, int, int, int]], int]], int]:
     try:
         from PIL import Image as PillowImage
     except ImportError:
@@ -124,6 +125,9 @@ def open_frames(path: Path) -> tuple[list[tuple[int, int, list[tuple[int, int, i
         source = PillowImage.open(path)
     except OSError as error:
         fail(f"cannot decode image {path}: {error}")
+    if source.format not in accepted_formats:
+        expected = "/".join(sorted(accepted_formats))
+        fail(f"image {path} uses {source.format or 'unknown'} format; expected {expected}")
     frames = []
     count = getattr(source, "n_frames", 1)
     for index in range(count):
@@ -144,7 +148,7 @@ def open_frames(path: Path) -> tuple[list[tuple[int, int, list[tuple[int, int, i
 def add_image_entry(assets: AssetSet, base: Path, entry: dict[str, Any], flags: dict[str, int]) -> None:
     name = require_string(entry, "name")
     source = base / require_string(entry, "source")
-    frames, gif_repeat = open_frames(source)
+    frames, gif_repeat = open_frames(source, {"GIF", "PNG"})
     resize = entry.get("resize")
     transparent_rgb = entry.get("transparent_rgb")
     if resize is not None:
@@ -186,9 +190,11 @@ def add_image_entry(assets: AssetSet, base: Path, entry: dict[str, Any], flags: 
         regions = entry.get("sprites")
         if regions is None:
             regions = [{"name": image_name, "x": 0, "y": 0, "width": width, "height": height}]
+        regions = require_list(regions, f"image {source} sprites")
         if len(frames) > 1 and len(regions) != 1:
             fail(f"animated GIF {source} may define only one full-frame sprite")
-        for region in regions:
+        for region_index, region_value in enumerate(regions):
+            region = require_object(region_value, f"image {source} sprites[{region_index}]")
             sprite_name = require_string(region, "name")
             if len(frames) > 1:
                 sprite_name = f"{name}_frame_{frame_index}"
@@ -204,7 +210,7 @@ def add_image_entry(assets: AssetSet, base: Path, entry: dict[str, Any], flags: 
             flag_value = flags_value(region.get("flags", 0), flags)
             generated_sprite_ids.append(len(assets.sprites))
             assets.sprites.append(Sprite(sprite_name, image_id, x, y, region_width, region_height,
-                                          integer(pivot[0], "pivot x"), integer(pivot[1], "pivot y"), flag_value))
+                                          signed_32(pivot[0], "pivot x"), signed_32(pivot[1], "pivot y"), flag_value))
     if len(frames) > 1:
         durations = []
         for index, frame in enumerate(frames):
@@ -235,10 +241,42 @@ def unsigned_32(value: Any, label: str) -> int:
     return result
 
 
-def require_string(value: dict[str, Any], key: str) -> str:
+def signed_32(value: Any, label: str) -> int:
+    result = integer(value, label)
+    if result < -0x80000000 or result > 0x7FFFFFFF:
+        fail(f"{label} must fit a signed 32-bit integer")
+    return result
+
+
+def require_list(value: Any, label: str) -> list[Any]:
+    if not isinstance(value, list):
+        fail(f"{label} must be an array")
+    return value
+
+
+def require_object(value: Any, label: str) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        fail(f"{label} must be an object")
+    return value
+
+
+def boolean(value: Any, label: str) -> bool:
+    if not isinstance(value, bool):
+        fail(f"{label} must be a boolean")
+    return value
+
+
+def require_string(value: dict[str, Any], key: str, label: str | None = None) -> str:
     result = value.get(key)
     if not isinstance(result, str) or not result:
-        fail(f"{key} must be a non-empty string")
+        fail(f"{label or key} must be a non-empty string")
+    return result
+
+
+def optional_string(value: dict[str, Any], key: str, label: str) -> str:
+    result = value.get(key, "")
+    if not isinstance(result, str):
+        fail(f"{label} must be a string")
     return result
 
 
@@ -260,15 +298,18 @@ def load_manifest(path: Path) -> AssetSet:
         manifest = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
         fail(f"cannot read asset manifest {path}: {error}")
-    if not isinstance(manifest, dict) or manifest.get("version") != 1:
-        fail("asset manifest version must be 1")
-    assets = AssetSet(require_string(manifest, "name"))
+    manifest = require_object(manifest, f"asset manifest {path}")
+    if integer(manifest.get("version"), f"asset manifest {path} version") != 1:
+        fail(f"asset manifest {path} version must be 1")
+    assets = AssetSet(require_string(manifest, "name", f"asset manifest {path} name"))
     raw_flags = manifest.get("flags", {})
     if not isinstance(raw_flags, dict):
         fail("flags must be an object")
     flags: dict[str, int] = {}
     used_flag_values: dict[int, str] = {}
     for name, value in raw_flags.items():
+        if not name:
+            fail(f"asset manifest {path} flag names must be non-empty")
         flag = unsigned_32(value, f"flag {name}")
         if flag == 0 or (flag & (flag - 1)) != 0:
             fail(f"flag {name!r} must be one nonzero 32-bit bit")
@@ -276,17 +317,21 @@ def load_manifest(path: Path) -> AssetSet:
             fail(f"flags {used_flag_values[flag]!r} and {name!r} use the same bit")
         flags[name] = flag
         used_flag_values[flag] = name
-    for entry in manifest.get("images", []):
-        if not isinstance(entry, dict):
-            fail("each images entry must be an object")
+    for index, entry_value in enumerate(require_list(manifest.get("images", []), f"asset manifest {path} images")):
+        entry = require_object(entry_value, f"asset manifest {path} images[{index}]")
         add_image_entry(assets, path.parent, entry, flags)
-    for entry in manifest.get("maps", []):
+    for index, entry_value in enumerate(require_list(manifest.get("maps", []), f"asset manifest {path} maps")):
+        entry = require_object(entry_value, f"asset manifest {path} maps[{index}]")
         assets.maps.append(load_tiled_map(assets, path.parent / require_string(entry, "source"),
                                           require_string(entry, "name"), flags))
     sprite_ids = {sprite.name: index for index, sprite in enumerate(assets.sprites)}
-    for entry in manifest.get("animations", []):
+    for index, entry_value in enumerate(require_list(manifest.get("animations", []),
+                                                     f"asset manifest {path} animations")):
+        entry = require_object(entry_value, f"asset manifest {path} animations[{index}]")
         frames = []
-        for frame in entry.get("frames", []):
+        for frame_index, frame_value in enumerate(require_list(entry.get("frames", []),
+                                                               f"animation {index} frames")):
+            frame = require_object(frame_value, f"animation {index} frames[{frame_index}]")
             sprite_name = require_string(frame, "sprite")
             if sprite_name not in sprite_ids:
                 fail(f"unknown animation sprite {sprite_name!r}")
@@ -299,9 +344,13 @@ def load_manifest(path: Path) -> AssetSet:
         assets.animations.append(Animation(require_string(entry, "name"), frames,
                                             unsigned_32(entry.get("repeat_count", 0), "repeat count")))
     sprite_ids = {sprite.name: index for index, sprite in enumerate(assets.sprites)}
-    for entry in manifest.get("metasprites", []):
+    for index, entry_value in enumerate(require_list(manifest.get("metasprites", []),
+                                                     f"asset manifest {path} metasprites")):
+        entry = require_object(entry_value, f"asset manifest {path} metasprites[{index}]")
         parts = []
-        for part in entry.get("parts", []):
+        for part_index, part_value in enumerate(require_list(entry.get("parts", []),
+                                                             f"metasprite {index} parts")):
+            part = require_object(part_value, f"metasprite {index} parts[{part_index}]")
             sprite_name = require_string(part, "sprite")
             if sprite_name not in sprite_ids:
                 fail(f"unknown metasprite sprite {sprite_name!r}")
@@ -309,9 +358,10 @@ def load_manifest(path: Path) -> AssetSet:
             opacity = integer(part.get("opacity", 255), "part opacity")
             if rotation < 0 or rotation > 3 or opacity < 0 or opacity > 255:
                 fail("metasprite rotation must be 0-3 and opacity must be 0-255")
-            parts.append({"sprite": sprite_ids[sprite_name], "x": integer(part.get("x", 0), "part x"),
-                          "y": integer(part.get("y", 0), "part y"), "rotation": rotation,
-                          "mirror_x": bool(part.get("mirror_x", False)), "mirror_y": bool(part.get("mirror_y", False)),
+            parts.append({"sprite": sprite_ids[sprite_name], "x": signed_32(part.get("x", 0), "part x"),
+                          "y": signed_32(part.get("y", 0), "part y"), "rotation": rotation,
+                          "mirror_x": boolean(part.get("mirror_x", False), "part mirror_x"),
+                          "mirror_y": boolean(part.get("mirror_y", False), "part mirror_y"),
                           "opacity": opacity})
         if not parts:
             fail("metasprite needs at least one part")
@@ -343,59 +393,99 @@ def load_tiled_map(assets: AssetSet, path: Path, name: str, flags: dict[str, int
         tiled = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
         fail(f"cannot read Tiled map {path}: {error}")
-    if tiled.get("infinite", False) or tiled.get("orientation") != "orthogonal":
+    tiled = require_object(tiled, f"Tiled map {path}")
+    if tiled.get("type") != "map":
+        fail(f"Tiled map {path} type must be 'map'")
+    if boolean(tiled.get("infinite", False), f"Tiled map {path} infinite") or tiled.get("orientation") != "orthogonal":
         fail(f"Tiled map {path} must be finite and orthogonal")
-    width = integer(tiled.get("width"), "map width")
-    height = integer(tiled.get("height"), "map height")
-    tile_width = integer(tiled.get("tilewidth"), "tile width")
-    tile_height = integer(tiled.get("tileheight"), "tile height")
+    width = signed_32(tiled.get("width"), f"Tiled map {path} width")
+    height = signed_32(tiled.get("height"), f"Tiled map {path} height")
+    tile_width = signed_32(tiled.get("tilewidth"), f"Tiled map {path} tilewidth")
+    tile_height = signed_32(tiled.get("tileheight"), f"Tiled map {path} tileheight")
+    if min(width, height, tile_width, tile_height) <= 0:
+        fail(f"Tiled map {path} dimensions and tile dimensions must be positive")
+    if width * height > 0xFFFFFFFF:
+        fail(f"Tiled map {path} cell count must fit an unsigned 32-bit integer")
     gid_map: dict[int, int] = {}
-    for tileset_ref in tiled.get("tilesets", []):
+    tileset_values = require_list(tiled.get("tilesets", []), f"Tiled map {path} tilesets")
+    for tileset_index, tileset_ref_value in enumerate(tileset_values):
+        tileset_ref = require_object(tileset_ref_value, f"Tiled map {path} tilesets[{tileset_index}]")
         if "source" in tileset_ref:
-            external_path = path.parent / tileset_ref["source"]
+            external_path = path.parent / require_string(
+                tileset_ref, "source", f"Tiled map {path} tilesets[{tileset_index}] source")
             try:
                 tileset = json.loads(external_path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError) as error:
                 fail(f"cannot read Tiled tileset {external_path}: {error}")
+            tileset = require_object(tileset, f"Tiled tileset {external_path}")
+            if tileset.get("type") != "tileset":
+                fail(f"Tiled tileset {external_path} type must be 'tileset'")
             tileset_base = external_path.parent
+            tileset_label = f"Tiled tileset {external_path}"
         else:
             tileset = tileset_ref
             tileset_base = path.parent
-        first_gid = integer(tileset_ref.get("firstgid"), "tileset firstgid")
+            tileset_label = f"inline tileset {tileset_index} in {path}"
+            if "type" in tileset and tileset.get("type") != "tileset":
+                fail(f"{tileset_label} type must be 'tileset'")
+        first_gid = unsigned_32(tileset_ref.get("firstgid"), f"{tileset_label} firstgid")
+        if first_gid == 0 or first_gid > GID_MASK:
+            fail(f"{tileset_label} firstgid must be between 1 and {GID_MASK}")
         if "image" not in tileset:
-            fail("collection-of-images Tiled tilesets are not supported")
+            fail(f"{tileset_label}: collection-of-images tilesets are not supported")
         image_path = tileset_base / require_string(tileset, "image")
-        frames, _ = open_frames(image_path)
+        frames, _ = open_frames(image_path, {"PNG"})
         if len(frames) != 1:
-            fail("Tiled tileset image must not be animated")
+            fail(f"{tileset_label} image must not be animated")
         image_width, image_height, rgba, _ = frames[0]
         transparent_color = tileset.get("transparentcolor")
+        property_values = require_list(tileset.get("properties", []), f"{tileset_label} properties")
+        tileset_properties = [
+            require_object(prop, f"{tileset_label} properties[{index}]")
+            for index, prop in enumerate(property_values)
+        ]
         if transparent_color is not None:
             if not isinstance(transparent_color, str) or re.fullmatch(r"#[0-9A-Fa-f]{6}", transparent_color) is None:
-                fail("Tiled transparentcolor must be #RRGGBB")
+                fail(f"{tileset_label} transparentcolor must be #RRGGBB")
             color = tuple(int(transparent_color[index:index + 2], 16) for index in (1, 3, 5))
             tolerance = 0
-            for prop in tileset.get("properties", []):
+            for prop in tileset_properties:
                 if prop.get("name") == "transparent_tolerance":
                     if prop.get("type") != "int":
-                        fail("transparent_tolerance must be an integer property")
-                    tolerance = integer(prop.get("value"), "transparent_tolerance")
+                        fail(f"{tileset_label} transparent_tolerance must be an integer property")
+                    tolerance = integer(prop.get("value"), f"{tileset_label} transparent_tolerance")
                     if tolerance < 0 or tolerance > 255:
-                        fail("transparent_tolerance must be between 0 and 255")
+                        fail(f"{tileset_label} transparent_tolerance must be between 0 and 255")
             rgba = [(red, green, blue, 0 if max(abs(red - color[0]), abs(green - color[1]),
                                                 abs(blue - color[2])) <= tolerance else alpha)
                     for red, green, blue, alpha in rgba]
         pixels, key = convert_pixels(rgba)
         image_id = len(assets.images)
-        tileset_name = str(tileset.get("name", image_path.stem))
+        tileset_name = optional_string(tileset, "name", f"{tileset_label} name") or image_path.stem
         assets.images.append(Image(f"{name}_{tileset_name}", image_width, image_height, pixels, key))
-        tw = integer(tileset.get("tilewidth", tile_width), "tileset tilewidth")
-        th = integer(tileset.get("tileheight", tile_height), "tileset tileheight")
-        columns = integer(tileset.get("columns", image_width // tw), "tileset columns")
-        tile_count = integer(tileset.get("tilecount", columns * (image_height // th)), "tileset tilecount")
-        margin = integer(tileset.get("margin", 0), "tileset margin")
-        spacing = integer(tileset.get("spacing", 0), "tileset spacing")
-        metadata = {integer(item.get("id"), "tile id"): item for item in tileset.get("tiles", [])}
+        tw = signed_32(tileset.get("tilewidth", tile_width), f"{tileset_label} tilewidth")
+        th = signed_32(tileset.get("tileheight", tile_height), f"{tileset_label} tileheight")
+        if tw <= 0 or th <= 0:
+            fail(f"{tileset_label} tile dimensions must be positive")
+        columns = signed_32(tileset.get("columns", image_width // tw), f"{tileset_label} columns")
+        tile_count = signed_32(tileset.get("tilecount", columns * (image_height // th)),
+                               f"{tileset_label} tilecount")
+        margin = signed_32(tileset.get("margin", 0), f"{tileset_label} margin")
+        spacing = signed_32(tileset.get("spacing", 0), f"{tileset_label} spacing")
+        if columns <= 0 or tile_count < 0 or margin < 0 or spacing < 0:
+            fail(f"{tileset_label} columns must be positive; tilecount, margin, and spacing must be nonnegative")
+        if tile_count and first_gid + tile_count - 1 > GID_MASK:
+            fail(f"{tileset_label} GID range exceeds supported Tiled GIDs")
+        metadata: dict[int, dict[str, Any]] = {}
+        tile_values = require_list(tileset.get("tiles", []), f"{tileset_label} tiles")
+        for tile_index, item_value in enumerate(tile_values):
+            item = require_object(item_value, f"{tileset_label} tiles[{tile_index}]")
+            local_id = unsigned_32(item.get("id"), f"{tileset_label} tile id")
+            if local_id >= tile_count:
+                fail(f"{tileset_label} tile id {local_id} is outside tilecount {tile_count}")
+            if local_id in metadata:
+                fail(f"{tileset_label} defines tile id {local_id} more than once")
+            metadata[local_id] = item
         local_sprite_ids = []
         animation_names: dict[int, str] = {}
         animation_repeats: dict[int, int] = {}
@@ -403,13 +493,16 @@ def load_tiled_map(assets: AssetSet, path: Path, name: str, flags: dict[str, int
             x = margin + (local_id % columns) * (tw + spacing)
             y = margin + (local_id // columns) * (th + spacing)
             if x + tw > image_width or y + th > image_height:
-                fail(f"tileset tile {local_id} lies outside image")
-            properties = metadata.get(local_id, {}).get("properties", [])
+                fail(f"{tileset_label} tile {local_id} lies outside image")
+            properties = require_list(metadata.get(local_id, {}).get("properties", []),
+                                      f"{tileset_label} tile {local_id} properties")
             tile_flags = 0
             sprite_name = f"{name}_{tileset_name}_{local_id}"
             pivot_x = 0
             pivot_y = 0
-            for prop in properties:
+            for property_index, prop_value in enumerate(properties):
+                prop = require_object(prop_value,
+                                      f"{tileset_label} tile {local_id} properties[{property_index}]")
                 prop_name = require_string(prop, "name")
                 prop_type = prop.get("type")
                 if prop_name in ("name", "animation_name"):
@@ -429,21 +522,33 @@ def load_tiled_map(assets: AssetSet, path: Path, name: str, flags: dict[str, int
                     if prop_type != "int":
                         fail(f"{prop_name} must be an integer property")
                     if prop_name == "pivot_x":
-                        pivot_x = integer(prop.get("value"), prop_name)
+                        pivot_x = signed_32(prop.get("value"), prop_name)
                     else:
-                        pivot_y = integer(prop.get("value"), prop_name)
-                elif prop_type not in ("int", "bool"):
+                        pivot_y = signed_32(prop.get("value"), prop_name)
+                elif prop_type == "int":
+                    enabled = signed_32(prop.get("value"), f"tile property {prop_name}") != 0
+                    if prop_name in flags and enabled:
+                        tile_flags |= flags[prop_name]
+                elif prop_type == "bool":
+                    enabled = boolean(prop.get("value"), f"tile property {prop_name}")
+                    if prop_name in flags and enabled:
+                        tile_flags |= flags[prop_name]
+                else:
                     fail("only integer and boolean tile properties plus reserved TabOS metadata are supported")
-                elif prop_name in flags and bool(prop.get("value")):
-                    tile_flags |= flags[prop_name]
             sprite_id = len(assets.sprites)
             assets.sprites.append(Sprite(sprite_name, image_id, x, y, tw, th, pivot_x, pivot_y, tile_flags))
-            gid_map[first_gid + local_id] = sprite_id
+            gid = first_gid + local_id
+            if gid in gid_map:
+                fail(f"{tileset_label} GID {gid} overlaps another tileset")
+            gid_map[gid] = sprite_id
             local_sprite_ids.append(sprite_id)
         for local_id, item in metadata.items():
             if "animation" in item:
                 frames_out = []
-                for frame in item["animation"]:
+                animation_values = require_list(item["animation"], f"{tileset_label} tile {local_id} animation")
+                for frame_index, frame_value in enumerate(animation_values):
+                    frame = require_object(
+                        frame_value, f"{tileset_label} tile {local_id} animation[{frame_index}]")
                     frame_id = integer(frame.get("tileid"), "animation tileid")
                     if frame_id < 0 or frame_id >= len(local_sprite_ids):
                         fail("Tiled animation references invalid tile")
@@ -459,15 +564,23 @@ def load_tiled_map(assets: AssetSet, path: Path, name: str, flags: dict[str, int
     layers = []
     objects = []
     properties = []
-    for layer in tiled.get("layers", []):
+    layer_values = require_list(tiled.get("layers", []), f"Tiled map {path} layers")
+    for layer_index, layer_value in enumerate(layer_values):
+        layer = require_object(layer_value, f"Tiled map {path} layers[{layer_index}]")
         layer_name = require_string(layer, "name")
         if layer.get("type") == "tilelayer":
-            data = layer.get("data")
-            if not isinstance(data, list) or len(data) != width * height:
+            if (integer(layer.get("width", width), f"tile layer {layer_name!r} width") != width or
+                    integer(layer.get("height", height), f"tile layer {layer_name!r} height") != height):
+                fail(f"tile layer {layer_name!r} dimensions must match Tiled map {path}")
+            if (integer(layer.get("offsetx", 0), f"tile layer {layer_name!r} offsetx") != 0 or
+                    integer(layer.get("offsety", 0), f"tile layer {layer_name!r} offsety") != 0):
+                fail(f"tile layer {layer_name!r} offsets are not supported")
+            data = require_list(layer.get("data"), f"tile layer {layer_name!r} data")
+            if len(data) != width * height:
                 fail(f"tile layer {layer_name!r} must contain width * height cells")
             cells = []
             for raw_gid in data:
-                gid = integer(raw_gid, "tile gid")
+                gid = unsigned_32(raw_gid, f"tile layer {layer_name!r} GID")
                 if gid & GID_RESERVED:
                     fail(f"tile layer {layer_name!r} contains malformed reserved GID bit")
                 transforms = gid & (GID_HORIZONTAL | GID_VERTICAL | GID_DIAGONAL)
@@ -481,35 +594,49 @@ def load_tiled_map(assets: AssetSet, path: Path, name: str, flags: dict[str, int
             layers.append({"name": layer_name, "type": 0, "cells": cells, "first": 0, "count": len(cells)})
         elif layer.get("type") == "objectgroup":
             first = len(objects)
-            for obj in layer.get("objects", []):
-                unsupported = any(bool(obj.get(key)) for key in ("ellipse", "text", "polygon", "polyline", "template"))
+            object_values = require_list(layer.get("objects", []), f"object layer {layer_name!r} objects")
+            for object_index, object_value in enumerate(object_values):
+                obj = require_object(object_value, f"object layer {layer_name!r} objects[{object_index}]")
+                unsupported = any(key in obj for key in ("text", "polygon", "polyline", "template"))
+                if "ellipse" in obj:
+                    unsupported = boolean(obj["ellipse"], "object ellipse") or unsupported
                 if unsupported or obj.get("rotation", 0) != 0:
                     fail(f"object {obj.get('name', obj.get('id'))!r} uses unsupported geometry or rotation")
-                geometry = [obj.get(key, 0) for key in ("x", "y", "width", "height")]
-                if any(not isinstance(value, int) or isinstance(value, bool) for value in geometry):
-                    fail("object geometry must use integral coordinates")
+                geometry = [signed_32(obj.get("x", 0), "object x"), signed_32(obj.get("y", 0), "object y"),
+                            unsigned_32(obj.get("width", 0), "object width"),
+                            unsigned_32(obj.get("height", 0), "object height")]
                 first_property = len(properties)
-                for prop in obj.get("properties", []):
-                    if prop.get("type") != "int" or not isinstance(prop.get("value"), int):
+                property_values = require_list(obj.get("properties", []), "object properties")
+                for property_index, prop_value in enumerate(property_values):
+                    prop = require_object(prop_value, f"object properties[{property_index}]")
+                    if prop.get("type") != "int":
                         fail("object properties must be integers")
-                    properties.append((require_string(prop, "name"), prop["value"]))
+                    properties.append((require_string(prop, "name"), signed_32(prop.get("value"), "object property")))
                 tile = 0
-                shape = 0 if obj.get("point", False) else 1
+                point = boolean(obj.get("point", False), "object point")
+                shape = 0 if point else 1
                 if "gid" in obj:
-                    raw_gid = integer(obj["gid"], "object gid")
+                    raw_gid = unsigned_32(obj["gid"], "object gid")
                     plain_gid = raw_gid & GID_MASK
                     if plain_gid not in gid_map or raw_gid & GID_RESERVED:
                         fail("tile object contains malformed or unknown GID")
                     tile = (raw_gid & (GID_HORIZONTAL | GID_VERTICAL | GID_DIAGONAL)) | (gid_map[plain_gid] + 1)
                     shape = 2
-                objects.append({"id": integer(obj.get("id"), "object id"), "name": str(obj.get("name", "")),
-                                "class": str(obj.get("class", obj.get("type", ""))), "shape": shape,
+                object_id = unsigned_32(obj.get("id"), "object id")
+                if object_id == 0:
+                    fail("object id must be nonzero")
+                object_name = optional_string(obj, "name", "object name")
+                object_class = optional_string(obj, "class", "object class")
+                if not object_class:
+                    object_class = optional_string(obj, "type", "object type")
+                objects.append({"id": object_id, "name": object_name,
+                                "class": object_class, "shape": shape,
                                 "x": geometry[0], "y": geometry[1], "width": geometry[2], "height": geometry[3],
                                 "tile": tile, "first_property": first_property,
                                 "property_count": len(properties) - first_property})
             layers.append({"name": layer_name, "type": 1, "first": first, "count": len(objects) - first})
         else:
-            fail(f"unsupported Tiled layer type {layer.get('type')!r}")
+            fail(f"Tiled map {path} uses unsupported layer type {layer.get('type')!r}")
     return {"name": name, "width": width, "height": height, "tile_width": tile_width, "tile_height": tile_height,
             "layers": layers, "objects": objects, "properties": properties}
 

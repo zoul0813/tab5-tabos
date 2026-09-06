@@ -126,7 +126,7 @@ Extend `tabos_graphics_blit_options_t` with an optional clip rectangle:
 
 Add `./tools/tabos assets build <manifest>`:
 
-- [ ] Review: Accept a versioned JSON manifest, PNG or GIF sprite images, and finite orthogonal
+- [x] Review: Accept a versioned JSON manifest, PNG or GIF sprite images, and finite orthogonal
   Tiled JSON maps.
 - [ ] Review: Treat a single-frame GIF as one image. Fully composite animated GIF frames according
   to GIF transparency and disposal rules, import frame delays, and generate one named
@@ -147,7 +147,7 @@ Add `./tools/tabos assets build <manifest>`:
   metasprites, layers, objects, and flags. Reject identifier collisions. Do not generate
   map IDs because maps load individually by path and no public API consumes them. Allow a
   constants-only generated public header under the app include directory for normal source use.
-- [ ] Review: Reject infinite or isometric maps, ellipse/text/polygon/polyline/template objects,
+- [x] Review: Reject infinite or isometric maps, ellipse/text/polygon/polyline/template objects,
   arbitrary object rotation, non-integral object geometry, unsupported properties, and
   malformed GIDs with clear diagnostics.
 - [ ] Review: Convert opaque PNG and composited GIF pixels exactly like `TABOS_RGB565`. Require
@@ -398,6 +398,23 @@ Validated working-tree changes based on `7e43d93`:
   pixel pointers, and both `present()` and graphics close drain the queue before return.
   Seven focused macOS Debug tests pass with sanitizers, and all standard RV32 applications
   cross-build with the hardened SDK.
+
+## Converter Input Contract Evidence — 2026-09-06
+
+- The converter requires an integer version-1 object manifest and validates every manifest,
+  image, animation, metasprite, map, tileset, layer, object, and property collection before
+  iteration. Malformed structures exit through normal converter diagnostics rather than raw
+  Python exceptions.
+- Standalone inputs are restricted to decoded PNG/GIF files and Tiled atlas inputs to PNG.
+  The maintained fixture covers both image types, inline and external tilesets, and finite
+  orthogonal TMJ input.
+- Tiled dimensions, IDs, GIDs, coordinates, properties, animation frames, and tileset ranges
+  are type- and range-checked against their binary representation. Tests reject infinite and
+  isometric maps, layer offsets and unsupported layer types, reserved/unknown/out-of-range
+  GIDs, nonintegral geometry, invalid property values, and every unsupported object form.
+- Focused converter, tile, binary-loader, and C/binary equivalence tests pass on macOS Debug
+  and Release. The full macOS Debug suite passed 43/44; only the unrelated loopback network
+  test failed because sandbox networking could not reserve local TCP/UDP ports.
 
 ## Assumptions
 

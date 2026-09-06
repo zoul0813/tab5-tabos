@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import copy
+import io
 import json
 import os
 import struct
 import sys
 import tempfile
+from contextlib import redirect_stderr
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -15,11 +18,13 @@ sys.path.insert(0, str(ROOT / "tools"))
 from tabos_tools.assets import load_manifest, rgb565, write_c, write_header, write_tsp
 
 
-def rejected(path: Path) -> bool:
-    try:
-        load_manifest(path)
-    except SystemExit as error:
-        return error.code == 2
+def rejected(path: Path, message: str | None = None) -> bool:
+    stderr = io.StringIO()
+    with redirect_stderr(stderr):
+        try:
+            load_manifest(path)
+        except SystemExit as error:
+            return error.code == 2 and (message is None or message in stderr.getvalue())
     return False
 
 
@@ -93,6 +98,31 @@ def main() -> int:
         if demo_header.read_bytes() != (ROOT / "apps/tile-demo/include/tdemo.h").read_bytes():
             return 1
 
+        bitmap = Image.new("RGB", (1, 1), (0, 0, 0))
+        bitmap.save(root / "unsupported.bmp")
+        bitmap_manifest = {
+            "version": 1, "name": "bitmap",
+            "images": [{"name": "bitmap", "source": "unsupported.bmp"}],
+        }
+        (root / "bitmap.json").write_text(json.dumps(bitmap_manifest), encoding="utf-8")
+        if not rejected(root / "bitmap.json", "uses BMP format; expected GIF/PNG"):
+            return 1
+
+        malformed_manifests = [
+            ([], f"asset manifest {root / 'malformed.json'} must be an object"),
+            ({"version": True, "name": "bad"}, "version must be an integer"),
+            ({"version": 1, "name": "bad", "images": {}}, "images must be an array"),
+            ({"version": 1, "name": "bad", "maps": [1]}, "maps[0] must be an object"),
+            ({"version": 1, "name": "bad", "animations": [{"frames": {}}]},
+             "animation 0 frames must be an array"),
+            ({"version": 1, "name": "bad", "metasprites": [{"parts": {}}]},
+             "metasprite 0 parts must be an array"),
+        ]
+        for malformed, message in malformed_manifests:
+            (root / "malformed.json").write_text(json.dumps(malformed), encoding="utf-8")
+            if not rejected(root / "malformed.json", message):
+                return 1
+
         partial = Image.new("RGBA", (1, 1), (0, 0, 0, 128))
         partial.save(root / "partial.png")
         partial_manifest = {"version": 1, "name": "partial", "images": [{"name": "pixel", "source": "partial.png"}]}
@@ -160,6 +190,7 @@ def main() -> int:
                           "tiles": [{"id": 0, "animation": [{"tileid": 1, "duration": 50}]}]}],
             "layers": [{"type": "tilelayer", "name": "ground", "width": 1, "height": 1, "data": [1]}],
         }
+        base_tiled = copy.deepcopy(tiled)
         (root / "animated.tmj").write_text(json.dumps(tiled), encoding="utf-8")
         tiled_manifest = {"version": 1, "name": "tiled", "maps": [{"name": "world", "source": "animated.tmj"}]}
         (root / "tiled.json").write_text(json.dumps(tiled_manifest), encoding="utf-8")
@@ -194,6 +225,84 @@ def main() -> int:
         del tile["animation"]
         (root / "animated.tmj").write_text(json.dumps(tiled), encoding="utf-8")
         if not rejected(root / "tiled.json"):
+            return 1
+
+        def rejects_tiled(candidate: object, message: str) -> bool:
+            (root / "animated.tmj").write_text(json.dumps(candidate), encoding="utf-8")
+            return rejected(root / "tiled.json", message)
+
+        tiled_cases: list[tuple[object, str]] = []
+        candidate = copy.deepcopy(base_tiled)
+        candidate["infinite"] = True
+        tiled_cases.append((candidate, f"Tiled map {root / 'animated.tmj'} must be finite and orthogonal"))
+        candidate = copy.deepcopy(base_tiled)
+        candidate["orientation"] = "isometric"
+        tiled_cases.append((candidate, "must be finite and orthogonal"))
+        candidate = copy.deepcopy(base_tiled)
+        candidate["width"] = 0
+        tiled_cases.append((candidate, "dimensions and tile dimensions must be positive"))
+        candidate = copy.deepcopy(base_tiled)
+        candidate["layers"] = {}
+        tiled_cases.append((candidate, "layers must be an array"))
+        candidate = copy.deepcopy(base_tiled)
+        candidate["tilesets"] = {}
+        tiled_cases.append((candidate, "tilesets must be an array"))
+        candidate = copy.deepcopy(base_tiled)
+        candidate["tilesets"][0]["image"] = "unsupported.bmp"
+        tiled_cases.append((candidate, "uses BMP format; expected PNG"))
+        candidate = copy.deepcopy(base_tiled)
+        candidate["layers"][0]["data"] = [3]
+        tiled_cases.append((candidate, "references unknown GID 3"))
+        candidate = copy.deepcopy(base_tiled)
+        candidate["layers"][0]["data"] = [0x10000001]
+        tiled_cases.append((candidate, "contains malformed reserved GID bit"))
+        candidate = copy.deepcopy(base_tiled)
+        candidate["layers"][0]["data"] = [0x100000000]
+        tiled_cases.append((candidate, "must fit an unsigned 32-bit integer"))
+        candidate = copy.deepcopy(base_tiled)
+        candidate["layers"][0]["offsetx"] = 1
+        tiled_cases.append((candidate, "offsets are not supported"))
+        candidate = copy.deepcopy(base_tiled)
+        candidate["layers"] = [{"type": "imagelayer", "name": "background"}]
+        tiled_cases.append((candidate, "uses unsupported layer type 'imagelayer'"))
+        for candidate, message in tiled_cases:
+            if not rejects_tiled(candidate, message):
+                return 1
+
+        object_base = copy.deepcopy(base_tiled)
+        object_base["layers"] = [{
+            "type": "objectgroup", "name": "objects",
+            "objects": [{"id": 1, "name": "spawn", "point": True, "x": 0, "y": 0}],
+        }]
+        for unsupported_key, unsupported_value in (
+                ("ellipse", True), ("text", {}), ("polygon", []), ("polyline", []), ("template", "shape.tx")):
+            candidate = copy.deepcopy(object_base)
+            candidate["layers"][0]["objects"][0][unsupported_key] = unsupported_value
+            if not rejects_tiled(candidate, "uses unsupported geometry or rotation"):
+                return 1
+        candidate = copy.deepcopy(object_base)
+        candidate["layers"][0]["objects"][0]["rotation"] = 90
+        if not rejects_tiled(candidate, "uses unsupported geometry or rotation"):
+            return 1
+        candidate = copy.deepcopy(object_base)
+        candidate["layers"][0]["objects"][0]["x"] = 0.5
+        if not rejects_tiled(candidate, "object x must be an integer"):
+            return 1
+        candidate = copy.deepcopy(object_base)
+        candidate["layers"][0]["objects"][0]["name"] = 4
+        if not rejects_tiled(candidate, "object name must be a string"):
+            return 1
+        candidate = copy.deepcopy(object_base)
+        candidate["layers"][0]["objects"][0]["properties"] = [
+            {"name": "damage", "type": "int", "value": True},
+        ]
+        if not rejects_tiled(candidate, "object property must be an integer"):
+            return 1
+        candidate = copy.deepcopy(base_tiled)
+        candidate["tilesets"][0]["tiles"][0]["properties"] = [
+            {"name": "damage", "type": "string", "value": "high"},
+        ]
+        if not rejects_tiled(candidate, "only integer and boolean tile properties"):
             return 1
     return 0
 

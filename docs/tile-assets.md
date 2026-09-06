@@ -403,7 +403,7 @@ Converter requires Pillow. Install pinned host dependency with
 Application builds preserve this host Python when activating ESP-IDF, so IDF's
 isolated Python environment does not need a second Pillow installation.
 
-Version-1 JSON manifests contain `name`, optional numeric `flags`, and arrays named
+Version-1 JSON manifests contain `name`, an optional `flags` object, and arrays named
 `images`, `animations`, `metasprites`, and `maps`. Each named flag must be one unique,
 nonzero bit in a 32-bit value. Combine generated flag macros in game code rather than
 assigning multiple bits to one manifest name. Paths are relative to the manifest. Example:
@@ -419,6 +419,12 @@ assigning multiple bits to one manifest name. Paths are relative to the manifest
   "maps": [{"name": "level", "source": "level.tmj"}]
 }
 ```
+
+`version` must be the integer `1`; a boolean or string is not accepted. The manifest root,
+each entry, and each nested frame, part, or region must have the documented JSON object or
+array form. Standalone image entries accept PNG or GIF files. Tiled atlas images accept PNG
+files. Other formats fail during conversion instead of depending on whichever decoders a
+local Pillow installation happens to provide.
 
 Standalone PNGs may become one full-image sprite or several named regions:
 
@@ -478,7 +484,11 @@ Maps may be finite orthogonal Tiled JSON with multiple atlas tilesets, tile/obje
 layers, transforms, animations, integer/boolean tile properties, and integer object
 properties. Only integral point, rectangle, and tile objects with zero rotation are
 accepted. Unsupported map modes, object geometry, partial alpha, unknown GIDs, and the
-reserved GID bit fail with diagnostics.
+reserved GID bit fail with diagnostics. Map and tile dimensions must be positive and fit
+the runtime's 32-bit fields; tile-layer dimensions must match the map and offsets must be
+zero. GIDs, object IDs, object sizes, and property values are range-checked before binary
+generation. Diagnostics identify the input path, field, layer, tileset, object, or GID
+where applicable.
 
 When a manifest imports a Tiled map, its TMJ/TSJ files are authoritative for atlas
 regions and tile animations; do not list the same tileset image under manifest `images`.

@@ -22,6 +22,10 @@
 
 ### Sprite and Tile Graphics
 
+- [x] Review converter input boundaries: require a typed version-1 manifest, restrict standalone
+  images to PNG/GIF and Tiled atlases to PNG, validate finite orthogonal TMJ/TSJ structures and
+  32-bit ranges, and reject unsupported layers, objects, properties, and GIDs with diagnostics.
+
 - [x] Add direct object lookup by generated layer and stable Tiled object IDs while retaining descriptor-array iteration for processing every marker.
 
 - [x] Add a tilemap draw-options default for full-canvas drawing at animation time zero while preserving explicit empty-viewport behavior.

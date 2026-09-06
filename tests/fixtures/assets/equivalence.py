@@ -26,7 +26,7 @@ def main():
     atlas.save(root / "atlas.png")
     Image.new("RGBA", (2, 2), (0, 255, 255, 255)).save(root / "accent.png")
     write_json(root, "atlas.tsj", {
-        "name": "atlas", "image": "atlas.png", "tilewidth": 2, "tileheight": 2,
+        "type": "tileset", "name": "atlas", "image": "atlas.png", "tilewidth": 2, "tileheight": 2,
         "columns": 2, "tilecount": 2,
         "tiles": [
             {"id": 0, "properties": [prop("name", "quad", "string"), prop("pivot_x", 1),
@@ -37,7 +37,7 @@ def main():
         ],
     })
     write_json(root, "accent.tsj", {
-        "name": "accent", "image": "accent.png", "tilewidth": 2, "tileheight": 2,
+        "type": "tileset", "name": "accent", "image": "accent.png", "tilewidth": 2, "tileheight": 2,
         "columns": 1, "tilecount": 1,
         "tiles": [{"id": 0, "properties": [prop("name", "accent", "string"), prop("water", 1),
                                               prop("animation_name", "once", "string"), prop("repeat_count", 1)],
@@ -46,7 +46,7 @@ def main():
     transforms = [0, 0x80000000, 0x40000000, 0xc0000000,
                   0x20000000, 0xa0000000, 0x60000000, 0xe0000000]
     write_json(root, "world.tmj", {
-        "orientation": "orthogonal", "infinite": False, "width": 8, "height": 2,
+        "type": "map", "orientation": "orthogonal", "infinite": False, "width": 8, "height": 2,
         "tilewidth": 2, "tileheight": 2,
         "tilesets": [{"firstgid": 1, "source": "atlas.tsj"}, {"firstgid": 19, "source": "accent.tsj"}],
         "layers": [
