@@ -22,6 +22,10 @@
 
 ### Sprite and Tile Graphics
 
+- [x] Verify GIF import semantics with independent composited pixels for transparency,
+  restore-background, and restore-previous disposal; cover single-frame input, delay clamping and
+  overrides, missing/indefinite/finite loop metadata, invalid options, and named clip generation.
+
 - [x] Review converter input boundaries: require a typed version-1 manifest, restrict standalone
   images to PNG/GIF and Tiled atlases to PNG, validate finite orthogonal TMJ/TSJ structures and
   32-bit ranges, reject unsupported layers, objects, properties, and GIDs with diagnostics, and

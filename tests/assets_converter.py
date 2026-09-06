@@ -63,8 +63,32 @@ def main() -> int:
         manifest = {"version": 1, "name": "fixture", "images": [{"name": "walk", "source": "animated.gif"}]}
         (root / "assets.json").write_text(json.dumps(manifest), encoding="utf-8")
         assets = load_manifest(root / "assets.json")
-        if len(assets.images) != 2 or len(assets.animations) != 1 or assets.animations[0].frames[0][1] != 10 or assets.animations[0].repeat != 3:
+        if (len(assets.images) != 2 or len(assets.animations) != 1 or assets.animations[0].name != "walk" or
+                assets.animations[0].frames != [(0, 10), (1, 20)] or assets.animations[0].repeat != 3):
             return 1
+        manifest["images"][0]["durations_ms"] = [3, 7]
+        manifest["images"][0]["repeat_count"] = 1
+        (root / "assets.json").write_text(json.dumps(manifest), encoding="utf-8")
+        overridden = load_manifest(root / "assets.json")
+        if overridden.animations[0].frames != [(0, 3), (1, 7)] or overridden.animations[0].repeat != 1:
+            return 1
+        invalid_gif_options = [
+            {"durations_ms": [10]},
+            {"durations_ms": "10,20"},
+            {"durations_ms": [0, 20]},
+            {"durations_ms": [True, 20]},
+            {"repeat_count": -1},
+            {"repeat_count": 0x100000000},
+            {"repeat_count": True},
+        ]
+        for options in invalid_gif_options:
+            invalid_manifest = {
+                "version": 1, "name": "invalid_gif",
+                "images": [{"name": "walk", "source": "animated.gif", **options}],
+            }
+            (root / "invalid-gif.json").write_text(json.dumps(invalid_manifest), encoding="utf-8")
+            if not rejected(root / "invalid-gif.json"):
+                return 1
         write_tsp(assets, root / "one.tsp")
         write_tsp(assets, root / "two.tsp")
         if (root / "one.tsp").read_bytes() != (root / "two.tsp").read_bytes():
@@ -75,6 +99,56 @@ def main() -> int:
 
         opaque = Image.new("RGBA", (1, 1), (255, 128, 0, 255))
         opaque.save(root / "opaque.png")
+        opaque.save(root / "single.gif")
+        single_manifest = {
+            "version": 1, "name": "single", "images": [{"name": "single", "source": "single.gif"}],
+        }
+        (root / "single.json").write_text(json.dumps(single_manifest), encoding="utf-8")
+        single_assets = load_manifest(root / "single.json")
+        if (len(single_assets.images) != 1 or len(single_assets.sprites) != 1 or single_assets.animations or
+                single_assets.images[0].pixels != [rgb565(255, 128, 0)]):
+            return 1
+
+        disposal_frames = []
+        for x, color in ((0, (255, 0, 0, 255)), (1, (0, 255, 0, 255)), (2, (0, 0, 255, 255))):
+            frame = Image.new("RGBA", (3, 1), (0, 0, 0, 0))
+            frame.putpixel((x, 0), color)
+            disposal_frames.append(frame)
+        disposal_expectations = {
+            2: [[rgb565(255, 0, 0), 0, 0], [rgb565(255, 0, 0), rgb565(0, 255, 0), 0],
+                [0, 0, rgb565(0, 0, 255)]],
+            3: [[rgb565(255, 0, 0), 0, 0], [rgb565(255, 0, 0), rgb565(0, 255, 0), 0],
+                [rgb565(255, 0, 0), 0, rgb565(0, 0, 255)]],
+        }
+        for disposal, expected_pixels in disposal_expectations.items():
+            gif_path = root / f"disposal-{disposal}.gif"
+            disposal_frames[0].save(gif_path, save_all=True, append_images=disposal_frames[1:],
+                                    duration=[20, 30, 40], loop=0, disposal=[1, disposal, 1],
+                                    transparency=0, optimize=False)
+            disposal_manifest = {
+                "version": 1, "name": f"disposal_{disposal}",
+                "images": [{"name": "effect", "source": gif_path.name}],
+            }
+            (root / "disposal.json").write_text(json.dumps(disposal_manifest), encoding="utf-8")
+            disposal_assets = load_manifest(root / "disposal.json")
+            if len(disposal_assets.animations) != 1:
+                return 1
+            disposal_animation = disposal_assets.animations[0]
+            if (disposal_animation.name != "effect" or disposal_animation.frames != [(0, 20), (1, 30), (2, 40)] or
+                    disposal_animation.repeat != 0 or [image.key for image in disposal_assets.images] != [0, 0, 0] or
+                    [image.pixels for image in disposal_assets.images] != expected_pixels):
+                return 1
+
+        no_loop_path = root / "no-loop.gif"
+        disposal_frames[0].save(no_loop_path, save_all=True, append_images=disposal_frames[1:],
+                                duration=[20, 30, 40], disposal=[1, 1, 1], transparency=0, optimize=False)
+        no_loop_manifest = {
+            "version": 1, "name": "no_loop", "images": [{"name": "effect", "source": no_loop_path.name}],
+        }
+        (root / "no-loop.json").write_text(json.dumps(no_loop_manifest), encoding="utf-8")
+        if load_manifest(root / "no-loop.json").animations[0].repeat != 1:
+            return 1
+
         static_manifest = {"version": 1, "name": "static", "images": [{"name": "pixel", "source": "opaque.png"}]}
         (root / "static.json").write_text(json.dumps(static_manifest), encoding="utf-8")
         static_assets = load_manifest(root / "static.json")

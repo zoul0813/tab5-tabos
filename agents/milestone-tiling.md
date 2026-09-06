@@ -128,7 +128,7 @@ Add `./tools/tabos assets build <manifest>`:
 
 - [x] Review: Accept a versioned JSON manifest, PNG or GIF sprite images, and finite orthogonal
   Tiled JSON maps.
-- [ ] Review: Treat a single-frame GIF as one image. Fully composite animated GIF frames according
+- [x] Review: Treat a single-frame GIF as one image. Fully composite animated GIF frames according
   to GIF transparency and disposal rules, import frame delays, and generate one named
   animation clip. Preserve the GIF repeat count, using zero for indefinite repetition
   and one when no loop extension exists. Clamp an animated frame delay below 10 ms to
@@ -420,6 +420,19 @@ Validated working-tree changes based on `7e43d93`:
 - Focused converter, tile, binary-loader, and C/binary equivalence tests pass on macOS Debug
   and Release. The full macOS Debug suite passed 43/44; only the unrelated loopback network
   test failed because sandbox networking could not reserve local TCP/UDP ports.
+
+## GIF Import Evidence — 2026-09-06
+
+- A single-frame GIF produces one image and sprite without an animation. Animated GIFs produce
+  one full-canvas sprite per composited frame and one clip using the image entry's name.
+- Independent RGB565 expectations verify transparency plus restore-background and restore-previous
+  disposal across three partially updated frames. Imported frame delays are preserved, while a
+  sub-10-ms delay clamps to 10 ms.
+- Explicit durations remain exact even below 10 ms. Missing loop metadata imports as one cycle,
+  zero imports as indefinite repetition, and finite GIF loop counts include the initial cycle.
+  Manifest duration and repeat overrides are type-, count-, positivity-, and range-checked.
+- Focused converter, tile, binary-loader, and C/binary equivalence tests pass on macOS Debug and
+  Release after the GIF review.
 
 ## Assumptions
 
