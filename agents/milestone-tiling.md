@@ -113,8 +113,8 @@ Extend `tabos_graphics_blit_options_t` with an optional clip rectangle:
 - [x] Review: Zero-initialized options preserve current behavior.
 - [x] Review: Intersect the clip rectangle with framebuffer bounds.
 - [x] Review: An empty clip succeeds without drawing.
-- [ ] Review: Update the private ABI layout, RV32 marshaling, scalar renderer, SDL host, and Tab5 paths.
-- [ ] Review: PPA may render unclipped interior tiles; unsupported clipped boundary operations use
+- [x] Review: Update the private ABI layout, RV32 marshaling, scalar renderer, SDL host, and Tab5 paths.
+- [x] Review: PPA may render unclipped interior tiles; unsupported clipped boundary operations use
   the pixel-identical fallback.
 
 - [ ] Review: All APIs follow the existing `0`/`-1` plus `errno` convention. Draw calls retain the
@@ -383,6 +383,13 @@ Validated working-tree changes based on `7e43d93`:
 - Public graphics documentation defines clips as half-open screen-space rectangles.
   Focused SDK tests cover omitted/disabled clips, negative and oversized clips intersected
   with the canvas, and enabled empty or fully outside clips that succeed without drawing.
+- Reviewed clip transport through the 76-byte RV32 structure, queued command copy, scalar
+  renderer, SDL acceleration rejection and fallback, and Tab5 PPA rejection with native or
+  logical scalar fallback. Compile-time ABI offset guards cover every marshaled field.
+  Shared SDK validation now rejects malformed blits immediately in both native and logical
+  modes instead of allowing native errors to surface later from `present()`.
+  Eight focused macOS Debug tests, the Tab5 Debug firmware build, and all standard RV32
+  application builds pass; the RV32 build exercises the new wire-layout assertions.
 
 ## Assumptions
 

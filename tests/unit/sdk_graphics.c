@@ -161,6 +161,37 @@ static void check_blit_clips(void)
     CHECK(tabos_graphics_close(&graphics) == 0);
 }
 
+static void check_blit_validation(bool logical)
+{
+    tabos_graphics_t graphics = logical ? (tabos_graphics_t) {.width = 4U, .height = 4U} : (tabos_graphics_t) {0};
+    CHECK(tabos_graphics_open(&graphics) == 0);
+    capture_native                     = !logical;
+    const tabos_color_t pixel          = 1U;
+    tabos_graphics_blit_options_t blit = {
+        .pixels        = &pixel,
+        .bitmap_width  = 1U,
+        .bitmap_height = 1U,
+        .source        = {.width = 1U, .height = 1U},
+        .destination   = {.width = 1U, .height = 1U},
+        .opacity       = 255U,
+    };
+    const unsigned int before = submitted_count;
+
+    blit.source.width = 0U;
+    CHECK(tabos_graphics_blit_ex(&graphics, &blit) == -1 && errno == EINVAL);
+    blit.source.width      = 1U;
+    blit.destination.width = 0U;
+    CHECK(tabos_graphics_blit_ex(&graphics, &blit) == -1 && errno == EINVAL);
+    blit.destination.width = 1U;
+    blit.source.x          = 1;
+    CHECK(tabos_graphics_blit_ex(&graphics, &blit) == -1 && errno == EINVAL);
+    blit.source.x = 0;
+    blit.rotation = (tabos_graphics_rotation_t) (TABOS_GRAPHICS_ROTATE_270 + 1U);
+    CHECK(tabos_graphics_blit_ex(&graphics, &blit) == -1 && errno == EINVAL);
+    CHECK(submitted_count == before);
+    CHECK(tabos_graphics_close(&graphics) == 0);
+}
+
 static void check_camera(void)
 {
     tabos_graphics_t graphics = {.width = 16U, .height = 12U};
@@ -326,5 +357,7 @@ int main(void)
     }
     check_camera();
     check_blit_clips();
+    check_blit_validation(false);
+    check_blit_validation(true);
     return 0;
 }

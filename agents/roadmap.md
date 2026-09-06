@@ -50,6 +50,8 @@
 - [x] Review the public clip contract: disabled clips preserve existing draws; clips are
   half-open screen-space rectangles intersected with the canvas; empty and outside clips
   succeed without drawing.
+- [x] Review clip implementation parity through the private ABI, RV32 marshaling, scalar,
+  SDL, and Tab5 paths; guard all wire offsets and validate malformed blits consistently.
 - [x] Add portable sprite, animation, metasprite, tilemap, object, property, and flag APIs.
 - [x] Add validated versioned `.tsp` and `.tmap` loaders.
 - [x] Add deterministic PNG/GIF/Tiled converter and generated C output.

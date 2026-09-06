@@ -9,7 +9,25 @@ extern const tabos_elf_api_t* tabos_runtime_api;
 
 #if defined(TABOS_APPLICATION)
 _Static_assert(sizeof(void*) == 4U, "TabOS applications require 32-bit pointers");
+_Static_assert(sizeof(tabos_graphics_rect_t) == 16U, "graphics rectangle ABI layout changed");
 _Static_assert(sizeof(tabos_graphics_blit_options_t) == 76U, "graphics ABI layout changed");
+_Static_assert(offsetof(tabos_graphics_blit_options_t, pixels) == 0U, "graphics pixel ABI offset changed");
+_Static_assert(offsetof(tabos_graphics_blit_options_t, bitmap_width) == 4U, "graphics width ABI offset changed");
+_Static_assert(offsetof(tabos_graphics_blit_options_t, bitmap_height) == 8U, "graphics height ABI offset changed");
+_Static_assert(offsetof(tabos_graphics_blit_options_t, source) == 12U, "graphics source ABI offset changed");
+_Static_assert(offsetof(tabos_graphics_blit_options_t, destination) == 28U, "graphics destination ABI offset changed");
+_Static_assert(offsetof(tabos_graphics_blit_options_t, rotation) == 44U, "graphics rotation ABI offset changed");
+_Static_assert(offsetof(tabos_graphics_blit_options_t, mirror_x) == 48U, "graphics mirror-x ABI offset changed");
+_Static_assert(offsetof(tabos_graphics_blit_options_t, mirror_y) == 49U, "graphics mirror-y ABI offset changed");
+_Static_assert(offsetof(tabos_graphics_blit_options_t, opacity) == 50U, "graphics opacity ABI offset changed");
+_Static_assert(offsetof(tabos_graphics_blit_options_t, color_key_enabled) == 51U,
+               "graphics color-key-enable ABI offset changed");
+_Static_assert(offsetof(tabos_graphics_blit_options_t, color_key_low) == 52U,
+               "graphics color-key-low ABI offset changed");
+_Static_assert(offsetof(tabos_graphics_blit_options_t, color_key_high) == 54U,
+               "graphics color-key-high ABI offset changed");
+_Static_assert(offsetof(tabos_graphics_blit_options_t, clip) == 56U, "graphics clip ABI offset changed");
+_Static_assert(offsetof(tabos_graphics_blit_options_t, clip_enabled) == 72U, "graphics clip-enable ABI offset changed");
 #endif
 
 static int result(int value)
@@ -88,6 +106,18 @@ static bool inside_clip(const tabos_graphics_blit_options_t* options, int64_t x,
     const int64_t right  = (int64_t) options->clip.x + options->clip.width;
     const int64_t bottom = (int64_t) options->clip.y + options->clip.height;
     return x >= options->clip.x && x < right && y >= options->clip.y && y < bottom;
+}
+
+static bool valid_blit_options(const tabos_graphics_blit_options_t* options)
+{
+    return options != NULL && options->pixels != NULL && options->bitmap_width != 0U && options->bitmap_height != 0U &&
+           options->bitmap_width <= SIZE_MAX / options->bitmap_height &&
+           (size_t) options->bitmap_width * options->bitmap_height <= SIZE_MAX / sizeof(*options->pixels) &&
+           options->source.width != 0U && options->source.height != 0U && options->destination.width != 0U &&
+           options->destination.height != 0U && options->source.x >= 0 && options->source.y >= 0 &&
+           (uint64_t) (uint32_t) options->source.x + options->source.width <= options->bitmap_width &&
+           (uint64_t) (uint32_t) options->source.y + options->source.height <= options->bitmap_height &&
+           options->rotation <= TABOS_GRAPHICS_ROTATE_270;
 }
 
 int tabos_graphics_open(tabos_graphics_t* graphics)
@@ -304,16 +334,6 @@ uint32_t tabos_graphics_capabilities(const tabos_graphics_t* graphics)
 
 static int scaled_blit(tabos_graphics_t* graphics, const tabos_graphics_blit_options_t* options)
 {
-    if (options->bitmap_width == 0U || options->bitmap_height == 0U || options->source.width == 0U ||
-        options->source.height == 0U || options->destination.width == 0U || options->destination.height == 0U ||
-        options->source.x < 0 || options->source.y < 0 ||
-        (uint64_t) (uint32_t) options->source.x + options->source.width > options->bitmap_width ||
-        (uint64_t) (uint32_t) options->source.y + options->source.height > options->bitmap_height ||
-        options->rotation > TABOS_GRAPHICS_ROTATE_270) {
-        errno = EINVAL;
-        return -1;
-    }
-
     const uint32_t rotated_width =
         options->rotation == TABOS_GRAPHICS_ROTATE_90 || options->rotation == TABOS_GRAPHICS_ROTATE_270 ?
             options->source.height :
@@ -367,7 +387,7 @@ static int scaled_blit(tabos_graphics_t* graphics, const tabos_graphics_blit_opt
 
 int tabos_graphics_blit_ex(tabos_graphics_t* graphics, const tabos_graphics_blit_options_t* options)
 {
-    if (!valid(graphics) || options == NULL || options->pixels == NULL) {
+    if (!valid(graphics) || !valid_blit_options(options)) {
         errno = EINVAL;
         return -1;
     }
