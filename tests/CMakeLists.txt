@@ -348,7 +348,19 @@ target_include_directories(tabos_host_runtime_event PRIVATE
     "${TABOS_ROOT}/platform/include"
     "${TABOS_ROOT}/sdk/include"
 )
-target_link_libraries(tabos_host_runtime_event PRIVATE tabos_core tabos_platform_host SDL3::SDL3)
+if(TABOS_TARGET STREQUAL "linux")
+    # platform runtime initialization calls back into portable services, which
+    # in turn consume platform synchronization. Rescan both static archives so
+    # GNU ld resolves dependencies introduced by either side.
+    target_link_libraries(tabos_host_runtime_event PRIVATE
+        "-Wl,--start-group" tabos_core tabos_platform_host "-Wl,--end-group"
+        SDL3::SDL3
+    )
+else()
+    target_link_libraries(tabos_host_runtime_event PRIVATE
+        tabos_core tabos_platform_host SDL3::SDL3
+    )
+endif()
 tabos_enable_warnings(tabos_host_runtime_event)
 tabos_enable_sanitizers(tabos_host_runtime_event)
 add_test(NAME unit.host_runtime_event COMMAND tabos_host_runtime_event)
