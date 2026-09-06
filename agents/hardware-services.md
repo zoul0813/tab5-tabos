@@ -339,6 +339,12 @@ watchdog, or reset. Earlier H.264 recording delivered 30 written pictures over a
 
 ## Phase 8: Low-Power Integration
 
+This phase starts from the completed interrupt/event-runtime handoff: keyboard and touch
+are interrupt-driven; service and process completions notify one bounded dispatcher;
+software work publishes exact deadlines; and the runtime blocks without a fixed 10 ms
+tick. Low-power work owns policy, blockers, ordered suspend/resume, wake-source arming,
+sleep entry, time accounting, and measurement rather than repeating that conversion.
+
 - [ ] Define active, idle, suspending, suspended, resuming, and shutting-down states.
 - [ ] Add idle display dimming and reduced driver polling before attempting suspend.
 - [ ] Add wake-source registration for RTC alarm, power button, keyboard, and BMI270 motion.

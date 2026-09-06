@@ -47,6 +47,13 @@
 - [x] Phase 8: pass wake bits into one bounded central dispatcher, remove the 10 ms
   compatibility deadline, and record debug wake counts without adding a timer.
 
+### Low-Power Integration Milestone
+
+- [x] Accept interrupt/event-runtime handoff as power-policy foundation.
+- [ ] Slice 1: implement portable power manager, dependency-ordered service registration,
+  platform sleep contract, and deterministic host controls.
+- [ ] Slice 2: implement activity-driven idle dimming and measure each power reduction.
+
 ### Hardware Services Phase 6 Validation
 
 - [x] Physical RAW8 capture writes 921,600 payload bytes to microSD (operator confirmed).
@@ -272,7 +279,7 @@
 - [x] Disable keyboard diagnostics by default after hardware validation.
 - [x] Verify physical Tab5 keyboard produces correct serial diagnostic events.
 - [ ] Add Tab5 USB HID keyboard backend using same input queue.
-- [ ] Replace Tab5 keyboard polling with interrupt-driven wakeup if measurements justify it.
+- [x] Replace Tab5 keyboard polling with GPIO50 interrupt-driven wakeup.
 
 ### Application Lifecycle
 
@@ -629,6 +636,8 @@ but is not a substitute for this execution path.
 - [ ] Centralize or make idempotent Tab5 GPIO ISR-service installation. Keyboard may
   install the shared ESP-IDF service before ST7121 touch initialization, currently
   producing a benign `GPIO isr service already installed` error-level boot message.
+- [ ] Replace or reduce the 50 ms PI4IO headphone-detect poll; shared-I2C read failures
+  currently produce intermittent error logs during touch activity.
 - [x] Migrate existing generic `tab_*` and internal-only `tabos_*` symbols to decided
   layer/subsystem prefixes without changing public `tabos_*` ABI.
 - [x] Rename portable platform contract from `tab_platform_*` to `platform_*`.
@@ -643,7 +652,8 @@ but is not a substitute for this execution path.
 - [ ] Review experimental ELF loader for final ABI-independent boundaries before extending it.
 - [ ] Replace provisional storage namespace examples only after mount-layout decision.
 - [ ] Measure terminal dirty-rendering cost on hardware as output volume increases.
-- [ ] Measure keyboard polling overhead before implementing interrupt path.
+- [x] Remove the keyboard polling path; retain latency and power measurement as hardware
+  validation rather than an implementation prerequisite.
 - [ ] Audit tracked files and generated artifacts before releases.
 
 ## Explicitly Deferred

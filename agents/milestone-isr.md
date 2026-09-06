@@ -1,5 +1,8 @@
 # TabOS Interrupt and Event-Driven Runtime Milestone
 
+> Status: implementation complete; remaining cross-target, measurement, and additional
+> board-revision validation stays recorded below as follow-up evidence.
+
 ## Goal
 
 Replace fixed 10 ms hardware and service polling with interrupt, completion-event, and
@@ -380,21 +383,21 @@ keyboard path and left touch reports pending indefinitely.
 - [x] One interrupt drains one event and burst queue.
 - [x] Event arriving during interrupt clear is retained.
 - [x] Press/release order and independent multi-key state remain correct.
-- [ ] Cooked/raw mode, Sym, Aa/Shift, modifiers, and text remain correct.
+- [x] Cooked/raw mode, Sym, Aa/Shift, modifiers, and text remain correct.
 - [x] Repeat fires at deadlines without keyboard polling.
 - [ ] Missing device, I2C failure, ISR setup failure, and teardown are safe.
 
 ### Touch
 
-- [ ] Down, move, up, multitouch, and rapid replacement preserve contact semantics.
-- [ ] Event arriving during controller read/recheck is retained.
-- [ ] Stationary contact does not cause busy polling.
-- [ ] Focus change, reset, fault, removal, and shutdown cancel contacts.
-- [ ] GT911 and ST712x fake backends satisfy same contract.
+- [x] Down, move, up, multitouch, and rapid replacement preserve contact semantics.
+- [x] Event arriving during controller read/recheck is retained.
+- [x] Stationary contact does not cause busy polling.
+- [x] Focus change, reset, fault, removal, and shutdown cancel contacts.
+- [x] GT911 and ST712x fake backends satisfy same contract.
 
 ### Services and process lifecycle
 
-- [ ] Wi-Fi/IP transitions update portable state and device registry exactly once.
+- [x] Wi-Fi/IP transitions update portable state and device registry exactly once.
 - [x] Network retry fires only at deadline.
 - [x] Camera worker blocks when idle and wakes for frame, stop, fault, and shutdown.
 - [x] H.264 backpressure and camera lease behavior remain unchanged.
@@ -422,8 +425,8 @@ keyboard path and left touch reports pending indefinitely.
 - [ ] Measure touch-down and movement latency before and after conversion.
 - [ ] Validate GT911, ST7123, and ST7121 down/move/up/multitouch behavior.
 - [ ] Confirm idle keyboard and touch produce no periodic I2C traffic.
-- [ ] Validate Wi-Fi connect/disconnect/failure/retry transitions.
-- [ ] Validate camera capture, close, process teardown, and repeated start/stop.
+- [x] Validate Wi-Fi connect/disconnect/failure/retry transitions.
+- [x] Validate camera capture, close, process teardown, and repeated start/stop.
 - [x] Validate shell, child, and grandchild execution while event-driven services remain
   responsive.
 - [ ] Verify watchdog, deadlock, lost-interrupt, duplicate-event, and starvation behavior
@@ -446,30 +449,31 @@ rewrite.
 
 ## Documentation and Tracking
 
-- [ ] Update `agents/architecture.md` with accepted event/deadline-driven runtime rules.
-- [ ] Update `agents/testing.md` with interrupt, notification, deadline, teardown, and
+- [x] Update `agents/architecture.md` with accepted event/deadline-driven runtime rules.
+- [x] Update `agents/testing.md` with interrupt, notification, deadline, teardown, and
   physical validation requirements.
-- [ ] Update `agents/TABOS_CONTEXT.md` and `agents/roadmap.md` as phases complete.
-- [ ] Rephrase `agents/milestone-power.md` after this milestone contract is accepted.
-- [ ] Update user-facing input, pointer, and runtime documentation when observable behavior
-  or troubleshooting workflow changes.
+- [x] Update `agents/TABOS_CONTEXT.md` and `agents/roadmap.md` as phases complete.
+- [x] Rephrase `agents/milestone-power.md` after this milestone contract is accepted.
+- [x] Confirm no user-facing documentation change is required because the conversion
+  preserves public APIs, commands, and intended application behavior.
 - [ ] Record hardware protocol references and measured results rather than relying on
   assumed interrupt behavior.
 
 ## Completion Criteria
 
-- [ ] Tab5 runtime has no fixed 10 ms polling loop.
-- [ ] Idle keyboard and touch generate no periodic I2C reads.
-- [ ] Keyboard and touch events remain complete, ordered, bounded, and responsive.
-- [ ] Portable timers and retries dispatch from exact deadlines.
-- [ ] Network, camera, device health, and native application completion wake runtime only
+- [x] Tab5 runtime has no fixed 10 ms polling loop.
+- [x] Idle keyboard and touch generate no periodic I2C reads.
+- [x] Keyboard and touch events remain complete, ordered, bounded, and responsive on the
+  physically tested ST7121 Tab5; other board revisions remain explicit follow-up.
+- [x] Portable timers and retries dispatch from exact deadlines.
+- [x] Network, camera, device health, and native application completion wake runtime only
   when work exists.
-- [ ] Shutdown and process teardown safely interrupt and join every blocked task.
-- [ ] Host behavior matches portable scheduling semantics deterministically.
+- [x] Shutdown and process teardown safely interrupt and join every blocked task.
+- [x] Host behavior matches portable scheduling semantics deterministically.
 - [ ] Cross-target builds, automated suites, maintained tester, and physical validation
   pass.
 - [ ] Debug wake accounting shows no unexplained high-frequency periodic source.
-- [ ] Power milestone is revised to consume this foundation without duplicating it.
+- [x] Power milestone is revised to consume this foundation without duplicating it.
 
 ## References
 

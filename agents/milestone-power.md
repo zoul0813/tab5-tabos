@@ -11,6 +11,10 @@ boundary.
 This document expands Phase 8 of [`agents/hardware-services.md`](hardware-services.md).
 That checklist remains the source of completion status.
 
+The interrupt and event-driven runtime milestone is the accepted foundation for this
+work. Power integration consumes its wake events, exact deadlines, and idle blocking;
+it does not reintroduce polling or duplicate runtime dispatch.
+
 ## Current Baseline
 
 - [x] Deferred orderly reboot and power-off already stop applications, close resources,
@@ -20,8 +24,13 @@ That checklist remains the source of completion status.
 - [x] Audio, pointer, camera, network, filesystem, display, and input services have explicit
   ownership and cleanup paths that can supply suspend-blocker state.
 - [x] Tab5 display initializes brightness support and enables the backlight at 75 percent.
+- [x] Tab5 keyboard and touch input use GPIO interrupt notification with bounded report
+  draining in runtime task context.
+- [x] Network, camera, audio, device-state, and native-application work notify the central
+  runtime dispatcher when work becomes ready.
+- [x] Key repeat, cursor blink, network retry, health audit, and finite waits publish exact
+  monotonic deadlines; the runtime blocks without a fixed compatibility tick.
 - [ ] No portable power-state manager or coordinated service suspend/resume path exists.
-- [ ] Tab5 keyboard remains polled; its interrupt mode is disabled.
 - [ ] RX8130 alarm programming and wake routing do not exist.
 - [ ] BMI270 initialization, sampling, and motion wake remain incomplete Phase 3 work.
 - [ ] Expansion I/O remains incomplete Phase 7 work; every future active driver must join
@@ -120,8 +129,9 @@ Transition rules:
 - [ ] Make fullscreen graphics ownership inhibit display dimming.
 - [ ] Make active media streams inhibit automatic display dimming where user-visible
   playback or capture requires it.
-- [ ] Reduce keyboard, pointer, battery, and other periodic polling only where latency and
-  correctness remain acceptable.
+- [ ] Replace or reduce remaining periodic work only where latency and correctness remain
+  acceptable, beginning with the 50 ms PI4IO headphone-detect poll and reviewing the
+  60-second hardware-health audit.
 - [ ] Restore brightness before delivering the activity that ended idle state.
 - [ ] Measure idle draw before and after display dimming and each polling reduction.
 
@@ -174,7 +184,7 @@ foreground application
   require CPU/APB frequency or prohibit light sleep.
 - [ ] Preserve required GPIO levels across sleep where peripheral power-down would
   otherwise float pins.
-- [ ] Add keyboard interrupt-driven wake and stop depending on 10 ms polling while asleep.
+- [ ] Arm the existing GPIO50 keyboard interrupt as a validated light-sleep wake source.
 - [ ] Confirm power-button wiring and semantics before advertising it as a wake source.
 - [ ] Report wake cause to portable power manager without exposing ESP-IDF enums.
 
