@@ -22,6 +22,10 @@
 
 ### Sprite and Tile Graphics
 
+- [x] Verify multiple source images remain independent inside one logical sprite set, including
+  per-image dimensions and transparency, sprite image indices, and cross-image animations and
+  metasprites in generated-C/binary pixel-equivalence coverage.
+
 - [x] Verify complex Tiled import: ordered tile/object layers, multiple external and inline
   tilesets, all eight GID transforms, exact animated-tile timing, integer/Boolean properties,
   overlapping ranges, malformed animations, and generated-C/binary pixel equivalence.

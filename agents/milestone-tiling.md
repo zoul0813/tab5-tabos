@@ -138,7 +138,7 @@ Add `./tools/tabos assets build <manifest>`:
 - [x] Review: Import animated-tile integer `repeat_count`: zero/default loops indefinitely,
   one plays once, and positive values count cycles. Preserve it in C and binary output;
   reject invalid types/ranges and use on nonanimated tiles.
-- [ ] Review: Convert multiple source images into one logical sprite set without requiring physical
+- [x] Review: Convert multiple source images into one logical sprite set without requiring physical
   atlas repacking.
 - [ ] Review: Imported TMJ/TSJ files remain authoritative for tileset images, regions, tile metadata, and tile animations. Manifests orchestrate outputs and non-Tiled metadata without duplicating imported tiles or images.
 - [ ] Review: Let the manifest define arbitrary sprite regions, pivots, named animations,
@@ -450,6 +450,18 @@ Validated working-tree changes based on `7e43d93`:
   and Boolean-duration animations, duplicate tile metadata, and overlapping tileset GID ranges.
 - The converter suite covers inline tilesets separately from the multi-external-tileset fixture.
   Focused converter, tile, loader, and equivalence tests pass on macOS Debug and Release.
+
+## Multiple Source Image Evidence — 2026-09-06
+
+- Manifest coverage imports separate opaque and transparent PNG sources into one logical sprite
+  set. It verifies distinct image indices and color keys, then combines both sprites in one named
+  animation and one metasprite without atlas packing.
+- The generated-C/binary equivalence fixture retains two differently sized Tiled atlas images with
+  independent transparency state. Descriptor checks prove the expected image index for every
+  sprite and cross-image references in both a manual animation and a metasprite.
+- Independent pixel expectations render sprites from both images, their cross-image animation and
+  metasprite, and transparent foreground composition. Full metadata and 79 rendered scene pairs
+  remain identical between generated C and binary assets on macOS Debug and Release.
 
 ## Assumptions
 

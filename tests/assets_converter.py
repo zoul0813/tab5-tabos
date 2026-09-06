@@ -215,6 +215,25 @@ def main() -> int:
         if keyed_assets.images[0].key != 1 or keyed_assets.images[0].pixels != [0, 1]:
             return 1
 
+        multi_image_manifest = {
+            "version": 1, "name": "multi_image",
+            "images": [{"name": "pixel", "source": "opaque.png"},
+                       {"name": "keyed", "source": "keyed.png"}],
+            "animations": [{"name": "mixed", "frames": [
+                {"sprite": "pixel", "duration_ms": 4}, {"sprite": "keyed", "duration_ms": 6},
+            ]}],
+            "metasprites": [{"name": "mixed", "parts": [
+                {"sprite": "pixel"}, {"sprite": "keyed", "x": 1},
+            ]}],
+        }
+        (root / "multi-image.json").write_text(json.dumps(multi_image_manifest), encoding="utf-8")
+        multi_image = load_manifest(root / "multi-image.json")
+        if (len(multi_image.images) != 2 or [sprite.image for sprite in multi_image.sprites] != [0, 1] or
+                [image.key for image in multi_image.images] != [None, 1] or
+                multi_image.animations[0].frames != [(0, 4), (1, 6)] or
+                [part["sprite"] for part in multi_image.metasprites[0].parts] != [0, 1]):
+            return 1
+
         collision_key_manifest = {
             "version": 1, "name": "key_collision",
             "images": [{"name": "keyed", "source": "keyed.png", "color_key": 0}],

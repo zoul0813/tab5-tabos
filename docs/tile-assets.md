@@ -457,6 +457,12 @@ Optional `color_key` selects an explicit RGB565 transparency key; otherwise tran
 input receives a deterministic unused key. The explicit key is rejected if an opaque
 source pixel converts to the same RGB565 value.
 
+An asset set may contain any combination of standalone PNG/GIF entries and images imported
+through Tiled tilesets. Each source remains an independent image descriptor with its own
+dimensions, pixels, and transparency key; conversion does not require or perform physical
+atlas repacking. Sprites keep the corresponding image index. Named animations and metasprites
+may freely combine sprites from different source images.
+
 An animated GIF image entry generates one full-frame sprite per GIF frame and one
 animation using the image entry's name. Animated GIF entries cannot define multiple
 regions. `durations_ms` may override every frame duration, and `repeat_count` may override

@@ -153,6 +153,12 @@ static void check_ids(const tabos_sprite_set_t* sprites, const tabos_tilemap_t* 
     CHECK(EQUIVALENCE_FLAG_SOLID == UINT32_C(0x80000000) && EQUIVALENCE_FLAG_WATER == 2U);
     CHECK(sprites->image_count == 2U && sprites->sprite_count == 3U && sprites->animation_count == 3U &&
           sprites->metasprite_count == 1U && map->layer_count == 4U);
+    CHECK(sprites->images[0].width == 4U && sprites->images[0].height == 2U && sprites->images[0].color_key_enabled &&
+          sprites->images[0].color_key == 0U);
+    CHECK(sprites->images[1].width == 2U && sprites->images[1].height == 2U && !sprites->images[1].color_key_enabled);
+    CHECK(sprites->sprites[EQUIVALENCE_SPRITE_QUAD].image == 0U &&
+          sprites->sprites[EQUIVALENCE_SPRITE_KEYED].image == 0U &&
+          sprites->sprites[EQUIVALENCE_SPRITE_ACCENT].image == 1U);
     CHECK(sprites->sprites[EQUIVALENCE_SPRITE_QUAD].flags == EQUIVALENCE_FLAG_SOLID);
     CHECK(sprites->sprites[EQUIVALENCE_SPRITE_KEYED].flags == 0U);
     CHECK(sprites->sprites[EQUIVALENCE_SPRITE_ACCENT].flags == EQUIVALENCE_FLAG_WATER);
@@ -172,6 +178,10 @@ static void check_ids(const tabos_sprite_set_t* sprites, const tabos_tilemap_t* 
           missing_property == 123);
     CHECK(sprites->animations[EQUIVALENCE_ANIMATION_CYCLE].trigger_sprite == EQUIVALENCE_SPRITE_KEYED);
     CHECK(sprites->animations[EQUIVALENCE_ANIMATION_CYCLE].frames[0].sprite == EQUIVALENCE_SPRITE_QUAD);
+    CHECK(sprites->animations[EQUIVALENCE_ANIMATION_HOLD].frames[0].sprite == EQUIVALENCE_SPRITE_ACCENT &&
+          sprites->animations[EQUIVALENCE_ANIMATION_HOLD].frames[1].sprite == EQUIVALENCE_SPRITE_KEYED);
+    CHECK(sprites->metasprites[EQUIVALENCE_METASPRITE_ACTOR].parts[0].sprite == EQUIVALENCE_SPRITE_QUAD &&
+          sprites->metasprites[EQUIVALENCE_METASPRITE_ACTOR].parts[1].sprite == EQUIVALENCE_SPRITE_ACCENT);
 }
 
 static void compare_pixels(const tabos_color_t* actual, const tabos_color_t* expected, const char* scene)
