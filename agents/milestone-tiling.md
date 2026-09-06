@@ -156,7 +156,7 @@ Add `./tools/tabos assets build <manifest>`:
   alpha values of 0 or 255; reject partial alpha.
 - [x] Review: Select a deterministic unused RGB565 color key automatically when transparency exists.
   Allow an explicit manifest key only when no opaque pixel converts to the same value.
-- [ ] Review: Produce deterministic generated `.c`/`.h` descriptors and versioned binary assets from
+- [x] Review: Produce deterministic generated `.c`/`.h` descriptors and versioned binary assets from
   the same normalized data.
 
 Binary formats:
@@ -507,6 +507,20 @@ Validated working-tree changes based on `7e43d93`:
   validation before RGB keying, while conversion retains its own defensive validation.
 - The asset guide now states that RGB keying cannot make partial-alpha input valid. Focused converter,
   tile, loader, and generated-C/binary equivalence tests pass on macOS Debug and Release.
+
+## Deterministic Output Evidence — 2026-09-06
+
+- The complete tile-demo normalized asset model is independently written into two output directories.
+  Generated `.c`, `.h`, `.tsp`, and `.tmap` files compare byte for byte; output contains no timestamp,
+  source path, output directory, temporary name, or unordered collection traversal.
+- Tests assert `TSP1`/`TMP1` magic and version 1 independently. Existing generated-C/binary equivalence
+  coverage proves both forms preserve matching IDs, descriptors, flags, animations, layers, objects,
+  properties, and rendered pixels from one normalized fixture.
+- Review exposed that `.tmap` serialization changed each normalized tile layer's `first` field while
+  calculating packed cell offsets. The writer now keeps those offsets locally, and tests verify that
+  generating every output leaves the complete normalized asset model unchanged.
+- Focused converter, tile, loader, and generated-C/binary equivalence tests pass on macOS Debug and
+  Release after the writer-purity fix.
 
 ## Assumptions
 

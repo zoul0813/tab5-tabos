@@ -15,7 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
-from tabos_tools.assets import convert_pixels, load_manifest, write_c, write_header, write_tsp
+from tabos_tools.assets import convert_pixels, load_manifest, write_c, write_header, write_tmap, write_tsp
 
 
 def expected_rgb565(red: int, green: int, blue: int) -> int:
@@ -206,6 +206,30 @@ def main() -> int:
         demo_header = root / "tdemo.h"
         write_header(demo_assets, demo_header, include_declarations=False)
         if demo_header.read_bytes() != (ROOT / "apps/tile-demo/include/tdemo.h").read_bytes():
+            return 1
+
+        deterministic_outputs = []
+        for directory_name in ("deterministic-one", "deterministic-two"):
+            output = root / directory_name
+            output.mkdir()
+            generated_assets = copy.deepcopy(demo_assets)
+            original_assets = copy.deepcopy(generated_assets)
+            stem = output / "tdemo"
+            write_tsp(generated_assets, stem.with_suffix(".tsp"))
+            for tiled_map in generated_assets.maps:
+                write_tmap(tiled_map, output / f"{tiled_map['name']}.tmap")
+            write_c(generated_assets, stem)
+            if generated_assets != original_assets:
+                return 1
+            deterministic_outputs.append(output)
+        for filename in ("tdemo.c", "tdemo.h", "tdemo.tsp", "world.tmap"):
+            if ((deterministic_outputs[0] / filename).read_bytes() !=
+                    (deterministic_outputs[1] / filename).read_bytes()):
+                return 1
+        tsp_header = (deterministic_outputs[0] / "tdemo.tsp").read_bytes()[:12]
+        tmap_header = (deterministic_outputs[0] / "world.tmap").read_bytes()[:12]
+        if (struct.unpack("<4s2I", tsp_header)[:2] != (b"TSP1", 1) or
+                struct.unpack("<4s2I", tmap_header)[:2] != (b"TMP1", 1)):
             return 1
 
         bitmap = Image.new("RGB", (1, 1), (0, 0, 0))

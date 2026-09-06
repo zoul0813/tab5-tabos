@@ -783,17 +783,20 @@ def write_tmap(tiled: dict[str, Any], path: Path) -> None:
     align(data); layers_offset = len(data); data.extend(bytes(len(tiled["layers"]) * 20))
     align(data); cells_offset = len(data)
     cell_index = 0
+    layer_firsts = []
     for layer in tiled["layers"]:
         if layer["type"] == 0:
-            layer["first"] = cell_index
+            layer_firsts.append(cell_index)
             data.extend(struct.pack(f"<{len(layer['cells'])}I", *layer["cells"]))
             cell_index += len(layer["cells"])
+        else:
+            layer_firsts.append(layer["first"])
     align(data); objects_offset = len(data); data.extend(bytes(len(tiled["objects"]) * 48))
     align(data); properties_offset = len(data); data.extend(bytes(len(tiled["properties"]) * 12))
     align(data); strings_offset = len(data); data.extend(strings)
     for index, layer in enumerate(tiled["layers"]):
         struct.pack_into("<5I", data, layers_offset + index * 20, names[layer["name"]], layer["type"],
-                         layer["first"], layer["count"], 0)
+                         layer_firsts[index], layer["count"], 0)
     for index, obj in enumerate(tiled["objects"]):
         struct.pack_into("<4I2i6I", data, objects_offset + index * 48, obj["id"], names[obj["name"]],
                          names[obj["class"]], obj["shape"], obj["x"], obj["y"], obj["width"], obj["height"],

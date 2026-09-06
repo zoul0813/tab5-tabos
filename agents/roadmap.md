@@ -22,6 +22,9 @@
 
 ### Sprite and Tile Graphics
 
+- [x] Verify deterministic byte-identical generated C, headers, sprite binaries, and map binaries
+  from one normalized model; make `.tmap` serialization pure and assert binary format versions.
+
 - [x] Verify PNG and composited-GIF conversion against independent `TABOS_RGB565` expectations;
   exhaustively reject alpha values 1-254 before transparent-RGB keying and document the ordering.
 
