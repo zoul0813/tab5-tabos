@@ -601,7 +601,7 @@ def load_tiled_map(assets: AssetSet, path: Path, name: str, flags: dict[str, int
                     duration = integer(frame.get("duration"), "animation duration")
                     if duration <= 0:
                         fail("Tiled animation duration must be positive")
-                    frames_out.append((local_sprite_ids[frame_id], max(duration, 10)))
+                    frames_out.append((local_sprite_ids[frame_id], duration))
                 if not frames_out:
                     fail("Tiled animation needs at least one frame")
                 animation_name = animation_names.get(local_id, f"{name}_{tileset_name}_{local_id}")

@@ -22,6 +22,10 @@
 
 ### Sprite and Tile Graphics
 
+- [x] Verify complex Tiled import: ordered tile/object layers, multiple external and inline
+  tilesets, all eight GID transforms, exact animated-tile timing, integer/Boolean properties,
+  overlapping ranges, malformed animations, and generated-C/binary pixel equivalence.
+
 - [x] Verify GIF import semantics with independent composited pixels for transparency,
   restore-background, and restore-previous disposal; cover single-frame input, delay clamping and
   overrides, missing/indefinite/finite loop metadata, invalid options, and named clip generation.

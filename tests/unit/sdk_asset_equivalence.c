@@ -154,6 +154,7 @@ static void check_ids(const tabos_sprite_set_t* sprites, const tabos_tilemap_t* 
     CHECK(sprites->image_count == 2U && sprites->sprite_count == 3U && sprites->animation_count == 3U &&
           sprites->metasprite_count == 1U && map->layer_count == 4U);
     CHECK(sprites->sprites[EQUIVALENCE_SPRITE_QUAD].flags == EQUIVALENCE_FLAG_SOLID);
+    CHECK(sprites->sprites[EQUIVALENCE_SPRITE_KEYED].flags == 0U);
     CHECK(sprites->sprites[EQUIVALENCE_SPRITE_ACCENT].flags == EQUIVALENCE_FLAG_WATER);
     CHECK(map->layers[EQUIVALENCE_LAYER_WORLD_MARKERS].objects[0].id == EQUIVALENCE_OBJECT_WORLD_SPAWN);
     CHECK(map->layers[EQUIVALENCE_LAYER_WORLD_MARKERS].objects[1].id == EQUIVALENCE_OBJECT_WORLD_ZONE);

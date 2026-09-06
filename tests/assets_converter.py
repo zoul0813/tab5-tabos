@@ -414,6 +414,40 @@ def main() -> int:
         ]
         if not rejects_tiled(candidate, "only integer and boolean tile properties"):
             return 1
+
+        candidate = copy.deepcopy(base_tiled)
+        candidate["tilesets"][0]["tiles"][0]["animation"][0]["duration"] = 5
+        (root / "animated.tmj").write_text(json.dumps(candidate), encoding="utf-8")
+        precise_animation = load_manifest(root / "tiled.json").animations[0]
+        if precise_animation.frames != [(1, 5)]:
+            return 1
+
+        invalid_animations = [
+            ({}, "animation must be an array"),
+            ([], "animation needs at least one frame"),
+            ([{"tileid": 2, "duration": 10}], "references invalid tile"),
+            ([{"tileid": True, "duration": 10}], "animation tileid must be an integer"),
+            ([{"tileid": 1, "duration": 0}], "animation duration must be positive"),
+            ([{"tileid": 1, "duration": True}], "animation duration must be an integer"),
+        ]
+        for animation_value, message in invalid_animations:
+            candidate = copy.deepcopy(base_tiled)
+            candidate["tilesets"][0]["tiles"][0]["animation"] = animation_value
+            if not rejects_tiled(candidate, message):
+                return 1
+
+        candidate = copy.deepcopy(base_tiled)
+        overlapping = copy.deepcopy(candidate["tilesets"][0])
+        overlapping["firstgid"] = 2
+        overlapping["name"] = "overlapping"
+        candidate["tilesets"].append(overlapping)
+        if not rejects_tiled(candidate, "GID 2 overlaps another tileset"):
+            return 1
+
+        candidate = copy.deepcopy(base_tiled)
+        candidate["tilesets"][0]["tiles"].append(copy.deepcopy(candidate["tilesets"][0]["tiles"][0]))
+        if not rejects_tiled(candidate, "defines tile id 0 more than once"):
+            return 1
     return 0
 
 

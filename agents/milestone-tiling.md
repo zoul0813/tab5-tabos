@@ -133,7 +133,7 @@ Add `./tools/tabos assets build <manifest>`:
   animation clip. Preserve the GIF repeat count, using zero for indefinite repetition
   and one when no loop extension exists. Clamp an animated frame delay below 10 ms to
   10 ms unless the manifest supplies an explicit duration override.
-- [ ] Review: Support multiple tile and object layers, multiple tilesets, tile flips, Tiled tile
+- [x] Review: Support multiple tile and object layers, multiple tilesets, tile flips, Tiled tile
   animations, and integer tile properties.
 - [x] Review: Import animated-tile integer `repeat_count`: zero/default loops indefinitely,
   one plays once, and positive values count cycles. Preserve it in C and binary output;
@@ -433,6 +433,23 @@ Validated working-tree changes based on `7e43d93`:
   Manifest duration and repeat overrides are type-, count-, positivity-, and range-checked.
 - Focused converter, tile, binary-loader, and C/binary equivalence tests pass on macOS Debug and
   Release after the GIF review.
+
+## Complex Tiled Import Evidence — 2026-09-06
+
+- The shared generated-C/binary fixture imports two external atlas tilesets into one sprite set
+  and preserves four ordered layers alternating between tile and object data. Metadata comparison
+  checks every cell, object, property, sprite flag, animation frame, and descriptor field.
+- Independent pixels verify all eight Tiled horizontal/vertical/diagonal GID transforms, animated
+  tiles, viewport bounds, transparency between ground and foreground layers, and authored draw
+  order. Seventy-nine generated-C/binary scene pairs remain pixel-identical.
+- Registered Boolean `true` and integer nonzero properties set flags; false and zero leave them
+  clear. Unregistered integer and Boolean editor properties remain accepted and intentionally
+  absent from runtime sprite descriptors.
+- Tiled tile-animation delays now preserve every positive authored millisecond exactly; the GIF-only
+  10-ms clamp no longer changes Tiled timing. Tests reject malformed, empty, invalid-tile, zero,
+  and Boolean-duration animations, duplicate tile metadata, and overlapping tileset GID ranges.
+- The converter suite covers inline tilesets separately from the multi-external-tileset fixture.
+  Focused converter, tile, loader, and equivalence tests pass on macOS Debug and Release.
 
 ## Assumptions
 

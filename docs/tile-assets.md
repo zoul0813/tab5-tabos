@@ -527,6 +527,9 @@ entries to reference sprites named in TSJ tile properties. Supported TSJ metadat
 - Standard tileset `transparentcolor`, plus optional integer tileset property
   `transparent_tolerance` from 0 through 255: color-key preparation.
 
+Tiled tile-animation durations are preserved exactly in milliseconds and must be positive.
+The 10-ms minimum applies only to GIF delays without a manifest duration override.
+
 Keep manifest content for orchestration and metadata Tiled cannot represent, such as
 asset-set name, flag-bit registry, standalone PNG/GIF imports, and metasprite composition.
 

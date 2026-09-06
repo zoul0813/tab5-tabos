@@ -32,7 +32,9 @@ def main():
             {"id": 0, "properties": [prop("name", "quad", "string"), prop("pivot_x", 1),
                                      prop("pivot_y", 1), prop("solid", True, "bool")]},
             {"id": 1, "properties": [prop("name", "keyed", "string"),
-                                     prop("animation_name", "cycle", "string")],
+                                     prop("animation_name", "cycle", "string"), prop("solid", False, "bool"),
+                                     prop("water", 0), prop("editor_weight", 37),
+                                     prop("editor_toggle", False, "bool")],
              "animation": [{"tileid": 0, "duration": 10}, {"tileid": 1, "duration": 20}]},
         ],
     })
