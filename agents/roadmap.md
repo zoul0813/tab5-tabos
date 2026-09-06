@@ -22,6 +22,10 @@
 
 ### Sprite and Tile Graphics
 
+- [x] Verify manifest-authored sprite regions, signed pivots, application flags, named animations,
+  and ordered metasprites, including generated constants and invalid reference/type/range coverage;
+  enforce unsigned 32-bit frame durations before serialization.
+
 - [x] Verify TMJ/TSJ authority for tileset images, calculated atlas regions, names, pivots, flags,
   transparency, and tile animations; prove inline/external parity and reject duplicate manifest
   image declarations that conflict with Tiled-owned sources.

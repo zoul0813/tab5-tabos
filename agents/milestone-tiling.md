@@ -141,7 +141,7 @@ Add `./tools/tabos assets build <manifest>`:
 - [x] Review: Convert multiple source images into one logical sprite set without requiring physical
   atlas repacking.
 - [x] Review: Imported TMJ/TSJ files remain authoritative for tileset images, regions, tile metadata, and tile animations. Manifests orchestrate outputs and non-Tiled metadata without duplicating imported tiles or images.
-- [ ] Review: Let the manifest define arbitrary sprite regions, pivots, named animations,
+- [x] Review: Let the manifest define arbitrary sprite regions, pivots, named animations,
   metasprites, and application flags.
 - [x] Review: Generate asset-set-prefixed, sanitized C constants for named sprites, clips,
   metasprites, layers, objects, and flags. Reject identifier collisions. Do not generate
@@ -476,6 +476,23 @@ Validated working-tree changes based on `7e43d93`:
   collection-of-images tilesets, malformed animations, and identifier collisions remain rejected.
 - Generated-C and binary forms compare all normalized metadata and 79 scene pairs. Focused converter,
   tile, loader, and equivalence tests pass on macOS Debug and Release.
+
+## Manifest Metadata Evidence — 2026-09-06
+
+- A standalone-sheet fixture verifies multiple arbitrary regions, nonzero source origins, positive
+  dimensions at image edges, pivots inside/on/outside a region, named and raw flag masks, looping
+  and finite named animations, and ordered metasprite parts using every quarter turn, both mirrors,
+  signed offsets, and opacity endpoints.
+- Generated public constants are checked for every manifest-defined flag, sprite, animation, and
+  metasprite. Existing generated-C/binary equivalence coverage compares all corresponding runtime
+  descriptor fields and renders cross-image animations and metasprites pixel for pixel.
+- Negative coverage rejects malformed/out-of-image regions, malformed and out-of-range pivots,
+  unknown flags and sprite references, empty animations/metasprites, invalid transforms, opacity,
+  mirrors, offsets, repeat counts, and frame durations. Manual and overridden GIF durations now
+  reject values outside the runtime and binary unsigned 32-bit representation during conversion.
+- The asset guide documents coordinate, pivot, flag-mask, duration, repeat, ordering, transform,
+  and default-value semantics needed to author these manifest features without reading converter
+  source. Focused converter, tile, loader, and equivalence tests pass on macOS Debug and Release.
 
 ## Assumptions
 

@@ -457,6 +457,12 @@ Optional `color_key` selects an explicit RGB565 transparency key; otherwise tran
 input receives a deterministic unused key. The explicit key is rejected if an opaque
 source pixel converts to the same RGB565 value.
 
+Every region must remain inside its decoded or resized image and have positive dimensions.
+Region coordinates use the image's top-left as `(0, 0)`. Pivots are signed 32-bit local
+coordinates and may lie on or outside the region for attachment points. `flags` accepts either
+a 32-bit integer mask or a list of flag names registered by the manifest; named values are
+combined with bitwise OR.
+
 An asset set may contain any combination of standalone PNG/GIF entries and images imported
 through Tiled tilesets. Each source remains an independent image descriptor with its own
 dimensions, pixels, and transparency key; conversion does not require or perform physical
@@ -482,6 +488,11 @@ Manual animations reference previously imported sprite names:
   ]
 }
 ```
+
+Manual clips require at least one frame. Every duration is a positive unsigned 32-bit
+millisecond value. `repeat_count` is also unsigned 32-bit: zero loops indefinitely, while a
+positive value gives the number of cycles and then holds the last frame. Frame references must
+name sprites imported earlier from manifest images or Tiled maps.
 
 GIF frames honor transparency, disposal, delay, and loop metadata. Delays below 10 ms
 become 10 ms unless `durations_ms` overrides them. Alpha must be exactly 0 or 255.

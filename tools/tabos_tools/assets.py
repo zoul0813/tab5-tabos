@@ -230,7 +230,7 @@ def add_image_entry(assets: AssetSet, base: Path, entry: dict[str, Any], flags: 
             if duration_overrides is not None:
                 if not isinstance(duration_overrides, list) or len(duration_overrides) != len(frames):
                     fail(f"{name} durations_ms must contain one value per GIF frame")
-                duration = integer(duration_overrides[index], "GIF frame duration")
+                duration = unsigned_32(duration_overrides[index], "GIF frame duration")
             elif duration < 10:
                 duration = 10
             if duration <= 0:
@@ -381,7 +381,7 @@ def load_manifest(path: Path) -> AssetSet:
             sprite_name = require_string(frame, "sprite")
             if sprite_name not in sprite_ids:
                 fail(f"unknown animation sprite {sprite_name!r}")
-            duration = integer(frame.get("duration_ms"), "animation duration_ms")
+            duration = unsigned_32(frame.get("duration_ms"), "animation duration_ms")
             if duration <= 0:
                 fail("animation duration_ms must be positive")
             frames.append((sprite_ids[sprite_name], duration))

@@ -77,6 +77,7 @@ def main() -> int:
             {"durations_ms": "10,20"},
             {"durations_ms": [0, 20]},
             {"durations_ms": [True, 20]},
+            {"durations_ms": [0x100000000, 20]},
             {"repeat_count": -1},
             {"repeat_count": 0x100000000},
             {"repeat_count": True},
@@ -214,6 +215,135 @@ def main() -> int:
         keyed_assets = load_manifest(root / "keyed.json")
         if keyed_assets.images[0].key != 1 or keyed_assets.images[0].pixels != [0, 1]:
             return 1
+
+        sheet = Image.new("RGBA", (5, 4), (12, 34, 56, 255))
+        sheet.save(root / "sheet.png")
+        authored_manifest = {
+            "version": 1,
+            "name": "authored",
+            "flags": {"solid": 1, "hazard": 4},
+            "images": [{
+                "name": "sheet",
+                "source": "sheet.png",
+                "sprites": [
+                    {"name": "hero", "x": 1, "y": 1, "width": 2, "height": 2,
+                     "pivot": [1, 2], "flags": ["solid", "hazard"]},
+                    {"name": "attachment", "x": 0, "y": 0, "width": 1, "height": 1,
+                     "pivot": [-3, 7], "flags": 0x80000000},
+                    {"name": "edge", "x": 4, "y": 3, "width": 1, "height": 1,
+                     "pivot": [1, 1], "flags": []},
+                ],
+            }],
+            "animations": [
+                {"name": "loop", "frames": [
+                    {"sprite": "hero", "duration_ms": 7},
+                    {"sprite": "attachment", "duration_ms": 9},
+                ]},
+                {"name": "flash", "repeat_count": 3,
+                 "frames": [{"sprite": "edge", "duration_ms": 11}]},
+            ],
+            "metasprites": [{"name": "assembled", "parts": [
+                {"sprite": "hero", "x": -8, "y": 9, "rotation": 0,
+                 "mirror_x": False, "mirror_y": False, "opacity": 255},
+                {"sprite": "attachment", "x": 6, "y": -7, "rotation": 1,
+                 "mirror_x": True, "mirror_y": False, "opacity": 128},
+                {"sprite": "edge", "rotation": 2, "mirror_x": False,
+                 "mirror_y": True, "opacity": 0},
+                {"sprite": "hero", "rotation": 3, "mirror_x": True,
+                 "mirror_y": True},
+            ]}],
+        }
+        (root / "authored.json").write_text(json.dumps(authored_manifest), encoding="utf-8")
+        authored = load_manifest(root / "authored.json")
+        sprite_values = [
+            (item.name, item.image, item.x, item.y, item.width, item.height,
+             item.pivot_x, item.pivot_y, item.flags)
+            for item in authored.sprites
+        ]
+        if (len(authored.images) != 1 or sprite_values != [
+                ("hero", 0, 1, 1, 2, 2, 1, 2, 5),
+                ("attachment", 0, 0, 0, 1, 1, -3, 7, 0x80000000),
+                ("edge", 0, 4, 3, 1, 1, 1, 1, 0),
+            ] or
+            [(item.name, item.frames, item.repeat) for item in authored.animations] != [
+                ("loop", [(0, 7), (1, 9)], 0), ("flash", [(2, 11)], 3),
+            ] or
+            authored.metasprites[0].parts != [
+                {"sprite": 0, "x": -8, "y": 9, "rotation": 0,
+                 "mirror_x": False, "mirror_y": False, "opacity": 255},
+                {"sprite": 1, "x": 6, "y": -7, "rotation": 1,
+                 "mirror_x": True, "mirror_y": False, "opacity": 128},
+                {"sprite": 2, "x": 0, "y": 0, "rotation": 2,
+                 "mirror_x": False, "mirror_y": True, "opacity": 0},
+                {"sprite": 0, "x": 0, "y": 0, "rotation": 3,
+                 "mirror_x": True, "mirror_y": True, "opacity": 255},
+            ]):
+            return 1
+        authored_header = root / "authored.h"
+        write_header(authored, authored_header, include_declarations=False)
+        authored_header_text = authored_header.read_text(encoding="utf-8")
+        for definition in (
+                "#define AUTHORED_FLAG_SOLID 1U",
+                "#define AUTHORED_FLAG_HAZARD 4U",
+                "#define AUTHORED_SPRITE_HERO 0U",
+                "#define AUTHORED_SPRITE_ATTACHMENT 1U",
+                "#define AUTHORED_ANIMATION_LOOP 0U",
+                "#define AUTHORED_ANIMATION_FLASH 1U",
+                "#define AUTHORED_METASPRITE_ASSEMBLED 0U"):
+            if definition not in authored_header_text:
+                return 1
+
+        invalid_authored_manifests = [
+            {"images": [{"name": "sheet", "source": "sheet.png", "sprites": {}}]},
+            {"images": [{"name": "sheet", "source": "sheet.png", "sprites": [1]}]},
+            {"images": [{"name": "sheet", "source": "sheet.png",
+                         "sprites": [{"name": "bad", "x": -1}]}]},
+            {"images": [{"name": "sheet", "source": "sheet.png",
+                         "sprites": [{"name": "bad", "width": 0}]}]},
+            {"images": [{"name": "sheet", "source": "sheet.png",
+                         "sprites": [{"name": "bad", "x": 4, "width": 2}]}]},
+            {"images": [{"name": "sheet", "source": "sheet.png",
+                         "sprites": [{"name": "bad", "pivot": [0]}]}]},
+            {"images": [{"name": "sheet", "source": "sheet.png",
+                         "sprites": [{"name": "bad", "pivot": [0x80000000, 0]}]}]},
+            {"flags": {"solid": 1}, "images": [{"name": "sheet", "source": "sheet.png",
+                         "sprites": [{"name": "bad", "flags": ["missing"]}]}]},
+            {"images": [{"name": "sheet", "source": "sheet.png"}],
+             "animations": [{"name": "bad", "frames": []}]},
+            {"images": [{"name": "sheet", "source": "sheet.png"}],
+             "animations": [{"name": "bad", "frames": [{"sprite": "missing", "duration_ms": 1}]}]},
+            {"images": [{"name": "sheet", "source": "sheet.png"}],
+             "animations": [{"name": "bad", "frames": [{"sprite": "sheet", "duration_ms": True}]}]},
+            {"images": [{"name": "sheet", "source": "sheet.png"}],
+             "animations": [{"name": "bad", "frames": [{"sprite": "sheet", "duration_ms": 0}]}]},
+            {"images": [{"name": "sheet", "source": "sheet.png"}],
+             "animations": [{"name": "bad", "frames": [
+                 {"sprite": "sheet", "duration_ms": 0x100000000}]}]},
+            {"images": [{"name": "sheet", "source": "sheet.png"}],
+             "animations": [{"name": "bad", "repeat_count": -1,
+                              "frames": [{"sprite": "sheet", "duration_ms": 1}]}]},
+            {"images": [{"name": "sheet", "source": "sheet.png"}],
+             "animations": [{"name": "bad", "repeat_count": True,
+                              "frames": [{"sprite": "sheet", "duration_ms": 1}]}]},
+            {"images": [{"name": "sheet", "source": "sheet.png"}],
+             "metasprites": [{"name": "bad", "parts": []}]},
+            {"images": [{"name": "sheet", "source": "sheet.png"}],
+             "metasprites": [{"name": "bad", "parts": [{"sprite": "missing"}]}]},
+            {"images": [{"name": "sheet", "source": "sheet.png"}],
+             "metasprites": [{"name": "bad", "parts": [{"sprite": "sheet", "rotation": 4}]}]},
+            {"images": [{"name": "sheet", "source": "sheet.png"}],
+             "metasprites": [{"name": "bad", "parts": [{"sprite": "sheet", "opacity": 256}]}]},
+            {"images": [{"name": "sheet", "source": "sheet.png"}],
+             "metasprites": [{"name": "bad", "parts": [{"sprite": "sheet", "mirror_x": 1}]}]},
+            {"images": [{"name": "sheet", "source": "sheet.png"}],
+             "metasprites": [{"name": "bad", "parts": [{"sprite": "sheet", "x": -0x80000001}]}]},
+        ]
+        for invalid_index, invalid_sections in enumerate(invalid_authored_manifests):
+            invalid_manifest = {"version": 1, "name": "invalid_authored", **invalid_sections}
+            invalid_path = root / f"invalid-authored-{invalid_index}.json"
+            invalid_path.write_text(json.dumps(invalid_manifest), encoding="utf-8")
+            if not rejected(invalid_path):
+                return 1
 
         multi_image_manifest = {
             "version": 1, "name": "multi_image",
