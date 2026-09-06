@@ -640,6 +640,16 @@ application-task model must assign explicit per-application stack budgets instea
 
 ## 9. Shell Architecture
 
+### Persistent command history [DECIDED]
+
+The shell owns a fixed 32-entry command history and Up/Down recall policy. It preserves
+unparsed printable ASCII command lines, skips blank lines and consecutive exact
+duplicates, and restores the current draft after browsing. History loads from
+`T:/user/history.txt` and saves before command execution through standard SDK file
+operations using a temporary file and rename. Storage failure does not stop the shell.
+Plain Up/Down recalls commands; Ctrl+Arrow remains the existing opt-in TTY scrollback
+policy. History is application state, not a kernel or terminal service.
+
 The shell is a first-class TabOS application/system component.
 
 More specifically, the shell is an application, not kernel code. It belongs under `apps/` and consumes kernel/system services through application-facing APIs. The kernel may provide a boot console and terminal service, but must not own shell parsing, commands, or policy.

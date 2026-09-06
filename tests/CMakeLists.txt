@@ -436,6 +436,80 @@ tabos_enable_sanitizers(tabos_shell_input)
 
 add_test(NAME unit.shell_input COMMAND tabos_shell_input)
 
+add_executable(tabos_shell_history
+    unit/shell_history.c
+    "${TABOS_ROOT}/apps/shell/src/history.c"
+    "${TABOS_ROOT}/apps/shell/src/input.c"
+    "${TABOS_ROOT}/apps/shell/src/line.c"
+    "${TABOS_ROOT}/apps/shell/src/parser.c"
+)
+target_include_directories(tabos_shell_history PRIVATE "${TABOS_ROOT}/apps/shell/include")
+tabos_enable_warnings(tabos_shell_history)
+tabos_enable_sanitizers(tabos_shell_history)
+add_test(NAME unit.shell_history COMMAND tabos_shell_history)
+
+add_library(tabos_shell_history_file_faults OBJECT "${TABOS_ROOT}/apps/shell/src/history_file.c")
+target_include_directories(tabos_shell_history_file_faults PRIVATE "${TABOS_ROOT}/apps/shell/include")
+target_compile_definitions(tabos_shell_history_file_faults PRIVATE
+    fprintf=test_history_fprintf fclose=test_history_fclose rename=test_history_rename
+)
+tabos_enable_warnings(tabos_shell_history_file_faults)
+tabos_enable_sanitizers(tabos_shell_history_file_faults)
+add_executable(tabos_shell_history_file
+    component/shell_history_file.c
+    "${TABOS_ROOT}/apps/shell/src/history.c"
+    $<TARGET_OBJECTS:tabos_shell_history_file_faults>
+)
+target_include_directories(tabos_shell_history_file PRIVATE "${TABOS_ROOT}/apps/shell/include")
+tabos_enable_warnings(tabos_shell_history_file)
+tabos_enable_sanitizers(tabos_shell_history_file)
+add_test(NAME component.shell_history_file COMMAND tabos_shell_history_file)
+
+add_library(tabos_shell_session_main OBJECT "${TABOS_ROOT}/apps/shell/src/main.c")
+target_include_directories(tabos_shell_session_main PRIVATE
+    "${TABOS_ROOT}/apps/shell/include" "${TABOS_ROOT}/sdk/include"
+)
+target_compile_definitions(tabos_shell_session_main PRIVATE
+    main=shell_test_main read=test_shell_read getcwd=test_shell_getcwd
+    ioctl=test_shell_ioctl tabos_spawn=test_shell_spawn waitpid=test_shell_waitpid
+)
+tabos_enable_warnings(tabos_shell_session_main)
+tabos_enable_sanitizers(tabos_shell_session_main)
+add_executable(tabos_shell_session
+    component/shell_session.c
+    "${TABOS_ROOT}/apps/shell/src/history.c"
+    "${TABOS_ROOT}/apps/shell/src/history_file.c"
+    "${TABOS_ROOT}/apps/shell/src/line.c"
+    "${TABOS_ROOT}/apps/shell/src/input.c"
+    "${TABOS_ROOT}/apps/shell/src/parser.c"
+    $<TARGET_OBJECTS:tabos_shell_session_main>
+    ${TABOS_TEST_PLATFORM_FAKES}
+)
+target_include_directories(tabos_shell_session PRIVATE
+    "${TABOS_ROOT}/apps/shell/include" "${TABOS_ROOT}/graphics/include"
+    "${TABOS_ROOT}/platform/include" "${TABOS_GENERATED_INCLUDE_DIR}"
+)
+target_link_libraries(tabos_shell_session PRIVATE tabos_core)
+tabos_enable_warnings(tabos_shell_session)
+tabos_enable_sanitizers(tabos_shell_session)
+add_test(NAME component.shell_session COMMAND tabos_shell_session)
+
+# Run explicitly with a freshly SDK-built shell path. Ordinary host tests must
+# remain independent of separately built/installed application artifacts.
+add_executable(tabos_shell_rv32 component/shell_rv32.c)
+target_include_directories(tabos_shell_rv32 PRIVATE
+    "${TABOS_ROOT}/kernel/include" "${TABOS_ROOT}/input/include" "${TABOS_ROOT}/platform/include"
+)
+if(TABOS_TARGET STREQUAL "linux")
+    target_link_libraries(tabos_shell_rv32 PRIVATE
+        "-Wl,--start-group" tabos_core tabos_platform_host "-Wl,--end-group" SDL3::SDL3
+    )
+else()
+    target_link_libraries(tabos_shell_rv32 PRIVATE tabos_core tabos_platform_host SDL3::SDL3)
+endif()
+tabos_enable_warnings(tabos_shell_rv32)
+tabos_enable_sanitizers(tabos_shell_rv32)
+
 add_executable(tabos_application_lifecycle unit/application_lifecycle.c ${TABOS_TEST_PLATFORM_FAKES})
 target_include_directories(tabos_application_lifecycle PRIVATE
     "${TABOS_ROOT}/console/include"

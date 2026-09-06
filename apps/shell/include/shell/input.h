@@ -14,8 +14,18 @@ typedef enum {
 
 typedef struct {
         shell_input_state_t state;
+        bool csi_parameters;
 } shell_input_filter_t;
 
-bool shell_input_filter(shell_input_filter_t* filter, uint8_t input, char* output);
+typedef enum {
+    SHELL_INPUT_NONE,
+    SHELL_INPUT_CHARACTER,
+    SHELL_INPUT_UP,
+    SHELL_INPUT_DOWN,
+    SHELL_INPUT_ENTER,
+    SHELL_INPUT_BACKSPACE,
+} shell_input_action_t;
+
+shell_input_action_t shell_input_filter(shell_input_filter_t* filter, uint8_t input, char* output);
 
 #endif

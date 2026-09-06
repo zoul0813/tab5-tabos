@@ -20,6 +20,14 @@
 
 ## Current Work
 
+### Persistent Shell History
+
+- [x] Implement shell-local 32-entry recall, editable drafts, and `history` listing.
+- [x] Persist history to `T:/user/history.txt` with recoverable storage failures.
+- [x] Validate input, navigation, filesystem failures, wrapped rendering, and shell restart on host.
+- [x] Cross-build the independent RV32 shell and run its restart/recall check in the host interpreter.
+- [ ] Verify Up/Down, Ctrl+Arrow scrollback, and persistence across physical Tab5 reboot.
+
 ### Event-Driven Runtime and ISR Milestone
 
 - [x] Phase 1: define portable readiness bits and absolute monotonic deadline contract.
