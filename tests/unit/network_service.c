@@ -25,14 +25,28 @@ int main(void)
     expect(network_service_status(&status) && status.state == NETWORK_STATE_OFFLINE &&
                strcmp(status.hostname, "TabOS") == 0,
            "starts offline with default hostname");
+    network_service_update();
+    const unsigned int initial_status_calls = test_platform_network_status_calls();
+    network_service_update();
+    network_service_update();
+    expect(test_platform_network_status_calls() == initial_status_calls,
+           "idle updates do not poll platform network status");
 
     expect(network_service_connect("test-network", "secret", false), "explicit connect starts");
     expect(test_platform_network_connect_calls() == 1U, "first attempt issued");
     test_platform_network_set_state(PLATFORM_NETWORK_FAILED, "test failure");
     network_service_update();
-    test_platform_advance_time_ms(1000U);
+    expect(test_platform_network_status_calls() == initial_status_calls + 1U,
+           "network notification causes one platform status read");
+    const uint64_t first_retry_ms = test_platform_time_ms() + 1000U;
+    expect(network_service_next_deadline() == first_retry_ms, "retry publishes exact deadline");
+    test_platform_advance_time_ms(999U);
+    network_service_update();
+    expect(test_platform_network_connect_calls() == 1U, "retry does not fire early");
+    test_platform_advance_time_ms(1U);
     network_service_update();
     expect(test_platform_network_connect_calls() == 2U, "second attempt issued");
+    expect(network_service_next_deadline() == UINT64_MAX, "fired retry clears deadline");
     test_platform_network_set_state(PLATFORM_NETWORK_FAILED, "test failure");
     network_service_update();
     test_platform_advance_time_ms(1000U);
@@ -53,21 +67,23 @@ int main(void)
     expect(network_service_status(&status) && status.state == NETWORK_STATE_ONLINE &&
                strcmp(status.ipv4, "192.0.2.10") == 0 && status.signal_dbm == -42,
            "online status propagated");
+    expect(network_service_next_deadline() == UINT64_MAX, "online state has no retry deadline");
     network_address_t address;
-    expect(network_service_resolve("localhost", 4U, &address) == NETWORK_OPERATION_OK &&
-               address.family == 4U && strcmp(address.text, "127.0.0.1") == 0,
+    expect(network_service_resolve("localhost", 4U, &address) == NETWORK_OPERATION_OK && address.family == 4U &&
+               strcmp(address.text, "127.0.0.1") == 0,
            "online resolver delegates to platform");
     expect(network_service_resolve("missing.test", 4U, &address) == NETWORK_OPERATION_NOT_FOUND,
            "resolver preserves deterministic not-found result");
     network_echo_result_t echo;
-    expect(network_service_echo(&address, 7U, 56U, 1000U, &echo) == NETWORK_OPERATION_OK &&
-               echo.sequence == 7U && echo.bytes == 56U && echo.round_trip_ms == 2U,
+    expect(network_service_echo(&address, 7U, 56U, 1000U, &echo) == NETWORK_OPERATION_OK && echo.sequence == 7U &&
+               echo.bytes == 56U && echo.round_trip_ms == 2U,
            "online echo delegates to platform");
     address = (network_address_t) {.family = 4U};
     (void) snprintf(address.text, sizeof(address.text), "%s", "198.51.100.1");
     expect(network_service_echo(&address, 8U, 56U, 1000U, &echo) == NETWORK_OPERATION_TIMEOUT,
            "echo preserves deterministic timeout result");
     expect(network_service_disconnect(), "explicit disconnect succeeds");
+    expect(network_service_next_deadline() == UINT64_MAX, "disconnect cancels retry deadline");
     expect(network_service_resolve("localhost", 4U, &address) == NETWORK_OPERATION_OFFLINE,
            "resolver rejects offline operation");
     test_platform_network_set_state(PLATFORM_NETWORK_FAILED, "late failure");
@@ -82,6 +98,16 @@ int main(void)
     expect(test_platform_network_connect_calls() == 5U && network_service_status(&status) &&
                status.state == NETWORK_STATE_ONLINE,
            "reconnect after disconnect restores online state");
+
+    expect(network_service_connect("test-network", "secret", false), "connect for retry cancellation starts");
+    test_platform_network_set_state(PLATFORM_NETWORK_FAILED, "cancelled failure");
+    network_service_update();
+    expect(network_service_next_deadline() != UINT64_MAX, "failed connection schedules cancellable retry");
+    expect(network_service_disconnect(), "disconnect cancels scheduled retry");
+    expect(network_service_next_deadline() == UINT64_MAX, "scheduled retry deadline is cancelled");
+    test_platform_advance_time_ms(5000U);
+    network_service_update();
+    expect(test_platform_network_connect_calls() == 6U, "cancelled retry does not start later");
 
     network_service_shutdown();
     filesystem_shutdown();

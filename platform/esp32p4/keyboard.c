@@ -1,25 +1,34 @@
 #include "internal.h"
+#include "keyboard_interrupt.h"
 
 #include <tabos/config/identity.h>
 #include <tabos/internal/input.h>
+#include <tabos/platform/platform.h>
 
+#include <driver/gpio.h>
 #include <driver/i2c_master.h>
+#include <esp_attr.h>
 #include <esp_log.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
 #include <stdint.h>
 #include <stdio.h>
+#include <stdatomic.h>
 #include <errno.h>
 
 #define KEYBOARD_I2C_ADDRESS          0x6d
 #define KEYBOARD_I2C_FREQUENCY_HZ     400000
 #define KEYBOARD_REG_INTERRUPT_CONFIG 0x00
+#define KEYBOARD_REG_INTERRUPT_STATUS 0x01
 #define KEYBOARD_REG_EVENT_COUNT      0x02
 #define KEYBOARD_REG_MODE             0x10
 #define KEYBOARD_REG_KEY_EVENT        0x20
 #define KEYBOARD_REG_FIRMWARE_VERSION 0xfe
 #define KEYBOARD_MODE_NORMAL          0
+#define KEYBOARD_INTERRUPT_NORMAL     0x01
+#define KEYBOARD_INTERRUPT_PIN        GPIO_NUM_50
+#define KEYBOARD_DRAIN_PASSES         4U
 #define KEYBOARD_ROWS                 5U
 #define KEYBOARD_COLUMNS              14U
 #define KEYBOARD_KEY_COUNT            (KEYBOARD_ROWS * KEYBOARD_COLUMNS)
@@ -78,6 +87,8 @@ static bool shift_latched;
 static bool sym_used;
 static bool shift_used;
 static bool delete_held;
+static bool keyboard_isr_installed;
+static atomic_bool keyboard_interrupt_pending;
 static char keyboard_name[40] = "Tab5 keyboard not detected";
 
 static esp_err_t keyboard_read(uint8_t reg, void* data, size_t size)
@@ -237,8 +248,84 @@ static void capture_boot_delete(void)
     }
 }
 
+static bool interrupt_read_status(void* context, uint8_t* status)
+{
+    (void) context;
+    return keyboard_read(KEYBOARD_REG_INTERRUPT_STATUS, status, sizeof(*status)) == ESP_OK;
+}
+
+static bool interrupt_read_count(void* context, uint8_t* count)
+{
+    (void) context;
+    return keyboard_read(KEYBOARD_REG_EVENT_COUNT, count, sizeof(*count)) == ESP_OK;
+}
+
+static bool interrupt_read_event(void* context, uint8_t* event)
+{
+    (void) context;
+    return keyboard_read(KEYBOARD_REG_KEY_EVENT, event, sizeof(*event)) == ESP_OK;
+}
+
+static bool interrupt_clear_status(void* context)
+{
+    (void) context;
+    return keyboard_write(KEYBOARD_REG_INTERRUPT_STATUS, 0U) == ESP_OK;
+}
+
+static bool interrupt_asserted(void* context)
+{
+    (void) context;
+    return gpio_get_level(KEYBOARD_INTERRUPT_PIN) == 0;
+}
+
+static void interrupt_submit_event(void* context, uint8_t event)
+{
+    (void) context;
+    submit_matrix_event(event);
+}
+
+static void IRAM_ATTR keyboard_interrupt(void* context)
+{
+    (void) context;
+    atomic_store_explicit(&keyboard_interrupt_pending, true, memory_order_release);
+    platform_runtime_notify_from_isr(PLATFORM_RUNTIME_EVENT_INPUT);
+}
+
+static bool keyboard_interrupt_init(void)
+{
+    const gpio_config_t interrupt_config = {
+        .pin_bit_mask = UINT64_C(1) << KEYBOARD_INTERRUPT_PIN,
+        .mode         = GPIO_MODE_INPUT,
+        .pull_up_en   = GPIO_PULLUP_ENABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type    = GPIO_INTR_NEGEDGE,
+    };
+    if (gpio_config(&interrupt_config) != ESP_OK) {
+        return false;
+    }
+    const esp_err_t install_result = gpio_install_isr_service(0);
+    if (install_result != ESP_OK && install_result != ESP_ERR_INVALID_STATE) {
+        return false;
+    }
+    if (gpio_isr_handler_add(KEYBOARD_INTERRUPT_PIN, keyboard_interrupt, NULL) != ESP_OK) {
+        return false;
+    }
+    keyboard_isr_installed = true;
+    return true;
+}
+
 void tab5_keyboard_shutdown(void)
 {
+    if (keyboard_device != NULL) {
+        (void) keyboard_write(KEYBOARD_REG_INTERRUPT_CONFIG, 0U);
+    }
+    (void) gpio_intr_disable(KEYBOARD_INTERRUPT_PIN);
+    atomic_store_explicit(&keyboard_interrupt_pending, false, memory_order_release);
+    if (keyboard_isr_installed) {
+        (void) gpio_isr_handler_remove(KEYBOARD_INTERRUPT_PIN);
+        keyboard_isr_installed = false;
+    }
+    (void) gpio_reset_pin(KEYBOARD_INTERRUPT_PIN);
     if (keyboard_device != NULL) {
         (void) i2c_master_bus_rm_device(keyboard_device);
         keyboard_device = NULL;
@@ -264,6 +351,7 @@ bool tab5_keyboard_init(void)
 {
     keyboard_detected = false;
     keyboard_error    = 0;
+    atomic_store_explicit(&keyboard_interrupt_pending, false, memory_order_release);
     (void) snprintf(keyboard_name, sizeof(keyboard_name), "Tab5 keyboard not detected");
     const i2c_master_bus_config_t bus_config = {
         .i2c_port                     = I2C_NUM_0,
@@ -276,11 +364,13 @@ bool tab5_keyboard_init(void)
     esp_err_t result = i2c_new_master_bus(&bus_config, &keyboard_bus);
     if (result != ESP_OK) {
         ESP_LOGW(TAG, "Could not initialize Tab5 Keyboard I2C bus: %s", esp_err_to_name(result));
+        keyboard_error = EIO;
         return false;
     }
     result = i2c_master_probe(keyboard_bus, KEYBOARD_I2C_ADDRESS, 100);
     if (result != ESP_OK) {
         ESP_LOGW(TAG, "Tab5 Keyboard not detected at I2C address 0x%02x", KEYBOARD_I2C_ADDRESS);
+        tab5_keyboard_shutdown();
         return false;
     }
     keyboard_detected                       = true;
@@ -293,6 +383,7 @@ bool tab5_keyboard_init(void)
     if (result != ESP_OK) {
         ESP_LOGW(TAG, "Could not attach Tab5 Keyboard I2C device: %s", esp_err_to_name(result));
         keyboard_error = EIO;
+        tab5_keyboard_shutdown();
         return false;
     }
     uint8_t firmware_version = 0U;
@@ -303,15 +394,30 @@ bool tab5_keyboard_init(void)
         tab5_keyboard_shutdown();
         return false;
     }
-    capture_boot_delete();
-    if (keyboard_write(KEYBOARD_REG_EVENT_COUNT, 0U) != ESP_OK ||
-        keyboard_write(KEYBOARD_REG_INTERRUPT_CONFIG, 0U) != ESP_OK) {
+    if (keyboard_write(KEYBOARD_REG_INTERRUPT_CONFIG, 0U) != ESP_OK) {
         ESP_LOGW(TAG, "Could not configure Tab5 Keyboard");
         keyboard_error = EIO;
         tab5_keyboard_shutdown();
         return false;
     }
+    capture_boot_delete();
+    if (keyboard_write(KEYBOARD_REG_INTERRUPT_STATUS, 0U) != ESP_OK || !keyboard_interrupt_init()) {
+        ESP_LOGW(TAG, "Could not configure Tab5 Keyboard interrupt");
+        keyboard_error = EIO;
+        tab5_keyboard_shutdown();
+        return false;
+    }
     keyboard_present = true;
+    if (keyboard_write(KEYBOARD_REG_INTERRUPT_CONFIG, KEYBOARD_INTERRUPT_NORMAL) != ESP_OK) {
+        ESP_LOGW(TAG, "Could not enable Tab5 Keyboard interrupt");
+        keyboard_error = EIO;
+        tab5_keyboard_shutdown();
+        return false;
+    }
+    if (gpio_get_level(KEYBOARD_INTERRUPT_PIN) == 0) {
+        atomic_store_explicit(&keyboard_interrupt_pending, true, memory_order_release);
+        platform_runtime_notify(PLATFORM_RUNTIME_EVENT_INPUT);
+    }
     (void) snprintf(keyboard_name, sizeof(keyboard_name), "Tab5 keyboard FW %u; Normal mode", firmware_version);
     ESP_LOGI(TAG, "Detected keyboard: %s", keyboard_name);
     return true;
@@ -322,20 +428,35 @@ void tab5_keyboard_poll(void)
     if (!keyboard_present) {
         return;
     }
-    uint8_t count = 0U;
-    if (keyboard_read(KEYBOARD_REG_EVENT_COUNT, &count, sizeof(count)) != ESP_OK) {
+    if (!atomic_exchange_explicit(&keyboard_interrupt_pending, false, memory_order_acq_rel) &&
+        gpio_get_level(KEYBOARD_INTERRUPT_PIN) != 0) {
         return;
     }
-    if (count > 32U) {
-        count = 32U;
+    const tab5_keyboard_interrupt_ops_t ops = {
+        .read_status        = interrupt_read_status,
+        .read_count         = interrupt_read_count,
+        .read_event         = interrupt_read_event,
+        .clear_status       = interrupt_clear_status,
+        .interrupt_asserted = interrupt_asserted,
+        .submit_event       = interrupt_submit_event,
+    };
+    bool still_pending = false;
+    if (!tab5_keyboard_interrupt_drain(&ops, KEYBOARD_DRAIN_PASSES, &still_pending)) {
+        ESP_LOGW(TAG, "Tab5 Keyboard interrupt drain failed");
+        keyboard_error   = EIO;
+        keyboard_present = false;
+        (void) gpio_intr_disable(KEYBOARD_INTERRUPT_PIN);
+        return;
     }
-    for (uint8_t index = 0U; index < count; ++index) {
-        uint8_t report = 0xffU;
-        if (keyboard_read(KEYBOARD_REG_KEY_EVENT, &report, sizeof(report)) != ESP_OK || report == 0xffU) {
-            break;
-        }
-        submit_matrix_event(report);
+    if (still_pending || atomic_exchange_explicit(&keyboard_interrupt_pending, false, memory_order_acq_rel)) {
+        atomic_store_explicit(&keyboard_interrupt_pending, true, memory_order_release);
+        platform_runtime_notify(PLATFORM_RUNTIME_EVENT_INPUT);
     }
+}
+
+void platform_keyboard_update(void)
+{
+    tab5_keyboard_poll();
 }
 
 const char* tab5_keyboard_name(void)
@@ -356,6 +477,14 @@ bool tab5_keyboard_detected(void)
 int tab5_keyboard_error(void)
 {
     return keyboard_error;
+}
+
+bool platform_keyboard_health(int* error)
+{
+    if (error != NULL) {
+        *error = keyboard_error;
+    }
+    return keyboard_present && keyboard_error == 0;
 }
 
 bool tab5_keyboard_delete_held(uint32_t window_ms)

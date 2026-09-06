@@ -146,6 +146,11 @@ The ESP-IDF platform backend must detect these at runtime so one firmware image 
 
 Current implementation uses the Tab5 BSP for ILI9881C and ST7123, and the official `espressif/esp_lcd_st7121` component for ST7121. ILI9881C uses the BSP 1000 Mbps DSI rate; ST7121/ST7123 use the M5Stack reference rate of 965 Mbps. Shared TabOS graphics render at 1280x720 RGB565 and the hardware backend rotates counter-clockwise into the panel's native 720x1280 scanout orientation.
 
+GT911 and ST712x touch input is interrupt-driven through active-low GPIO23. Controller
+callbacks only notify runtime task; I2C report reads, drain/recheck, contact matching,
+rotation, delivery, and deterministic fault/shutdown cancellation run in task context.
+Idle runtime updates perform no touch I2C reads.
+
 The detected display name must remain available through the platform API and reported over serial at info level in both debug and release builds. This information will later feed an on-screen boot driver/hardware list.
 
 ## 3. Operating-System Architecture
@@ -203,6 +208,28 @@ The shell is the first planned official TabOS application. It must not be compil
 The kernel currently constructs one structured boot report and sends it to both the platform serial/log sink and a portable framebuffer terminal. Portable graphics embeds raw fixed-width bitmap font assets through assembler `.incbin` and provides a scaled RGB565 terminal renderer with clearing, wrapping, colored text, and scrolling. `config/Font.cmake` defines asset path, glyph width/height, glyph count from 1 through 256, and cell width/height. Packed rows support widths above 8; missing high glyphs fall back to glyph zero. Default is the 256-glyph 8x12 CP437 `graphics/blueterm.f12`. All targets use the same compiled default terminal scale from `TABOS_TERMINAL_SCALE` in `config/Display.cmake`; its default is 2. At this scale, 16x24 glyphs occupy 16x30 terminal cells, yielding exactly 80x24 on 1280x720. Glyphs have no added horizontal spacing. Host rendering must match Tab5 size and wrapping. The public `<tabos/terminal.h>` API can select scale 1 through 8 before or after runtime startup. The runtime retains the active scale and boot report, allowing immediate reflow/redraw; persistence across device restarts is deferred until filesystem/configuration support. Current report entries cover system version, target, detected display, framebuffer, processor, memory, storage state, and kernel runtime state. Tab5 supplies internal heap, PSRAM, physical flash capacity, and mounted microSD filesystem capacity/free space. Host reports its controlled root filesystem capacity/free space. Missing Tab5 microSD is nonfatal and reported as not mounted. The static boot frame is presented once; LCD hardware performs scanout refresh while the platform loop sleeps. This boot console is infrastructure, not the shell application.
 
 The public `<tabos/console.h>` API now supplies one cooperative foreground console session. Only current session can write, clear, inspect cursor, navigate scrollback, or read normalized input; rejected reads do not consume events. Terminal controls support newline, carriage return, four-column tabs, destructive backspace, wrapping, clearing, and scrolling. Terminal state is a colored cell ring retaining visible rows plus `TABOS_TERMINAL_SCROLLBACK_LINES` (default 256) history rows. Viewport is separate from live cursor; cursor hides above live output, and new output returns to end. Scrollback shortcuts are process-owned opt-in TTY policy exposed through `ioctl()`: the shell enables Page Up/Down/Home/End and Tab5 Ctrl+Arrow equivalents, children inherit a value copy, and raw-input applications may disable them without changing the retained parent. Runtime scale changes reflow retained hard/soft lines and redraw cells. Cursor blinks at configurable half-period through reusable polling timer service; input/output restores visible phase. Terminal dirty-cell rendering avoids full glyph redraw for ordinary writes and blink changes. Writes still present framebuffer immediately on every target. Optional `TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP` builds a target-neutral echo/test application under `apps/`; it defaults off and is explicitly not shell.
+
+Portable runtime scheduling carries coalesced TabOS-owned readiness bits and absolute
+monotonic deadlines through the platform boundary. Host uses SDL event waits, including
+headless tests; Tab5 uses FreeRTOS direct task notifications with a separate ISR-safe
+entry point. The platform passes each wake bitset to the portable central dispatcher,
+which invokes only event-ready or expired-deadline owners once per bounded pass and then
+recomputes the nearest deadline. Key repeat, cursor blink, network retry, and finite
+application waits use explicit saturating monotonic deadlines. Late periodic updates run
+once and advance directly to the next future period. No compatibility tick remains. Host
+RV32 guests remain runnable through bounded interpreter slices, while native Tab5
+application tasks do not force runtime spinning. Debug wake diagnostics reuse the
+60-second hardware-health audit and therefore add no independent periodic deadline.
+ESP-IDF Wi-Fi/IP and host-simulated network changes now wake runtime through a platform
+callback; portable network status is copied only after that notification. Device health
+uses immediate service notifications where available and a 60-second audit for keyboard,
+RTC, battery, and storage drivers that cannot report changes.
+
+Native Tab5 application return, ELF exit request, ELF child-exec request, process launch,
+and parent restoration notify runtime through a pointer-free coalesced readiness bit.
+Process state remains authoritative and late wakeups cannot target reused process slots.
+ELF teardown cancels waits and stops native execution before releasing process-owned
+resources. Host RV32 guests continue through explicit bounded interpreter slices.
 
 Portable application foundation defines descriptor and cooperative lifecycle API in
 `<tabos/application.h>`. Fixed-capacity process table exposes PID, parent, and state
@@ -498,6 +525,15 @@ Still to decide:
 
 ## 8. Shell and Terminal
 
+### Current implementation: persistent command history
+
+The shell retains 32 nonblank command lines, excluding consecutive exact duplicates.
+Up/Down recalls entries and restores the unfinished draft; editing a recalled line
+does not mutate stored history. The `history` built-in prints numbered entries.
+Plaintext `T:/user/history.txt` is loaded before the prompt and rewritten through a
+temporary file before executing changed submissions. Missing storage remains nonfatal.
+All history policy and storage use stay within the shell application.
+
 ### Decision
 
 TabOS should boot into or make readily available a keyboard-oriented shell.
@@ -585,22 +621,43 @@ Input events should eventually cover:
 
 The keyboard-first philosophy means reliable low-latency keyboard behavior has priority even though the Tab5 is also a touchscreen device.
 
-### Decision: touch input is deferred
+### Current implementation: touch and pointer input
 
-Touch is not part of the initial terminal interface. Do not prioritize a general touch driver, touch kernel events, host pointer emulation, or touch-facing application API while building the boot console, terminal, keyboard path, and shell. Touch support belongs later with the GUI/windowing system and application input API.
+The public `<tabos/pointer.h>` API exposes process-owned bounded streams of down, move,
+up, and cancel events in logical 1280x720 display coordinates. Only the foreground process
+may consume them. Focus changes, device loss, and queue resets cancel active contacts.
+Tab5 supports GT911 and ST712x-family controllers behind the platform boundary; SDL mouse
+contact 0 and native touch contacts provide the host equivalent. Gestures and window
+routing remain deferred to future GUI clients.
 
-The current ST712x touch-controller access exists only to identify the attached display revision. Keep that narrow probe separate from future kernel touch/input support.
+### Current implementation: camera capture foundation
+
+The public `<tabos/camera.h>` API exposes configured process-owned capture streams with
+copied metadata and frame bytes. Kernel-owned three-slot pools issue opaque
+generation-tagged leases, preserve leased frames, replace the oldest unleased frame for
+slow consumers, and count drops. H.264 pauses backend updates when the pool is full to
+preserve reference pictures; upstream sensor skips are not pool drops.
+Wait sources expose readable, error, and hangup state;
+process teardown reclaims leaked leases. Host supplies deterministic RAW8 fixtures. Tab5
+detects and registers the SC2356 through its platform backend. Dedicated host and Tab5
+capture workers deliver completion callbacks and wake runtime without camera polling.
+Tab5 pins its capture worker to CPU0 because physical testing showed corrupted gray RGB565
+preview data when the V4L2/ISP path could migrate between cores. It blocks in dequeue with a
+two-second stall watchdog; stop paths interrupt capture and join the worker before releasing
+buffers. H.264 checks pool capacity before dequeue and resumes only after lease release.
 
 ### Current implementation: keyboard input
 
 The public `<tabos/input.h>` API exposes physical key-down/key-up events, modifiers,
 repeat state, CP437 text events, and polling/waiting through a thread-safe 64-event queue.
+Queue and repeat state use the platform mutex abstraction; Tab5 therefore uses priority
+inheritance rather than a task-level spinlock that could starve its runtime owner.
 Loaded ELF applications receive this raw API through ABI v6. Terminal stdin preserves
 ANSI arrow sequences; raw and terminal reads share one foreground queue and an application
 must choose one. SDL3 supplies host physical/text events. Tab5 uses ExtPort1 I2C controller
 0 on GPIO0/GPIO1, probes address `0x6D`, reports firmware register `0xFE`, and reads HID-mode
-reports. It polls at 10 ms; GPIO50 interrupt support is a later optimization that must not
-change public semantics. Tab5 text translation is currently US ANSI. Missing keyboard
+reports. GPIO50 interrupt delivery wakes runtime task context, where queued reports are
+drained over I2C. Tab5 text translation is currently US ANSI. Missing keyboard
 hardware is a boot warning, not a fatal initialization error. Optional CMake flag
 `TABOS_ENABLE_KEYBOARD_DIAGNOSTICS` logs normalized events without consuming them and
 defaults off. USB HID keyboards on Tab5 are a future backend; they should coexist with the

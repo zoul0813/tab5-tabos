@@ -12,7 +12,12 @@ if (tabos_timer_poll(&timer)) {
 tabos_timer_cancel(&timer);
 ```
 
-The first duration is delay before first expiration. The second is repeat interval; zero creates one-shot timer. Polling late reports one expiration and advances deadline past current time, preventing catch-up bursts. Timers do not create threads or callbacks. Runtime owner must poll them.
+The first duration is delay before first expiration. The second is repeat interval; zero
+creates a one-shot timer. Polling late reports one expiration and advances directly to
+the next future deadline, preventing catch-up bursts. Finite deadline arithmetic
+saturates instead of wrapping; the internal infinite-wait value remains distinct.
+Timers do not create threads or callbacks. Runtime owner publishes their next deadline
+and polls them after runtime wakes.
 
 `tabos_time_monotonic_ms()` is suitable for elapsed-time measurement and scheduling. It is not wall-clock time and has no date, timezone, or calendar meaning.
 

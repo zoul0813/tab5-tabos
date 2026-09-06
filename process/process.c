@@ -1,6 +1,7 @@
 #include <tabos/internal/application.h>
 #include <tabos/internal/console.h>
 #include <tabos/internal/elf_application.h>
+#include <tabos/internal/pointer.h>
 
 #include <tabos/platform/platform.h>
 
@@ -121,6 +122,7 @@ static void release_process_console(kernel_process_t* process)
 static void finish_child_process(kernel_process_t* child)
 {
     const int status = child->context.exit_status;
+    pointer_service_set_foreground_owner(NULL);
     release_process_console(child);
     destroy_process(child);
     if (foreground_depth > 0U) {
@@ -133,6 +135,7 @@ static void finish_child_process(kernel_process_t* child)
     foreground_process->state                      = TABOS_PROCESS_RUNNING;
     foreground_process->context.child_status       = status;
     foreground_process->context.child_status_valid = true;
+    pointer_service_set_foreground_owner(foreground_process->context.application_data);
     if (!acquire_process_console(foreground_process)) {
         foreground_process->context.exit_status = -1;
         if (foreground_process->id == 0U) {
@@ -141,6 +144,7 @@ static void finish_child_process(kernel_process_t* child)
             foreground_process->context.exit_requested = true;
         }
     }
+    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_APPLICATION);
 }
 
 void kernel_application_system_init(void)
@@ -175,8 +179,19 @@ void kernel_application_system_update(void)
     }
 }
 
+bool kernel_application_system_runnable(void)
+{
+    if (foreground_process == NULL || foreground_process->state != TABOS_PROCESS_RUNNING ||
+        foreground_process->context.exit_requested) {
+        return false;
+    }
+    return loader_elf_application_runtime_runnable(foreground_process->context.descriptor,
+                                                   foreground_process->context.application_data);
+}
+
 void kernel_application_system_shutdown(void)
 {
+    pointer_service_set_foreground_owner(NULL);
     for (size_t index = KERNEL_PROCESS_CAPACITY; index > 0U; --index) {
         if (processes[index - 1U].occupied) {
             destroy_process(&processes[index - 1U]);
@@ -237,16 +252,19 @@ static tabos_app_result_t launch_root_descriptor(const tabos_app_descriptor_t* d
     foreground_stack[0] = 0U;
     foreground_depth    = 1U;
     last_exit_valid     = false;
+    pointer_service_set_foreground_owner(context->application_data);
     if (!descriptor->entry(context)) {
         context->exit_status = -1;
         destroy_process(process);
         foreground_process = NULL;
         foreground_depth   = 0U;
+        pointer_service_set_foreground_owner(NULL);
         return TABOS_APP_RESULT_START_FAILED;
     }
     if (context->exit_requested) {
         panic_root_process(process);
     }
+    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_APPLICATION);
     return TABOS_APP_RESULT_OK;
 }
 
@@ -327,6 +345,7 @@ static tabos_app_result_t launch_child_descriptor(tabos_app_context_t* parent, c
     parent_process->state                = TABOS_PROCESS_BLOCKED;
     foreground_stack[foreground_depth++] = child_id;
     foreground_process                   = child;
+    pointer_service_set_foreground_owner(child->context.application_data);
     if (!acquire_process_console(child) || !descriptor->entry(&child->context)) {
         child->context.exit_status = -1;
         finish_child_process(child);
@@ -334,6 +353,8 @@ static tabos_app_result_t launch_child_descriptor(tabos_app_context_t* parent, c
     }
     if (child->context.exit_requested) {
         finish_child_process(child);
+    } else {
+        platform_runtime_notify(PLATFORM_RUNTIME_EVENT_APPLICATION);
     }
     return TABOS_APP_RESULT_OK;
 }
@@ -411,6 +432,7 @@ void tabos_app_request_exit(tabos_app_context_t* context, int exit_status)
         }
         context->exit_requested = true;
         context->exit_status    = exit_status;
+        platform_runtime_notify(PLATFORM_RUNTIME_EVENT_APPLICATION);
     }
 }
 
@@ -423,6 +445,7 @@ void kernel_process_fail(tabos_app_context_t* context, tabos_process_termination
     context->termination_cause = cause;
     context->exit_requested    = true;
     context->exit_status       = exit_status;
+    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_APPLICATION);
 }
 
 bool kernel_process_force_terminate(tabos_process_id_t process_id, int exit_status)

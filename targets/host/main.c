@@ -39,7 +39,7 @@ int main(int argc, char** argv)
             return 1;
         }
         printf("%s %s on %s\n", TABOS_SYSTEM_NAME, kernel_runtime_version(), platform_name());
-        result                                = platform_run(kernel_runtime_update);
+        result                                = platform_run(kernel_runtime_update, kernel_runtime_next_deadline);
         const platform_system_action_t action = kernel_runtime_take_system_action();
 #if TABOS_ENABLE_FILESYSTEM_DIAGNOSTIC_APP
         int diagnostic_status = -1;

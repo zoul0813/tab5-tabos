@@ -52,6 +52,7 @@ static void elf_task_main(void* argument)
     vTaskSetThreadLocalStoragePointer(NULL, 0, context->user_data);
     context->returned_status = context->entry(&context->api, (int) context->argc, context->argv);
     atomic_store_explicit(&context->finished, true, memory_order_release);
+    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_APPLICATION);
     vTaskSuspend(NULL);
 }
 
@@ -230,6 +231,11 @@ platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* cont
     }
     *returned_status = context->returned_status;
     return PLATFORM_RISCV32_RETURNED;
+}
+
+bool platform_riscv32_requires_runtime_slices(void)
+{
+    return false;
 }
 
 void platform_riscv32_destroy(platform_riscv32_context_t* context)

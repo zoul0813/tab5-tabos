@@ -38,18 +38,19 @@ typedef enum {
 } network_operation_result_t;
 
 typedef struct {
-    uint32_t family;
-    char text[46];
+        uint32_t family;
+        char text[46];
 } network_address_t;
 
 typedef struct {
-    uint32_t sequence;
-    uint32_t bytes;
-    uint32_t round_trip_ms;
+        uint32_t sequence;
+        uint32_t bytes;
+        uint32_t round_trip_ms;
 } network_echo_result_t;
 
 bool network_service_init(void);
 void network_service_update(void);
+uint64_t network_service_next_deadline(void);
 void network_service_shutdown(void);
 bool network_service_connect(const char* ssid, const char* password, bool automatic);
 bool network_service_disconnect(void);

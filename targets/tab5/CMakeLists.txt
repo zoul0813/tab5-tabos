@@ -6,6 +6,7 @@ include("${TABOS_ROOT}/config/Display.cmake")
 include("${TABOS_ROOT}/config/Font.cmake")
 include("${TABOS_ROOT}/config/Filesystem.cmake")
 include("${TABOS_ROOT}/config/Input.cmake")
+include("${TABOS_ROOT}/config/Pointer.cmake")
 include("${TABOS_ROOT}/config/Console.cmake")
 include("${TABOS_ROOT}/config/Acceleration.cmake")
 include("${TABOS_ROOT}/config/Loader.cmake")
@@ -63,6 +64,7 @@ set(EXTRA_COMPONENT_DIRS
 )
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+add_compile_definitions(TABOS_POINTER_MAX_CONTACTS=${TABOS_POINTER_MAX_CONTACTS})
 project(${TABOS_CMAKE_PROJECT_NAME})
 
 if(NOT IDF_VERSION_MAJOR EQUAL 5 OR

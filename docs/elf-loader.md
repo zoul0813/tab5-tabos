@@ -103,6 +103,8 @@ descriptors from 3 upward. It owns an inherited working directory, errno state, 
 metadata-selected (or legacy-default) 16 KiB stack. Its heap grows on demand to its
 metadata-selected (or legacy-default) 256 KiB limit. Process cleanup closes open
 descriptors and releases guest memory, task stack, heap, and executable memory.
+On Tab5, native return, exit, and child-exec work notify runtime immediately; cleanup
+stops native task before releasing anything reachable through an application call gate.
 
 ## Tab5 Hardware Test
 

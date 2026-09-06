@@ -32,12 +32,23 @@ static atomic_bool wifi_starting;
 static atomic_int wifi_state;
 static atomic_bool wifi_disconnect_requested;
 static SemaphoreHandle_t wifi_status_mutex;
+static _Atomic(TaskHandle_t) runtime_task;
+static atomic_uint runtime_events;
 static bool wifi_connect_pending;
 static char wifi_ssid[33];
 static char wifi_password[65];
 static char wifi_hostname[33];
 static char wifi_ipv4[16];
 static char wifi_failure[64];
+static platform_network_event_fn wifi_event_callback;
+
+static void set_wifi_state(platform_network_state_t state)
+{
+    atomic_store_explicit(&wifi_state, state, memory_order_release);
+    if (wifi_event_callback != NULL) {
+        wifi_event_callback();
+    }
+}
 
 static void network_event(void* argument, esp_event_base_t base, int32_t id, void* data)
 {
@@ -45,14 +56,14 @@ static void network_event(void* argument, esp_event_base_t base, int32_t id, voi
     if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
         const wifi_event_sta_disconnected_t* event = data;
         if (atomic_exchange_explicit(&wifi_disconnect_requested, false, memory_order_acq_rel)) {
-            atomic_store_explicit(&wifi_state, PLATFORM_NETWORK_OFFLINE, memory_order_release);
+            set_wifi_state(PLATFORM_NETWORK_OFFLINE);
         } else {
             if (xSemaphoreTake(wifi_status_mutex, portMAX_DELAY) == pdTRUE) {
                 (void) snprintf(wifi_failure, sizeof(wifi_failure), "Wi-Fi disconnect reason %u",
                                 event != NULL ? event->reason : 0U);
                 xSemaphoreGive(wifi_status_mutex);
             }
-            atomic_store_explicit(&wifi_state, PLATFORM_NETWORK_FAILED, memory_order_release);
+            set_wifi_state(PLATFORM_NETWORK_FAILED);
         }
     } else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
         const ip_event_got_ip_t* event = data;
@@ -60,7 +71,7 @@ static void network_event(void* argument, esp_event_base_t base, int32_t id, voi
             (void) snprintf(wifi_ipv4, sizeof(wifi_ipv4), IPSTR, IP2STR(&event->ip_info.ip));
             xSemaphoreGive(wifi_status_mutex);
         }
-        atomic_store_explicit(&wifi_state, PLATFORM_NETWORK_ONLINE, memory_order_release);
+        set_wifi_state(PLATFORM_NETWORK_ONLINE);
     }
 }
 
@@ -83,7 +94,10 @@ bool platform_init(bool headless)
 {
     (void) headless;
     atomic_store_explicit(&stop_requested, false, memory_order_release);
-    hosted_initialized = false;
+    atomic_store_explicit(&runtime_events, 0U, memory_order_release);
+    atomic_store_explicit(&runtime_task, NULL, memory_order_release);
+    wifi_event_callback = NULL;
+    hosted_initialized  = false;
     if (!platform_usb_port_disable_host_power()) {
         ESP_LOGW(TAG, "Could not place USB-A port in safe unpowered state; continuing normal boot");
     }
@@ -128,7 +142,7 @@ static bool wifi_driver_init(void)
         esp_wifi_set_mode(WIFI_MODE_STA) != ESP_OK || esp_wifi_start() != ESP_OK) {
         return false;
     }
-    atomic_store_explicit(&wifi_state, PLATFORM_NETWORK_OFFLINE, memory_order_release);
+    set_wifi_state(PLATFORM_NETWORK_OFFLINE);
     atomic_store_explicit(&wifi_disconnect_requested, false, memory_order_release);
     atomic_store_explicit(&wifi_initialized, true, memory_order_release);
     return true;
@@ -139,7 +153,7 @@ static void wifi_start(void* argument)
     (void) argument;
     if (esp_hosted_slave_reset() != ESP_OK) {
         ESP_LOGW(TAG, "ESP32-C6 hosted transport did not become ready");
-        atomic_store_explicit(&wifi_state, PLATFORM_NETWORK_FAILED, memory_order_release);
+        set_wifi_state(PLATFORM_NETWORK_FAILED);
         atomic_store_explicit(&wifi_starting, false, memory_order_release);
         vTaskDelete(NULL);
         return;
@@ -153,7 +167,7 @@ static void wifi_start(void* argument)
     }
     if (!wifi_driver_init()) {
         ESP_LOGW(TAG, "ESP32-C6 Wi-Fi initialization failed");
-        atomic_store_explicit(&wifi_state, PLATFORM_NETWORK_FAILED, memory_order_release);
+        set_wifi_state(PLATFORM_NETWORK_FAILED);
         atomic_store_explicit(&wifi_starting, false, memory_order_release);
         vTaskDelete(NULL);
         return;
@@ -173,18 +187,18 @@ static void wifi_start(void* argument)
         xSemaphoreGive(wifi_status_mutex);
     }
     if (connect_pending) {
-        atomic_store_explicit(&wifi_state, PLATFORM_NETWORK_CONNECTING, memory_order_release);
+        set_wifi_state(PLATFORM_NETWORK_CONNECTING);
         if (esp_wifi_set_config(WIFI_IF_STA, &config) != ESP_OK || esp_wifi_connect() != ESP_OK) {
-            atomic_store_explicit(&wifi_state, PLATFORM_NETWORK_FAILED, memory_order_release);
+            set_wifi_state(PLATFORM_NETWORK_FAILED);
         }
     } else {
-        atomic_store_explicit(&wifi_state, PLATFORM_NETWORK_OFFLINE, memory_order_release);
+        set_wifi_state(PLATFORM_NETWORK_OFFLINE);
     }
     atomic_store_explicit(&wifi_starting, false, memory_order_release);
     vTaskDelete(NULL);
 }
 
-bool platform_network_init(const char* hostname)
+bool platform_network_init(const char* hostname, platform_network_event_fn event)
 {
     if (!hosted_initialized || hostname == NULL || hostname[0] == '\0' || strlen(hostname) > 32U) {
         return false;
@@ -194,13 +208,15 @@ bool platform_network_init(const char* hostname)
         return false;
     }
     wifi_connect_pending = false;
+    wifi_event_callback  = event;
     (void) snprintf(wifi_hostname, sizeof(wifi_hostname), "%s", hostname);
-    atomic_store_explicit(&wifi_state, PLATFORM_NETWORK_STARTING, memory_order_release);
+    set_wifi_state(PLATFORM_NETWORK_STARTING);
     atomic_store_explicit(&wifi_starting, true, memory_order_release);
     if (xTaskCreate(wifi_start, "tabos_wifi_start", 4096U, NULL, 5U, &wifi_start_task) != pdPASS) {
         atomic_store_explicit(&wifi_starting, false, memory_order_release);
         vSemaphoreDelete(wifi_status_mutex);
-        wifi_status_mutex = NULL;
+        wifi_status_mutex   = NULL;
+        wifi_event_callback = NULL;
         return false;
     }
     return true;
@@ -216,6 +232,7 @@ void platform_network_shutdown(void)
             vSemaphoreDelete(wifi_status_mutex);
             wifi_status_mutex = NULL;
         }
+        wifi_event_callback = NULL;
         return;
     }
     (void) esp_event_handler_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, network_event);
@@ -225,6 +242,7 @@ void platform_network_shutdown(void)
     vSemaphoreDelete(wifi_status_mutex);
     wifi_status_mutex = NULL;
     atomic_store_explicit(&wifi_initialized, false, memory_order_release);
+    wifi_event_callback = NULL;
 }
 
 bool platform_network_connect(const char* ssid, const char* password)
@@ -241,7 +259,7 @@ bool platform_network_connect(const char* ssid, const char* password)
             wifi_connect_pending = true;
             xSemaphoreGive(wifi_status_mutex);
         }
-        atomic_store_explicit(&wifi_state, PLATFORM_NETWORK_CONNECTING, memory_order_release);
+        set_wifi_state(PLATFORM_NETWORK_CONNECTING);
         return true;
     }
     wifi_config_t config = {0};
@@ -257,9 +275,9 @@ bool platform_network_connect(const char* ssid, const char* password)
         xSemaphoreGive(wifi_status_mutex);
     }
     atomic_store_explicit(&wifi_disconnect_requested, false, memory_order_release);
-    atomic_store_explicit(&wifi_state, PLATFORM_NETWORK_CONNECTING, memory_order_release);
+    set_wifi_state(PLATFORM_NETWORK_CONNECTING);
     if (esp_wifi_set_config(WIFI_IF_STA, &config) != ESP_OK || esp_wifi_connect() != ESP_OK) {
-        atomic_store_explicit(&wifi_state, PLATFORM_NETWORK_FAILED, memory_order_release);
+        set_wifi_state(PLATFORM_NETWORK_FAILED);
         return false;
     }
     return true;
@@ -273,12 +291,12 @@ bool platform_network_disconnect(void)
             wifi_password[0]     = '\0';
             xSemaphoreGive(wifi_status_mutex);
         }
-        atomic_store_explicit(&wifi_state, PLATFORM_NETWORK_OFFLINE, memory_order_release);
+        set_wifi_state(PLATFORM_NETWORK_OFFLINE);
         return true;
     }
     atomic_store_explicit(&wifi_disconnect_requested, true, memory_order_release);
     const esp_err_t result = esp_wifi_disconnect();
-    atomic_store_explicit(&wifi_state, PLATFORM_NETWORK_OFFLINE, memory_order_release);
+    set_wifi_state(PLATFORM_NETWORK_OFFLINE);
     if (xSemaphoreTake(wifi_status_mutex, portMAX_DELAY) == pdTRUE) {
         wifi_ipv4[0] = '\0';
         xSemaphoreGive(wifi_status_mutex);
@@ -310,26 +328,85 @@ bool platform_network_status(platform_network_status_t* status)
     return true;
 }
 
-int platform_run(platform_update_fn update)
+int platform_run(platform_update_fn update, platform_deadline_fn next_deadline)
 {
     ESP_LOGI(TAG, "Tab5 platform run loop started");
+    atomic_store_explicit(&runtime_task, xTaskGetCurrentTaskHandle(), memory_order_release);
+    uint64_t deadline                = platform_time_ms();
+    platform_runtime_events_t events = platform_runtime_wait_until(deadline);
     while (!atomic_load_explicit(&stop_requested, memory_order_acquire)) {
-        tab5_keyboard_poll();
         if (update != NULL) {
-            update();
+            update(events);
         }
-        vTaskDelay(pdMS_TO_TICKS(10));
+        if (!atomic_load_explicit(&stop_requested, memory_order_acquire)) {
+            deadline = next_deadline != NULL ? next_deadline() : PLATFORM_RUNTIME_DEADLINE_NONE;
+            events   = platform_runtime_wait_until(deadline);
+        }
     }
+    atomic_store_explicit(&runtime_task, NULL, memory_order_release);
     return 0;
 }
 
 void platform_stop_run_loop(void)
 {
     atomic_store_explicit(&stop_requested, true, memory_order_release);
+    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_SHUTDOWN);
+}
+
+void platform_runtime_notify(platform_runtime_events_t events)
+{
+    if (events == PLATFORM_RUNTIME_EVENT_NONE) {
+        return;
+    }
+    atomic_fetch_or_explicit(&runtime_events, events, memory_order_release);
+    TaskHandle_t task = atomic_load_explicit(&runtime_task, memory_order_acquire);
+    if (task != NULL) {
+        xTaskNotifyGive(task);
+    }
+}
+
+void platform_runtime_notify_from_isr(platform_runtime_events_t events)
+{
+    if (events == PLATFORM_RUNTIME_EVENT_NONE) {
+        return;
+    }
+    atomic_fetch_or_explicit(&runtime_events, events, memory_order_release);
+    TaskHandle_t task = atomic_load_explicit(&runtime_task, memory_order_acquire);
+    if (task != NULL) {
+        BaseType_t higher_priority_task_woken = pdFALSE;
+        vTaskNotifyGiveFromISR(task, &higher_priority_task_woken);
+        portYIELD_FROM_ISR(higher_priority_task_woken);
+    }
+}
+
+platform_runtime_events_t platform_runtime_wait_until(uint64_t deadline_ms)
+{
+    for (;;) {
+        platform_runtime_events_t events = atomic_exchange_explicit(&runtime_events, 0U, memory_order_acq_rel);
+        const uint64_t now               = platform_time_ms();
+        if (deadline_ms != PLATFORM_RUNTIME_DEADLINE_NONE && now >= deadline_ms) {
+            events |= PLATFORM_RUNTIME_EVENT_DEADLINE;
+        }
+        if (events != PLATFORM_RUNTIME_EVENT_NONE) {
+            (void) ulTaskNotifyTake(pdTRUE, 0U);
+            return events;
+        }
+        TickType_t wait_ticks = portMAX_DELAY;
+        if (deadline_ms != PLATFORM_RUNTIME_DEADLINE_NONE) {
+            const uint64_t remaining_ms    = deadline_ms - now;
+            const uint64_t maximum_wait_ms = ((uint64_t) (portMAX_DELAY - 1U) * 1000U) / configTICK_RATE_HZ;
+            wait_ticks = remaining_ms >= maximum_wait_ms ? portMAX_DELAY - 1U : pdMS_TO_TICKS(remaining_ms);
+            if (wait_ticks == 0U) {
+                wait_ticks = 1U;
+            }
+        }
+        (void) ulTaskNotifyTake(pdTRUE, wait_ticks);
+    }
 }
 
 void platform_shutdown(void)
 {
+    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_SHUTDOWN);
     if (hosted_initialized) {
         (void) esp_hosted_deinit();
         hosted_initialized = false;

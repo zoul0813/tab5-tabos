@@ -17,7 +17,10 @@ installs it as `.local/rootfs/T/bin/shell`. Use `make -C apps/shell build` to bu
 without installing. The unstripped ELF remains at
 `build/apps/shell/shell.elf` for debugging.
 
-Command entry accepts and echoes printable ASCII. ANSI escape sequences, including
-arrow-key sequences, and non-ASCII input bytes are ignored.
+Command entry accepts and echoes printable ASCII. Up/Down recalls the last 32 commands;
+Down past the newest entry restores the unfinished line. The `history` built-in
+prints retained commands. History persists in `T:/user/history.txt`; consecutive
+exact duplicates and blank lines are skipped. Other escape sequences and non-ASCII
+input bytes are ignored. Ctrl+Arrow still navigates terminal scrollback.
 
-See `docs/shell.md` for commands and runtime behavior.
+See [Shell](../../docs/shell.md) for commands, persistence, and runtime behavior.

@@ -177,6 +177,36 @@ This should make normal development substantially faster.
 - Info-level serial logging is required in debug and release so detected hardware remains visible during boot.
 - Current host suite has unit, integration, architecture-boundary, and invalid-target tests. Display transforms must remain host-unit-tested.
 
+### Event and deadline runtime validation
+
+Runtime wake tests use both deterministic platform fakes and the real headless SDL
+backend. Coverage must prove duplicate-bit coalescing, simultaneous event preservation,
+task notification, simulated ISR notification, indefinite blocking, no return before an
+absolute monotonic deadline, and shutdown wakeup. Tests must notify a blocked longer wait
+when a producer creates earlier work so the runtime can recompute its nearest deadline.
+
+Platform contract tests must keep SDL and FreeRTOS types below the portable boundary.
+Tab5 cross-builds validate the direct-task-notification and ISR-safe paths; physical
+interrupt phases add hardware timing and teardown validation separately. Central-dispatch
+tests must prove an idle or unrelated event does not poll keyboard or network state, and
+an input event invokes the keyboard backend exactly once per bounded dispatch. No 10 ms
+compatibility deadline remains.
+Network-service tests count platform status reads and prove idle runtime updates perform
+none; one coalesced backend transition causes one copied status read. Core smoke tests
+advance fake monotonic time to exercise the 60-second hardware-health audit explicitly.
+
+Deadline-service tests use fake monotonic time and must prove exact key-repeat, cursor,
+network-retry, and finite-wait deadlines; no firing one millisecond early; immediate
+cancellation on release, reset, fullscreen ownership, disconnect, and shutdown; one
+update after multiple missed periods; and next-deadline advancement strictly into the
+future. Saturation tests must prove finite additions never wrap into the past and never
+collide with `UINT64_MAX`, which remains the infinite/no-deadline sentinel.
+
+Input concurrency validation must exercise runtime production and application
+consumption from separate tasks. Queue synchronization must block/yield through the
+platform mutex rather than spin while another schedulable task owns the queue; physical
+Tab5 idle testing must show no `IDLE0` watchdog report in `lock_queue`.
+
 Host builds are especially useful for:
 
 - shell development
@@ -223,6 +253,12 @@ fault, and forced termination. Console tests build against the platform mutex co
 hardware validation remains responsible for detecting task starvation, lock inversion,
 and watchdog regressions under the FreeRTOS implementation.
 
+Lifecycle tests also require application readiness on root/child launch, nested exit,
+and parent restoration. Tab5 validation must prove native return, explicit exit, and
+child execution wake a blocked runtime promptly. Late coalesced application readiness
+must be harmless after process teardown or process-slot reuse. Cleanup must stop native
+execution before releasing process-owned resources.
+
 Host RV32 tests must force multiple instruction-slice yields before child completion and
 verify retained PC, registers, memory, and parent state. Tab5 tests must keep native child
 active while independently proving keyboard polling, timer/cursor updates, display work,
@@ -246,6 +282,27 @@ backend waits, monotonic timeout, readiness clearing, source ordering, mixed soc
 readiness, stale and foreign handles, interrupted waits, and leaked-source process cleanup. With configured
 online Wi-Fi, a nested tester child disconnects and reconnects the network so the retained
 parent can verify `wifi0` lifecycle readiness without a test-only device mutation API.
+
+Pointer validation injects synthetic SDL mouse and touch events and covers stable
+multi-contact IDs, logical coordinates, foreground-only reads, generic wait readiness,
+focus cancellation, bounded-queue reset, device removal, stale handles, and process
+cleanup. Controller-neutral GT911 and ST712x interrupt fakes cover report drain/recheck,
+stable contact matching, multitouch, rapid retouch, stationary-report suppression, bounded rescheduling,
+fault cancellation, and shutdown cancellation. Physical validation must still confirm
+down/move/up, multitouch, rapid retouch, long stationary contact, and orientation
+independently on GT911, ST7123, and ST7121 Tab5 revisions.
+
+Camera concurrency regression uses real host mutexes and concurrent wake threads while
+streams close and reclaim outstanding leases. Worker wake operations must serialize with
+start/stop. Real host-backend coverage must prove frame completion without runtime polling,
+runtime notification, H.264 capacity blocking, release-driven resume, and joined close.
+
+Camera-foundation validation uses deterministic frames and covers bounded pool
+exhaustion, oldest-unleased replacement, drop accounting, opaque lease generation,
+foreign/stale rejection, copied frame bytes, wait readiness/error/hangup, and process
+cleanup. macOS simulator RAW8, RGB565, fullscreen preview, JPEG, and H.264 utility paths
+have been manually verified. Physical SC2356 completion-worker stop, teardown, all-format,
+performance, and responsiveness checks remain required.
 
 ---
 
@@ -535,13 +592,19 @@ Hardware-specific tests are still required for the real STM32 keyboard controlle
 
 ## 9. Touch and Pointer Simulation
 
-This section describes eventual GUI/input testing, not current implementation priority. Touch and host pointer-to-touch mapping are deferred until the windowing system and application touch API. Terminal, keyboard, and shell work should not wait for touch support.
+Touch and host pointer input now share the public pointer stream service. GUI gestures and
+window-level routing remain deferred; terminal, keyboard, and shell behavior do not depend
+on pointer input.
 
 Current keyboard coverage includes host tests for HID-to-text translation, key/text event ordering, queue overflow policy, and runtime bootstrap with a fake keyboard platform. SDL3 and the Tab5 I2C backend feed the same public queue. Hardware validation must confirm that boot diagnostics show `TAB5 KEYBOARD FW ...; HID MODE`; missing keyboard must remain a warning rather than preventing boot. Builds configured with `TABOS_ENABLE_KEYBOARD_DIAGNOSTICS=ON` also log every normalized key/text event without consuming the queue; this flag defaults off. USB HID keyboards on Tab5 are not yet supported.
 
 Console tests cover exclusive foreground acquisition, background and stale-session rejection, rejected-read non-consumption, cursor pixels and blink phase, clearing, history ring overflow, Page Up/Down/Home/End navigation, automatic return to live output, and scale reflow with retained cells. Timer tests cover one-shot, repeating, late-poll skipping, and cancellation behavior with fake monotonic time. Manual validation must verify shell opt-in consumes Page Up/Down/Home/End and Tab5 Ctrl+Arrow equivalents, a disabled mode delivers those events to the application, children inherit by value, and returning to the parent restores its unchanged mode. `TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP=ON` provides manual cross-target keyboard-to-framebuffer validation and defaults off. Diagnostic application is not shell.
 
 Application lifecycle tests cover descriptor validation, duplicate rejection, registry lookup, startup failure cleanup, PID metadata, process-table retention, PID 0→1→2 nesting, blocked-parent state, console focus transfer, reverse-order status unwind, root-exit panic transition, and shutdown cleanup. Runtime smoke test verifies configured `console-test` remains PID 0 after Ctrl+Q reports completion. Same portable lifecycle code compiles into host and Tab5; host executes deterministic tests while Tab5 cross-build verifies target compatibility.
+
+Host integration smoke tests initialize and exercise the runtime without launching
+the configured startup application. They must not depend on separately installed
+filesystem application artifacts such as `T:/bin/shell`.
 
 The C runtime test matrix must use the same independently built applications on
 host and Tab5. Cover `main(argc, argv)`, return-to-exit status, descriptors
@@ -847,6 +910,29 @@ These tests should validate subsystem contracts without requiring the full simul
 ---
 
 ## 19. Host Integration Tests
+
+### Shell history validation
+
+`unit.shell_input` and `unit.shell_history` cover split arrow sequences, editing,
+draft restoration, duplicates, capacity, and preservation before parser mutation.
+`component.shell_history_file` uses a temporary drive with injected write, close, and
+rename failures. `component.shell_session` runs the native shell loop with controlled
+input/process boundaries and checks restart persistence, numbered output, and wrapped
+line replacement through the real terminal model.
+
+The optional `tabos_shell_rv32` harness runs the actual SDK-built shell with real host
+runtime, interpreter, and filesystem services, mapping `T:` to a temporary directory.
+After building host tests and the shell, run:
+
+```sh
+build/macos-debug/tests/tabos_shell_rv32 build/apps/shell/shell
+```
+
+Use the matching `build/linux-debug/` path on Linux. This harness is deliberately
+outside ordinary CTest registration so host smoke tests do not require separately
+built applications. It verifies saved history, runtime restart, recalled command
+editing, and unchanged Ctrl+Arrow policy. Physical Tab5 Up/Down, wrap behavior, and
+microSD persistence across reboot still require device validation.
 
 The full host build should support integration testing.
 

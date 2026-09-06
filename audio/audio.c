@@ -637,4 +637,5 @@ void audio_service_error(int error)
         }
     }
     platform_mutex_unlock(audio_mutex);
+    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_AUDIO | PLATFORM_RUNTIME_EVENT_DEVICE);
 }

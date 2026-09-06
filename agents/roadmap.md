@@ -104,6 +104,81 @@
 - [x] Validate Debug/Release builds on macOS and Tab5.
 - [ ] Validate Debug/Release builds on Linux.
 - [ ] Validate rendering, repeated load/unload, terminal restoration, and performance on physical Tab5.
+### Persistent Shell History
+
+- [x] Implement shell-local 32-entry recall, editable drafts, and `history` listing.
+- [x] Persist history to `T:/user/history.txt` with recoverable storage failures.
+- [x] Validate input, navigation, filesystem failures, wrapped rendering, and shell restart on host.
+- [x] Cross-build the independent RV32 shell and run its restart/recall check in the host interpreter.
+- [ ] Verify Up/Down, Ctrl+Arrow scrollback, and persistence across physical Tab5 reboot.
+
+### Event-Driven Runtime and ISR Milestone
+
+- [x] Phase 1: define portable readiness bits and absolute monotonic deadline contract.
+- [x] Implement coalescing task/ISR notifications and blocking waits on host and Tab5.
+- [x] Aggregate key-repeat, cursor, network-retry, and compatibility polling deadlines.
+- [x] Keep active host RV32 interpretation runnable without spinning for native Tab5 tasks.
+- [x] Add deterministic fake and real headless-SDL runtime wake/deadline tests.
+- [x] Cross-build Phase 1 for Tab5 Debug.
+- [x] Physical Phase 1 smoke: shell boot, `touchtest`, input/touch/cursor, and application
+  lifecycle work without watchdog, crash, or freeze. Intermittent known PI4IO headphone-
+  detect read failures remain separately deferred.
+- [x] Phase 2: convert Tab5 keyboard polling to GPIO50 interrupt-driven wake.
+- [x] Phase 5: convert network and device state to notifications plus low-rate health audit.
+- [x] Phase 3 implementation: convert Tab5 GT911/ST712x touch reads to GPIO23
+  interrupt-driven wake, with drain/recheck and deterministic cancellation.
+- [ ] Phase 3 hardware validation: verify down/move/up, multitouch, rapid retouch,
+  stationary contact, and orientation on GT911, ST7123, and ST7121 revisions.
+- [x] Phase 4: drive key repeat, cursor blink, network retry, and finite waits from
+  explicit saturating monotonic deadlines; skip missed-period replay and cancel obsolete
+  deadlines immediately.
+- [x] Phase 6: move host and Tab5 camera capture to completion workers with runtime wake,
+  bounded stall watchdog, joined teardown, and release-driven H.264 backpressure.
+- [x] Phase 7: notify runtime for native application completion and ELF process work;
+  stop native execution before releasing process-owned resources.
+- [x] Phase 8: pass wake bits into one bounded central dispatcher, remove the 10 ms
+  compatibility deadline, and record debug wake counts without adding a timer.
+
+### Low-Power Integration Milestone
+
+- [x] Accept interrupt/event-runtime handoff as power-policy foundation.
+- [ ] Slice 1: implement portable power manager, dependency-ordered service registration,
+  platform sleep contract, and deterministic host controls.
+- [ ] Slice 2: implement activity-driven idle dimming and measure each power reduction.
+
+### Hardware Services Phase 6 Validation
+
+- [x] Physical RAW8 capture writes 921,600 payload bytes to microSD (operator confirmed).
+- [x] Physical RGB565 capture writes 1,843,200 bytes with the updated utility.
+- [x] RGB565 rerun writes full payload with no blue flash or capture-time task watchdog.
+- [x] H.264 utility writes 30 frames to SD; reports 16 dropped.
+- [x] Inspect physical H.264 output: 30 coded slices yield only 15 decoded pictures.
+- [x] Preserve H.264 references with pool backpressure; threaded stall regression passes.
+- [x] Re-record and decode H.264: 30 written, zero pool drops, all 30 pictures decode cleanly at 1280x720;
+  measured throughput recorded separately from configured FPS.
+- [x] Operator inspected corrected H.264 playback and reports video looks "ok" (basic visual acceptance).
+- [x] Resolve observed runtime CCM overflow after white balance; physical varied-light validation passes.
+
+- [x] Expand deterministic camera pool/lease/drop tests and add threaded backend lifecycle regression.
+- [x] Serialize camera updates from runtime and application waits with start/stop.
+- [x] Validate expanded maintained tester on Tab5: operator reports 33 camera assertions, zero failures.
+- [x] Physical preview looks acceptable and keyboard `q` exits correctly (operator confirmed).
+- [x] Run expanded maintained camera tester on host: RV32 application exits zero under ASan/UBSan.
+- [x] Full Tab5 SDK tester after preview: operator reports 176 assertions, zero failures.
+- [x] Add opt-in camera/audio/UDP/storage overlap test; real RV32 app passes on host with SDL dummy audio and ASan/UBSan.
+- [x] Physical overlap test: 43 assertions, zero failures; six rounds in 632 ms, longest 155 ms. Capture-time logs show no stack overflow, watchdog, CCM, or I2C errors; transient dequeue warnings remain.
+- [x] Fix overlap tester stack overflow: move 12 KiB buffers to heap; RV32 static frame drops from 12,688 to 400 bytes.
+- [x] Trace ordinary dequeue `EPERM` to pinned video driver's empty ready-wait mapping; count misses and warn on prolonged stalls instead of each timeout.
+- [x] Add first-rejected final CCM matrix diagnostic; Debug/Release builds and architecture checks pass, Debug flashed.
+- [x] Preview/Wi-Fi coexistence: operator reports 44/44 ping replies, average 142.931 ms, peak 1037.393 ms; recurring CCM overflow reproduced.
+- [x] Bound final CCM coefficients while preserving neutral row sums; measured-matrix and edge-case regressions pass.
+- [x] Physical CCM correction/preview pass: correction applied, no CCM rejection or capture-time I2C/watchdog/stall errors; operator reports expected visuals, 48/48 ping replies.
+- [ ] Paused by user (2026-09-05): remaining Phase 6 acceptance gaps are deferred. Preview plus user-triggered snapshot is the validated application workflow; resume only when requested.
+- [x] Physical camera child cleanup: 31 assertions, zero failures, 12 starts/stops without I2C or teardown errors on final firmware.
+- [x] Record RAW8/RGB565/H.264 throughput, timing, memory, drops, and service progress.
+- [x] Inspect supplied still files and record JPEG timing (78.95 ms encoding/backend frame).
+- [ ] Deferred: automatic CLI still readiness, recurring RAW8/RGB565 IO-expander read errors, and image-quality limitations. Snapshot preserves the displayed scene and orientation.
+- [ ] Phase 6 remains paused, not fully complete; deferred items recorded in `hardware-services.md`.
 
 ### RTC and Wall Clock
 
@@ -296,7 +371,7 @@
 - [x] Disable keyboard diagnostics by default after hardware validation.
 - [x] Verify physical Tab5 keyboard produces correct serial diagnostic events.
 - [ ] Add Tab5 USB HID keyboard backend using same input queue.
-- [ ] Replace Tab5 keyboard polling with interrupt-driven wakeup if measurements justify it.
+- [x] Replace Tab5 keyboard polling with GPIO50 interrupt-driven wakeup.
 
 ### Application Lifecycle
 
@@ -598,8 +673,18 @@ but is not a substitute for this execution path.
 - [x] Add RTC and wall-clock service with live `rtc0` fault/ready reporting; physical restart-retention validation remains.
 - [x] Add validated battery telemetry fields, charger controls, and live `battery0` fault/ready reporting;
   physical telemetry, charger, external-power, and shutdown validation remains.
+- [x] Add the process-owned pointer service, `touch0` discovery, logical coordinates,
+  generic waits, foreground focus cancellation, SDL mouse/touch input, Tab5 GT911/ST712x
+  backends, `touchtest`, and automated host coverage.
+- [ ] Validate pointer orientation and input on physical ILI9881C/GT911, ST7123, and ST7121 revisions.
+- [x] Add camera capture foundation: SC2356 discovery, process-owned streams, bounded
+  kernel frame pools, opaque leases, generic waits, cleanup, and deterministic host RAW8 fixtures.
+- [x] Implement Tab5 CSI capture, RAW8 luminance conversion, RGB565 preview frames,
+  hardware JPEG encoding, and hardware H.264 encoding.
+- [ ] Physically validate Tab5 raw frames, RGB preview, camera utility, encoding stages,
+  memory use, throughput, and service responsiveness; equivalent macOS simulator paths
+  are manually verified.
 - [ ] Add USB host/OTG service beyond keyboard support.
-- [ ] Add camera service when application needs justify it.
 - [ ] Add supported sensor APIs.
 - [x] Add initial device/system information API.
 
@@ -642,6 +727,11 @@ but is not a substitute for this execution path.
 
 ## Maintenance and Technical Debt
 
+- [ ] Centralize or make idempotent Tab5 GPIO ISR-service installation. Keyboard may
+  install the shared ESP-IDF service before ST7121 touch initialization, currently
+  producing a benign `GPIO isr service already installed` error-level boot message.
+- [ ] Replace or reduce the 50 ms PI4IO headphone-detect poll; shared-I2C read failures
+  currently produce intermittent error logs during touch activity.
 - [x] Migrate existing generic `tab_*` and internal-only `tabos_*` symbols to decided
   layer/subsystem prefixes without changing public `tabos_*` ABI.
 - [x] Rename portable platform contract from `tab_platform_*` to `platform_*`.
@@ -656,7 +746,8 @@ but is not a substitute for this execution path.
 - [ ] Review experimental ELF loader for final ABI-independent boundaries before extending it.
 - [ ] Replace provisional storage namespace examples only after mount-layout decision.
 - [ ] Measure terminal dirty-rendering cost on hardware as output volume increases.
-- [ ] Measure keyboard polling overhead before implementing interrupt path.
+- [x] Remove the keyboard polling path; retain latency and power measurement as hardware
+  validation rather than an implementation prerequisite.
 - [ ] Audit tracked files and generated artifacts before releases.
 
 ## Explicitly Deferred

@@ -48,6 +48,10 @@ slice and currently reports an unsupported operation.
 policy, attempt count, SSID, IPv4 address, signal strength, and last failure
 when those fields are available. It never reports the password.
 
+Failed autoconnect attempts use an exact monotonic retry deadline. Disconnecting or
+starting an explicit connection cancels pending retry immediately; retry never fires
+before its configured delay.
+
 Interactive credential entry, scanning, and forgetting credentials are not
 implemented yet.
 
@@ -108,7 +112,9 @@ polls immediately, a finite timeout uses monotonic milliseconds, and
 `TABOS_WAIT_TIMEOUT_INFINITE` waits until an event or process cleanup interrupts
 the operation. The return value is the number of ready items, zero for timeout,
 or `-1` with `errno` set. Process teardown cancels an active wait before closing
-its parent resources.
+its parent resources. Finite waits calculate one absolute monotonic deadline and
+recompute remaining blocking time after intermediate wakes, so an early empty wake does
+not become an early timeout.
 
 `tester` exercises socket-only and mixed socket/device waits. On an online configured
 system it also disconnects Wi-Fi, confirms `wifi0` lifecycle readiness, and starts a saved

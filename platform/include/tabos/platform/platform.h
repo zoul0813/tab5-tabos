@@ -6,6 +6,8 @@
 #include <stdint.h>
 
 #include <tabos/internal/elf_api.h>
+#include <tabos/pointer.h>
+#include <tabos/camera.h>
 
 enum {
     TABOS_DISPLAY_WIDTH  = 1280,
@@ -13,13 +15,47 @@ enum {
 };
 
 typedef uint16_t platform_pixel_t;
-typedef void (*platform_update_fn)(void);
 typedef struct platform_riscv32_context platform_riscv32_context_t;
 typedef struct platform_mutex platform_mutex_t;
+
+typedef uint32_t platform_runtime_events_t;
+typedef void (*platform_update_fn)(platform_runtime_events_t events);
+typedef uint64_t (*platform_deadline_fn)(void);
+
+enum {
+    PLATFORM_RUNTIME_EVENT_NONE        = 0U,
+    PLATFORM_RUNTIME_EVENT_INPUT       = 1U << 0U,
+    PLATFORM_RUNTIME_EVENT_POINTER     = 1U << 1U,
+    PLATFORM_RUNTIME_EVENT_NETWORK     = 1U << 2U,
+    PLATFORM_RUNTIME_EVENT_CAMERA      = 1U << 3U,
+    PLATFORM_RUNTIME_EVENT_AUDIO       = 1U << 4U,
+    PLATFORM_RUNTIME_EVENT_APPLICATION = 1U << 5U,
+    PLATFORM_RUNTIME_EVENT_DEVICE      = 1U << 6U,
+    PLATFORM_RUNTIME_EVENT_DEADLINE    = 1U << 7U,
+    PLATFORM_RUNTIME_EVENT_SHUTDOWN    = 1U << 8U,
+};
+
+#define PLATFORM_RUNTIME_DEADLINE_NONE UINT64_MAX
 
 typedef void (*platform_audio_render_fn)(int16_t* stereo, size_t frames);
 typedef void (*platform_audio_capture_fn)(const int16_t* samples, size_t frames, uint32_t channels);
 typedef void (*platform_audio_error_fn)(int error);
+typedef void (*platform_camera_frame_fn)(const void* data, size_t size, uint32_t width, uint32_t height,
+                                         uint32_t stride_bytes, uint32_t format, uint64_t timestamp_ms);
+typedef void (*platform_camera_error_fn)(int error);
+typedef bool (*platform_camera_capture_ready_fn)(void);
+typedef void (*platform_network_event_fn)(void);
+
+typedef struct {
+        const char* driver;
+        uint32_t formats;
+        uint32_t max_width;
+        uint32_t max_height;
+        uint32_t max_fps;
+        bool detected;
+        bool ready;
+        int error;
+} platform_camera_info_t;
 
 typedef struct {
         const char* driver;
@@ -137,9 +173,14 @@ typedef struct {
 } platform_diagnostics_t;
 
 bool platform_init(bool headless);
-int platform_run(platform_update_fn update);
+int platform_run(platform_update_fn update, platform_deadline_fn next_deadline);
 void platform_shutdown(void);
 void platform_stop_run_loop(void);
+void platform_runtime_notify(platform_runtime_events_t events);
+void platform_runtime_notify_from_isr(platform_runtime_events_t events);
+// Returns coalesced readiness and includes DEADLINE when the absolute deadline
+// is reached, including a wake that also carries other ready sources.
+platform_runtime_events_t platform_runtime_wait_until(uint64_t deadline_ms);
 void platform_perform_system_action(platform_system_action_t action);
 const char* platform_name(void);
 const char* platform_display_name(void);
@@ -149,7 +190,9 @@ uint64_t platform_time_ms(void);
 bool platform_wall_clock_get(int64_t* seconds);
 bool platform_wall_clock_set(int64_t seconds);
 bool platform_wall_clock_status(int* error);
-bool platform_network_init(const char* hostname);
+void platform_keyboard_update(void);
+bool platform_keyboard_health(int* error);
+bool platform_network_init(const char* hostname, platform_network_event_fn event);
 void platform_network_shutdown(void);
 bool platform_network_connect(const char* ssid, const char* password);
 bool platform_network_disconnect(void);
@@ -163,6 +206,18 @@ bool platform_audio_init(platform_audio_render_fn render, platform_audio_capture
 void platform_audio_shutdown(void);
 bool platform_audio_set_route(uint32_t route);
 bool platform_audio_set_sample_rate(uint32_t sample_rate);
+bool platform_pointer_init(const char** driver, int* error);
+void platform_pointer_update(void);
+void platform_pointer_shutdown(void);
+bool platform_pointer_health(int* error);
+bool platform_camera_init(platform_camera_frame_fn frame, platform_camera_error_fn error,
+                          platform_camera_capture_ready_fn capture_ready, platform_camera_info_t* info);
+bool platform_camera_start(const tabos_camera_config_t* config);
+void platform_camera_stop(void);
+// Wake a blocked capture worker after destination capacity or other capture
+// readiness changes. Frame and error callbacks run asynchronously in task context.
+void platform_camera_resume(void);
+void platform_camera_shutdown(void);
 bool platform_network_operations_init(void);
 void platform_network_operations_shutdown(void);
 bool platform_network_socket_operations_init(void);
@@ -220,6 +275,7 @@ platform_riscv32_context_t* platform_riscv32_create(const void* entry, const voi
                                                     void* user_data);
 platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* context, unsigned int instruction_budget,
                                                 int* returned_status);
+bool platform_riscv32_requires_runtime_slices(void);
 void platform_riscv32_destroy(platform_riscv32_context_t* context);
 void* platform_riscv32_current_user_data(void);
 void platform_input_wait(void);

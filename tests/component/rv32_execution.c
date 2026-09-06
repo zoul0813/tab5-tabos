@@ -16,6 +16,7 @@ static int requested_status = -1;
 static uint32_t tty_mode;
 static bool input_event_available;
 static unsigned int yield_count;
+static unsigned int wait_count;
 static int raw_returned_status;
 
 static void test_console_write(const char* text)
@@ -83,6 +84,14 @@ static void test_yield(void)
     ++yield_count;
 }
 
+static int test_wait(tabos_elf_wait_item_t* items, uint32_t count, uint32_t timeout_ms)
+{
+    (void) items;
+    (void) timeout_ms;
+    ++wait_count;
+    return count == 1U ? 0 : -1;
+}
+
 static uint32_t test_device_count(void)
 {
     return 7U;
@@ -111,6 +120,7 @@ static platform_riscv32_result_t execute_raw_with_limits(const uint32_t* instruc
         .tty_set_mode      = test_tty_set_mode,
         .input_poll        = test_input_poll,
         .yield             = test_yield,
+        .wait              = test_wait,
         .device_count      = test_device_count,
         .battery_status    = test_battery_status,
     };
@@ -147,6 +157,7 @@ int main(void)
         .tty_set_mode      = test_tty_set_mode,
         .input_poll        = test_input_poll,
         .yield             = test_yield,
+        .wait              = test_wait,
         .device_count      = test_device_count,
         .battery_status    = test_battery_status,
     };
@@ -202,6 +213,19 @@ int main(void)
         UINT32_C(0x000280e7), /* jalr ra, t0, 0 */
         UINT32_C(0x00038093), /* addi ra, t2, 0: restore caller return address */
         UINT32_C(0x00700513), /* addi a0, zero, 7 */
+        UINT32_C(0x00008067), /* ret */
+    };
+    static const uint32_t wait_program[] = {
+        UINT32_C(0x00008393), /* addi t2, ra, 0: preserve caller return address */
+        UINT32_C(0x00050293), /* addi t0, a0, 0: retain API table pointer */
+        UINT32_C(0x1302a283), /* lw t0, 304(t0): wait table entry */
+        UINT32_C(0x20000313), /* addi t1, zero, 512: guest wait item storage */
+        UINT32_C(0x00030513), /* addi a0, t1, 0 */
+        UINT32_C(0x00100593), /* addi a1, zero, 1 */
+        UINT32_C(0x00000613), /* addi a2, zero, 0 */
+        UINT32_C(0x000280e7), /* jalr ra, t0, 0 */
+        UINT32_C(0x00038093), /* addi ra, t2, 0: restore caller return address */
+        UINT32_C(0x00900513), /* addi a0, zero, 9 */
         UINT32_C(0x00008067), /* ret */
     };
     static const uint32_t input_poll_program[] = {
@@ -268,6 +292,18 @@ int main(void)
                                      yield_status == 7;
     platform_riscv32_destroy(yielding);
 
+    platform_riscv32_context_t* waiting = platform_riscv32_create(wait_program, wait_program, sizeof(wait_program), 0U,
+                                                                  256U * 1024U, 16U * 1024U, &api, 0U, NULL, NULL);
+    int wait_status                     = -1;
+    wait_count                          = 0U;
+    const bool yielded_after_wait       = waiting != NULL &&
+                                    platform_riscv32_step(waiting, 20U, &wait_status) == PLATFORM_RISCV32_YIELDED &&
+                                    wait_count == 1U;
+    const bool resumed_after_wait = waiting != NULL &&
+                                    platform_riscv32_step(waiting, 8U, &wait_status) == PLATFORM_RISCV32_RETURNED &&
+                                    wait_status == 9;
+    platform_riscv32_destroy(waiting);
+
     platform_riscv32_context_t* capped =
         platform_riscv32_create(resumable_program, resumable_program, sizeof(resumable_program), 0U,
                                 24U * 1024U * 1024U, 16U * 1024U, &api, 0U, NULL, NULL);
@@ -292,17 +328,18 @@ int main(void)
         raw_returned_status == 1;
     const bool invalid_input_pointer_fault =
         execute_raw(invalid_input_pointer_program, sizeof(invalid_input_pointer_program), 8U) == PLATFORM_RISCV32_FAULT;
-    if (!resumed || !batched || !stopped_at_api_boundary || !yielded_at_api || !resumed_after_yield || !cap_rejected ||
-        !illegal_fault || !invalid_fault || !large_heap_runs || !runaway_yields || !input_event_delivered ||
-        !input_event_correct || !late_api_gate_runs || !battery_api_gate_runs || !invalid_input_pointer_fault ||
-        input_event_available) {
+    if (!resumed || !batched || !stopped_at_api_boundary || !yielded_at_api || !resumed_after_yield ||
+        !yielded_after_wait || !resumed_after_wait || !cap_rejected || !illegal_fault || !invalid_fault ||
+        !large_heap_runs || !runaway_yields || !input_event_delivered || !input_event_correct || !late_api_gate_runs ||
+        !battery_api_gate_runs || !invalid_input_pointer_fault || input_event_available) {
         fprintf(stderr,
-                "resumed=%d batched=%d boundary=%d yield=%d yield_resume=%d cap=%d illegal=%d invalid=%d large=%d "
-                "runaway=%d input=%d input_data=%d late_api=%d battery_api=%d input_pointer=%d pending=%d\n",
-                resumed, batched, stopped_at_api_boundary, yielded_at_api, resumed_after_yield, cap_rejected,
-                illegal_fault, invalid_fault, large_heap_runs, runaway_yields, input_event_delivered,
-                input_event_correct, late_api_gate_runs, battery_api_gate_runs, invalid_input_pointer_fault,
-                input_event_available);
+                "resumed=%d batched=%d boundary=%d yield=%d yield_resume=%d wait_yield=%d wait_resume=%d cap=%d "
+                "illegal=%d invalid=%d large=%d runaway=%d input=%d input_data=%d late_api=%d battery_api=%d "
+                "input_pointer=%d pending=%d\n",
+                resumed, batched, stopped_at_api_boundary, yielded_at_api, resumed_after_yield, yielded_after_wait,
+                resumed_after_wait, cap_rejected, illegal_fault, invalid_fault, large_heap_runs, runaway_yields,
+                input_event_delivered, input_event_correct, late_api_gate_runs, battery_api_gate_runs,
+                invalid_input_pointer_fault, input_event_available);
         return 1;
     }
     return 0;

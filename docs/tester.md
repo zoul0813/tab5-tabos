@@ -20,6 +20,10 @@ Tests are separate modules under `apps/tester/src/tests/`. The current modules c
   routes, nonblocking reads, status, and stale handles
 - graphics and logical-canvas pixels, including one-call animated drawing, scaled animated
   drawing, shared camera translation and HUD restoration, one-shot completion at the final frame boundary, and indefinitely looping clips
+- camera discovery, copied capabilities, RAW8 frame leases, bounded copying, waits,
+  pool exhaustion, drops, stale leases, and repeated close/reopen with outstanding leases
+- pointer registry state, process-owned streams, nonblocking reads, waits, stale handles,
+  and leaked-resource cleanup
 
 Build and install into the host root filesystem:
 
@@ -32,6 +36,29 @@ Run from the shell:
 
 ```text
 > tester one "two words"
+```
+
+Run `tester --camera` for only the camera assertions during hardware validation.
+
+Run `tester --camera-cleanup` to repeat six child-exit/reopen cycles. Each child
+acquires a RAW8 frame and deliberately exits with status 89 without releasing its
+lease, stream, or wait source. The parent requires that status, reopens the camera,
+copies a new frame, and checks close invalidates its wait source. A successful run
+reports 31 assertions and zero failures. This also exercises 12 capture starts/stops.
+
+Run `tester --camera-services` for six rounds with RGB565 capture, silent stereo
+playback, UDP loopback, and scratch-file write/readback active together. Each round
+requires a newer camera frame, checks up to 4 KiB of frame bytes through storage,
+verifies the UDP payload, and requires queued audio to drain within five seconds.
+The summary reports elapsed time, longest round, and camera pool drops. This is a
+service-progress check, not a sustained audio-quality or Wi-Fi-radio throughput test.
+It runs only when explicitly selected and requires ready camera and audio devices.
+The test exclusively creates `T:/tabos-camera-services.tmp` and removes it on completion;
+an existing file causes a failure without overwriting its contents.
+After a reset interrupts this test, remove its leftover scratch file before retrying:
+
+```sh
+rm T:/tabos-camera-services.tmp
 ```
 
 For Tab5, copy `build/apps/tester/tester` to `T:/bin/tester`. A successful run

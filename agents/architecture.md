@@ -128,6 +128,33 @@ failures likewise move `battery0` to fault, and successful retries restore ready
 Battery status carries explicit per-field validity; signed current and power are positive
 while discharging and negative while charging.
 
+Detected touch hardware is registered as `touch0`. The process-owned pointer service
+normalizes platform coordinates into the logical 1280x720 display space and supplies
+bounded multi-contact event queues only to the foreground owner. Focus changes, device
+removal, and queue resets cancel active contacts. SDL mouse contact 0 and SDL touch
+contacts share this contract; Tab5 controller handles remain below the platform boundary.
+The contact ceiling defaults to five and is build-configurable for future hardware.
+Tab5 GT911 and ST712x controllers use active-low GPIO23 interrupt callbacks. ISR context
+only records readiness and wakes runtime task; controller I2C reads, contact matching,
+logical rotation, delivery, and fault cancellation remain serialized in task context.
+Idle runtime updates do not read touch controller.
+
+Camera capture follows the same platform boundary. Applications configure process-owned
+streams and receive metadata plus opaque generation-tagged leases; the kernel retains
+frame storage and exposes bounded copying only. Three-slot stream pools never overwrite
+leased frames, replace the oldest ready unleased frame for slow consumers, and count
+drops. H.264 instead pauses backend updates until a pool slot is free, preserving encoded
+reference pictures; sensor-side skips are outside the pool-drop count. Close or process
+teardown reclaims buffers and leaked leases. Host supplies
+deterministic RAW8 fixtures. Host and Tab5 use dedicated capture workers; callbacks wake
+runtime after frame or fault completion. Tab5 camera I/O, RAW conversion, preview
+submission, JPEG encoding, and H.264 encoding remain in worker task context. The Tab5
+worker is pinned to CPU0: physical testing found that allowing this V4L2/ISP path to migrate
+between cores corrupted RGB565 preview data without reporting a driver error. A two-second
+dequeue deadline provides slow stall diagnostics, not normal polling. H.264 capacity is
+checked before dequeue, and lease release wakes a capacity-blocked worker. Stop and
+shutdown join capture work before frame pools, DMA mappings, or mutexes are destroyed.
+
 ### Generic wait sources [DECIDED]
 
 Asynchronous application waits use opaque, generation-tagged `tabos_wait_source_t`
@@ -139,7 +166,9 @@ finite monotonic millisecond deadlines, and infinite waits. Process teardown mar
 cancelled and wakes native workers before disposing parent resources, so a later process
 cannot receive stale completions. Sockets expose sources through
 `tabos_socket_wait_source()` and device lifecycle subscriptions through
-`tabos_device_subscription_wait_source()`. A type-indexed internal adapter table supplies
+`tabos_device_subscription_wait_source()`, and pointer streams through
+`tabos_pointer_wait_source()`, and camera streams through `tabos_camera_wait_source()`.
+A type-indexed internal adapter table supplies
 per-source event validation and readiness translation so future services can join without
 adding service-specific wait transports.
 
@@ -246,6 +275,33 @@ Application code targets **TabOS**, not ESP-IDF.
 
 TabOS is a multitasking system layered on the SMP scheduler supplied by FreeRTOS.
 
+### Event and deadline wake foundation [DECIDED]
+
+Portable runtime scheduling uses a narrow TabOS-owned readiness bitset and absolute
+monotonic deadlines. Readiness bits are wake hints and may coalesce; authoritative data
+remains in each subsystem queue or state owner. Platform backends provide task-context
+notification, an ISR-safe notification form where supported, indefinite wait, and wait
+until an absolute deadline. Shutdown sets its readiness bit and wakes the runtime before
+platform notification state is released.
+
+The host backend maps the contract to SDL events, including headless operation. Tab5 maps
+it to FreeRTOS direct task notifications; FreeRTOS types remain below the platform
+boundary. Each blocking wait returns its coalesced readiness bitset to the portable
+dispatcher. The dispatcher runs only named event owners and expired deadline owners,
+once each in deterministic order per bounded pass, then the platform recomputes the
+nearest deadline before blocking again. Key repeat, cursor blink, network retry, and
+finite waits publish exact monotonic deadlines. `UINT64_MAX` means no deadline and finite
+additions clamp below it; late periodic work runs once and advances to the next future
+period. Cursor ownership and network/input changes wake runtime when they add or cancel
+deadlines. Native Tab5 application completion and ELF exit/child-exec requests publish
+application readiness; process launch and parent restoration do likewise. These
+notifications carry no process pointer, so coalesced late wakeups cannot target a
+destroyed or generation-reused slot. No compatibility tick remains. Active host RV32
+interpretation keeps the runtime immediately runnable for bounded instruction slices.
+Native Tab5 execution does not use that runnable hint because it runs in its own managed
+task. Debug builds count wake bits and expired deadline owners; reporting piggybacks on
+the existing health audit rather than creating another periodic deadline.
+
 A conceptual runtime looks like:
 
 ```text
@@ -304,8 +360,12 @@ Filesystem-backed shell now loads `T:/bin/shell.bin` directly as process 0. Expe
 ELF API provides console input/output, terminal clear, current-directory and directory
 listing operations, child execution, yield, and exit request. Host advances shell through
 retained RV32 interpreter slices. Tab5 platform starts native ELF entry in managed FreeRTOS
-application task and polls completion from runtime task. Shell uses pending child-exec
+application task and receives completion notification in runtime task. Shell uses pending child-exec
 protocol to remain blocked until process manager restores it with child status.
+
+Process teardown cancels blocking application waits and stops the native execution
+context before releasing any process-owned service, descriptor, heap, or executable
+mapping. This prevents cleanup from racing a final application API call.
 
 ELF ABI version 3 entry and nested execution carry bounded `argc`/`argv`. Child loader
 state owns copied arguments for full process lifetime. Tokenization, quoting, and escaping
@@ -626,6 +686,16 @@ application-task model must assign explicit per-application stack budgets instea
 
 ## 9. Shell Architecture
 
+### Persistent command history [DECIDED]
+
+The shell owns a fixed 32-entry command history and Up/Down recall policy. It preserves
+unparsed printable ASCII command lines, skips blank lines and consecutive exact
+duplicates, and restores the current draft after browsing. History loads from
+`T:/user/history.txt` and saves before command execution through standard SDK file
+operations using a temporary file and rename. Storage failure does not stop the shell.
+Plain Up/Down recalls commands; Ctrl+Arrow remains the existing opt-in TTY scrollback
+policy. History is application state, not a kernel or terminal service.
+
 The shell is a first-class TabOS application/system component.
 
 More specifically, the shell is an application, not kernel code. It belongs under `apps/` and consumes kernel/system services through application-facing APIs. The kernel may provide a boot console and terminal service, but must not own shell parsing, commands, or policy.
@@ -694,8 +764,15 @@ A generic input event model should eventually support:
 - system shortcuts
 
 Keyboard latency and reliability have priority because TabOS is intended to support a keyboard-first workflow.
+Portable input queue and repeat state use the platform mutex abstraction. Tab5 uses a
+priority-inheriting FreeRTOS mutex because application and runtime tasks can contend on
+one core; task-level atomic spinning is forbidden for this queue.
 
-Touch input is intentionally deferred until the future GUI/windowing and application-input work. Initial terminal and shell milestones require keyboard support, not touch. Current ST712x I2C access in the display backend is hardware-revision detection only and must not be mistaken for a general touch subsystem.
+Pointer input uses a separate public `<tabos/pointer.h>` stream API with down, move, up,
+and cancel events. Events carry boot-local device and stable contact IDs, logical display
+coordinates, buttons, and optional normalized pressure. Consumption follows existing
+foreground process ownership. Gesture recognition and window routing remain future
+clients of this service rather than kernel pointer semantics.
 
 Keyboard input now uses a public platform-neutral event queue with key-down, key-up,
 modifier, repeat, and CP437 text semantics. Filesystem ELF applications access raw events
@@ -741,7 +818,19 @@ input policy. Shell enables scroll keys through the public `ioctl()` wrapper. Ch
 inherit a value copy; a child may disable the mode for raw/game input without changing
 the blocked parent's retained mode. Enabled navigation keys are consumed before stdin.
 
-Portable monotonic time and polling timers live behind platform clock source. Console uses repeating timer for cursor phase; service remains reusable for future runtime scheduling. Terminal tracks dirty visible cells for ordinary text/cursor changes and reserves full redraw for viewport, clear, or resize changes.
+Portable monotonic time and deadline timers live behind platform clock source. Console
+uses a repeating timer for cursor phase and publishes its next deadline to runtime;
+fullscreen graphics cancels that deadline. Late timer polls emit one expiration and skip
+missed intervals without replay. Terminal tracks dirty visible cells for ordinary
+text/cursor changes and reserves full redraw for viewport, clear, or resize changes.
+
+Network backends expose a callback that only marks status dirty and wakes runtime.
+Portable network service copies platform status in runtime context after notification;
+idle updates perform no backend status read. ESP-IDF Wi-Fi/IP callbacks and host state
+changes use same path. Registry synchronization reads in-memory audio, pointer, camera,
+and network service state, while keyboard, RTC, battery, and storage use one 60-second
+health audit because current drivers lack change callbacks. Registry itself coalesces
+unchanged state, preserving one subscription event per transition.
 
 ---
 

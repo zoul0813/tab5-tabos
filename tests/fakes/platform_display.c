@@ -72,16 +72,24 @@ static platform_pixel_t pixels[TABOS_DISPLAY_WIDTH * TABOS_DISPLAY_HEIGHT];
 static uint64_t monotonic_ms;
 static char last_log[256];
 static platform_network_status_t fake_network;
+static platform_network_event_fn fake_network_event;
 static unsigned int network_connect_calls;
+static unsigned int network_status_calls;
 static char network_hostname[33];
 static bool fake_rtc_ready = true;
 static int fake_rtc_error;
+static bool fake_keyboard_ready = true;
+static int fake_keyboard_error;
+static unsigned int keyboard_update_calls;
+static unsigned int pointer_update_calls;
 static bool fake_battery_ready = true;
 static int fake_battery_error;
 static platform_audio_error_fn fake_audio_error;
 static platform_audio_render_fn fake_audio_render;
 static platform_audio_capture_fn fake_audio_capture;
 static uint32_t fake_audio_sample_rate;
+static platform_runtime_events_t fake_runtime_events;
+static uint64_t fake_runtime_wait_deadline;
 
 bool platform_display_init(platform_framebuffer_t* framebuffer)
 {
@@ -109,6 +117,28 @@ void platform_display_shutdown(void)
 
 void platform_stop_run_loop(void)
 {
+    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_SHUTDOWN);
+}
+
+void platform_runtime_notify(platform_runtime_events_t events)
+{
+    fake_runtime_events |= events;
+}
+
+void platform_runtime_notify_from_isr(platform_runtime_events_t events)
+{
+    platform_runtime_notify(events);
+}
+
+platform_runtime_events_t platform_runtime_wait_until(uint64_t deadline_ms)
+{
+    fake_runtime_wait_deadline       = deadline_ms;
+    platform_runtime_events_t events = fake_runtime_events;
+    fake_runtime_events              = PLATFORM_RUNTIME_EVENT_NONE;
+    if (deadline_ms != PLATFORM_RUNTIME_DEADLINE_NONE && monotonic_ms >= deadline_ms) {
+        events |= PLATFORM_RUNTIME_EVENT_DEADLINE;
+    }
+    return events;
 }
 
 void platform_perform_system_action(platform_system_action_t action)
@@ -140,8 +170,9 @@ bool platform_get_diagnostics(platform_diagnostics_t* diagnostics)
         .memory_free_known  = true,
         .keyboard_name      = "TEST KEYBOARD",
         .keyboard_driver    = "TEST KEYBOARD",
-        .keyboard_present   = true,
+        .keyboard_present   = fake_keyboard_ready,
         .keyboard_detected  = true,
+        .keyboard_error     = fake_keyboard_error,
         .rtc_name           = "TEST RTC",
         .rtc_present        = fake_rtc_ready,
         .rtc_detected       = true,
@@ -198,6 +229,30 @@ bool platform_wall_clock_status(int* error)
     return fake_rtc_ready && fake_rtc_error == 0;
 }
 
+bool platform_keyboard_health(int* error)
+{
+    if (error != NULL) {
+        *error = fake_keyboard_error;
+    }
+    return fake_keyboard_ready && fake_keyboard_error == 0;
+}
+
+void platform_keyboard_update(void)
+{
+    ++keyboard_update_calls;
+}
+
+unsigned int test_platform_keyboard_update_calls(void)
+{
+    return keyboard_update_calls;
+}
+
+void test_platform_keyboard_set_status(bool ready, int error)
+{
+    fake_keyboard_ready = ready;
+    fake_keyboard_error = error;
+}
+
 void test_platform_rtc_set_status(bool ready, int error)
 {
     fake_rtc_ready = ready;
@@ -228,14 +283,14 @@ bool platform_audio_init(platform_audio_render_fn render, platform_audio_capture
     fake_audio_capture = capture;
     fake_audio_error   = error;
     *info              = (platform_audio_info_t) {
-                     .driver           = "fake-audio",
-                     .features         = TABOS_AUDIO_FEATURE_PLAYBACK | TABOS_AUDIO_FEATURE_CAPTURE,
-                     .routes           = TABOS_AUDIO_ROUTE_SPEAKER | TABOS_AUDIO_ROUTE_HEADPHONE | TABOS_AUDIO_ROUTE_MICROPHONE,
-                     .capture_channels = 4U,
-                     .sample_rates     = TABOS_AUDIO_RATES_ALL,
+                     .driver              = "fake-audio",
+                     .features            = TABOS_AUDIO_FEATURE_PLAYBACK | TABOS_AUDIO_FEATURE_CAPTURE,
+                     .routes              = TABOS_AUDIO_ROUTE_SPEAKER | TABOS_AUDIO_ROUTE_HEADPHONE | TABOS_AUDIO_ROUTE_MICROPHONE,
+                     .capture_channels    = 4U,
+                     .sample_rates        = TABOS_AUDIO_RATES_ALL,
                      .default_sample_rate = TABOS_AUDIO_DEFAULT_SAMPLE_RATE,
-                     .detected         = true,
-                     .ready            = true,
+                     .detected            = true,
+                     .ready               = true,
     };
     fake_audio_sample_rate = TABOS_AUDIO_DEFAULT_SAMPLE_RATE;
     return true;
@@ -267,11 +322,8 @@ bool platform_audio_set_sample_rate(uint32_t sample_rate)
         case TABOS_AUDIO_SAMPLE_RATE_44100:
         case TABOS_AUDIO_SAMPLE_RATE_48000:
         case TABOS_AUDIO_SAMPLE_RATE_88200:
-        case TABOS_AUDIO_SAMPLE_RATE_96000:
-            fake_audio_sample_rate = sample_rate;
-            return true;
-        default:
-            return false;
+        case TABOS_AUDIO_SAMPLE_RATE_96000: fake_audio_sample_rate = sample_rate; return true;
+        default: return false;
     }
 }
 
@@ -301,17 +353,23 @@ void test_platform_audio_error(int error)
     }
 }
 
-bool platform_network_init(const char* hostname)
+bool platform_network_init(const char* hostname, platform_network_event_fn event)
 {
+    fake_network_event    = event;
     fake_network          = (platform_network_status_t) {.state = PLATFORM_NETWORK_OFFLINE};
     network_connect_calls = 0U;
+    network_status_calls  = 0U;
     (void) snprintf(network_hostname, sizeof(network_hostname), "%s", hostname != NULL ? hostname : "");
+    if (fake_network_event != NULL) {
+        fake_network_event();
+    }
     return true;
 }
 
 void platform_network_shutdown(void)
 {
-    fake_network = (platform_network_status_t) {0};
+    fake_network       = (platform_network_status_t) {0};
+    fake_network_event = NULL;
 }
 
 bool platform_network_connect(const char* ssid, const char* password)
@@ -323,12 +381,18 @@ bool platform_network_connect(const char* ssid, const char* password)
     ++network_connect_calls;
     fake_network.state = PLATFORM_NETWORK_CONNECTING;
     (void) snprintf(fake_network.ssid, sizeof(fake_network.ssid), "%s", ssid);
+    if (fake_network_event != NULL) {
+        fake_network_event();
+    }
     return true;
 }
 
 bool platform_network_disconnect(void)
 {
     fake_network.state = PLATFORM_NETWORK_OFFLINE;
+    if (fake_network_event != NULL) {
+        fake_network_event();
+    }
     return true;
 }
 
@@ -337,6 +401,7 @@ bool platform_network_status(platform_network_status_t* status)
     if (status == NULL) {
         return false;
     }
+    ++network_status_calls;
     *status = fake_network;
     return true;
 }
@@ -562,11 +627,19 @@ void test_platform_network_set_state(platform_network_state_t state, const char*
         (void) snprintf(fake_network.ipv4, sizeof(fake_network.ipv4), "192.0.2.10");
         fake_network.signal_dbm = -42;
     }
+    if (fake_network_event != NULL) {
+        fake_network_event();
+    }
 }
 
 unsigned int test_platform_network_connect_calls(void)
 {
     return network_connect_calls;
+}
+
+unsigned int test_platform_network_status_calls(void)
+{
+    return network_status_calls;
 }
 
 const char* test_platform_network_hostname(void)
@@ -632,6 +705,11 @@ platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* cont
     return PLATFORM_RISCV32_FAULT;
 }
 
+bool platform_riscv32_requires_runtime_slices(void)
+{
+    return false;
+}
+
 void platform_riscv32_destroy(platform_riscv32_context_t* context)
 {
     (void) context;
@@ -652,8 +730,114 @@ void test_platform_advance_time_ms(uint64_t elapsed_ms)
     monotonic_ms += elapsed_ms;
 }
 
+uint64_t test_platform_time_ms(void)
+{
+    return monotonic_ms;
+}
+
+uint64_t test_platform_runtime_wait_deadline(void)
+{
+    return fake_runtime_wait_deadline;
+}
+
 void platform_input_wait(void)
 {
+}
+
+bool platform_pointer_init(const char** driver, int* error)
+{
+    if (driver != NULL) {
+        *driver = "fake pointer";
+    }
+    if (error != NULL) {
+        *error = 0;
+    }
+    return true;
+}
+
+void platform_pointer_update(void)
+{
+    ++pointer_update_calls;
+}
+
+unsigned int test_platform_pointer_update_calls(void)
+{
+    return pointer_update_calls;
+}
+
+void platform_pointer_shutdown(void)
+{
+}
+
+bool platform_pointer_health(int* error)
+{
+    if (error != NULL) {
+        *error = 0;
+    }
+    return true;
+}
+
+static platform_camera_frame_fn fake_camera_frame;
+static platform_camera_error_fn fake_camera_error;
+static platform_camera_capture_ready_fn fake_camera_ready;
+
+bool platform_camera_init(platform_camera_frame_fn frame, platform_camera_error_fn error,
+                          platform_camera_capture_ready_fn capture_ready, platform_camera_info_t* info)
+{
+    fake_camera_frame = frame;
+    fake_camera_error = error;
+    fake_camera_ready = capture_ready;
+    *info             = (platform_camera_info_t) {.driver     = "fake camera",
+                                                  .formats    = TABOS_CAMERA_FORMAT_FLAG_RAW8 | TABOS_CAMERA_FORMAT_FLAG_JPEG,
+                                                  .max_width  = 8U,
+                                                  .max_height = 8U,
+                                                  .max_fps    = 30U,
+                                                  .detected   = true,
+                                                  .ready      = true};
+    return true;
+}
+
+bool platform_camera_start(const tabos_camera_config_t* config)
+{
+    return config != NULL;
+}
+
+void platform_camera_stop(void)
+{
+}
+
+void platform_camera_resume(void)
+{
+}
+
+void platform_camera_shutdown(void)
+{
+    fake_camera_frame = NULL;
+    fake_camera_error = NULL;
+    fake_camera_ready = NULL;
+}
+
+void test_platform_camera_frame(const void* data, size_t size, uint32_t width, uint32_t height, uint32_t stride_bytes,
+                                uint64_t timestamp_ms)
+{
+    if (fake_camera_frame != NULL) {
+        fake_camera_frame(data, size, width, height, stride_bytes, TABOS_CAMERA_FORMAT_RAW8, timestamp_ms);
+    }
+}
+
+void test_platform_camera_encoded_frame(const void* data, size_t size, uint32_t width, uint32_t height, uint32_t format,
+                                        uint64_t timestamp_ms)
+{
+    if (fake_camera_frame != NULL) {
+        fake_camera_frame(data, size, width, height, 0U, format, timestamp_ms);
+    }
+}
+
+void test_platform_camera_error(int error)
+{
+    if (fake_camera_error != NULL) {
+        fake_camera_error(error);
+    }
 }
 
 platform_mutex_t* platform_mutex_create(void)

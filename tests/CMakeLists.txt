@@ -66,6 +66,102 @@ tabos_enable_warnings(tabos_sdk_audio)
 tabos_enable_sanitizers(tabos_sdk_audio)
 add_test(NAME unit.sdk_audio COMMAND tabos_sdk_audio)
 
+add_executable(tabos_pointer_service unit/pointer_service.c ${TABOS_TEST_PLATFORM_FAKES})
+target_include_directories(tabos_pointer_service PRIVATE
+    "${TABOS_ROOT}/pointer/include"
+    "${TABOS_ROOT}/platform/include"
+    "${TABOS_ROOT}/sdk/include"
+    "${TABOS_GENERATED_INCLUDE_DIR}"
+)
+target_link_libraries(tabos_pointer_service PRIVATE tabos_core)
+tabos_enable_warnings(tabos_pointer_service)
+tabos_enable_sanitizers(tabos_pointer_service)
+add_test(NAME unit.pointer_service COMMAND tabos_pointer_service)
+
+add_executable(tabos_camera_service unit/camera_service.c ${TABOS_TEST_PLATFORM_FAKES})
+target_include_directories(tabos_camera_service PRIVATE
+    "${TABOS_ROOT}/camera/include"
+    "${TABOS_ROOT}/platform/include"
+    "${TABOS_ROOT}/sdk/include"
+    "${CMAKE_CURRENT_LIST_DIR}/fakes"
+)
+target_link_libraries(tabos_camera_service PRIVATE tabos_core)
+tabos_enable_warnings(tabos_camera_service)
+tabos_enable_sanitizers(tabos_camera_service)
+add_test(NAME unit.camera_service COMMAND tabos_camera_service)
+
+add_executable(tabos_camera_ccm unit/camera_ccm.c "${TABOS_ROOT}/platform/esp32p4/camera_ccm.c")
+target_include_directories(tabos_camera_ccm PRIVATE "${TABOS_ROOT}/platform/esp32p4")
+tabos_enable_warnings(tabos_camera_ccm)
+tabos_enable_sanitizers(tabos_camera_ccm)
+add_test(NAME unit.camera_ccm COMMAND tabos_camera_ccm)
+
+add_executable(tabos_keyboard_interrupt
+    unit/keyboard_interrupt.c
+    "${TABOS_ROOT}/platform/esp32p4/keyboard_interrupt.c"
+)
+target_include_directories(tabos_keyboard_interrupt PRIVATE "${TABOS_ROOT}/platform/esp32p4")
+tabos_enable_warnings(tabos_keyboard_interrupt)
+tabos_enable_sanitizers(tabos_keyboard_interrupt)
+add_test(NAME unit.keyboard_interrupt COMMAND tabos_keyboard_interrupt)
+
+add_executable(tabos_touch_interrupt
+    unit/touch_interrupt.c
+    "${TABOS_ROOT}/platform/esp32p4/touch_interrupt.c"
+)
+target_include_directories(tabos_touch_interrupt PRIVATE
+    "${TABOS_ROOT}/platform/esp32p4"
+    "${TABOS_ROOT}/sdk/include"
+    "${TABOS_GENERATED_INCLUDE_DIR}"
+)
+tabos_enable_warnings(tabos_touch_interrupt)
+tabos_enable_sanitizers(tabos_touch_interrupt)
+add_test(NAME unit.touch_interrupt COMMAND tabos_touch_interrupt)
+
+add_executable(tabos_sdk_camera
+    unit/sdk_camera.c
+    "${TABOS_ROOT}/sdk/lib/camera.c"
+    "${TABOS_ROOT}/sdk/lib/wait.c"
+)
+target_include_directories(tabos_sdk_camera PRIVATE "${TABOS_ROOT}/sdk/include")
+tabos_enable_warnings(tabos_sdk_camera)
+tabos_enable_sanitizers(tabos_sdk_camera)
+add_test(NAME unit.sdk_camera COMMAND tabos_sdk_camera)
+
+add_executable(tabos_sdk_pointer
+    unit/sdk_pointer.c
+    "${TABOS_ROOT}/sdk/lib/pointer.c"
+    "${TABOS_ROOT}/sdk/lib/wait.c"
+)
+target_include_directories(tabos_sdk_pointer PRIVATE "${TABOS_ROOT}/sdk/include")
+tabos_enable_warnings(tabos_sdk_pointer)
+tabos_enable_sanitizers(tabos_sdk_pointer)
+add_test(NAME unit.sdk_pointer COMMAND tabos_sdk_pointer)
+
+add_executable(tabos_host_pointer unit/host_pointer.c)
+target_include_directories(tabos_host_pointer PRIVATE
+    "${TABOS_ROOT}/platform/host/sdl"
+    "${TABOS_ROOT}/pointer/include"
+    "${TABOS_ROOT}/platform/include"
+    "${TABOS_ROOT}/sdk/include"
+    "${TABOS_GENERATED_INCLUDE_DIR}"
+)
+target_link_libraries(tabos_host_pointer PRIVATE tabos_core tabos_platform_host SDL3::SDL3)
+tabos_enable_warnings(tabos_host_pointer)
+tabos_enable_sanitizers(tabos_host_pointer)
+add_test(NAME unit.host_pointer COMMAND tabos_host_pointer)
+
+add_executable(tabos_host_camera_completion unit/host_camera_completion.c)
+target_include_directories(tabos_host_camera_completion PRIVATE
+    "${TABOS_ROOT}/camera/include"
+    "${TABOS_ROOT}/platform/include"
+    "${TABOS_ROOT}/sdk/include"
+)
+target_link_libraries(tabos_host_camera_completion PRIVATE tabos_core tabos_platform_host SDL3::SDL3)
+tabos_enable_warnings(tabos_host_camera_completion)
+tabos_enable_sanitizers(tabos_host_camera_completion)
+add_test(NAME unit.host_camera_completion COMMAND tabos_host_camera_completion)
+
 add_executable(tabos_raster unit/raster.c ${TABOS_TEST_PLATFORM_FAKES})
 target_include_directories(tabos_raster PRIVATE
     "${TABOS_ROOT}/graphics/include"
@@ -306,6 +402,7 @@ add_executable(tabos_timer unit/timer.c ${TABOS_TEST_PLATFORM_FAKES})
 target_include_directories(tabos_timer PRIVATE
     "${TABOS_ROOT}/platform/include"
     "${TABOS_ROOT}/sdk/include"
+    "${TABOS_ROOT}/time/include"
     "${CMAKE_CURRENT_LIST_DIR}/fakes"
 )
 target_link_libraries(tabos_timer PRIVATE tabos_core)
@@ -313,6 +410,39 @@ tabos_enable_warnings(tabos_timer)
 tabos_enable_sanitizers(tabos_timer)
 
 add_test(NAME unit.timer COMMAND tabos_timer)
+
+add_executable(tabos_runtime_event unit/runtime_event.c ${TABOS_TEST_PLATFORM_FAKES})
+target_include_directories(tabos_runtime_event PRIVATE
+    "${TABOS_ROOT}/platform/include"
+    "${TABOS_ROOT}/sdk/include"
+    "${CMAKE_CURRENT_LIST_DIR}/fakes"
+)
+target_link_libraries(tabos_runtime_event PRIVATE tabos_core)
+tabos_enable_warnings(tabos_runtime_event)
+tabos_enable_sanitizers(tabos_runtime_event)
+add_test(NAME unit.runtime_event COMMAND tabos_runtime_event)
+
+add_executable(tabos_host_runtime_event unit/host_runtime_event.c)
+target_include_directories(tabos_host_runtime_event PRIVATE
+    "${TABOS_ROOT}/platform/include"
+    "${TABOS_ROOT}/sdk/include"
+)
+if(TABOS_TARGET STREQUAL "linux")
+    # platform runtime initialization calls back into portable services, which
+    # in turn consume platform synchronization. Rescan both static archives so
+    # GNU ld resolves dependencies introduced by either side.
+    target_link_libraries(tabos_host_runtime_event PRIVATE
+        "-Wl,--start-group" tabos_core tabos_platform_host "-Wl,--end-group"
+        SDL3::SDL3
+    )
+else()
+    target_link_libraries(tabos_host_runtime_event PRIVATE
+        tabos_core tabos_platform_host SDL3::SDL3
+    )
+endif()
+tabos_enable_warnings(tabos_host_runtime_event)
+tabos_enable_sanitizers(tabos_host_runtime_event)
+add_test(NAME unit.host_runtime_event COMMAND tabos_host_runtime_event)
 
 add_executable(tabos_wall_clock unit/wall_clock.c ${TABOS_TEST_PLATFORM_FAKES})
 target_include_directories(tabos_wall_clock PRIVATE
@@ -373,6 +503,80 @@ tabos_enable_warnings(tabos_shell_input)
 tabos_enable_sanitizers(tabos_shell_input)
 
 add_test(NAME unit.shell_input COMMAND tabos_shell_input)
+
+add_executable(tabos_shell_history
+    unit/shell_history.c
+    "${TABOS_ROOT}/apps/shell/src/history.c"
+    "${TABOS_ROOT}/apps/shell/src/input.c"
+    "${TABOS_ROOT}/apps/shell/src/line.c"
+    "${TABOS_ROOT}/apps/shell/src/parser.c"
+)
+target_include_directories(tabos_shell_history PRIVATE "${TABOS_ROOT}/apps/shell/include")
+tabos_enable_warnings(tabos_shell_history)
+tabos_enable_sanitizers(tabos_shell_history)
+add_test(NAME unit.shell_history COMMAND tabos_shell_history)
+
+add_library(tabos_shell_history_file_faults OBJECT "${TABOS_ROOT}/apps/shell/src/history_file.c")
+target_include_directories(tabos_shell_history_file_faults PRIVATE "${TABOS_ROOT}/apps/shell/include")
+target_compile_definitions(tabos_shell_history_file_faults PRIVATE
+    fprintf=test_history_fprintf fclose=test_history_fclose rename=test_history_rename
+)
+tabos_enable_warnings(tabos_shell_history_file_faults)
+tabos_enable_sanitizers(tabos_shell_history_file_faults)
+add_executable(tabos_shell_history_file
+    component/shell_history_file.c
+    "${TABOS_ROOT}/apps/shell/src/history.c"
+    $<TARGET_OBJECTS:tabos_shell_history_file_faults>
+)
+target_include_directories(tabos_shell_history_file PRIVATE "${TABOS_ROOT}/apps/shell/include")
+tabos_enable_warnings(tabos_shell_history_file)
+tabos_enable_sanitizers(tabos_shell_history_file)
+add_test(NAME component.shell_history_file COMMAND tabos_shell_history_file)
+
+add_library(tabos_shell_session_main OBJECT "${TABOS_ROOT}/apps/shell/src/main.c")
+target_include_directories(tabos_shell_session_main PRIVATE
+    "${TABOS_ROOT}/apps/shell/include" "${TABOS_ROOT}/sdk/include"
+)
+target_compile_definitions(tabos_shell_session_main PRIVATE
+    main=shell_test_main read=test_shell_read getcwd=test_shell_getcwd
+    ioctl=test_shell_ioctl tabos_spawn=test_shell_spawn waitpid=test_shell_waitpid
+)
+tabos_enable_warnings(tabos_shell_session_main)
+tabos_enable_sanitizers(tabos_shell_session_main)
+add_executable(tabos_shell_session
+    component/shell_session.c
+    "${TABOS_ROOT}/apps/shell/src/history.c"
+    "${TABOS_ROOT}/apps/shell/src/history_file.c"
+    "${TABOS_ROOT}/apps/shell/src/line.c"
+    "${TABOS_ROOT}/apps/shell/src/input.c"
+    "${TABOS_ROOT}/apps/shell/src/parser.c"
+    $<TARGET_OBJECTS:tabos_shell_session_main>
+    ${TABOS_TEST_PLATFORM_FAKES}
+)
+target_include_directories(tabos_shell_session PRIVATE
+    "${TABOS_ROOT}/apps/shell/include" "${TABOS_ROOT}/graphics/include"
+    "${TABOS_ROOT}/platform/include" "${TABOS_GENERATED_INCLUDE_DIR}"
+)
+target_link_libraries(tabos_shell_session PRIVATE tabos_core)
+tabos_enable_warnings(tabos_shell_session)
+tabos_enable_sanitizers(tabos_shell_session)
+add_test(NAME component.shell_session COMMAND tabos_shell_session)
+
+# Run explicitly with a freshly SDK-built shell path. Ordinary host tests must
+# remain independent of separately built/installed application artifacts.
+add_executable(tabos_shell_rv32 component/shell_rv32.c)
+target_include_directories(tabos_shell_rv32 PRIVATE
+    "${TABOS_ROOT}/kernel/include" "${TABOS_ROOT}/input/include" "${TABOS_ROOT}/platform/include"
+)
+if(TABOS_TARGET STREQUAL "linux")
+    target_link_libraries(tabos_shell_rv32 PRIVATE
+        "-Wl,--start-group" tabos_core tabos_platform_host "-Wl,--end-group" SDL3::SDL3
+    )
+else()
+    target_link_libraries(tabos_shell_rv32 PRIVATE tabos_core tabos_platform_host SDL3::SDL3)
+endif()
+tabos_enable_warnings(tabos_shell_rv32)
+tabos_enable_sanitizers(tabos_shell_rv32)
 
 add_executable(tabos_application_lifecycle unit/application_lifecycle.c ${TABOS_TEST_PLATFORM_FAKES})
 target_include_directories(tabos_application_lifecycle PRIVATE
@@ -436,9 +640,19 @@ target_include_directories(tabos_rv32_execution PRIVATE
     "${TABOS_ROOT}/loader/include"
     "${TABOS_ROOT}/platform/include"
 )
-target_link_libraries(tabos_rv32_execution PRIVATE
-    tabos_core tabos_platform_host SDL3::SDL3
-)
+if(TABOS_TARGET STREQUAL "linux")
+    # tabos_core consumes the platform contract while the host backend calls
+    # back into portable services. GNU ld needs both static archives rescanned
+    # when this focused executable does not otherwise pull every host object in.
+    target_link_libraries(tabos_rv32_execution PRIVATE
+        "-Wl,--start-group" tabos_core tabos_platform_host "-Wl,--end-group"
+        SDL3::SDL3
+    )
+else()
+    target_link_libraries(tabos_rv32_execution PRIVATE
+        tabos_core tabos_platform_host SDL3::SDL3
+    )
+endif()
 tabos_enable_warnings(tabos_rv32_execution)
 tabos_enable_sanitizers(tabos_rv32_execution)
 
@@ -546,3 +760,20 @@ add_test(
         "-DTABOS_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/invalid-target"
         -P "${CMAKE_CURRENT_LIST_DIR}/check_invalid_target.cmake"
 )
+
+add_executable(tabos_camera_concurrency
+    component/camera_concurrency.c
+    "${TABOS_ROOT}/camera/camera.c"
+    "${TABOS_ROOT}/platform/host/sdl/mutex.c"
+)
+target_include_directories(tabos_camera_concurrency PRIVATE
+    "${TABOS_ROOT}/camera/include"
+    "${TABOS_ROOT}/platform/include"
+    "${TABOS_ROOT}/sdk/include"
+    "${TABOS_GENERATED_INCLUDE_DIR}"
+)
+target_link_libraries(tabos_camera_concurrency PRIVATE SDL3::SDL3)
+tabos_enable_warnings(tabos_camera_concurrency)
+tabos_enable_sanitizers(tabos_camera_concurrency)
+add_test(NAME component.camera_concurrency COMMAND tabos_camera_concurrency)
+set_tests_properties(component.camera_concurrency PROPERTIES TIMEOUT 15)

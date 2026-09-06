@@ -193,7 +193,9 @@ static const tabos_app_descriptor_t panic_app = {
 
 int main(void)
 {
-    input_init();
+    if (!input_init()) {
+        return 1;
+    }
     if (!display_init()) {
         return 1;
     }
@@ -211,7 +213,13 @@ int main(void)
         !application_registry_register(&grandchild_app) || tabos_app_launch("nested-root") != TABOS_APP_RESULT_OK) {
         return 1;
     }
+    if ((platform_runtime_wait_until(PLATFORM_RUNTIME_DEADLINE_NONE) & PLATFORM_RUNTIME_EVENT_APPLICATION) == 0U) {
+        return 1;
+    }
     kernel_application_system_update();
+    if ((platform_runtime_wait_until(PLATFORM_RUNTIME_DEADLINE_NONE) & PLATFORM_RUNTIME_EVENT_APPLICATION) == 0U) {
+        return 1;
+    }
     tabos_process_info_t process_info;
     if (tabos_process_count() != 2U || !tabos_process_info(0U, &process_info) ||
         process_info.state != TABOS_PROCESS_BLOCKED || !tabos_process_info(1U, &process_info) ||
@@ -219,11 +227,17 @@ int main(void)
         return 1;
     }
     kernel_application_system_update();
+    if ((platform_runtime_wait_until(PLATFORM_RUNTIME_DEADLINE_NONE) & PLATFORM_RUNTIME_EVENT_APPLICATION) == 0U) {
+        return 1;
+    }
     if (tabos_process_count() != 3U || !tabos_process_info(2U, &process_info) || process_info.parent_id != 1U ||
         process_info.state != TABOS_PROCESS_RUNNING) {
         return 1;
     }
     kernel_application_system_update();
+    if ((platform_runtime_wait_until(PLATFORM_RUNTIME_DEADLINE_NONE) & PLATFORM_RUNTIME_EVENT_APPLICATION) == 0U) {
+        return 1;
+    }
     kernel_application_system_update();
     kernel_application_system_update();
     if (!nested_complete || tabos_process_count() != 1U || !tabos_process_info(0U, &process_info) ||

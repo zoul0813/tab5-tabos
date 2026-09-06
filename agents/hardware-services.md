@@ -1,5 +1,7 @@
 # Hardware Services Milestone
 
+[Milestone Docs](milestone-hardware-services.md)
+
 ## Goal
 
 Move existing and future TabOS hardware drivers behind one portable, discoverable,
@@ -213,52 +215,113 @@ documentation pass.
 
 ## Phase 5: Touch and Pointer
 
-- [ ] Register detected GT911, ST7123, or ST7121 touch hardware as `touch0`.
-- [ ] Add `<tabos/pointer.h>` with down, move, up, and cancel events.
-- [ ] Include device ID, contact ID, logical 1280x720 coordinates, buttons, and optional normalized pressure.
-- [ ] Normalize rotation and controller-specific coordinates inside the Tab5 backend.
-- [ ] Support bounded multi-contact state and queues.
-- [ ] Map SDL mouse to contact 0 and SDL touch contacts to stable contact IDs.
-- [ ] Restrict pointer consumption to the foreground process through existing focus ownership.
-- [ ] Expose pointer readiness through generic waits.
-- [ ] Cancel active contacts when focus changes, device disappears, or queue state must reset.
-- [ ] Add `touchtest` to `apps/coreutils`.
-- [ ] Test synthetic host mouse/touch input, focus ownership, multi-contact behavior,
+- [x] Register detected GT911, ST7123, or ST7121 touch hardware as `touch0`.
+- [x] Add `<tabos/pointer.h>` with down, move, up, and cancel events.
+- [x] Include device ID, contact ID, logical 1280x720 coordinates, buttons, and optional normalized pressure.
+- [x] Normalize rotation and controller-specific coordinates inside the Tab5 backend.
+- [x] Support bounded multi-contact state and queues.
+- [x] Map SDL mouse to contact 0 and SDL touch contacts to stable contact IDs.
+- [x] Restrict pointer consumption to the foreground process through existing focus ownership.
+- [x] Expose pointer readiness through generic waits.
+- [x] Cancel active contacts when focus changes, device disappears, or queue state must reset.
+- [x] Add `touchtest` to `apps/coreutils`.
+- [x] Test synthetic host mouse/touch input, focus ownership, multi-contact behavior,
   overflow, cancellation, waits, stale sources, and cleanup.
 - [ ] Physically validate coordinate orientation and input on ILI9881C/GT911, ST7123, and ST7121 revisions.
-- [ ] Update pointer/input and utility documentation.
+- [x] Update pointer/input and utility documentation.
 
 ## Phase 6: Camera and Media Pipeline
 
+Current status (2026-09-05): paused at the user's request. Preview followed by
+user-triggered `cameratest snapshot` is the validated, representative application
+workflow. Automatic CLI still capture readiness is deferred; do not resume Phase 6
+investigation or request more hardware runs unless the user asks. The phase is not
+marked fully complete. Detailed
+[session evidence](validation/phase6-2026-09-05.md) includes failures superseded by
+fixes; this section is the authoritative current checklist.
+
 ### Capture foundation
 
-- [ ] Detect SC2356 and register `camera0`.
-- [ ] Add `<tabos/camera.h>` for formats, configuration, stream lifecycle, frame acquisition,
+- [x] Detect the camera sensor and register `camera0` (physical unit reports SC202CS).
+- [x] Add `<tabos/camera.h>` for formats, configuration, stream lifecycle, frame acquisition,
   metadata, copying, and release.
-- [ ] Use kernel-owned bounded frame pools and opaque generation-tagged leases.
-- [ ] Never expose native DMA, ISP, or frame-buffer pointers to applications.
-- [ ] Require explicit frame release and reclaim leaked leases on process exit.
-- [ ] Drop the oldest unleased frame for slow consumers and increment a drop counter.
-- [ ] Expose frame readiness, error, and hangup through generic waits.
-- [ ] Add deterministic host frame fixtures.
+- [x] Use kernel-owned bounded frame pools and opaque generation-tagged leases.
+- [x] Never expose native DMA, ISP, or frame-buffer pointers to applications.
+- [x] Require explicit frame release and reclaim leaked leases on process exit.
+- [x] Drop the oldest unleased RAW8/RGB565/JPEG frame for slow consumers and count drops.
+- [x] Preserve H.264 reference pictures by pausing encoding when its frame pool is full.
+- [x] Expose frame readiness, error, and hangup through generic waits.
+- [x] Add deterministic host frame fixtures.
 
 ### Formats and tools
 
-- [ ] Deliver bounded raw capture first.
-- [ ] Add RGB preview conversion and fullscreen preview validation.
-- [ ] Add JPEG encoding after raw/preview cleanup and throughput tests pass.
-- [ ] Add H.264 only after raw and JPEG paths meet memory and service-responsiveness requirements.
-- [ ] Add `cameratest` to `apps/coreutils` for detection, still capture, preview,
+- [x] Deliver bounded Tab5 RAW8 capture through CSI RGB565 luminance conversion.
+- [x] Add Tab5 RGB565 capture for fullscreen preview.
+- [x] Add Tab5 hardware JPEG encoding from captured RGB565 frames.
+- [x] Add Tab5 hardware H.264 encoding from captured YUV420 frames.
+- [x] Add `cameratest` to `apps/coreutils` for detection, still capture, preview,
   file output, and dropped-frame reporting.
 
-### Phase 6 validation
+### Completed validation
 
-- [ ] Test pool exhaustion, lease reuse, stale handles, slow consumers, drops, cancellation,
-  unavailable hardware, process cleanup, and repeat launch.
-- [ ] Validate physical capture, preview, JPEG, and optional H.264 without starving input,
-  audio, networking, storage, or display service work.
-- [ ] Record memory use, frame rate, conversion time, encoding time, and dropped frames.
-- [ ] Update camera/media API and utility documentation.
+- [x] Deterministic pool exhaustion, lease reuse, stale handles, slow consumers, exact
+  drop counts, bounded copies, foreign ownership, and unavailable-hardware tests.
+- [x] Service-level owner cleanup, error/hangup notification, and repeated reopen tests.
+- [x] Actual RV32 child-exit cleanup/reopen test passes on host across six cycles.
+- [x] Physical child-exit cleanup/reopen passes: 31 assertions, zero failures, all
+  12 starts/stops clean on final firmware, including six deliberately leaked child leases.
+- [x] Repeated-start validation does not reproduce prior intermittent SCCB/IO-expander
+  I2C failures; no capture-time reset, watchdog, CCM rejection, or stall in these cycles.
+- [x] Serialize runtime/wait updates with start/stop; threaded lifecycle and H.264
+  backpressure regressions pass.
+- [x] All 47 host tests pass in Debug and Release; both Tab5 firmware builds pass.
+- [x] Maintained camera tester passes on host and Tab5 (33 physical assertions, zero failures).
+- [x] Full Tab5 SDK tester after camera use passes (176 assertions, zero failures).
+- [x] Physical RAW8 and RGB565 captures write expected payloads: 921,600 and 1,843,200 bytes.
+- [x] Physical JPEG capture, SD output, and Mac decoding verified. Earlier visual pass
+  is superseded for first-frame still capture by the gray-image regression below.
+- [x] Physical H.264 recording writes 30 pictures with zero pool drops; all 30 decode
+  at 1280x720 without decoder warnings; operator accepts visual output.
+- [x] Physical preview, exposure response, and keyboard `q` exit verified.
+- [x] Preview followed by RGB565 snapshot preserves the displayed scene; operator
+  confirms matching output and correct orientation. Accepted as the realistic
+  application capture workflow for this pause.
+- [x] Correct final CCM bounds after white balance; regression and physical varied-light
+  preview pass, correction exercised, no CCM rejection in the final run.
+- [x] Camera/audio/UDP-loopback/storage overlap passes: 43 assertions, zero failures,
+  six rounds in 632 ms, longest round 155 ms. Tester stack overflow fixed and revalidated.
+- [x] Wi-Fi progress during preview verified: latest run 48/48 ping replies, zero loss,
+  RTT average 134.414 ms, maximum 351.821 ms.
+- [x] Record RAW8 conversion, RGB565/preview and H.264 throughput, allocation snapshots,
+  encoding time, pool drops, and dequeue misses in the linked session evidence.
+- [x] Record JPEG stage timing: two backend frames, 157,903 us total encoding
+  (78.95 ms/frame), 424,890 us capture interval; output decodes at 1280x720.
+- [x] Diagnose ordinary dequeue `EPERM` as the pinned driver's empty-wait mapping;
+  count misses without per-poll warnings while retaining prolonged-stall detection.
+- [x] Update camera/media API and utility documentation.
+
+### Deferred work and known limitations
+
+- [ ] Fix and revalidate first-frame still capture: supplied RAW8, RGB565, and JPEG
+  files decode but show nearly uniform dark gray rather than the subject. Updated
+  `cameratest` startup-frame discard did not fix the physical rerun. Operator confirms
+  recognizable moving preview. `snapshot` saves a recognizable scene matching the
+  display, with correct orientation. Camera readiness timing is the current working
+  explanation, not a proven root cause; automatic capture is deferred in favor of
+  the validated preview-then-capture workflow.
+- [ ] Investigate recurring IO-expander read failures: three during RAW8, seven during
+  the subsequent RGB565 snapshot;
+  the earlier clean cleanup-cycle pass does not resolve this recurrence.
+- [ ] If automatic capture work resumes, revalidate its still outputs after any fix.
+  Snapshot has heavy noise and blue/green tint also visible in preview; retain this
+  image-quality limitation without requiring further tuning during the pause.
+
+Measured progress does not imply sustained glitch-free audio, calibrated color, or
+a network-latency guarantee. These remain limitations of the recorded validation,
+not additional unbounded Phase 6 requirements. Latest corrected preview delivered
+241 backend frames over 39.67 seconds (6.07 frames/s), with no CCM/I2C errors, stall,
+watchdog, or reset. Earlier H.264 recording delivered 30 written pictures over about
+17.53 seconds; configured 30 FPS must not be reported as measured throughput.
 
 ## Phase 7: Expansion and Industrial I/O
 
@@ -275,6 +338,12 @@ documentation pass.
 - [ ] Update expansion-device and utility documentation.
 
 ## Phase 8: Low-Power Integration
+
+This phase starts from the completed interrupt/event-runtime handoff: keyboard and touch
+are interrupt-driven; service and process completions notify one bounded dispatcher;
+software work publishes exact deadlines; and the runtime blocks without a fixed 10 ms
+tick. Low-power work owns policy, blockers, ordered suspend/resume, wake-source arming,
+sleep entry, time accounting, and measurement rather than repeating that conversion.
 
 - [ ] Define active, idle, suspending, suspended, resuming, and shutting-down states.
 - [ ] Add idle display dimming and reduced driver polling before attempting suspend.

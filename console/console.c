@@ -2,6 +2,7 @@
 
 #include <tabos/internal/console.h>
 #include <tabos/internal/display.h>
+#include <tabos/internal/time.h>
 #include <tabos/time.h>
 
 #include <tabos/config/console.h>
@@ -30,6 +31,7 @@ static bool restart_cursor_blink(void)
     }
     if (!graphics_active) {
         tabos_timer_start(&cursor_timer, TABOS_CURSOR_BLINK_INTERVAL_MS, TABOS_CURSOR_BLINK_INTERVAL_MS);
+        platform_runtime_notify(PLATFORM_RUNTIME_EVENT_DEADLINE);
     }
     return changed;
 }
@@ -144,15 +146,20 @@ void tabos_console_release(tabos_console_session_t* session)
         return;
     }
 
+    bool deadline_changed = false;
     lock_console();
     if (owns_console(session)) {
         terminal_set_cursor_visible(active_terminal, false);
         tabos_timer_cancel(&cursor_timer);
         (void) present_console();
         foreground_token = 0U;
+        deadline_changed = true;
     }
     session->token = 0U;
     unlock_console();
+    if (deadline_changed) {
+        platform_runtime_notify(PLATFORM_RUNTIME_EVENT_DEADLINE);
+    }
 }
 
 bool tabos_console_is_foreground(const tabos_console_session_t* session)
@@ -345,6 +352,16 @@ void console_update(void)
     unlock_console();
 }
 
+uint64_t console_next_deadline(void)
+{
+    lock_console();
+    const uint64_t deadline = !graphics_active && active_terminal != NULL && foreground_token != 0U ?
+                                  time_timer_deadline(&cursor_timer) :
+                                  UINT64_MAX;
+    unlock_console();
+    return deadline;
+}
+
 void console_redraw(void)
 {
     lock_console();
@@ -377,4 +394,5 @@ void console_set_graphics_active(bool active)
         (void) present_console();
     }
     unlock_console();
+    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_DEADLINE);
 }

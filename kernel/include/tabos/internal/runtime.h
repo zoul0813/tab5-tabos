@@ -2,13 +2,15 @@
 #define TABOS_INTERNAL_RUNTIME_H
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #include <tabos/platform/platform.h>
 
 bool kernel_runtime_init(void);
 /* Start services and optionally launch the configured startup application. */
 bool kernel_runtime_start(bool launch_startup_application);
-void kernel_runtime_update(void);
+void kernel_runtime_update(platform_runtime_events_t events);
+uint64_t kernel_runtime_next_deadline(void);
 void kernel_runtime_shutdown(void);
 bool kernel_runtime_request_system_action(platform_system_action_t action);
 platform_system_action_t kernel_runtime_take_system_action(void);

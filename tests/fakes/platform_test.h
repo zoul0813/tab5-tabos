@@ -6,17 +6,28 @@
 
 void test_platform_set_time_ms(uint64_t time_ms);
 void test_platform_advance_time_ms(uint64_t elapsed_ms);
+uint64_t test_platform_time_ms(void);
+uint64_t test_platform_runtime_wait_deadline(void);
 const char* test_storage_root(void);
 const char* test_platform_last_log(void);
 void test_platform_clear_log(void);
 void test_platform_network_set_state(platform_network_state_t state, const char* failure);
 unsigned int test_platform_network_connect_calls(void);
+unsigned int test_platform_network_status_calls(void);
 const char* test_platform_network_hostname(void);
+void test_platform_keyboard_set_status(bool ready, int error);
+unsigned int test_platform_keyboard_update_calls(void);
+unsigned int test_platform_pointer_update_calls(void);
 void test_platform_rtc_set_status(bool ready, int error);
 void test_platform_battery_set_status(bool ready, int error);
 void test_platform_audio_render(int16_t* stereo, size_t frames);
 void test_platform_audio_capture(const int16_t* samples, size_t frames, uint32_t channels);
 void test_platform_audio_error(int error);
 uint32_t test_platform_audio_sample_rate(void);
+void test_platform_camera_frame(const void* data, size_t size, uint32_t width, uint32_t height, uint32_t stride_bytes,
+                                uint64_t timestamp_ms);
+void test_platform_camera_encoded_frame(const void* data, size_t size, uint32_t width, uint32_t height, uint32_t format,
+                                        uint64_t timestamp_ms);
+void test_platform_camera_error(int error);
 
 #endif

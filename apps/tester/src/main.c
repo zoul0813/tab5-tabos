@@ -4,6 +4,7 @@
 #include <tabos/audio.h>
 #include <tabos/network.h>
 #include <tabos/device.h>
+#include <tabos/pointer.h>
 #include <tabos/wait.h>
 #include <tabos/ansi.h>
 
@@ -19,6 +20,7 @@ enum {
     PROCESS_LEAK_SOCKET_COUNT       = 4,
     PROCESS_LEAK_SUBSCRIPTION_COUNT = 4,
     PROCESS_LEAK_AUDIO_COUNT        = 2,
+    PROCESS_LEAK_POINTER_COUNT      = 1,
 };
 
 static int run_resource_failure_fixture(void)
@@ -56,6 +58,16 @@ static int run_resource_failure_fixture(void)
         const tabos_audio_stream_t stream = tabos_audio_open(&audio_config);
         if (stream == TABOS_AUDIO_STREAM_INVALID || tabos_audio_wait_source(stream) == TABOS_WAIT_SOURCE_INVALID) {
             return 78;
+        }
+    }
+    tabos_device_info_t pointer_device;
+    if (tabos_device_find(TABOS_DEVICE_NAME_TOUCH, &pointer_device) == 0) {
+        for (unsigned int index = 0U; index < PROCESS_LEAK_POINTER_COUNT; ++index) {
+            const tabos_pointer_stream_t stream = tabos_pointer_open(pointer_device.id);
+            if (stream == TABOS_POINTER_STREAM_INVALID ||
+                tabos_pointer_wait_source(stream) == TABOS_WAIT_SOURCE_INVALID) {
+                return 85;
+            }
         }
     }
     return 73;
@@ -107,6 +119,27 @@ static int run_process_fixture(int argc, char** argv)
 
 int main(int argc, char** argv)
 {
+    if (argc == 2 && strcmp(argv[1], "--camera-leak") == 0) {
+        return tester_camera_leak_fixture();
+    }
+    if (argc == 2 && strcmp(argv[1], "--camera-cleanup") == 0) {
+        tester_context_t context = {.argc = argc, .argv = argv};
+        tester_test_camera_cleanup(&context);
+        printf("Camera cleanup assertions: %u; failures: %u\n", context.assertions, context.failures);
+        return context.failures == 0U ? 0 : 1;
+    }
+    if (argc == 2 && strcmp(argv[1], "--camera-services") == 0) {
+        tester_context_t context = {.argc = argc, .argv = argv};
+        tester_test_camera_services(&context);
+        printf("Camera service assertions: %u; failures: %u\n", context.assertions, context.failures);
+        return context.failures == 0U ? 0 : 1;
+    }
+    if (argc == 2 && strcmp(argv[1], "--camera") == 0) {
+        tester_context_t context = {.argc = argc, .argv = argv};
+        tester_test_camera(&context);
+        printf("Camera assertions: %u; failures: %u\n", context.assertions, context.failures);
+        return context.failures == 0U ? 0 : 1;
+    }
     const int fixture_status = run_process_fixture(argc, argv);
     if (fixture_status >= 0) {
         return fixture_status;
@@ -123,6 +156,8 @@ int main(int argc, char** argv)
         {          "Device registry access",     tester_test_device},
         {             "Battery integration",    tester_test_battery},
         {               "Audio integration",      tester_test_audio},
+        {             "Pointer integration",    tester_test_pointer},
+        {              "Camera integration",     tester_test_camera},
         {              "TCP/UDP networking",    tester_test_network},
         {             "Fullscreen graphics",   tester_test_graphics},
     };

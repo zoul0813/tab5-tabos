@@ -1,9 +1,9 @@
 #include <tabos/internal/input.h>
+#include <tabos/internal/time.h>
 
 #include <tabos/config/input.h>
 #include <tabos/platform/platform.h>
 
-#include <stdatomic.h>
 #include <string.h>
 
 enum {
@@ -13,44 +13,67 @@ enum {
 static tabos_input_event_t event_queue[INPUT_QUEUE_CAPACITY];
 static size_t queue_head;
 static size_t queue_count;
-static atomic_flag queue_lock = ATOMIC_FLAG_INIT;
 static tabos_key_t held_key;
 static uint8_t held_modifiers;
 static char held_text[TABOS_INPUT_TEXT_MAX_BYTES + 1U];
 static uint8_t held_text_modifiers;
-static uint64_t next_repeat_ms;
+static tabos_timer_t repeat_timer;
+static platform_mutex_t* queue_mutex;
 
 static bool modifier_key(tabos_key_t key)
 {
     return key >= TABOS_KEY_CTRL && key <= TABOS_KEY_SYM;
 }
 
-static void lock_queue(void)
+static bool lock_queue(void)
 {
-    while (atomic_flag_test_and_set_explicit(&queue_lock, memory_order_acquire)) {}
+    if (queue_mutex == NULL) {
+        return false;
+    }
+    platform_mutex_lock(queue_mutex);
+    return true;
 }
 
 static void unlock_queue(void)
 {
-    atomic_flag_clear_explicit(&queue_lock, memory_order_release);
+    platform_mutex_unlock(queue_mutex);
 }
 
-void input_init(void)
+bool input_init(void)
 {
-    lock_queue();
+    if (queue_mutex == NULL) {
+        queue_mutex = platform_mutex_create();
+        if (queue_mutex == NULL) {
+            return false;
+        }
+    }
+    (void) lock_queue();
     queue_head          = 0U;
     queue_count         = 0U;
     held_key            = TABOS_KEY_UNKNOWN;
     held_modifiers      = 0U;
     held_text[0]        = '\0';
     held_text_modifiers = 0U;
-    next_repeat_ms      = 0U;
+    tabos_timer_cancel(&repeat_timer);
     unlock_queue();
+    return true;
 }
 
 void input_shutdown(void)
 {
-    input_init();
+    if (!lock_queue()) {
+        return;
+    }
+    queue_head          = 0U;
+    queue_count         = 0U;
+    held_key            = TABOS_KEY_UNKNOWN;
+    held_modifiers      = 0U;
+    held_text[0]        = '\0';
+    held_text_modifiers = 0U;
+    tabos_timer_cancel(&repeat_timer);
+    unlock_queue();
+    platform_mutex_destroy(queue_mutex);
+    queue_mutex = NULL;
 }
 
 bool input_submit(const tabos_input_event_t* event)
@@ -62,24 +85,26 @@ bool input_submit(const tabos_input_event_t* event)
     if (event->repeat) {
         return true;
     }
+    if (!lock_queue()) {
+        return false;
+    }
     if (event->type == TABOS_INPUT_KEY_DOWN && !modifier_key(event->key)) {
         held_key            = event->key;
         held_modifiers      = event->modifiers;
         held_text[0]        = '\0';
         held_text_modifiers = 0U;
-        next_repeat_ms      = platform_time_ms() + TABOS_KEY_REPEAT_DELAY_MS;
+        tabos_timer_start(&repeat_timer, TABOS_KEY_REPEAT_DELAY_MS, TABOS_KEY_REPEAT_INTERVAL_MS);
     } else if (event->type == TABOS_INPUT_KEY_UP && event->key == held_key) {
         held_key            = TABOS_KEY_UNKNOWN;
         held_modifiers      = 0U;
         held_text[0]        = '\0';
         held_text_modifiers = 0U;
-        next_repeat_ms      = 0U;
+        tabos_timer_cancel(&repeat_timer);
     } else if (event->type == TABOS_INPUT_TEXT && held_key != TABOS_KEY_UNKNOWN) {
         (void) strncpy(held_text, event->text, sizeof(held_text) - 1U);
         held_text[sizeof(held_text) - 1U] = '\0';
         held_text_modifiers               = event->modifiers;
     }
-    lock_queue();
     if (queue_count == INPUT_QUEUE_CAPACITY) {
         queue_head = (queue_head + 1U) % INPUT_QUEUE_CAPACITY;
         --queue_count;
@@ -88,14 +113,18 @@ bool input_submit(const tabos_input_event_t* event)
     event_queue[tail] = *event;
     ++queue_count;
     unlock_queue();
+    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_INPUT);
     input_diagnostic_log(event);
     return true;
 }
 
 void input_update(void)
 {
-    const uint64_t now = platform_time_ms();
-    if (held_key == TABOS_KEY_UNKNOWN || now < next_repeat_ms) {
+    if (!lock_queue()) {
+        return;
+    }
+    if (held_key == TABOS_KEY_UNKNOWN || !tabos_timer_poll(&repeat_timer)) {
+        unlock_queue();
         return;
     }
 
@@ -105,7 +134,6 @@ void input_update(void)
         .modifiers = held_modifiers,
         .repeat    = true,
     };
-    lock_queue();
     if (queue_count == INPUT_QUEUE_CAPACITY) {
         queue_head = (queue_head + 1U) % INPUT_QUEUE_CAPACITY;
         --queue_count;
@@ -113,18 +141,17 @@ void input_update(void)
     size_t tail       = (queue_head + queue_count) % INPUT_QUEUE_CAPACITY;
     event_queue[tail] = key_event;
     ++queue_count;
-    unlock_queue();
-    input_diagnostic_log(&key_event);
 
+    bool text_repeated             = false;
+    tabos_input_event_t text_event = {0};
     if (held_text[0] != '\0') {
-        tabos_input_event_t text_event = {
+        text_event = (tabos_input_event_t) {
             .type      = TABOS_INPUT_TEXT,
             .modifiers = held_text_modifiers,
             .repeat    = true,
         };
         (void) strncpy(text_event.text, held_text, sizeof(text_event.text) - 1U);
         text_event.text[sizeof(text_event.text) - 1U] = '\0';
-        lock_queue();
         if (queue_count == INPUT_QUEUE_CAPACITY) {
             queue_head = (queue_head + 1U) % INPUT_QUEUE_CAPACITY;
             --queue_count;
@@ -132,18 +159,30 @@ void input_update(void)
         tail              = (queue_head + queue_count) % INPUT_QUEUE_CAPACITY;
         event_queue[tail] = text_event;
         ++queue_count;
-        unlock_queue();
+        text_repeated = true;
+    }
+    unlock_queue();
+    input_diagnostic_log(&key_event);
+    if (text_repeated) {
         input_diagnostic_log(&text_event);
     }
-    next_repeat_ms = now + TABOS_KEY_REPEAT_INTERVAL_MS;
+}
+
+uint64_t input_next_deadline(void)
+{
+    if (!lock_queue()) {
+        return TIME_DEADLINE_NONE;
+    }
+    const uint64_t deadline = held_key != TABOS_KEY_UNKNOWN ? time_timer_deadline(&repeat_timer) : TIME_DEADLINE_NONE;
+    unlock_queue();
+    return deadline;
 }
 
 static bool pop_event(tabos_input_event_t* event)
 {
-    if (event == NULL) {
+    if (event == NULL || !lock_queue()) {
         return false;
     }
-    lock_queue();
     if (queue_count == 0U) {
         unlock_queue();
         return false;

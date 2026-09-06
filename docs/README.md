@@ -11,6 +11,7 @@ This directory contains user and contributor documentation for TabOS.
 - [Sprite and Tile Assets](tile-assets.md): complete sprite, animation, metasprite, tilemap,
   Tiled-authoring, generated-ID, build, and runtime guide.
 - [Keyboard Input](input.md): public events, SDL3 translation, and Tab5 Keyboard protocol.
+- [Touch and Pointer Input](pointer.md): process-owned pointer streams, logical coordinates, and host/Tab5 backends.
 - [Starfall](starfall.md): build, run, controls, storage, and asset provenance for the demo game.
 - [Console Service](console.md): foreground ownership, terminal controls, input, and diagnostic app.
 - [Application Lifecycle](applications.md): descriptors, built-in registry, foreground execution, and current limits.

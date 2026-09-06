@@ -37,7 +37,7 @@ Memory values are captured after display initialization, so Tab5 free-PSRAM repo
 
 macOS and Linux upload the logical framebuffer to an SDL3 RGB565 streaming texture. SDL preserves the 16:9 aspect ratio and letterboxes the image when the window has a different shape.
 
-The host window remains resizable and remembers its last valid screen position. Headless smoke tests create the framebuffer and texture without showing a window.
+The host window remains resizable and remembers its last valid screen position. Headless smoke tests create the framebuffer and texture without showing a window or launching the configured startup application.
 
 ## Tab5 Presentation
 

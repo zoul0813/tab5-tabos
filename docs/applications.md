@@ -85,6 +85,10 @@ expose native platform handles or implementation details.
 speaker or headphone tones, displays microphone levels, performs microphone loopback,
 changes routes, and reports deliberate underrun/overrun counters. See `docs/audio.md`.
 
+`touchtest` exercises `touch0` through the public pointer and wait APIs. It prints
+contact lifecycle, logical coordinates, buttons, and optional pressure. See
+`docs/pointer.md`.
+
 Networking utilities are grouped under `apps/netutils/`. Build one with
 `make -C apps/netutils netctl`, `make -C apps/netutils ping`, or
 `make -C apps/netutils nettest`. Sources live in
@@ -204,7 +208,7 @@ Current implementation is deliberately small:
 - filesystem-backed ELF loader supports argument vectors, static load relocation, and a
   first C17/newlib runtime, but no dynamic linking, discovery, or executable metadata yet
 - Tab5 runs each native ELF entry in managed FreeRTOS application task so persistent
-  applications do not block runtime/service loop
+  applications do not block runtime/service loop; return and process requests wake runtime
 - shared console state uses platform mutexes: SDL mutex on host and a FreeRTOS mutex with
   priority inheritance on Tab5
 
@@ -212,7 +216,8 @@ Filesystem ELF processes own their loaded image, executable mapping, execution
 context, heap arena, open descriptors, graphics session, arguments, working directory,
 and terminal policy. TabOS releases these resources through one idempotent teardown path
 after normal return, requested exit, launch failure, or a fault reported by the execution
-backend. A child failure returns a nonzero status after teardown and restores its parent;
+backend. Teardown stops application execution before releasing process-owned resources.
+A child failure returns a nonzero status after teardown and restores its parent;
 a PID 0 failure enters kernel panic.
 
 The host RV32 interpreter bounds-checks guest memory and turns invalid guest accesses
