@@ -41,10 +41,11 @@ The queue holds 64 events and is protected for host-thread and FreeRTOS-task acc
 
 ## Host Backend
 
-SDL3 physical keyboard events become TabOS key-down/key-up events. Representable SDL3
-text input becomes CP437 text events. SDL does not consistently provide text events for
-Enter, Tab, or operating-system key repeat, so the host backend synthesizes missing
-normalized text events and suppresses matching SDL duplicates.
+SDL3 physical keyboard events become TabOS key-down/key-up events. The host derives
+representable CP437 text directly from those normalized key events, including Enter,
+Tab, modifiers, and portable held-key repeats. Native SDL text-input/IME composition is
+disabled because TabOS accepts CP437 rather than composed Unicode; this also prevents
+macOS press-and-hold accent UI from intercepting game controls.
 
 macOS maps either Option key to TabOS Sym and keeps Command as GUI. Windows and Linux
 map either Win/Super key to Sym and retain their Alt keys as TabOS Alt. Key events and

@@ -3,10 +3,6 @@
 #include <tabos/internal/input.h>
 #include <tabos/platform/platform.h>
 
-#include <stdio.h>
-#include <string.h>
-
-static char synthesized_text[TABOS_INPUT_TEXT_MAX_BYTES + 1U];
 static bool screenshot_shortcut_active;
 static bool sym_down;
 static bool sym_latched;
@@ -142,9 +138,7 @@ static void dispatch_event(const SDL_Event* event)
                 }
             }
         }
-        if (event->type == SDL_EVENT_KEY_UP) {
-            synthesized_text[0] = '\0';
-        } else if (key != TABOS_KEY_SYM && (sym_down || sym_latched)) {
+        if (event->type == SDL_EVENT_KEY_DOWN && key != TABOS_KEY_SYM && (sym_down || sym_latched)) {
             uint8_t cooked_modifiers       = modifiers | TABOS_MODIFIER_SYM;
             const tabos_key_t cooked_key   = sym_key(key, &cooked_modifiers);
             tabos_input_event_t text_event = {
@@ -154,13 +148,12 @@ static void dispatch_event(const SDL_Event* event)
             if (input_text_from_hid((uint8_t) cooked_key, cooked_modifiers, text_event.text, sizeof(text_event.text)) >
                 0U) {
                 (void) input_submit(&text_event);
-                (void) snprintf(synthesized_text, sizeof(synthesized_text), "%s", text_event.text);
             }
             if (sym_down) {
                 sym_used = true;
             }
             sym_latched = false;
-        } else if (event->key.repeat || key == TABOS_KEY_ENTER || key == TABOS_KEY_TAB) {
+        } else if (event->type == SDL_EVENT_KEY_DOWN) {
             tabos_input_event_t text_event = {
                 .type      = TABOS_INPUT_TEXT,
                 .modifiers = modifiers,
@@ -168,25 +161,9 @@ static void dispatch_event(const SDL_Event* event)
             };
             if (input_text_from_hid((uint8_t) key, modifiers, text_event.text, sizeof(text_event.text)) > 0U) {
                 (void) input_submit(&text_event);
-                (void) snprintf(synthesized_text, sizeof(synthesized_text), "%s", text_event.text);
             }
         }
         return;
-    }
-    if (event->type == SDL_EVENT_TEXT_INPUT) {
-        if (synthesized_text[0] != '\0' && strcmp(synthesized_text, event->text.text) == 0) {
-            synthesized_text[0] = '\0';
-            return;
-        }
-        synthesized_text[0] = '\0';
-        for (const unsigned char* byte = (const unsigned char*) event->text.text; *byte != '\0'; ++byte) {
-            if (*byte >= 0x80U) {
-                return;
-            }
-        }
-        tabos_input_event_t input_event = {.type = TABOS_INPUT_TEXT};
-        (void) snprintf(input_event.text, sizeof(input_event.text), "%s", event->text.text);
-        (void) input_submit(&input_event);
     }
 }
 

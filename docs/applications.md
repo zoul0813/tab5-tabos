@@ -66,8 +66,11 @@ files with `TABOS_RUNTIME_ASSETS`. Its source lives in `apps/tile-demo`; build i
 `demo.tsj` tileset and `sprites-64.png` image from the same directory. Its build regenerates
 `apps/tile-demo/include/tdemo.h` before compiling. Application code includes this
 developer-facing header and uses generated sprite, animation, metasprite, layer, object,
-and flag constants instead of numeric asset IDs. It looks up the named spawn marker
-directly to place the robot, then iterates the same object layer to process every marker.
+and flag constants instead of numeric asset IDs. It looks up the named spawn and grove
+markers, uses the grove's `trees` property to place metasprites, and iterates the object
+layer to process every marker. Hold WASD to move the animated robot four pixels per frame
+while solid and water tile flags block movement. Hold the arrow keys to scroll the shared
+camera at the same rate, press E to edit one foreground cell, and press Q or Escape to exit.
 
 Core utilities are grouped under `apps/coreutils/`, but each utility remains a separate
 program. Build one with `make -C apps/coreutils ls` or `make -C apps/coreutils mkdir`.

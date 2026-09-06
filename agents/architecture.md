@@ -704,7 +704,8 @@ sequences. Both interfaces consume the same foreground queue and must not be mix
 application. Per-process TTY policy defaults to cooked input and supports raw input for
 physical key consumers. Tab5 Normal matrix events expose Sym and Aa/Shift independently;
 cooked Tab5 translation implements one-shot tap and held modifier behavior. SDL3 and the
-Tab5 I2C keyboard are backend producers. Future USB HID support
+Tab5 I2C keyboard are backend producers. The SDL host derives CP437 text from normalized
+physical key events and leaves native Unicode IME composition disabled. Future USB HID support
 on Tab5 must feed the same queue and may coexist with the built-in I2C keyboard;
 applications must not depend on input-device-specific protocols.
 

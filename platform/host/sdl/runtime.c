@@ -150,11 +150,6 @@ bool platform_init(bool headless)
         SDL_Quit();
         return false;
     }
-    if (!SDL_StartTextInput(host_window)) {
-        SDL_Log("SDL text input initialization failed: %s", SDL_GetError());
-        platform_shutdown();
-        return false;
-    }
     return true;
 }
 
@@ -266,7 +261,6 @@ void platform_shutdown(void)
 {
     platform_display_shutdown();
     if (host_window != NULL) {
-        SDL_StopTextInput(host_window);
         save_window_position();
         SDL_DestroyWindow(host_window);
         host_window = NULL;

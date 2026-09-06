@@ -189,7 +189,7 @@ Binary formats:
   canvas upscale as one accelerated presentation.
 - [x] Review: Keep native-mode support functional through queued blits. Add bulk kernel tile submission
   only later if measured API overhead misses the benchmark target.
-- [ ] Review: Add an original `tdemo` reference application using a generated sprite animation,
+- [x] Review: Add an original `tdemo` reference application using a generated sprite animation,
   metasprite, scrolling multilayer map, editable cell, collision flags, and object markers.
   Load binary assets from `T:/data/tdemo/`.
 - [x] Review: Update graphics/API, SDK/application-build, asset-authoring, and demo documentation.
@@ -234,7 +234,7 @@ Binary formats:
 
 ### Performance Acceptance
 
-- [ ] Add a repeatable benchmark fixture and timing instrumentation; current `tdemo` uses a 160x120 canvas and two tile layers, so it does not meet the acceptance workload.
+- [ ] Add a repeatable benchmark fixture and timing instrumentation; current `tdemo` uses a 426x240 canvas and two tile layers, but does not include the benchmark's three full visible tile layers and 64 sprites.
 - [ ] Performance acceptance uses a 320x180 logical canvas, 16x16 tiles, three full visible
   tile layers, and 64 sprites, sustaining the Tab5 panel cadence target of 58 FPS. If frame
   construction, excluding the VSYNC wait, exceeds 12 ms, add one bounded bulk tile-layer
@@ -582,6 +582,28 @@ Validated working-tree changes based on `7e43d93`:
   overhead missing its target.
 - The full macOS Debug suite passes 45/45 with sanitizers. Focused native graphics and tile tests pass
   on macOS Release.
+
+## Reference Application Evidence — 2026-09-06
+
+- `apps/tile-demo` builds the `tdemo` RV32 application and regenerates its checked-in constants-only
+  header plus `tdemo.tsp` and `world.tmap`. Runtime data loads exclusively from
+  `T:/data/tdemo/`, and application code uses generated sprite, animation, metasprite, flag, layer,
+  and object constants rather than numeric asset IDs.
+- The 426x240 application draws ordered ground and foreground layers through one scrolling camera,
+  animates the robot from the named spawn marker, edits a foreground cell, and outlines every object
+  marker. WASD movement queries both tile layers and treats the generated solid and water flags as
+  application-defined collision rules.
+- The named grove marker and its integer `trees` property now determine metasprite placement. The
+  grove draws after the opaque foreground so its trees remain visible. This replaces the demo's
+  hard-coded metasprite position and demonstrates generated object lookup, named property lookup,
+  ordered metasprite parts, and authored object geometry together.
+- Movement and camera controls retain key-down/key-up state and move four pixels per rendered frame.
+  The editable-cell action ignores repeated key-down events so one press produces one toggle. Host
+  CP437 text derives directly from physical SDL key events without macOS press-and-hold IME
+  interception.
+- Regenerating assets produced the expected rounding diagnostics and left `include/tdemo.h`
+  unchanged. All standard RV32 applications cross-built successfully. Focused tile, converter,
+  application-asset, and generated-C/binary-equivalence tests pass on macOS Debug and Release.
 
 ## Assumptions
 

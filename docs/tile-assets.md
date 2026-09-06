@@ -194,7 +194,8 @@ int main(void)
 Check return values in production code. Draw operations may queue source pointers, so
 loaded assets must remain alive and unchanged until `tabos_graphics_present()` completes.
 The [`tdemo` source](../apps/tile-demo/src/main.c) adds a real input/render loop, camera
-movement, a metasprite, object markers, and a writable cell using the same API.
+movement, flag-based collision checks, a property-sized grove of metasprites, object markers,
+and a writable cell using the same API.
 
 ### Draw a Sprite
 

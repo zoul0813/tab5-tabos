@@ -484,6 +484,8 @@ A pointer event received in the scaled host window should be translated back to 
 ## 8. Input Simulation
 
 SDL keyboard input should feed the same TabOS input subsystem used on hardware.
+Host text input must derive from normalized physical keys without enabling native SDL IME
+composition, including initial and held CP437 text events.
 
 Tab5 keyboard validation must cover independent simultaneous keys, raw Sym and Aa/Shift
 press/release state, cooked one-shot Sym/Aa text, held modifiers, and modified repeats.
