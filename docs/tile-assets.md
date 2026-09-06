@@ -498,9 +498,10 @@ GIF frames honor transparency, disposal, delay, and loop metadata. Delays below 
 become 10 ms unless `durations_ms` overrides them. Alpha must be exactly 0 or 255.
 Transparency gets a deterministic unused RGB565 key; explicit `color_key` must not
 collide with opaque pixels. `resize` performs nearest-neighbor import resizing.
-`transparent_rgb` and optional `transparent_tolerance` key deliberately opaque pixel
-art before strict alpha validation. A pixel matches when the absolute difference of each
-red, green, and blue component is at most the tolerance.
+Decoded pixels must already have alpha exactly 0 or 255. After that validation,
+`transparent_rgb` and optional `transparent_tolerance` key deliberately opaque pixel art.
+A pixel matches when the absolute difference of each red, green, and blue component is at
+most the tolerance. RGB keying never makes a partially transparent source acceptable.
 
 Maps may be finite orthogonal Tiled JSON with multiple atlas tilesets, tile/object
 layers, transforms, animations, integer/boolean tile properties, and integer object

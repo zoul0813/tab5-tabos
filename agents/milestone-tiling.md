@@ -152,7 +152,7 @@ Add `./tools/tabos assets build <manifest>`:
   and malformed GIDs with clear diagnostics. Round fractional object geometry to the nearest
   logical pixel and report every adjustment. Normalize all Tiled tile-object alignments to the
   runtime's top-left object origin.
-- [ ] Review: Convert opaque PNG and composited GIF pixels exactly like `TABOS_RGB565`. Require
+- [x] Review: Convert opaque PNG and composited GIF pixels exactly like `TABOS_RGB565`. Require
   alpha values of 0 or 255; reject partial alpha.
 - [x] Review: Select a deterministic unused RGB565 color key automatically when transparency exists.
   Allow an explicit manifest key only when no opaque pixel converts to the same value.
@@ -493,6 +493,20 @@ Validated working-tree changes based on `7e43d93`:
 - The asset guide documents coordinate, pivot, flag-mask, duration, repeat, ordering, transform,
   and default-value semantics needed to author these manifest features without reading converter
   source. Focused converter, tile, loader, and equivalence tests pass on macOS Debug and Release.
+
+## RGB565 and Alpha Evidence — 2026-09-06
+
+- Converter expectations no longer call the converter's own RGB565 helper. An independent formula
+  matching the public `TABOS_RGB565` contract verifies all 256 input values separately in the red,
+  green, and blue channels through actual PNG decoding, plus mixed-color and animated composited-GIF
+  cases.
+- Exhaustive direct coverage rejects every partial alpha value from 1 through 254. End-to-end PNG
+  cases verify that alpha 0 and 255 remain valid and partial alpha fails with and without RGB keying.
+- Review exposed a real ordering hole: a partially transparent pixel matching `transparent_rgb`
+  became transparent before validation and was accepted. Decoded input now passes binary-alpha
+  validation before RGB keying, while conversion retains its own defensive validation.
+- The asset guide now states that RGB keying cannot make partial-alpha input valid. Focused converter,
+  tile, loader, and generated-C/binary equivalence tests pass on macOS Debug and Release.
 
 ## Assumptions
 

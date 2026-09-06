@@ -22,6 +22,9 @@
 
 ### Sprite and Tile Graphics
 
+- [x] Verify PNG and composited-GIF conversion against independent `TABOS_RGB565` expectations;
+  exhaustively reject alpha values 1-254 before transparent-RGB keying and document the ordering.
+
 - [x] Verify manifest-authored sprite regions, signed pivots, application flags, named animations,
   and ordered metasprites, including generated constants and invalid reference/type/range coverage;
   enforce unsigned 32-bit frame durations before serialization.

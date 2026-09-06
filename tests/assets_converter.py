@@ -15,7 +15,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
-from tabos_tools.assets import load_manifest, rgb565, write_c, write_header, write_tsp
+from tabos_tools.assets import convert_pixels, load_manifest, write_c, write_header, write_tsp
+
+
+def expected_rgb565(red: int, green: int, blue: int) -> int:
+    return ((red & 0xF8) << 8) | ((green & 0xFC) << 3) | (blue >> 3)
 
 
 def rejected(path: Path, message: str | None = None) -> bool:
@@ -25,6 +29,16 @@ def rejected(path: Path, message: str | None = None) -> bool:
             load_manifest(path)
         except SystemExit as error:
             return error.code == 2 and (message is None or message in stderr.getvalue())
+    return False
+
+
+def pixels_rejected(rgba: list[tuple[int, int, int, int]]) -> bool:
+    stderr = io.StringIO()
+    with redirect_stderr(stderr):
+        try:
+            convert_pixels(rgba)
+        except SystemExit as error:
+            return error.code == 2
     return False
 
 
@@ -107,7 +121,26 @@ def main() -> int:
         (root / "single.json").write_text(json.dumps(single_manifest), encoding="utf-8")
         single_assets = load_manifest(root / "single.json")
         if (len(single_assets.images) != 1 or len(single_assets.sprites) != 1 or single_assets.animations or
-                single_assets.images[0].pixels != [rgb565(255, 128, 0)]):
+                single_assets.images[0].pixels != [expected_rgb565(255, 128, 0)]):
+            return 1
+
+        ramp = Image.new("RGBA", (256 * 3, 1))
+        ramp.putdata(
+            [(value, 0, 0, 255) for value in range(256)] +
+            [(0, value, 0, 255) for value in range(256)] +
+            [(0, 0, value, 255) for value in range(256)])
+        ramp.save(root / "rgb565-ramp.png")
+        ramp_manifest = {
+            "version": 1, "name": "rgb565_ramp",
+            "images": [{"name": "ramp", "source": "rgb565-ramp.png"}],
+        }
+        (root / "rgb565-ramp.json").write_text(json.dumps(ramp_manifest), encoding="utf-8")
+        ramp_assets = load_manifest(root / "rgb565-ramp.json")
+        expected_ramp = (
+            [expected_rgb565(value, 0, 0) for value in range(256)] +
+            [expected_rgb565(0, value, 0) for value in range(256)] +
+            [expected_rgb565(0, 0, value) for value in range(256)])
+        if ramp_assets.images[0].pixels != expected_ramp:
             return 1
 
         disposal_frames = []
@@ -116,10 +149,12 @@ def main() -> int:
             frame.putpixel((x, 0), color)
             disposal_frames.append(frame)
         disposal_expectations = {
-            2: [[rgb565(255, 0, 0), 0, 0], [rgb565(255, 0, 0), rgb565(0, 255, 0), 0],
-                [0, 0, rgb565(0, 0, 255)]],
-            3: [[rgb565(255, 0, 0), 0, 0], [rgb565(255, 0, 0), rgb565(0, 255, 0), 0],
-                [rgb565(255, 0, 0), 0, rgb565(0, 0, 255)]],
+            2: [[expected_rgb565(255, 0, 0), 0, 0],
+                [expected_rgb565(255, 0, 0), expected_rgb565(0, 255, 0), 0],
+                [0, 0, expected_rgb565(0, 0, 255)]],
+            3: [[expected_rgb565(255, 0, 0), 0, 0],
+                [expected_rgb565(255, 0, 0), expected_rgb565(0, 255, 0), 0],
+                [expected_rgb565(255, 0, 0), 0, expected_rgb565(0, 0, 255)]],
         }
         for disposal, expected_pixels in disposal_expectations.items():
             gif_path = root / f"disposal-{disposal}.gif"
@@ -201,6 +236,12 @@ def main() -> int:
         partial = Image.new("RGBA", (1, 1), (0, 0, 0, 128))
         partial.save(root / "partial.png")
         partial_manifest = {"version": 1, "name": "partial", "images": [{"name": "pixel", "source": "partial.png"}]}
+        (root / "partial.json").write_text(json.dumps(partial_manifest), encoding="utf-8")
+        if not rejected(root / "partial.json"):
+            return 1
+        if any(not pixels_rejected([(1, 2, 3, alpha)]) for alpha in range(1, 255)):
+            return 1
+        partial_manifest["images"][0]["transparent_rgb"] = [0, 0, 0]
         (root / "partial.json").write_text(json.dumps(partial_manifest), encoding="utf-8")
         if not rejected(root / "partial.json"):
             return 1
@@ -384,7 +425,7 @@ def main() -> int:
         (root / "tolerance.json").write_text(json.dumps(tolerance_manifest), encoding="utf-8")
         tolerance_assets = load_manifest(root / "tolerance.json")
         if (tolerance_assets.images[0].key != 0 or
-                tolerance_assets.images[0].pixels != [0, 0, rgb565(111, 100, 100)]):
+                tolerance_assets.images[0].pixels != [0, 0, expected_rgb565(111, 100, 100)]):
             return 1
 
         for invalid_flags in ({"zero": 0}, {"combined": 3}, {"solid": 1, "blocking": 1}):

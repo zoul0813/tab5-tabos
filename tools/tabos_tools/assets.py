@@ -108,12 +108,16 @@ def parse_key(value: Any) -> int:
     fail("color_key must be an RGB565 integer or [red, green, blue]")
 
 
+def require_binary_alpha(rgba: list[tuple[int, int, int, int]]) -> None:
+    if any(alpha not in (0, 255) for _, _, _, alpha in rgba):
+        fail("sprite images require alpha values of exactly 0 or 255")
+
+
 def convert_pixels(rgba: list[tuple[int, int, int, int]], explicit_key: Any = None) -> tuple[list[int], int | None]:
+    require_binary_alpha(rgba)
     opaque: set[int] = set()
     transparent = False
     for red, green, blue, alpha in rgba:
-        if alpha not in (0, 255):
-            fail("sprite images require alpha values of exactly 0 or 255")
         if alpha == 0:
             transparent = True
         else:
@@ -177,6 +181,8 @@ def add_image_entry(assets: AssetSet, base: Path, entry: dict[str, Any], flags: 
             resized_frames.append((resized_width, resized_height, pixels, duration))
         frames = resized_frames
     if transparent_rgb is not None:
+        for _, _, rgba, _ in frames:
+            require_binary_alpha(rgba)
         if not isinstance(transparent_rgb, list) or len(transparent_rgb) != 3:
             fail("transparent_rgb must be [red, green, blue]")
         color = tuple(integer(value, "transparent RGB component") for value in transparent_rgb)
