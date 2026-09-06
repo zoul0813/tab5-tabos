@@ -461,7 +461,9 @@ An asset set may contain any combination of standalone PNG/GIF entries and image
 through Tiled tilesets. Each source remains an independent image descriptor with its own
 dimensions, pixels, and transparency key; conversion does not require or perform physical
 atlas repacking. Sprites keep the corresponding image index. Named animations and metasprites
-may freely combine sprites from different source images.
+may freely combine sprites from different source images. Each manifest image source must be
+unique. A source already owned by an imported Tiled tileset must not also appear under manifest
+`images`; the converter rejects either duplication with the conflicting path.
 
 An animated GIF image entry generates one full-frame sprite per GIF frame and one
 animation using the image entry's name. Animated GIF entries cannot define multiple
@@ -510,7 +512,9 @@ objects already use that origin. For tile objects, the converter resolves the ow
 All nine explicit Tiled alignments are supported.
 
 When a manifest imports a Tiled map, its TMJ/TSJ files are authoritative for atlas
-regions and tile animations; do not list the same tileset image under manifest `images`.
+image paths, regions, names, pivots, flags, transparency, and tile animations. The manifest
+cannot override those fields, and the converter rejects listing the same tileset image under
+manifest `images`.
 The converter loads maps before manifest animations and metasprites, allowing those
 entries to reference sprites named in TSJ tile properties. Supported TSJ metadata is:
 

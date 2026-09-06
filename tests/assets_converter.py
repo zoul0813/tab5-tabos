@@ -291,6 +291,35 @@ def main() -> int:
         animation = tiled_assets.animations[0]
         if animation.trigger != 0 or animation.frames != [(1, 50)] or animation.repeat != 0:
             return 1
+
+        external_tileset = copy.deepcopy(base_tiled["tilesets"][0])
+        del external_tileset["firstgid"]
+        external_tileset["type"] = "tileset"
+        (root / "external.tsj").write_text(json.dumps(external_tileset), encoding="utf-8")
+        external_map = copy.deepcopy(base_tiled)
+        external_map["tilesets"] = [{"firstgid": 1, "source": "external.tsj"}]
+        (root / "external.tmj").write_text(json.dumps(external_map), encoding="utf-8")
+        external_manifest = {
+            "version": 1, "name": "tiled", "maps": [{"name": "world", "source": "external.tmj"}],
+        }
+        (root / "external.json").write_text(json.dumps(external_manifest), encoding="utf-8")
+        if load_manifest(root / "external.json") != tiled_assets:
+            return 1
+
+        duplicate_manifest_image = {
+            "version": 1, "name": "duplicate",
+            "images": [{"name": "standalone", "source": "tiles.png"}],
+            "maps": [{"name": "world", "source": "animated.tmj"}],
+        }
+        (root / "duplicate-tiled-image.json").write_text(json.dumps(duplicate_manifest_image), encoding="utf-8")
+        if not rejected(root / "duplicate-tiled-image.json", "already imported by the manifest"):
+            return 1
+        duplicate_manifest_image["maps"] = []
+        duplicate_manifest_image["images"].append({"name": "again", "source": "tiles.png"})
+        (root / "duplicate-image.json").write_text(json.dumps(duplicate_manifest_image), encoding="utf-8")
+        if not rejected(root / "duplicate-image.json", "duplicates source from images[0]"):
+            return 1
+
         write_tsp(tiled_assets, root / "tiled.tsp")
         tiled_data = (root / "tiled.tsp").read_bytes()
         animation_offset = struct.unpack_from("<I", tiled_data, 44)[0]
@@ -340,6 +369,9 @@ def main() -> int:
         candidate = copy.deepcopy(base_tiled)
         candidate["tilesets"] = {}
         tiled_cases.append((candidate, "tilesets must be an array"))
+        candidate = copy.deepcopy(base_tiled)
+        del candidate["tilesets"][0]["image"]
+        tiled_cases.append((candidate, "collection-of-images tilesets are not supported"))
         candidate = copy.deepcopy(base_tiled)
         candidate["tilesets"][0]["image"] = "unsupported.bmp"
         tiled_cases.append((candidate, "uses BMP format; expected PNG"))
@@ -466,6 +498,23 @@ def main() -> int:
         candidate = copy.deepcopy(base_tiled)
         candidate["tilesets"][0]["tiles"].append(copy.deepcopy(candidate["tilesets"][0]["tiles"][0]))
         if not rejects_tiled(candidate, "defines tile id 0 more than once"):
+            return 1
+
+        candidate = copy.deepcopy(base_tiled)
+        candidate["tilesets"][0]["tiles"][0]["properties"] = [
+            {"name": "name", "type": "string", "value": "duplicate"},
+        ]
+        candidate["tilesets"][0]["tiles"].append({
+            "id": 1, "properties": [{"name": "name", "type": "string", "value": "duplicate"}],
+        })
+        if not rejects_tiled(candidate, "asset identifier collision"):
+            return 1
+
+        candidate = copy.deepcopy(base_tiled)
+        candidate["tilesets"][0]["tiles"][0]["properties"] = [
+            {"name": "pivot_x", "type": "string", "value": "center"},
+        ]
+        if not rejects_tiled(candidate, "pivot_x must be an integer property"):
             return 1
     return 0
 

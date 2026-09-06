@@ -159,6 +159,14 @@ static void check_ids(const tabos_sprite_set_t* sprites, const tabos_tilemap_t* 
     CHECK(sprites->sprites[EQUIVALENCE_SPRITE_QUAD].image == 0U &&
           sprites->sprites[EQUIVALENCE_SPRITE_KEYED].image == 0U &&
           sprites->sprites[EQUIVALENCE_SPRITE_ACCENT].image == 1U);
+    CHECK(sprites->sprites[EQUIVALENCE_SPRITE_QUAD].x == 0 && sprites->sprites[EQUIVALENCE_SPRITE_QUAD].y == 0 &&
+          sprites->sprites[EQUIVALENCE_SPRITE_QUAD].width == 2U &&
+          sprites->sprites[EQUIVALENCE_SPRITE_QUAD].height == 2U &&
+          sprites->sprites[EQUIVALENCE_SPRITE_QUAD].pivot_x == 1 &&
+          sprites->sprites[EQUIVALENCE_SPRITE_QUAD].pivot_y == 1);
+    CHECK(sprites->sprites[EQUIVALENCE_SPRITE_KEYED].x == 2 && sprites->sprites[EQUIVALENCE_SPRITE_KEYED].y == 0 &&
+          sprites->sprites[EQUIVALENCE_SPRITE_KEYED].width == 2U &&
+          sprites->sprites[EQUIVALENCE_SPRITE_KEYED].height == 2U);
     CHECK(sprites->sprites[EQUIVALENCE_SPRITE_QUAD].flags == EQUIVALENCE_FLAG_SOLID);
     CHECK(sprites->sprites[EQUIVALENCE_SPRITE_KEYED].flags == 0U);
     CHECK(sprites->sprites[EQUIVALENCE_SPRITE_ACCENT].flags == EQUIVALENCE_FLAG_WATER);
@@ -177,7 +185,10 @@ static void check_ids(const tabos_sprite_set_t* sprites, const tabos_tilemap_t* 
     CHECK(tabos_tilemap_object_property(spawn, "missing", &missing_property) == -1 && errno == ENOENT &&
           missing_property == 123);
     CHECK(sprites->animations[EQUIVALENCE_ANIMATION_CYCLE].trigger_sprite == EQUIVALENCE_SPRITE_KEYED);
-    CHECK(sprites->animations[EQUIVALENCE_ANIMATION_CYCLE].frames[0].sprite == EQUIVALENCE_SPRITE_QUAD);
+    CHECK(sprites->animations[EQUIVALENCE_ANIMATION_CYCLE].frames[0].sprite == EQUIVALENCE_SPRITE_QUAD &&
+          sprites->animations[EQUIVALENCE_ANIMATION_CYCLE].frames[0].duration_ms == 10U &&
+          sprites->animations[EQUIVALENCE_ANIMATION_CYCLE].frames[1].sprite == EQUIVALENCE_SPRITE_KEYED &&
+          sprites->animations[EQUIVALENCE_ANIMATION_CYCLE].frames[1].duration_ms == 20U);
     CHECK(sprites->animations[EQUIVALENCE_ANIMATION_HOLD].frames[0].sprite == EQUIVALENCE_SPRITE_ACCENT &&
           sprites->animations[EQUIVALENCE_ANIMATION_HOLD].frames[1].sprite == EQUIVALENCE_SPRITE_KEYED);
     CHECK(sprites->metasprites[EQUIVALENCE_METASPRITE_ACTOR].parts[0].sprite == EQUIVALENCE_SPRITE_QUAD &&

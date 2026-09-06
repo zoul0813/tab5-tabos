@@ -356,13 +356,20 @@ def load_manifest(path: Path) -> AssetSet:
             fail(f"flags {used_flag_values[flag]!r} and {name!r} use the same bit")
         flags[name] = flag
         used_flag_values[flag] = name
+    manifest_image_sources: dict[Path, int] = {}
     for index, entry_value in enumerate(require_list(manifest.get("images", []), f"asset manifest {path} images")):
         entry = require_object(entry_value, f"asset manifest {path} images[{index}]")
+        image_source = (path.parent / require_string(entry, "source")).resolve()
+        if image_source in manifest_image_sources:
+            original_index = manifest_image_sources[image_source]
+            fail(f"asset manifest {path} images[{index}] duplicates source from images[{original_index}]: "
+                 f"{image_source}")
+        manifest_image_sources[image_source] = index
         add_image_entry(assets, path.parent, entry, flags)
     for index, entry_value in enumerate(require_list(manifest.get("maps", []), f"asset manifest {path} maps")):
         entry = require_object(entry_value, f"asset manifest {path} maps[{index}]")
         assets.maps.append(load_tiled_map(assets, path.parent / require_string(entry, "source"),
-                                          require_string(entry, "name"), flags))
+                                          require_string(entry, "name"), flags, set(manifest_image_sources)))
     sprite_ids = {sprite.name: index for index, sprite in enumerate(assets.sprites)}
     for index, entry_value in enumerate(require_list(manifest.get("animations", []),
                                                      f"asset manifest {path} animations")):
@@ -427,7 +434,8 @@ def load_manifest(path: Path) -> AssetSet:
     return assets
 
 
-def load_tiled_map(assets: AssetSet, path: Path, name: str, flags: dict[str, int]) -> dict[str, Any]:
+def load_tiled_map(assets: AssetSet, path: Path, name: str, flags: dict[str, int],
+                   manifest_image_sources: set[Path]) -> dict[str, Any]:
     try:
         tiled = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
@@ -474,6 +482,8 @@ def load_tiled_map(assets: AssetSet, path: Path, name: str, flags: dict[str, int
         if "image" not in tileset:
             fail(f"{tileset_label}: collection-of-images tilesets are not supported")
         image_path = tileset_base / require_string(tileset, "image")
+        if image_path.resolve() in manifest_image_sources:
+            fail(f"{tileset_label} image {image_path} is already imported by the manifest; remove the images entry")
         frames, _ = open_frames(image_path, {"PNG"})
         if len(frames) != 1:
             fail(f"{tileset_label} image must not be animated")

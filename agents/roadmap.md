@@ -22,6 +22,10 @@
 
 ### Sprite and Tile Graphics
 
+- [x] Verify TMJ/TSJ authority for tileset images, calculated atlas regions, names, pivots, flags,
+  transparency, and tile animations; prove inline/external parity and reject duplicate manifest
+  image declarations that conflict with Tiled-owned sources.
+
 - [x] Verify multiple source images remain independent inside one logical sprite set, including
   per-image dimensions and transparency, sprite image indices, and cross-image animations and
   metasprites in generated-C/binary pixel-equivalence coverage.

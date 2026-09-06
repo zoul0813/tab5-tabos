@@ -140,7 +140,7 @@ Add `./tools/tabos assets build <manifest>`:
   reject invalid types/ranges and use on nonanimated tiles.
 - [x] Review: Convert multiple source images into one logical sprite set without requiring physical
   atlas repacking.
-- [ ] Review: Imported TMJ/TSJ files remain authoritative for tileset images, regions, tile metadata, and tile animations. Manifests orchestrate outputs and non-Tiled metadata without duplicating imported tiles or images.
+- [x] Review: Imported TMJ/TSJ files remain authoritative for tileset images, regions, tile metadata, and tile animations. Manifests orchestrate outputs and non-Tiled metadata without duplicating imported tiles or images.
 - [ ] Review: Let the manifest define arbitrary sprite regions, pivots, named animations,
   metasprites, and application flags.
 - [x] Review: Generate asset-set-prefixed, sanitized C constants for named sprites, clips,
@@ -462,6 +462,20 @@ Validated working-tree changes based on `7e43d93`:
 - Independent pixel expectations render sprites from both images, their cross-image animation and
   metasprite, and transparent foreground composition. Full metadata and 79 rendered scene pairs
   remain identical between generated C and binary assets on macOS Debug and Release.
+
+## TMJ/TSJ Authority Evidence — 2026-09-06
+
+- Equivalent inline and external tileset fixtures normalize to exactly equal images, sprites,
+  animations, map data, constants, and metadata. The manifest supplies only asset/map names and
+  source paths; it has no override path for Tiled-owned tile definitions.
+- Independent descriptor expectations verify decoded atlas dimensions and transparency, calculated
+  regions, tile names and generated IDs, pivots, registered flags, animation names, frame sprite
+  IDs, durations, repeat behavior, and tile-object GIDs sourced from TMJ/TSJ data.
+- The converter rejects duplicate manifest image sources and any manifest image also imported by a
+  Tiled tileset, reporting both the authority conflict and source path. Unsupported metadata types,
+  collection-of-images tilesets, malformed animations, and identifier collisions remain rejected.
+- Generated-C and binary forms compare all normalized metadata and 79 scene pairs. Focused converter,
+  tile, loader, and equivalence tests pass on macOS Debug and Release.
 
 ## Assumptions
 
