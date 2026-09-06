@@ -22,6 +22,9 @@
 
 ### Sprite and Tile Graphics
 
+- [x] Verify normal tile games render fully in logical RGB565 memory and submit one final accelerated
+  canvas blit per presentation; cover exact 426/427-pixel integer-scale boundary behavior.
+
 - [x] Verify sprite, animation, metasprite, tilemap, and binary loading remain portable SDK code;
   extend architecture guards across SDK sources and reject platform types in public headers.
 

@@ -20,6 +20,7 @@ static unsigned int present_count;
 static unsigned int clear_count;
 static tabos_color_t cleared_color;
 static bool upscale_valid;
+static unsigned int upscale_count;
 static uint32_t expected_width;
 static uint32_t expected_height;
 static int32_t expected_x;
@@ -92,6 +93,7 @@ static int graphics_blit_ex(const tabos_graphics_blit_options_t* options)
                     options->source.height == expected_height && options->destination.x == expected_x &&
                     options->destination.y == expected_y && options->destination.width == expected_output_width &&
                     options->destination.height == expected_output_height && options->opacity == 255U;
+    ++upscale_count;
     return upscale_valid ? 0 : -22;
 }
 
@@ -243,13 +245,14 @@ static void check_camera(void)
     for (size_t i = 0U; i < sizeof(expected) / sizeof(expected[0]); ++i) {
         CHECK(graphics.pixels[i] == 12U);
     }
-    expected_width         = 16U;
-    expected_height        = 12U;
-    expected_x             = 160;
-    expected_y             = 0;
-    expected_output_width  = 960U;
-    expected_output_height = 720U;
-    CHECK(tabos_graphics_present(&graphics) == 0 && upscale_valid);
+    expected_width                    = 16U;
+    expected_height                   = 12U;
+    expected_x                        = 160;
+    expected_y                        = 0;
+    expected_output_width             = 960U;
+    expected_output_height            = 720U;
+    const unsigned int before_upscale = upscale_count;
+    CHECK(tabos_graphics_present(&graphics) == 0 && upscale_valid && upscale_count == before_upscale + 1U);
     CHECK(graphics.camera_x == 2 && graphics.camera_y == 3);
     CHECK(tabos_graphics_close(&graphics) == 0);
     CHECK(graphics.camera_x == 0 && graphics.camera_y == 0);
@@ -273,6 +276,39 @@ static void check_camera(void)
     CHECK(tabos_graphics_blit(&graphics, INT32_MAX, 0, 2U, 2U, pixels) == -1 && errno == ERANGE);
     CHECK(tabos_graphics_blit_ex(&graphics, &blit) == -1 && errno == ERANGE);
     CHECK(submitted_count == before);
+    CHECK(tabos_graphics_close(&graphics) == 0);
+}
+
+static void check_scale_boundaries(void)
+{
+    capture_native            = false;
+    tabos_graphics_t graphics = {.width = 426U, .height = 240U};
+    CHECK(tabos_graphics_open(&graphics) == 0 && graphics.scale == 3U && graphics.output_x == 1U &&
+          graphics.output_y == 0U && graphics.output_width == 1278U && graphics.output_height == 720U);
+    expected_width                    = 426U;
+    expected_height                   = 240U;
+    expected_x                        = 1;
+    expected_y                        = 0;
+    expected_output_width             = 1278U;
+    expected_output_height            = 720U;
+    const unsigned int before_upscale = upscale_count;
+    const unsigned int before_clear   = clear_count;
+    const unsigned int before_present = present_count;
+    CHECK(tabos_graphics_present(&graphics) == 0 && upscale_valid && upscale_count == before_upscale + 1U &&
+          clear_count == before_clear + 1U && present_count == before_present + 1U);
+    CHECK(tabos_graphics_close(&graphics) == 0);
+
+    graphics = (tabos_graphics_t) {.width = 427U, .height = 240U};
+    CHECK(tabos_graphics_open(&graphics) == 0 && graphics.scale == 2U && graphics.output_x == 213U &&
+          graphics.output_y == 120U && graphics.output_width == 854U && graphics.output_height == 480U);
+    expected_width         = 427U;
+    expected_height        = 240U;
+    expected_x             = 213;
+    expected_y             = 120;
+    expected_output_width  = 854U;
+    expected_output_height = 480U;
+    CHECK(tabos_graphics_present(&graphics) == 0 && upscale_valid && upscale_count == before_upscale + 2U &&
+          clear_count == before_clear + 2U && present_count == before_present + 2U);
     CHECK(tabos_graphics_close(&graphics) == 0);
 }
 
@@ -302,7 +338,7 @@ int main(void)
     expected_output_width  = 960U;
     expected_output_height = 720U;
     if (tabos_graphics_present(&graphics) != 0 || clear_count != 1U || cleared_color != red || !upscale_valid ||
-        tabos_graphics_close(&graphics) != 0 || close_count != 1U) {
+        upscale_count != 1U || tabos_graphics_close(&graphics) != 0 || close_count != 1U) {
         return 1;
     }
 
@@ -345,8 +381,9 @@ int main(void)
     expected_output_height = 720U;
     if (tabos_graphics_blit_ex(&graphics, &blit) != 0 || tabos_graphics_blit_ex(&graphics, &clipped) != 0 ||
         graphics.pixels[20U * graphics.width + 20U] != red || graphics.pixels[20U * graphics.width + 21U] != blue ||
-        tabos_graphics_present(&graphics) != 0 || !upscale_valid || present_count != 2U || clear_count != 1U ||
-        tabos_graphics_close(&graphics) != 0 || close_count != 2U || graphics.open) {
+        upscale_count != 1U || tabos_graphics_present(&graphics) != 0 || !upscale_valid || upscale_count != 2U ||
+        present_count != 2U || clear_count != 1U || tabos_graphics_close(&graphics) != 0 || close_count != 2U ||
+        graphics.open) {
         return 1;
     }
 
@@ -359,5 +396,6 @@ int main(void)
     check_blit_clips();
     check_blit_validation(false);
     check_blit_validation(true);
+    check_scale_boundaries();
     return 0;
 }

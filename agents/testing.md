@@ -945,6 +945,11 @@ black default and runtime-changing letterbox colors, allocation and cleanup, dir
 access, clipped primitives, transformed/color-keyed/alpha blits, one full-canvas upscale
 per present, and matching logical output on host and Tab5.
 
+Tile-scene tests assert that logical sprite and map draws change application-owned pixels without
+submitting platform blits. A non-letterboxed present must then submit exactly one full-canvas blit
+and one presentation. Scale-boundary coverage verifies 426×240 fits a 1280×720 display at 3× while
+427×240 falls to 2× because 1281 physical pixels would be required at 3×.
+
 Foreground application stdin represents arrow-key presses and normalized repeats as ANSI
 CSI `A`, `B`, `C`, and `D` sequences. Reads smaller than a sequence must preserve and
 return its remaining bytes on later calls. Graphics-mode arrow keys must reach the active

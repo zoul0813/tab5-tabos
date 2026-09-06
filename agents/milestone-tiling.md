@@ -185,7 +185,7 @@ Binary formats:
 
 - [x] Review: Implement sprite, animation, metasprite, tilemap, and binary parsing as portable SDK code.
   Add no SDL, ESP-IDF, FreeRTOS, PPA, or PIE types to the public API.
-- [ ] Review: Use logical-canvas software drawing for normal tile games. Keep the existing final
+- [x] Review: Use logical-canvas software drawing for normal tile games. Keep the existing final
   canvas upscale as one accelerated presentation.
 - [ ] Review: Keep native-mode support functional through queued blits. Add bulk kernel tile submission
   only later if measured API overhead misses the benchmark target.
@@ -550,6 +550,22 @@ Validated working-tree changes based on `7e43d93`:
   PIE type names in every public SDK header.
 - The strengthened architecture test passes on macOS Debug and Release. Focused SDK tests and all
   standard RV32 applications compile successfully with the shared portable implementation.
+
+## Logical Canvas Tile Rendering Evidence — 2026-09-06
+
+- Sprite and tile APIs resolve every primitive, transform, animation frame, clip, camera offset,
+  transparency key, and opacity operation directly into the SDK-owned logical RGB565 pixel buffer.
+  A tile-scene regression asserts that these draws issue zero platform blits before presentation.
+- `tabos_graphics_present()` submits exactly one full-canvas nearest-neighbor blit followed by one
+  platform present when the output fits exactly. Letterboxed output may additionally clear the
+  physical target once for borders. The normal queued graphics path lets SDL or Tab5 PPA accelerate
+  that final blit, with the scalar raster path retained as fallback.
+- Exact scale-boundary tests verify 426×240 becomes centered 1278×720 at 3×, while 427×240 exceeds
+  physical width by one pixel at 3× and therefore becomes centered 854×480 at 2×. Both cases verify
+  one final canvas blit, one border clear, and one presentation.
+- Existing tile pixel tests cover maps, sprites, animations, metasprites, camera movement, clipping,
+  transparency, and all transforms inside logical memory. Focused graphics and tile tests pass on
+  macOS Debug and Release; standard RV32 applications compile the same path.
 
 ## Assumptions
 

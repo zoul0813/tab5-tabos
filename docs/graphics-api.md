@@ -57,6 +57,11 @@ borders. For 1280×720, examples include 320×180 at 4× fullscreen and 320×240
 with a centered 960×720 image and 160-pixel side borders. Allocation must also fit the
 application's available heap.
 
+Scale changes at exact integer-fit boundaries. A 426×240 canvas fits at 3×, producing
+1278×720 with one unused pixel on each side. A 427×240 canvas would require 1281 pixels
+at 3×, so it uses 2× instead and produces a centered 854×480 image. Choose logical
+dimensions that divide or nearly divide the physical display when maximizing coverage matters.
+
 Borders default to black. `tabos_graphics_set_letterbox_color()` changes their RGB565
 color for the next and following presentations, so gameplay may animate them—for example,
 flashing red when the player takes damage. Each letterboxed present clears the physical

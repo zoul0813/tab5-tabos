@@ -5,10 +5,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+static unsigned int platform_blit_count;
+static unsigned int platform_present_count;
+static tabos_graphics_blit_options_t platform_blit;
+
 static int graphics_open(uint32_t* width, uint32_t* height)
 {
-    *width  = 16U;
-    *height = 16U;
+    *width  = 32U;
+    *height = 32U;
     return 0;
 }
 
@@ -19,12 +23,14 @@ static int graphics_close(void)
 
 static int graphics_present(void)
 {
+    ++platform_present_count;
     return 0;
 }
 
 static int graphics_blit_ex(const tabos_graphics_blit_options_t* options)
 {
-    (void) options;
+    platform_blit = *options;
+    ++platform_blit_count;
     return 0;
 }
 
@@ -335,7 +341,12 @@ int main(int argc, char** argv)
             return 1;
         }
     }
-    if (tabos_graphics_close(&graphics) != 0) {
+    if (platform_blit_count != 0U || platform_present_count != 0U || tabos_graphics_present(&graphics) != 0 ||
+        platform_blit_count != 1U || platform_present_count != 1U || platform_blit.pixels != graphics.pixels ||
+        platform_blit.bitmap_width != 16U || platform_blit.bitmap_height != 16U || platform_blit.source.width != 16U ||
+        platform_blit.source.height != 16U || platform_blit.destination.x != 0 || platform_blit.destination.y != 0 ||
+        platform_blit.destination.width != 32U || platform_blit.destination.height != 32U ||
+        platform_blit.opacity != 255U || tabos_graphics_close(&graphics) != 0) {
         return 1;
     }
     if (argc == 3) {
