@@ -177,7 +177,7 @@ Binary formats:
 - [x] Review: Unload only after the final `present()` or graphics close because queued commands retain
   source pointers.
 
-- [ ] Review: Install binary assets under `T:/data/<app-name>/`. Extend application build rules so each
+- [x] Review: Install binary assets under `T:/data/<app-name>/`. Extend application build rules so each
   application explicitly declares generated asset outputs; normal installation and `--msc`
   copy only declared runtime assets, never source PNG, GIF, Tiled, or manifest files.
 
@@ -521,6 +521,20 @@ Validated working-tree changes based on `7e43d93`:
   generating every output leaves the complete normalized asset model unchanged.
 - Focused converter, tile, loader, and generated-C/binary equivalence tests pass on macOS Debug and
   Release after the writer-purity fix.
+
+## Runtime Asset Installation Evidence — 2026-09-06
+
+- `application.mk` stages only files named by `TABOS_RUNTIME_ASSETS` under
+  `build/apps/<app-name>/data`; normal installation copies that staging set under
+  `T:/data/<app-name>/`, and the MSC workflow copies the same per-app staging directories.
+- A synthetic application located beneath a path containing spaces verifies `.tsp`/`.tmap`
+  staging and installation, exclusion of adjacent PNG, TMJ, and manifest sources, clear failure
+  for a missing declared output, and preservation of unrelated runtime-created application data.
+- Review exposed that an empty asset declaration skipped staging cleanup, allowing obsolete files
+  to remain eligible for MSC copying. Staging now refreshes for every application build, including
+  an empty declaration, and the regression test begins with an intentionally stale asset.
+- Tile demo build inputs and generated outputs now use relative Make paths, matching the shared
+  application build contract and preserving builds when the repository path contains spaces.
 
 ## Assumptions
 

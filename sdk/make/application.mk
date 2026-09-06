@@ -83,16 +83,15 @@ install: $(OUTPUT) install-assets
 	cp "$(OUTPUT)" "$(INSTALL_PATH)"
 
 stage-assets: $(TABOS_RUNTIME_ASSETS)
-ifneq ($(strip $(TABOS_RUNTIME_ASSETS)),)
 	@mkdir -p $(BUILD_DIR)/data
 	@for asset in "$(BUILD_DIR)/data/"*; do if [ -f "$$asset" ]; then rm -f "$$asset"; fi; done
+ifneq ($(strip $(TABOS_RUNTIME_ASSETS)),)
 	@for asset in $(TABOS_RUNTIME_ASSETS); do cp "$$asset" "$(BUILD_DIR)/data/$${asset##*/}"; done
 endif
 
 install-assets: stage-assets
 ifneq ($(strip $(TABOS_RUNTIME_ASSETS)),)
 	@mkdir -p $(INSTALL_DATA_PATH)
-	@for asset in "$(INSTALL_DATA_PATH)/"*; do if [ -f "$$asset" ]; then rm -f "$$asset"; fi; done
 	@for asset in $(BUILD_DIR)/data/*; do cp "$$asset" "$(INSTALL_DATA_PATH)/$${asset##*/}"; done
 endif
 

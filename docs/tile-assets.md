@@ -599,3 +599,5 @@ include ../../sdk/make/application.mk
 
 Normal installation and `./apps/build.sh --msc` copy those files to
 `T:/data/<app-name>/`; PNG, GIF, Tiled, and manifest sources stay out of runtime media.
+Staging is refreshed on every build, including after the declaration becomes empty. Installing
+assets overwrites files with matching declared names and preserves unrelated runtime-created data.

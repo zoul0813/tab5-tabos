@@ -31,6 +31,12 @@ get/set/camera/transforms, binary loading and cleanup, deterministic conversion,
 timing/repeat metadata, generated-C compilation, editable TMJ/TSJ metadata, and absence
 of duplicate images or sprites when a manifest imports a Tiled tileset.
 
+`unit.application_assets` exercises the shared application Make rules from a synthetic
+application beneath a path containing spaces. It verifies that only declared runtime files
+enter staging and normal installation, an empty declaration clears stale staging, missing
+declared outputs fail the build, and installation preserves unrelated application-created data.
+The MSC workflow consumes these same refreshed per-application staging directories.
+
 Transformed-pivot tests use independent expected rectangles for all sixteen combinations
 of quarter-turn rotation and horizontal/vertical mirroring. They also cover scaling, an
 origin outside the sprite rectangle, and arithmetic-overflow rejection.

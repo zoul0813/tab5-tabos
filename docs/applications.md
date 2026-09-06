@@ -40,6 +40,10 @@ The default mount point is `/Volumes/TAB5`. Use `--msc-mount=/path` or set
 `TABOS_MSC_MOUNT` to override it. Runnable extensionless outputs are copied to the
 volume's `bin/` directory. Declared runtime assets are copied to `data/<app-name>/`.
 Intermediate build files, PNG/GIF and Tiled sources, and manifests are excluded.
+Each application build refreshes its staging directory even when its declared asset list is
+empty, preventing obsolete staged files from reaching MSC media. Installation overwrites
+declared asset names while preserving unrelated application-created files in the same data
+directory.
 Grouped utility outputs are flattened; for example, `build/apps/coreutils/ls/ls` is
 copied to `bin/ls`.
 

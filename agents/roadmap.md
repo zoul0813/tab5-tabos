@@ -22,6 +22,9 @@
 
 ### Sprite and Tile Graphics
 
+- [x] Verify declared runtime-asset staging, rootfs installation, and MSC inputs; clear stale staging
+  for empty declarations, preserve application-created data, and keep tdemo paths space-safe.
+
 - [x] Verify deterministic byte-identical generated C, headers, sprite binaries, and map binaries
   from one normalized model; make `.tmap` serialization pure and assert binary format versions.
 

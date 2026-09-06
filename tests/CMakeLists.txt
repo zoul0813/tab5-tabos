@@ -115,6 +115,7 @@ tabos_enable_sanitizers(tabos_sdk_tiles)
 add_test(NAME unit.sdk_tiles COMMAND tabos_sdk_tiles
     "${TABOS_TEST_TILE_ASSETS}/tdemo.tsp" "${TABOS_TEST_TILE_ASSETS}/world.tmap")
 add_test(NAME unit.asset_converter COMMAND "${Python3_EXECUTABLE}" "${TABOS_ROOT}/tests/assets_converter.py")
+add_test(NAME unit.application_assets COMMAND "${Python3_EXECUTABLE}" "${TABOS_ROOT}/tests/application_assets.py")
 
 # Redirect only the loader translation units, leaving the test's allocator real.
 add_library(tabos_test_asset_loaders OBJECT
