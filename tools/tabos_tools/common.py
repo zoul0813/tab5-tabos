@@ -21,6 +21,10 @@ def fail(message: str) -> None:
     raise SystemExit(2)
 
 
+def warn(message: str) -> None:
+    print(f"tabos: warning: {message}", file=sys.stderr)
+
+
 def identity_value(name: str) -> str:
     identity_file = ROOT / "config" / "Identity.cmake"
     contents = identity_file.read_text(encoding="utf-8")

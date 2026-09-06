@@ -285,8 +285,44 @@ def main() -> int:
         if not rejects_tiled(candidate, "uses unsupported geometry or rotation"):
             return 1
         candidate = copy.deepcopy(object_base)
-        candidate["layers"][0]["objects"][0]["x"] = 0.5
-        if not rejects_tiled(candidate, "object x must be an integer"):
+        candidate["layers"][0]["objects"][0].update({"x": 0.5, "y": -0.5, "width": 4.6, "height": 2.4})
+        (root / "animated.tmj").write_text(json.dumps(candidate), encoding="utf-8")
+        warnings = io.StringIO()
+        with redirect_stderr(warnings):
+            rounded = load_manifest(root / "tiled.json")
+        rounded_object = rounded.maps[0]["objects"][0]
+        warning_text = warnings.getvalue()
+        if ((rounded_object["x"], rounded_object["y"], rounded_object["width"], rounded_object["height"]) !=
+                (1, -1, 5, 2) or "object 'spawn' x 0.5 rounded to 1" not in warning_text or
+                "object 'spawn' y -0.5 rounded to -1" not in warning_text or
+                "object 'spawn' width 4.6 rounded to 5" not in warning_text or
+                "object 'spawn' height 2.4 rounded to 2" not in warning_text):
+            return 1
+        alignments = {
+            "topleft": (100, 100), "top": (90, 100), "topright": (80, 100),
+            "left": (100, 95), "center": (90, 95), "right": (80, 95),
+            "bottomleft": (100, 90), "bottom": (90, 90), "bottomright": (80, 90),
+            "unspecified": (100, 90),
+        }
+        for alignment, expected in alignments.items():
+            candidate = copy.deepcopy(base_tiled)
+            candidate["tilesets"][0]["objectalignment"] = alignment
+            candidate["layers"] = [{
+                "type": "objectgroup", "name": "objects",
+                "objects": [{"id": 1, "name": "tile", "gid": 1, "x": 100, "y": 100,
+                             "width": 20, "height": 10}],
+            }]
+            (root / "animated.tmj").write_text(json.dumps(candidate), encoding="utf-8")
+            aligned_object = load_manifest(root / "tiled.json").maps[0]["objects"][0]
+            if (aligned_object["x"], aligned_object["y"]) != expected:
+                return 1
+        candidate = copy.deepcopy(base_tiled)
+        candidate["tilesets"][0]["objectalignment"] = "baseline"
+        if not rejects_tiled(candidate, "objectalignment 'baseline' is not supported"):
+            return 1
+        candidate = copy.deepcopy(object_base)
+        candidate["layers"][0]["objects"][0]["x"] = "0.5"
+        if not rejects_tiled(candidate, "object 'spawn' x must be a finite number"):
             return 1
         candidate = copy.deepcopy(object_base)
         candidate["layers"][0]["objects"][0]["name"] = 4

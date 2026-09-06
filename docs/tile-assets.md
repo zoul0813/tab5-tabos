@@ -323,7 +323,9 @@ for (uint32_t index = 0U; index < layer->object_count; ++index) {
 }
 ```
 
-Point, rectangle, and tile objects preserve integral authored position and dimensions.
+Point, rectangle, and tile objects expose integer positions and dimensions. The converter
+normalizes tile-object positions to the same top-left convention used by rectangles, then
+rounds fractional Tiled geometry as described below and reports each rounding adjustment.
 Tile objects also expose an encoded `tile` value. `name` is the Tiled object name; `type`
 is its class, falling back to the legacy Tiled type. Missing properties return `ENOENT`.
 Generated object constants work with `tabos_tilemap_object()` and during iteration.
@@ -341,9 +343,10 @@ The normal workflow is:
 5. Reference the map from the version-1 manifest.
 6. Run `tabos assets build`, then include its generated app header.
 
-Use integral map and object coordinates and zero tile-layer offsets. Layer visibility and
-opacity are authoring aids; the runtime imports supported layers and game code chooses
-which tile layers to draw.
+Use integral map dimensions and zero tile-layer offsets. Object placement may be fractional;
+conversion rounds it to logical pixels with warnings. Layer visibility and opacity are
+authoring aids; the runtime imports supported layers and game code chooses which tile layers
+to draw.
 
 Run:
 
@@ -482,13 +485,23 @@ red, green, and blue component is at most the tolerance.
 
 Maps may be finite orthogonal Tiled JSON with multiple atlas tilesets, tile/object
 layers, transforms, animations, integer/boolean tile properties, and integer object
-properties. Only integral point, rectangle, and tile objects with zero rotation are
-accepted. Unsupported map modes, object geometry, partial alpha, unknown GIDs, and the
-reserved GID bit fail with diagnostics. Map and tile dimensions must be positive and fit
-the runtime's 32-bit fields; tile-layer dimensions must match the map and offsets must be
+properties. Point, rectangle, and tile objects with zero rotation are accepted. Fractional
+object positions and dimensions are rounded to the nearest logical pixel, with exact halves
+rounded away from zero. The converter prints a warning naming the map, object, field,
+alignment-normalized value, and rounded value for every adjustment. Unsupported map modes,
+nonnumeric or out-of-range object geometry, partial alpha, unknown GIDs, and the reserved
+GID bit fail with diagnostics.
+Map and tile dimensions must be positive and fit the runtime's 32-bit fields; tile-layer
+dimensions must match the map and offsets must be
 zero. GIDs, object IDs, object sizes, and property values are range-checked before binary
 generation. Diagnostics identify the input path, field, layer, tileset, object, or GID
 where applicable.
+
+Runtime object `x,y` always identifies the top-left of its bounding box. Tiled rectangle
+objects already use that origin. For tile objects, the converter resolves the owning tileset's
+`objectalignment` and translates its anchor to top-left. Tiled's `unspecified` alignment means
+`bottomleft` for the supported orthogonal maps, so the converter subtracts the object height.
+All nine explicit Tiled alignments are supported.
 
 When a manifest imports a Tiled map, its TMJ/TSJ files are authoritative for atlas
 regions and tile animations; do not list the same tileset image under manifest `images`.

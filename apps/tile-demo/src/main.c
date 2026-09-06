@@ -11,7 +11,7 @@
 #include <tdemo.h>
 
 enum {
-    DEMO_WIDTH  = 320,
+    DEMO_WIDTH  = 426,
     DEMO_HEIGHT = 240,
 };
 

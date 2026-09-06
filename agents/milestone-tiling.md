@@ -148,8 +148,10 @@ Add `./tools/tabos assets build <manifest>`:
   map IDs because maps load individually by path and no public API consumes them. Allow a
   constants-only generated public header under the app include directory for normal source use.
 - [x] Review: Reject infinite or isometric maps, ellipse/text/polygon/polyline/template objects,
-  arbitrary object rotation, non-integral object geometry, unsupported properties, and
-  malformed GIDs with clear diagnostics.
+  arbitrary object rotation, nonnumeric or out-of-range object geometry, unsupported properties,
+  and malformed GIDs with clear diagnostics. Round fractional object geometry to the nearest
+  logical pixel and report every adjustment. Normalize all Tiled tile-object alignments to the
+  runtime's top-left object origin.
 - [ ] Review: Convert opaque PNG and composited GIF pixels exactly like `TABOS_RGB565`. Require
   alpha values of 0 or 255; reject partial alpha.
 - [x] Review: Select a deterministic unused RGB565 color key automatically when transparency exists.
@@ -411,7 +413,10 @@ Validated working-tree changes based on `7e43d93`:
 - Tiled dimensions, IDs, GIDs, coordinates, properties, animation frames, and tileset ranges
   are type- and range-checked against their binary representation. Tests reject infinite and
   isometric maps, layer offsets and unsupported layer types, reserved/unknown/out-of-range
-  GIDs, nonintegral geometry, invalid property values, and every unsupported object form.
+  GIDs, nonnumeric and out-of-range geometry, invalid property values, and every unsupported
+  object form. Fractional geometry tests verify nearest-pixel rounding, halves away from zero,
+  and an explicit warning for every adjusted field. End-to-end cases verify all nine explicit
+  Tiled tile-object alignments plus orthogonal `unspecified`/bottom-left behavior.
 - Focused converter, tile, binary-loader, and C/binary equivalence tests pass on macOS Debug
   and Release. The full macOS Debug suite passed 43/44; only the unrelated loopback network
   test failed because sandbox networking could not reserve local TCP/UDP ports.

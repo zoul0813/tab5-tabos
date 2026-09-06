@@ -343,13 +343,21 @@ int main(int argc, char** argv)
         tabos_tilemap_t loaded_map        = {0};
         if (tabos_sprite_set_load(argv[1], &loaded_sprites) != 0 || loaded_sprites.image_count != 1U ||
             loaded_sprites.sprite_count != 16U || tabos_tilemap_load(argv[2], &loaded_map) != 0 ||
-            loaded_map.layer_count != 3U || tabos_tilemap_get(&loaded_map, 0U, 0U, 0U, &tile) != 0 ||
-            tile == TABOS_TILE_EMPTY) {
+            loaded_map.width == 0U || loaded_map.height == 0U || loaded_map.tile_width == 0U ||
+            loaded_map.tile_height == 0U || loaded_map.layer_count != 3U ||
+            loaded_map.layers[0].type != TABOS_TILEMAP_LAYER_TILES || loaded_map.layers[0].cells == NULL ||
+            loaded_map.layers[2].type != TABOS_TILEMAP_LAYER_OBJECTS) {
             return 1;
         }
+        const tabos_tilemap_object_t* grove = NULL;
+        for (uint32_t index = 0U; index < loaded_map.layers[2].object_count; ++index) {
+            if (loaded_map.layers[2].objects[index].id == 2U) {
+                grove = &loaded_map.layers[2].objects[index];
+                break;
+            }
+        }
         int32_t property = 0;
-        if (loaded_map.layers[2].object_count != 3U ||
-            tabos_tilemap_object_property(&loaded_map.layers[2].objects[1], "trees", &property) != 0 || property != 3) {
+        if (grove == NULL || tabos_tilemap_object_property(grove, "trees", &property) != 0 || property != 3) {
             return 1;
         }
         tabos_tilemap_unload(&loaded_map);

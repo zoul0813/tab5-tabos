@@ -50,7 +50,7 @@ typedef struct {
         /* Tiled class, or legacy type when class is absent. */
         const char* type;
         tabos_tilemap_object_shape_t shape;
-        /* Integer world coordinates and authored object dimensions. */
+        /* Top-left integer world geometry; conversion normalizes Tiled tile-object alignment. */
         int32_t x;
         int32_t y;
         uint32_t width;

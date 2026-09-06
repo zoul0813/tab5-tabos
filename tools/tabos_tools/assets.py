@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import re
 import struct
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .common import fail
+from .common import fail, warn
 
 
 GID_HORIZONTAL = 0x80000000
@@ -16,6 +17,17 @@ GID_VERTICAL = 0x40000000
 GID_DIAGONAL = 0x20000000
 GID_RESERVED = 0x10000000
 GID_MASK = 0x0FFFFFFF
+TILED_OBJECT_ALIGNMENTS = {
+    "topleft": (0, 0),
+    "top": (1, 0),
+    "topright": (2, 0),
+    "left": (0, 1),
+    "center": (1, 1),
+    "right": (2, 1),
+    "bottomleft": (0, 2),
+    "bottom": (1, 2),
+    "bottomright": (2, 2),
+}
 
 
 @dataclass
@@ -248,6 +260,33 @@ def signed_32(value: Any, label: str) -> int:
     return result
 
 
+def finite_number(value: Any, label: str) -> int | float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        fail(f"{label} must be a finite number")
+    if isinstance(value, float) and not math.isfinite(value):
+        fail(f"{label} must be a finite number")
+    return value
+
+
+def rounded_integer(value: Any, label: str, minimum: int, maximum: int) -> int:
+    value = finite_number(value, label)
+    if value < minimum or value > maximum:
+        fail(f"{label} must be between {minimum} and {maximum}")
+    if isinstance(value, int):
+        result = value
+    else:
+        result = math.floor(value + 0.5) if value >= 0 else math.ceil(value - 0.5)
+    if result != value:
+        warn(f"{label} {value!r} rounded to {result}")
+    return result
+
+
+def tiled_object_origin(x: int | float, y: int | float, width: int | float, height: int | float,
+                        alignment: str) -> tuple[int | float, int | float]:
+    horizontal, vertical = TILED_OBJECT_ALIGNMENTS[alignment]
+    return x - width * horizontal / 2, y - height * vertical / 2
+
+
 def require_list(value: Any, label: str) -> list[Any]:
     if not isinstance(value, list):
         fail(f"{label} must be an array")
@@ -407,6 +446,7 @@ def load_tiled_map(assets: AssetSet, path: Path, name: str, flags: dict[str, int
     if width * height > 0xFFFFFFFF:
         fail(f"Tiled map {path} cell count must fit an unsigned 32-bit integer")
     gid_map: dict[int, int] = {}
+    gid_alignments: dict[int, str] = {}
     tileset_values = require_list(tiled.get("tilesets", []), f"Tiled map {path} tilesets")
     for tileset_index, tileset_ref_value in enumerate(tileset_values):
         tileset_ref = require_object(tileset_ref_value, f"Tiled map {path} tilesets[{tileset_index}]")
@@ -462,6 +502,11 @@ def load_tiled_map(assets: AssetSet, path: Path, name: str, flags: dict[str, int
         pixels, key = convert_pixels(rgba)
         image_id = len(assets.images)
         tileset_name = optional_string(tileset, "name", f"{tileset_label} name") or image_path.stem
+        object_alignment = tileset.get("objectalignment", "unspecified")
+        if object_alignment == "unspecified":
+            object_alignment = "bottomleft"
+        if not isinstance(object_alignment, str) or object_alignment not in TILED_OBJECT_ALIGNMENTS:
+            fail(f"{tileset_label} objectalignment {object_alignment!r} is not supported")
         assets.images.append(Image(f"{name}_{tileset_name}", image_width, image_height, pixels, key))
         tw = signed_32(tileset.get("tilewidth", tile_width), f"{tileset_label} tilewidth")
         th = signed_32(tileset.get("tileheight", tile_height), f"{tileset_label} tileheight")
@@ -541,6 +586,7 @@ def load_tiled_map(assets: AssetSet, path: Path, name: str, flags: dict[str, int
             if gid in gid_map:
                 fail(f"{tileset_label} GID {gid} overlaps another tileset")
             gid_map[gid] = sprite_id
+            gid_alignments[gid] = object_alignment
             local_sprite_ids.append(sprite_id)
         for local_id, item in metadata.items():
             if "animation" in item:
@@ -597,24 +643,16 @@ def load_tiled_map(assets: AssetSet, path: Path, name: str, flags: dict[str, int
             object_values = require_list(layer.get("objects", []), f"object layer {layer_name!r} objects")
             for object_index, object_value in enumerate(object_values):
                 obj = require_object(object_value, f"object layer {layer_name!r} objects[{object_index}]")
+                object_label = f"Tiled map {path} object {obj.get('name', obj.get('id', object_index))!r}"
                 unsupported = any(key in obj for key in ("text", "polygon", "polyline", "template"))
                 if "ellipse" in obj:
                     unsupported = boolean(obj["ellipse"], "object ellipse") or unsupported
                 if unsupported or obj.get("rotation", 0) != 0:
                     fail(f"object {obj.get('name', obj.get('id'))!r} uses unsupported geometry or rotation")
-                geometry = [signed_32(obj.get("x", 0), "object x"), signed_32(obj.get("y", 0), "object y"),
-                            unsigned_32(obj.get("width", 0), "object width"),
-                            unsigned_32(obj.get("height", 0), "object height")]
-                first_property = len(properties)
-                property_values = require_list(obj.get("properties", []), "object properties")
-                for property_index, prop_value in enumerate(property_values):
-                    prop = require_object(prop_value, f"object properties[{property_index}]")
-                    if prop.get("type") != "int":
-                        fail("object properties must be integers")
-                    properties.append((require_string(prop, "name"), signed_32(prop.get("value"), "object property")))
                 tile = 0
                 point = boolean(obj.get("point", False), "object point")
                 shape = 0 if point else 1
+                object_alignment = "topleft"
                 if "gid" in obj:
                     raw_gid = unsigned_32(obj["gid"], "object gid")
                     plain_gid = raw_gid & GID_MASK
@@ -622,6 +660,29 @@ def load_tiled_map(assets: AssetSet, path: Path, name: str, flags: dict[str, int
                         fail("tile object contains malformed or unknown GID")
                     tile = (raw_gid & (GID_HORIZONTAL | GID_VERTICAL | GID_DIAGONAL)) | (gid_map[plain_gid] + 1)
                     shape = 2
+                    object_alignment = gid_alignments[plain_gid]
+                object_x = finite_number(obj.get("x", 0), f"{object_label} x")
+                object_y = finite_number(obj.get("y", 0), f"{object_label} y")
+                object_width = finite_number(obj.get("width", 0), f"{object_label} width")
+                object_height = finite_number(obj.get("height", 0), f"{object_label} height")
+                if object_width < 0 or object_height < 0:
+                    fail(f"{object_label} dimensions must be nonnegative")
+                if object_alignment != "topleft":
+                    object_x, object_y = tiled_object_origin(
+                        object_x, object_y, object_width, object_height, object_alignment)
+                geometry = [
+                    rounded_integer(object_x, f"{object_label} x", -0x80000000, 0x7FFFFFFF),
+                    rounded_integer(object_y, f"{object_label} y", -0x80000000, 0x7FFFFFFF),
+                    rounded_integer(object_width, f"{object_label} width", 0, 0xFFFFFFFF),
+                    rounded_integer(object_height, f"{object_label} height", 0, 0xFFFFFFFF),
+                ]
+                first_property = len(properties)
+                property_values = require_list(obj.get("properties", []), "object properties")
+                for property_index, prop_value in enumerate(property_values):
+                    prop = require_object(prop_value, f"object properties[{property_index}]")
+                    if prop.get("type") != "int":
+                        fail("object properties must be integers")
+                    properties.append((require_string(prop, "name"), signed_32(prop.get("value"), "object property")))
                 object_id = unsigned_32(obj.get("id"), "object id")
                 if object_id == 0:
                     fail("object id must be nonzero")

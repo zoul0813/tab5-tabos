@@ -24,7 +24,9 @@
 
 - [x] Review converter input boundaries: require a typed version-1 manifest, restrict standalone
   images to PNG/GIF and Tiled atlases to PNG, validate finite orthogonal TMJ/TSJ structures and
-  32-bit ranges, and reject unsupported layers, objects, properties, and GIDs with diagnostics.
+  32-bit ranges, reject unsupported layers, objects, properties, and GIDs with diagnostics, and
+  round fractional object geometry with explicit warnings. Normalize Tiled tile-object alignment
+  to the runtime's common top-left origin.
 
 - [x] Add direct object lookup by generated layer and stable Tiled object IDs while retaining descriptor-array iteration for processing every marker.
 
