@@ -15,7 +15,7 @@ static uint32_t filter_bytes(shell_input_filter_t* filter, const uint8_t* input,
 {
     uint32_t used = 0U;
     for (uint32_t index = 0U; index < count; ++index) {
-        if (shell_input_filter(filter, input[index], &output[used])) {
+        if (shell_input_filter(filter, input[index], &output[used]) == SHELL_INPUT_CHARACTER) {
             used++;
         }
     }
@@ -30,6 +30,18 @@ int main(void)
     const uint8_t arrows[] = {'a', 0x1B, '[', 'A', 0x1B, '[', 'B', 0x1B, '[', 'C', 0x1B, '[', 'D', 'b'};
     check(filter_bytes(&filter, arrows, sizeof(arrows), output) == 2U, "arrow output length");
     check(output[0] == 'a' && output[1] == 'b', "arrows ignored");
+
+    char character = '\0';
+    check(shell_input_filter(&filter, 0x1BU, &character) == SHELL_INPUT_NONE, "split escape");
+    check(shell_input_filter(&filter, '[', &character) == SHELL_INPUT_NONE, "split CSI");
+    check(shell_input_filter(&filter, 'A', &character) == SHELL_INPUT_UP, "up action");
+    (void) shell_input_filter(&filter, 0x1BU, &character);
+    (void) shell_input_filter(&filter, '[', &character);
+    check(shell_input_filter(&filter, 'B', &character) == SHELL_INPUT_DOWN, "down action");
+    const uint8_t modified[] = {0x1B, '[', '1', ';', '5', 'A'};
+    check(filter_bytes(&filter, modified, sizeof(modified), output) == 0U, "modified arrow ignored");
+    check(shell_input_filter(&filter, '\n', &character) == SHELL_INPUT_ENTER, "enter action");
+    check(shell_input_filter(&filter, '\b', &character) == SHELL_INPUT_BACKSPACE, "backspace action");
 
     const uint8_t split_start[] = {0x1B, '[', '1', ';'};
     const uint8_t split_end[]   = {'5', '~', 'c'};

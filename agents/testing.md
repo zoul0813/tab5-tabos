@@ -835,6 +835,29 @@ These tests should validate subsystem contracts without requiring the full simul
 
 ## 19. Host Integration Tests
 
+### Shell history validation
+
+`unit.shell_input` and `unit.shell_history` cover split arrow sequences, editing,
+draft restoration, duplicates, capacity, and preservation before parser mutation.
+`component.shell_history_file` uses a temporary drive with injected write, close, and
+rename failures. `component.shell_session` runs the native shell loop with controlled
+input/process boundaries and checks restart persistence, numbered output, and wrapped
+line replacement through the real terminal model.
+
+The optional `tabos_shell_rv32` harness runs the actual SDK-built shell with real host
+runtime, interpreter, and filesystem services, mapping `T:` to a temporary directory.
+After building host tests and the shell, run:
+
+```sh
+build/macos-debug/tests/tabos_shell_rv32 build/apps/shell/shell
+```
+
+Use the matching `build/linux-debug/` path on Linux. This harness is deliberately
+outside ordinary CTest registration so host smoke tests do not require separately
+built applications. It verifies saved history, runtime restart, recalled command
+editing, and unchanged Ctrl+Arrow policy. Physical Tab5 Up/Down, wrap behavior, and
+microSD persistence across reboot still require device validation.
+
 The full host build should support integration testing.
 
 Examples:

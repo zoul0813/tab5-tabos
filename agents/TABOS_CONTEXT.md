@@ -458,6 +458,15 @@ Still to decide:
 
 ## 8. Shell and Terminal
 
+### Current implementation: persistent command history
+
+The shell retains 32 nonblank command lines, excluding consecutive exact duplicates.
+Up/Down recalls entries and restores the unfinished draft; editing a recalled line
+does not mutate stored history. The `history` built-in prints numbered entries.
+Plaintext `T:/user/history.txt` is loaded before the prompt and rewritten through a
+temporary file before executing changed submissions. Missing storage remains nonfatal.
+All history policy and storage use stay within the shell application.
+
 ### Decision
 
 TabOS should boot into or make readily available a keyboard-oriented shell.

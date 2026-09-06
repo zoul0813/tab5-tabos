@@ -8,6 +8,7 @@
 
 #include <shell/parser.h>
 #include <shell/input.h>
+#include <shell/line.h>
 
 #include <stdint.h>
 #include <sys/ioctl.h>
@@ -15,12 +16,23 @@
 #include <stdbool.h>
 
 enum {
-    SHELL_LINE_CAPACITY     = 256,
     SHELL_IO_CAPACITY       = 1024,
     SHELL_ARGUMENT_CAPACITY = TABOS_PROCESS_ARG_MAX,
 };
 
 static char shell_path[256] = "T:/bin";
+static shell_history_t history;
+static bool history_storage_failed;
+
+static void history_storage_result(int result)
+{
+    if (result == 0) {
+        history_storage_failed = false;
+    } else if (!history_storage_failed) {
+        fprintf(stderr, "shell: history storage unavailable (errno %d); keeping history in memory\n", errno);
+        history_storage_failed = true;
+    }
+}
 
 static uint32_t string_length(const char* text)
 {
@@ -49,7 +61,7 @@ static int string_starts_with(const char* text, const char* prefix)
     return prefix[index] == '\0';
 }
 
-static void copy_string(char* destination, uint32_t capacity, const char* source)
+static void copy_string(char* destination, size_t capacity, const char* source)
 {
     uint32_t index = 0U;
     while (index + 1U < capacity && source[index] != '\0') {
@@ -133,7 +145,18 @@ static void execute_command(char* line)
     const char* command = argv[0];
 
     if (string_equal(command, "help")) {
-        printf("Commands: help clear pwd cd set echo <program>\n");
+        printf("Commands: help history clear pwd cd set echo <program>\n");
+        printf("Up/Down: recall commands; history saved to T:/user/history.txt\n");
+        return;
+    }
+    if (string_equal(command, "history")) {
+        if (argc != 1U) {
+            printf("Usage: history\n");
+            return;
+        }
+        for (size_t index = 0U; index < history.count; ++index) {
+            printf("%u  %s\n", (unsigned int) index + 1U, history.entries[index]);
+        }
         return;
     }
     if (string_equal(command, "set")) {
@@ -223,10 +246,7 @@ int main(int argc, char** argv)
     (void) argc;
     (void) argv;
 
-    char line[SHELL_LINE_CAPACITY];
-    shell_input_filter_t input_filter = {.state = SHELL_INPUT_TEXT};
-    uint32_t used                     = 0U;
-    line[0]                           = '\0';
+    shell_line_t line = {0};
 
     // disable buffering
     setvbuf(stdout, NULL, _IONBF, 0);
@@ -235,6 +255,7 @@ int main(int argc, char** argv)
     }
 
     printf("TabOS shell\n");
+    history_storage_result(shell_history_load(&history));
     prompt();
     for (;;) {
         char input[16];
@@ -247,31 +268,15 @@ int main(int argc, char** argv)
         }
         for (int index = 0; index < count; ++index) {
             const uint8_t input_byte = (uint8_t) input[index];
-            if (input_byte == '\n' && input_filter.state == SHELL_INPUT_TEXT) {
-                line[used] = '\0';
-                putchar('\n');
-                execute_command(line);
-                used    = 0U;
-                line[0] = '\0';
+            if (shell_line_feed(&line, &history, input_byte, stdout)) {
+                if (shell_history_add(&history, line.text)) {
+                    history_storage_result(shell_history_save(&history));
+                }
+                execute_command(line.text);
+                shell_line_reset(&line, &history);
                 prompt();
-            } else if (input_byte == '\b' && input_filter.state == SHELL_INPUT_TEXT) {
-                if (used > 0U) {
-                    used--;
-                    line[used] = '\0';
-                    putchar('\b');
-                }
-            } else {
-                char character;
-                if (!shell_input_filter(&input_filter, input_byte, &character)) {
-                    continue;
-                }
-                if (used + 1U >= sizeof(line)) {
-                    continue;
-                }
-                line[used++] = character;
-                line[used]   = '\0';
-                putchar((unsigned char) character);
             }
         }
     }
+    return 0;
 }
