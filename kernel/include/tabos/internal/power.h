@@ -10,7 +10,11 @@ enum {
     POWER_PARTICIPANT_CAPACITY = 16,
     POWER_NAME_CAPACITY        = 32,
     POWER_DEPENDENCY_CAPACITY  = 8,
-    POWER_TRACE_CAPACITY       = 64
+    POWER_TRACE_CAPACITY       = 64,
+    POWER_INHIBITOR_KEYBOARD   = 1U << 0U,
+    POWER_INHIBITOR_POINTER    = 1U << 1U,
+    POWER_INHIBITOR_FULLSCREEN = 1U << 2U,
+    POWER_INHIBITOR_MEDIA      = 1U << 3U
 };
 
 typedef enum {
@@ -43,7 +47,8 @@ typedef enum {
     POWER_FAILURE_CALLBACK,
     POWER_FAILURE_PLATFORM_PREPARE,
     POWER_FAILURE_PLATFORM_SLEEP,
-    POWER_FAILURE_PLATFORM_RESTORE
+    POWER_FAILURE_PLATFORM_RESTORE,
+    POWER_FAILURE_BRIGHTNESS
 } power_failure_code_t;
 typedef enum {
     POWER_CALLBACK_SUCCESS,
@@ -98,6 +103,10 @@ typedef struct {
         power_failure_t failure;
         size_t blocker_count;
         char blockers[POWER_PARTICIPANT_CAPACITY][POWER_NAME_CAPACITY];
+        uint32_t dim_inhibitors;
+        uint8_t desired_brightness;
+        uint8_t effective_brightness;
+        bool brightness_valid;
         bool suspend_available;
 } power_status_t;
 typedef struct {
@@ -145,6 +154,8 @@ bool power_manager_finalize(power_manager_t* manager);
 void power_manager_shutdown(power_manager_t* manager);
 bool power_manager_request_suspend(power_manager_t* manager);
 void power_manager_request_activity(power_manager_t* manager, uint64_t now_ms);
+bool power_manager_set_policy(power_manager_t* manager, power_policy_t policy, uint64_t now_ms);
+void power_manager_set_dim_inhibitors(power_manager_t* manager, uint32_t inhibitors, uint64_t now_ms);
 void power_manager_complete(power_manager_t* manager, power_completion_token_t token, power_callback_result_t result);
 void power_manager_update(power_manager_t* manager, platform_runtime_events_t events, uint64_t now_ms);
 uint64_t power_manager_next_deadline(const power_manager_t* manager);

@@ -480,11 +480,14 @@ void kernel_runtime_update(platform_runtime_events_t events)
 
     const uint64_t now = platform_time_ms();
     if (power_initialized) {
-        power_manager_update(&power_manager, events, now);
-        const power_status_t* power_status = power_manager_status(&power_manager);
-        if (power_status->state == POWER_STATE_SUSPENDING || power_status->state == POWER_STATE_SUSPENDED ||
-            power_status->state == POWER_STATE_RESUMING) {
-            return;
+        const power_state_t state = power_manager_status(&power_manager)->state;
+        if (state == POWER_STATE_SUSPENDING || state == POWER_STATE_SUSPENDED || state == POWER_STATE_RESUMING) {
+            power_manager_update(&power_manager, events, now);
+            const power_state_t updated = power_manager_status(&power_manager)->state;
+            if (updated == POWER_STATE_SUSPENDING || updated == POWER_STATE_SUSPENDED ||
+                updated == POWER_STATE_RESUMING) {
+                return;
+            }
         }
     }
     if ((events & PLATFORM_RUNTIME_EVENT_INPUT) != 0U) {
@@ -492,6 +495,27 @@ void kernel_runtime_update(platform_runtime_events_t events)
     }
     if ((events & PLATFORM_RUNTIME_EVENT_POINTER) != 0U) {
         platform_pointer_update();
+    }
+    if (power_initialized) {
+        bool key_held       = false;
+        bool contact_active = false;
+        const bool input_activity   = input_take_power_activity(&key_held);
+        const bool pointer_activity = pointer_service_take_power_activity(&contact_active);
+        const bool activity         = input_activity || pointer_activity;
+        uint32_t inhibitors  = key_held ? POWER_INHIBITOR_KEYBOARD : 0U;
+        inhibitors          |= contact_active ? POWER_INHIBITOR_POINTER : 0U;
+        inhibitors          |= console_graphics_active() ? POWER_INHIBITOR_FULLSCREEN : 0U;
+        inhibitors |= audio_service_power_inhibited() || camera_service_power_inhibited() ? POWER_INHIBITOR_MEDIA : 0U;
+        power_manager_set_dim_inhibitors(&power_manager, inhibitors, now);
+        if (activity) {
+            power_manager_request_activity(&power_manager, now);
+        }
+        power_manager_update(&power_manager, events, now);
+        const power_status_t* power_status = power_manager_status(&power_manager);
+        if (power_status->state == POWER_STATE_SUSPENDING || power_status->state == POWER_STATE_SUSPENDED ||
+            power_status->state == POWER_STATE_RESUMING) {
+            return;
+        }
     }
     if (deadline_wake && deadline_ready(input_next_deadline(), now)) {
         input_update();

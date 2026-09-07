@@ -39,6 +39,7 @@ static platform_pixel_t* native_front_pixels;
 static platform_pixel_t* native_framebuffers[2];
 static bool display_created;
 static bool display_uses_bsp;
+static bool backlight_initialized;
 static bool backlight_enabled;
 static const char* detected_display_name = "unknown";
 static ppa_client_handle_t ppa_srm_client;
@@ -884,13 +885,14 @@ bool platform_display_present(const platform_framebuffer_t* framebuffer)
         ESP_LOGE(TAG, "Could not submit Tab5 framebuffer at VSYNC");
         return false;
     }
-    if (!backlight_enabled) {
+    if (!backlight_initialized) {
         const esp_err_t result = bsp_display_brightness_set(75);
         if (result != ESP_OK) {
             ESP_LOGE(TAG, "Could not set Tab5 backlight brightness: %s", esp_err_to_name(result));
             return false;
         }
-        backlight_enabled = true;
+        backlight_initialized = true;
+        backlight_enabled     = true;
     }
     return true;
 }
@@ -904,7 +906,8 @@ bool platform_power_set_brightness(uint8_t percent)
     if (result != ESP_OK) {
         return false;
     }
-    backlight_enabled = percent > 0U;
+    backlight_initialized = true;
+    backlight_enabled     = percent > 0U;
     return true;
 }
 
@@ -933,6 +936,7 @@ void platform_display_shutdown(void)
         (void) bsp_display_backlight_off();
         backlight_enabled = false;
     }
+    backlight_initialized = false;
     if (display_created) {
         if (display_uses_bsp) {
             bsp_display_delete();

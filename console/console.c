@@ -394,5 +394,13 @@ void console_set_graphics_active(bool active)
         (void) present_console();
     }
     unlock_console();
-    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_DEADLINE);
+    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_DEADLINE | PLATFORM_RUNTIME_EVENT_POWER);
+}
+
+bool console_graphics_active(void)
+{
+    lock_console();
+    const bool active = graphics_active;
+    unlock_console();
+    return active;
 }

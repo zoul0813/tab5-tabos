@@ -60,16 +60,31 @@ restores `ready`.
 
 ## Power-management development
 
-Transparent suspend and automatic idle dimming are not yet available. The
+Automatic idle dimming is enabled; transparent suspend is not yet available. The
 [power baseline](power-baseline.md) records initialized services, suspend blockers,
 GPIO interrupt ownership, pinned-SDK restrictions, unverified wake paths, and the
 repeatable measurement worksheet. Functional sleep/wake and instrumented power
 measurements remain separate validation gates.
 
 TabOS now contains an internal portable power-state manager and deterministic host
-simulation used for development tests. This does not add an application API or enable
-automatic dimming or Tab5 light sleep. Those behaviors remain disabled until later
-power phases add service participation, safety gates, and hardware validation.
+simulation used for development tests. After 60 seconds without physical keyboard or
+pointer activity, display dims from default 75% active brightness to 20%. If active setting
+is below 20%, dimming never raises it. Physical key presses/releases, active pointer events,
+held keys, and active contacts restore or hold active brightness. Software key repeat,
+cursor blink, background output, and service completions do not reset idle time.
+
+Fullscreen graphics and open audio or camera streams inhibit dimming and suspend. Brightness
+restores when inhibitor begins; final inhibitor release starts fresh 60-second interval.
+Framebuffer pixels, terminal contents, display ownership, and input ordering remain intact.
+Host SDL applies dimming only while presenting texture, so framebuffer and screenshots retain
+original pixel values. Brightness failures remain recorded internally with desired and last
+known effective values. No public power configuration API or Tab5 light sleep exists yet.
+
+Physical Tab5 validation confirms dimming after 60 seconds, restoration from touch and
+keyboard input, no dimming during fullscreen `gdemo`, and no dimming beneath a held contact.
+Meter reading changed from 0.09 A active to 0.04 A dimmed (90 mA to 40 mA, about 56% lower).
+Measurement setup still requires capture before using those readings as instrumented
+whole-system power evidence.
 
 Debug firmware also reports cumulative `Platform activity:` counters beside the
 60-second runtime wake report. They expose codec, headphone-monitor, display-refresh

@@ -26,9 +26,48 @@ static void failure(power_manager_t* manager, power_failure_code_t code, const c
     (void) snprintf(manager->status.failure.participant, POWER_NAME_CAPACITY, "%s", name != NULL ? name : "");
 }
 
+static bool policy_ok(power_policy_t policy)
+{
+    return policy.active_brightness <= 100U && policy.idle_brightness <= 100U;
+}
+
+static uint8_t idle_brightness(power_policy_t policy)
+{
+    return policy.idle_brightness < policy.active_brightness ? policy.idle_brightness : policy.active_brightness;
+}
+
+static const char* inhibitor_name(uint32_t inhibitors)
+{
+    if ((inhibitors & POWER_INHIBITOR_KEYBOARD) != 0U) {
+        return "keyboard";
+    }
+    if ((inhibitors & POWER_INHIBITOR_POINTER) != 0U) {
+        return "pointer";
+    }
+    if ((inhibitors & POWER_INHIBITOR_FULLSCREEN) != 0U) {
+        return "fullscreen";
+    }
+    return "media";
+}
+
+static bool set_brightness(power_manager_t* manager, uint8_t brightness)
+{
+    manager->status.desired_brightness = brightness;
+    if (manager->status.brightness_valid && manager->status.effective_brightness == brightness) {
+        return true;
+    }
+    if (!platform_power_set_brightness(brightness)) {
+        failure(manager, POWER_FAILURE_BRIGHTNESS, NULL);
+        return false;
+    }
+    manager->status.effective_brightness = brightness;
+    manager->status.brightness_valid     = true;
+    return true;
+}
+
 bool power_manager_init(power_manager_t* manager, power_policy_t policy, uint64_t now_ms)
 {
-    if (manager == NULL || policy.active_brightness > 100U || policy.idle_brightness > 100U) {
+    if (manager == NULL || !policy_ok(policy)) {
         return false;
     }
     *manager       = (power_manager_t) {0};
@@ -42,6 +81,7 @@ bool power_manager_init(power_manager_t* manager, power_policy_t policy, uint64_
                                         .last_activity_ms  = now_ms,
                                         .state_changed_ms  = now_ms,
                                         .suspend_available = true};
+    (void) set_brightness(manager, policy.active_brightness);
     return true;
 }
 
@@ -161,6 +201,56 @@ void power_manager_request_activity(power_manager_t* manager, uint64_t now_ms)
     platform_mutex_unlock(manager->mutex);
     platform_runtime_notify(PLATFORM_RUNTIME_EVENT_POWER);
 }
+
+bool power_manager_set_policy(power_manager_t* manager, power_policy_t policy, uint64_t now_ms)
+{
+    if (manager == NULL || !manager->finalized || !policy_ok(policy) ||
+        manager->status.state == POWER_STATE_SHUTTING_DOWN) {
+        return false;
+    }
+    manager->status.policy = policy;
+    if (manager->status.dim_inhibitors != 0U) {
+        (void) set_brightness(manager, policy.active_brightness);
+        return true;
+    }
+    const uint64_t idle_deadline = add(manager->status.last_activity_ms, policy.idle_ms);
+    if ((manager->status.state == POWER_STATE_ACTIVE || manager->status.state == POWER_STATE_IDLE) &&
+        now_ms >= idle_deadline) {
+        manager->status.state            = POWER_STATE_IDLE;
+        manager->status.reason           = POWER_REASON_INACTIVITY;
+        manager->status.state_changed_ms = now_ms;
+        (void) set_brightness(manager, idle_brightness(policy));
+    } else if (manager->status.state == POWER_STATE_ACTIVE || manager->status.state == POWER_STATE_IDLE) {
+        manager->status.state            = POWER_STATE_ACTIVE;
+        manager->status.state_changed_ms = now_ms;
+        (void) set_brightness(manager, policy.active_brightness);
+    }
+    return true;
+}
+
+void power_manager_set_dim_inhibitors(power_manager_t* manager, uint32_t inhibitors, uint64_t now_ms)
+{
+    if (manager == NULL || !manager->finalized || manager->status.state == POWER_STATE_SHUTTING_DOWN) {
+        return;
+    }
+    const uint32_t previous        = manager->status.dim_inhibitors;
+    manager->status.dim_inhibitors = inhibitors;
+    if (inhibitors != 0U) {
+        if (manager->status.state == POWER_STATE_IDLE) {
+            manager->status.state            = POWER_STATE_ACTIVE;
+            manager->status.reason           = POWER_REASON_ACTIVITY;
+            manager->status.state_changed_ms = now_ms;
+        }
+        (void) set_brightness(manager, manager->status.policy.active_brightness);
+    } else if (previous != 0U) {
+        manager->status.last_activity_ms = now_ms;
+        if (manager->status.state == POWER_STATE_IDLE) {
+            manager->status.state            = POWER_STATE_ACTIVE;
+            manager->status.reason           = POWER_REASON_ACTIVITY;
+            manager->status.state_changed_ms = now_ms;
+        }
+    }
+}
 void power_manager_complete(power_manager_t* manager, power_completion_token_t token, power_callback_result_t result)
 {
     if (manager == NULL || manager->mutex == NULL || result == POWER_CALLBACK_PENDING) {
@@ -230,6 +320,7 @@ static void finish(power_manager_t* manager, uint64_t now_ms)
     manager->cursor                    = 0U;
     manager->suspended_count           = 0U;
     manager->platform_prepared         = false;
+    (void) set_brightness(manager, manager->status.policy.active_brightness);
 }
 
 static void drive(power_manager_t* manager, uint64_t now_ms)
@@ -326,6 +417,13 @@ static void start(power_manager_t* manager, uint64_t now_ms)
         failure(manager, POWER_FAILURE_REGISTRATION, NULL);
         return;
     }
+    if (manager->status.dim_inhibitors != 0U) {
+        manager->status.blocker_count = 1U;
+        (void) snprintf(manager->status.blockers[0], POWER_NAME_CAPACITY, "%s",
+                        inhibitor_name(manager->status.dim_inhibitors));
+        failure(manager, POWER_FAILURE_BLOCKED, manager->status.blockers[0]);
+        return;
+    }
     for (size_t order = manager->participant_count; order > 0U; --order) {
         power_participant_t* p           = &manager->participants[manager->dependency_order[order - 1U]];
         char reason[POWER_NAME_CAPACITY] = {0};
@@ -369,6 +467,7 @@ void power_manager_update(power_manager_t* manager, platform_runtime_events_t ev
             manager->status.state            = POWER_STATE_ACTIVE;
             manager->status.reason           = POWER_REASON_ACTIVITY;
             manager->status.state_changed_ms = now_ms;
+            (void) set_brightness(manager, manager->status.policy.active_brightness);
         }
     }
     if ((events & PLATFORM_RUNTIME_EVENT_DEADLINE) != 0U && now_ms >= power_manager_next_deadline(manager)) {
@@ -376,6 +475,7 @@ void power_manager_update(power_manager_t* manager, platform_runtime_events_t ev
             manager->status.state            = POWER_STATE_IDLE;
             manager->status.reason           = POWER_REASON_INACTIVITY;
             manager->status.state_changed_ms = now_ms;
+            (void) set_brightness(manager, idle_brightness(manager->status.policy));
         } else if (manager->status.state == POWER_STATE_IDLE) {
             request = true;
         }
@@ -400,6 +500,9 @@ void power_manager_update(power_manager_t* manager, platform_runtime_events_t ev
 uint64_t power_manager_next_deadline(const power_manager_t* manager)
 {
     if (manager == NULL || !manager->finalized) {
+        return PLATFORM_RUNTIME_DEADLINE_NONE;
+    }
+    if (manager->status.dim_inhibitors != 0U) {
         return PLATFORM_RUNTIME_DEADLINE_NONE;
     }
     if (manager->status.state == POWER_STATE_ACTIVE) {

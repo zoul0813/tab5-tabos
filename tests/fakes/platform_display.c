@@ -70,6 +70,8 @@ struct platform_mutex {
 
 static platform_pixel_t pixels[TABOS_DISPLAY_WIDTH * TABOS_DISPLAY_HEIGHT];
 static uint64_t monotonic_ms;
+static uint8_t fake_brightness = 100U;
+static bool fail_brightness_once;
 static char last_log[256];
 static platform_network_status_t fake_network;
 static platform_network_event_fn fake_network_event;
@@ -209,7 +211,20 @@ uint64_t platform_time_ms(void)
 
 bool platform_power_set_brightness(uint8_t percent)
 {
-    return percent <= 100U;
+    if (percent > 100U || fail_brightness_once) {
+        fail_brightness_once = false;
+        return false;
+    }
+    fake_brightness = percent;
+    return true;
+}
+uint8_t test_platform_brightness(void)
+{
+    return fake_brightness;
+}
+void test_platform_fail_brightness_once(void)
+{
+    fail_brightness_once = true;
 }
 bool platform_power_prepare_sleep(void)
 {

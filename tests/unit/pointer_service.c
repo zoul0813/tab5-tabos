@@ -19,6 +19,11 @@ int main(void)
     static const int owner_a;
     static const int owner_b;
     expect(pointer_service_init(), "initializes");
+    bool contact_active = true;
+    expect(!pointer_service_take_power_activity(&contact_active) && !contact_active, "starts power-idle");
+    pointer_service_record_movement();
+    expect(pointer_service_take_power_activity(&contact_active) && !contact_active,
+           "unpressed movement records activity without held contact");
     pointer_service_set_device_id(42U);
     const tabos_pointer_stream_t stream_a = pointer_service_open(&owner_a, 42U);
     const tabos_pointer_stream_t stream_b = pointer_service_open(&owner_b, 42U);
@@ -33,6 +38,7 @@ int main(void)
         .buttons    = TABOS_POINTER_BUTTON_PRIMARY,
     };
     pointer_service_submit(&down);
+    expect(pointer_service_take_power_activity(&contact_active) && contact_active, "down records held activity");
     uint32_t events = 0U;
     expect(pointer_service_poll(&owner_a, stream_a, TABOS_WAIT_READABLE, &events) == 0 && events == TABOS_WAIT_READABLE,
            "foreground stream becomes readable");
@@ -49,6 +55,7 @@ int main(void)
     second_down.contact_id            = 4U;
     second_down.x                     = 300;
     pointer_service_submit(&second_down);
+    expect(pointer_service_take_power_activity(&contact_active) && contact_active, "second contact records activity");
     expect(pointer_service_read(&owner_a, stream_a, &received) == 0 && received.type == TABOS_POINTER_DOWN &&
                received.contact_id == 4U && received.x == 300,
            "tracks a simultaneous second contact");
@@ -62,6 +69,15 @@ int main(void)
     }
     expect(canceled_contacts == 2U, "focus change cancels all active contacts");
 
+    tabos_pointer_event_t up = down;
+    up.type                  = TABOS_POINTER_UP;
+    up.buttons               = 0U;
+    pointer_service_submit(&up);
+    up.contact_id = 4U;
+    pointer_service_submit(&up);
+    expect(pointer_service_take_power_activity(&contact_active) && !contact_active,
+           "physical releases clear power inhibitor");
+
     pointer_service_submit(&down);
     for (uint32_t index = 0U; index < 80U; ++index) {
         tabos_pointer_event_t move = down;
@@ -69,6 +85,7 @@ int main(void)
         move.x                     = (int32_t) index;
         pointer_service_submit(&move);
     }
+    expect(pointer_service_take_power_activity(&contact_active) && contact_active, "movement records activity");
     bool saw_cancel = false;
     while (pointer_service_read(&owner_a, stream_a, &received) == 0) {
         saw_cancel = saw_cancel || received.type == TABOS_POINTER_CANCEL;

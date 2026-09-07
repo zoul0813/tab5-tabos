@@ -820,11 +820,15 @@ checks direct attachment and removes it before controller teardown. Concurrent r
 and new consumers require an explicit lifecycle audit.
 
 Power Phase 0 inventory and wake-source restrictions live in `docs/power-baseline.md`.
-Phase 1 adds internal portable power states, policy/diagnostics, dependency-ordered
+Phases 1 and 2 add internal portable power states, policy/diagnostics, dependency-ordered
 participants, generation-safe asynchronous completion, runtime event/deadline integration,
-and deterministic host simulation. No public suspend API, PM enablement, or Tab5 wake arming
-exists yet. Missing tested reversible service lifecycle remains a blocker, including
-initialized drivers with no application handles.
+and deterministic host simulation. Normalized physical keyboard and pointer ingress resets
+inactivity before foreground delivery; software repeat and service work do not. Held input,
+fullscreen graphics, and open audio/camera streams inhibit dimming and suspend. Default idle
+dimming applies after 60 seconds at most 20% and restores active brightness before input
+delivery. SDL modulates presentation without changing framebuffer pixels. No public suspend
+API, PM enablement, or Tab5 wake arming exists yet. Missing tested reversible service
+lifecycle remains a blocker, including initialized drivers with no application handles.
 
 Debug peripheral activity uses a narrow `platform_runtime_log_activity()` diagnostic
 hook beside the existing health-audit wake report. Tab5 counts codec pairs/frames/errors,

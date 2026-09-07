@@ -76,16 +76,24 @@ normal loopback permission); Tab5 Debug cross-build passes. No Tab5 sleep path i
 
 ## Phase 2 — Activity and idle dimming
 
-- [ ] Record activity at normalized keyboard/pointer ingress before foreground delivery.
-- [ ] Count physical presses/releases, pointer movement/contact changes, and button events. Software key repeat, cursor blink, background output, and service completions do not reset inactivity.
-- [ ] Treat held keys and active pointer contacts as temporary dim/suspend inhibitors; avoid dimming beneath stationary interaction.
-- [ ] Apply 60-second idle deadline and 20% brightness. Never increase brightness when active setting already below 20%.
-- [ ] Preserve active brightness independently from effective dimmed brightness; restore before delivering activity.
-- [ ] Immediately restore brightness when fullscreen ownership or inhibiting media starts.
-- [ ] On final inhibitor release, begin fresh inactivity interval; avoid immediate dim/suspend after long playback.
-- [ ] Preserve framebuffer, display ownership, terminal contents, and input ordering.
-- [ ] Simulate dimming in SDL presentation without modifying framebuffer pixels.
-- [ ] Report brightness failures and keep logical/effective brightness truthful.
+- [x] Record activity at normalized keyboard/pointer ingress before foreground delivery.
+- [x] Count physical presses/releases, pointer movement/contact changes, and button events. Software key repeat, cursor blink, background output, and service completions do not reset inactivity.
+- [x] Treat held keys and active pointer contacts as temporary dim/suspend inhibitors; avoid dimming beneath stationary interaction.
+- [x] Apply 60-second idle deadline and 20% brightness. Never increase brightness when active setting already below 20%.
+- [x] Preserve active brightness independently from effective dimmed brightness; restore before delivering activity.
+- [x] Immediately restore brightness when fullscreen ownership or inhibiting media starts.
+- [x] On final inhibitor release, begin fresh inactivity interval; avoid immediate dim/suspend after long playback.
+- [x] Preserve framebuffer, display ownership, terminal contents, and input ordering.
+- [x] Simulate dimming in SDL presentation without modifying framebuffer pixels.
+- [x] Report brightness failures and keep logical/effective brightness truthful.
+
+Phase 2 software validation: macOS Debug full suite passes, including exact-boundary,
+activity-race, held-input, inhibitor-release, policy-change, and brightness-failure cases;
+Tab5 Debug cross-build passes. Operator validates 60-second dimming, brightness restoration
+from touch and keyboard input, fullscreen `gdemo` inhibition, and held-contact inhibition.
+Meter reading changes from 0.09 A active to 0.04 A dimmed (90 mA to 40 mA, about 56% lower).
+Measurement setup remains to be captured before treating this as instrumented whole-system
+evidence. Light sleep remains disabled.
 
 **Tests:** exact timeout boundary, activity races, held input, graphics/media acquisition and release, configuration changes while idle, and brightness failure.
 

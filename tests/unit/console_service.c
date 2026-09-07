@@ -87,7 +87,8 @@ int main(void)
     }
     memcpy(graphics_snapshot, framebuffer->pixels, framebuffer_bytes);
     console_set_graphics_active(true);
-    if (!tabos_console_write(&foreground, "graphics-hidden") || tabos_console_page_up(&foreground) ||
+    if (!console_graphics_active() || !tabos_console_write(&foreground, "graphics-hidden") ||
+        tabos_console_page_up(&foreground) ||
         memcmp(graphics_snapshot, framebuffer->pixels, framebuffer_bytes) != 0 || !input_submit(&submitted) ||
         !tabos_console_poll(&foreground, &received) || console_next_deadline() != UINT64_MAX) {
         return 1;
@@ -98,7 +99,8 @@ int main(void)
         return 1;
     }
     console_set_graphics_active(false);
-    if (console_next_deadline() != test_platform_time_ms() + TABOS_CURSOR_BLINK_INTERVAL_MS) {
+    if (console_graphics_active() ||
+        console_next_deadline() != test_platform_time_ms() + TABOS_CURSOR_BLINK_INTERVAL_MS) {
         return 1;
     }
     free(graphics_snapshot);

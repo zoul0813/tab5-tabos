@@ -1,4 +1,5 @@
 #include "power_test.h"
+#include "internal.h"
 #include <stdatomic.h>
 static atomic_uint_fast64_t offset_ms;
 static atomic_uint wakes;
@@ -48,7 +49,7 @@ uint8_t host_power_test_brightness(void)
 }
 bool platform_power_set_brightness(uint8_t percent)
 {
-    if (percent > 100U || take(HOST_POWER_FAIL_BRIGHTNESS)) {
+    if (percent > 100U || take(HOST_POWER_FAIL_BRIGHTNESS) || !host_display_set_brightness(percent)) {
         return false;
     }
     atomic_store(&brightness, percent);

@@ -41,6 +41,7 @@ static platform_audio_info_t platform_info;
 static uint32_t active_sample_rate;
 static bool reconfiguring;
 static bool initialized;
+static bool streams_open(void);
 
 static uint32_t next_generation(uint32_t generation)
 {
@@ -212,6 +213,17 @@ bool audio_service_info(tabos_audio_info_t* info, const char** driver, int* erro
     return detected;
 }
 
+bool audio_service_power_inhibited(void)
+{
+    if (!initialized) {
+        return false;
+    }
+    platform_mutex_lock(audio_mutex);
+    const bool inhibited = streams_open();
+    platform_mutex_unlock(audio_mutex);
+    return inhibited;
+}
+
 static uint32_t sample_rate_flag(uint32_t sample_rate)
 {
     switch (sample_rate) {
@@ -334,6 +346,7 @@ tabos_audio_stream_t audio_service_open(const void* owner, const tabos_audio_con
             (void) audio_service_close(owner, handle);
             return -TABOS_EIO;
         }
+        platform_runtime_notify(PLATFORM_RUNTIME_EVENT_POWER);
         return handle;
     }
     platform_mutex_unlock(audio_mutex);
@@ -357,6 +370,7 @@ int audio_service_close(const void* owner, tabos_audio_stream_t handle)
     *stream                   = (audio_stream_t) {.generation = generation};
     platform_mutex_unlock(audio_mutex);
     free(ring);
+    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_POWER);
     return 0;
 }
 

@@ -127,16 +127,94 @@ static void test_idle_activity_and_shutdown(void)
     power_manager_t manager;
     assert(power_manager_init(&manager, policy(), 10U));
     assert(power_manager_finalize(&manager));
+    assert(power_manager_status(&manager)->brightness_valid);
+    assert(power_manager_status(&manager)->effective_brightness == 75U);
     power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_DEADLINE, 109U);
     assert(power_manager_status(&manager)->state == POWER_STATE_ACTIVE);
     power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_DEADLINE, 110U);
     assert(power_manager_status(&manager)->state == POWER_STATE_IDLE);
+    assert(power_manager_status(&manager)->desired_brightness == 20U);
+    assert(power_manager_status(&manager)->effective_brightness == 20U);
     power_manager_request_activity(&manager, 111U);
     power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_POWER, 112U);
     assert(power_manager_status(&manager)->state == POWER_STATE_ACTIVE);
     assert(power_manager_status(&manager)->last_activity_ms == 111U);
+    assert(power_manager_status(&manager)->effective_brightness == 75U);
     power_manager_begin_shutdown(&manager, 113U);
     assert(power_manager_status(&manager)->state == POWER_STATE_SHUTTING_DOWN);
+    power_manager_shutdown(&manager);
+}
+
+static void test_activity_race_and_inhibitors(void)
+{
+    power_manager_t manager;
+    assert(power_manager_init(&manager, policy(), 0U));
+    assert(power_manager_finalize(&manager));
+
+    power_manager_request_activity(&manager, 100U);
+    power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_POWER | PLATFORM_RUNTIME_EVENT_DEADLINE, 100U);
+    assert(power_manager_status(&manager)->state == POWER_STATE_ACTIVE);
+    assert(power_manager_next_deadline(&manager) == 200U);
+
+    power_manager_set_dim_inhibitors(&manager, POWER_INHIBITOR_KEYBOARD, 200U);
+    power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_DEADLINE, 1000U);
+    assert(power_manager_status(&manager)->state == POWER_STATE_ACTIVE);
+    assert(power_manager_next_deadline(&manager) == PLATFORM_RUNTIME_DEADLINE_NONE);
+    assert(power_manager_request_suspend(&manager));
+    power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_POWER, 1001U);
+    assert(power_manager_status(&manager)->failure.code == POWER_FAILURE_BLOCKED);
+
+    power_manager_set_dim_inhibitors(&manager, POWER_INHIBITOR_FULLSCREEN | POWER_INHIBITOR_MEDIA, 1100U);
+    power_manager_set_dim_inhibitors(&manager, 0U, 1200U);
+    assert(power_manager_status(&manager)->last_activity_ms == 1200U);
+    assert(power_manager_next_deadline(&manager) == 1300U);
+    power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_DEADLINE, 1299U);
+    assert(power_manager_status(&manager)->state == POWER_STATE_ACTIVE);
+    power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_DEADLINE, 1300U);
+    assert(power_manager_status(&manager)->state == POWER_STATE_IDLE);
+    power_manager_shutdown(&manager);
+}
+
+static void test_policy_and_brightness_failures(void)
+{
+    power_manager_t manager;
+    assert(power_manager_init(&manager, policy(), 0U));
+    assert(power_manager_finalize(&manager));
+    power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_DEADLINE, 100U);
+    assert(power_manager_status(&manager)->state == POWER_STATE_IDLE);
+
+    power_policy_t changed    = policy();
+    changed.active_brightness = 50U;
+    changed.idle_brightness   = 30U;
+    assert(power_manager_set_policy(&manager, changed, 100U));
+    assert(power_manager_status(&manager)->effective_brightness == 30U);
+    changed.active_brightness = 10U;
+    assert(power_manager_set_policy(&manager, changed, 100U));
+    assert(power_manager_status(&manager)->effective_brightness == 10U);
+
+    power_manager_shutdown(&manager);
+
+    assert(power_manager_init(&manager, policy(), 0U));
+    assert(power_manager_finalize(&manager));
+    test_platform_fail_brightness_once();
+    power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_DEADLINE, 100U);
+    assert(power_manager_status(&manager)->state == POWER_STATE_IDLE);
+    assert(power_manager_status(&manager)->desired_brightness == 20U);
+    assert(power_manager_status(&manager)->effective_brightness == 75U);
+    assert(power_manager_status(&manager)->failure.code == POWER_FAILURE_BRIGHTNESS);
+    assert(test_platform_brightness() == 75U);
+    power_manager_shutdown(&manager);
+
+    assert(power_manager_init(&manager, policy(), 0U));
+    assert(power_manager_finalize(&manager));
+    power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_DEADLINE, 100U);
+    test_platform_fail_brightness_once();
+    power_manager_request_activity(&manager, 101U);
+    power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_POWER, 101U);
+    assert(power_manager_status(&manager)->state == POWER_STATE_ACTIVE);
+    assert(power_manager_status(&manager)->desired_brightness == 75U);
+    assert(power_manager_status(&manager)->effective_brightness == 20U);
+    assert(power_manager_status(&manager)->failure.code == POWER_FAILURE_BRIGHTNESS);
     power_manager_shutdown(&manager);
 }
 
@@ -188,6 +266,8 @@ int main(void)
     test_order_async_and_wake();
     test_deadline_blocker_and_failure();
     test_idle_activity_and_shutdown();
+    test_activity_race_and_inhibitors();
+    test_policy_and_brightness_failures();
     test_registration_failures();
     return 0;
 }

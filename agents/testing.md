@@ -1632,3 +1632,10 @@ dependencies, cycles, and capacity overflow. `unit.host_power_model` validates s
 monotonic advancement, activity injection, brightness state, one-shot platform failure,
 coalesced wake injection, and wake-cause consumption. Tab5 builds retain stubbed sleep
 entry until validated hardware sleep lands in Phase 7.
+
+Phase 2 extends manager tests with exact idle boundary, simultaneous activity/deadline race,
+held-input and fullscreen/media inhibitor behavior, fresh timeout after final release,
+configuration changes while idle, active brightness below idle brightness, and dim/restore
+failures with truthful desired/effective state. Input and pointer service tests distinguish
+physical ingress and held/contact state from software repeat, text, and cancellation. Host SDL
+must dim through texture modulation without changing framebuffer or screenshot pixels.

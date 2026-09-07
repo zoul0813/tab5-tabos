@@ -71,7 +71,12 @@
   participant registration, runtime deadline/event integration, platform sleep contract,
   and deterministic host controls. macOS Debug tests and Tab5 Debug cross-build pass;
   hardware sleep remains disabled.
-- [ ] Slice 2: implement activity-driven idle dimming and measure each power reduction.
+- [x] Slice 2: implement activity-driven idle dimming, held-input/fullscreen/media
+  inhibition, truthful brightness state, and SDL presentation modulation.
+- [x] Physically validate Tab5 dim/restore behavior, touch/keyboard restoration,
+  fullscreen inhibition, and held-contact inhibition.
+- [ ] Capture measurement setup for reported 0.09 A active to 0.04 A dimmed current
+  before accepting instrumented whole-system power evidence.
 
 ### Hardware Services Phase 6 Validation
 

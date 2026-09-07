@@ -22,6 +22,9 @@ int main(void)
     if (!audio_service_init()) {
         return fail("audio service init failed");
     }
+    if (audio_service_power_inhibited()) {
+        return fail("idle audio service inhibits power");
+    }
     tabos_audio_info_t info;
     const char* driver = NULL;
     int error          = -1;
@@ -50,10 +53,11 @@ int main(void)
     conflicting_rate_config.sample_rate          = TABOS_AUDIO_SAMPLE_RATE_48000;
     tabos_audio_config_t unsupported_rate_config = native_rate_config;
     unsupported_rate_config.sample_rate          = 12345U;
-    if (native_rate <= 0 || test_platform_audio_sample_rate() != TABOS_AUDIO_SAMPLE_RATE_11025 ||
+    if (native_rate <= 0 || !audio_service_power_inhibited() ||
+        test_platform_audio_sample_rate() != TABOS_AUDIO_SAMPLE_RATE_11025 ||
         audio_service_open(&owner_b, &conflicting_rate_config) != -TABOS_EBUSY ||
         audio_service_open(&owner_b, &unsupported_rate_config) != -TABOS_EINVAL ||
-        audio_service_close(&owner_a, native_rate) != 0) {
+        audio_service_close(&owner_a, native_rate) != 0 || audio_service_power_inhibited()) {
         return fail("sample-rate selection or shared-clock arbitration failed");
     }
     const tabos_audio_stream_t default_rate = audio_service_open(&owner_a, &playback_config);

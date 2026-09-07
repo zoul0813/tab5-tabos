@@ -7,6 +7,8 @@
 void test_platform_set_time_ms(uint64_t time_ms);
 void test_platform_advance_time_ms(uint64_t elapsed_ms);
 uint64_t test_platform_time_ms(void);
+uint8_t test_platform_brightness(void);
+void test_platform_fail_brightness_once(void);
 uint64_t test_platform_runtime_wait_deadline(void);
 const char* test_storage_root(void);
 const char* test_platform_last_log(void);
