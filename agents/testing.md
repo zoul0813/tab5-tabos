@@ -764,6 +764,8 @@ The build system should:
 - make SDL3 a host-only dependency
 - keep ESP-IDF dependencies out of host builds
 - keep host dependencies out of Tab5 firmware
+- cross-build the maintained application rootfs used by published host packages
+- extract each host package into a clean directory and verify startup finds its bundled shell
 
 ---
 

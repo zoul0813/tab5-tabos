@@ -67,6 +67,10 @@ by `--msc`; separate binary distributions must preserve their notices.
 
 Individual application commands such as `make -C apps/shell` remain available.
 
+Published macOS and Linux host archives include the maintained application set under
+`rootfs/`, including the required `T:/bin/shell`. The archive launcher resolves that
+directory from its own installed location, independent of the source checkout.
+
 Core utilities are grouped under `apps/coreutils/`, but each utility remains a separate
 program. Build one with `make -C apps/coreutils ls` or `make -C apps/coreutils mkdir`.
 Sources live in `apps/coreutils/src/<name>/main.c`; each output installs directly under

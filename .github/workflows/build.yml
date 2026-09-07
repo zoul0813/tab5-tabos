@@ -8,9 +8,31 @@ permissions:
   contents: read
 
 jobs:
+  host-applications:
+    name: Host application rootfs
+    runs-on: ubuntu-24.04
+    container: espressif/idf:v5.4.4
+    steps:
+      - uses: actions/checkout@v7
+      - name: Cross-build host applications
+        shell: bash
+        run: |
+          . /opt/esp/idf/export.sh
+          ./apps/build.sh
+          test -x .local/rootfs/T/bin/shell
+          tar -C .local -czf host-rootfs.tar.gz rootfs
+      - name: Stage host application rootfs
+        uses: actions/upload-artifact@v7
+        with:
+          name: tabos-host-rootfs
+          path: host-rootfs.tar.gz
+          archive: false
+          retention-days: 1
+
   macos:
     name: macOS / ${{ matrix.configuration }}
     runs-on: macos-15
+    needs: host-applications
     strategy:
       fail-fast: false
       matrix:
@@ -21,6 +43,12 @@ jobs:
         run: brew install sdl3
       - name: Build and test
         run: ./tools/tabos macos ${{ matrix.configuration }} test
+      - name: Download host application rootfs
+        if: matrix.configuration == 'release'
+        uses: actions/download-artifact@v8
+        with:
+          name: tabos-host-rootfs
+          path: dist
       - name: Package macOS host
         if: matrix.configuration == 'release'
         shell: bash
@@ -33,11 +61,15 @@ jobs:
           test -n "$sdl_library"
           cp "$sdl_library" "$package/libSDL3.0.dylib"
           cp targets/host/packaging/macos/run.sh "$package/run.sh"
+          tar -C "$package" -xzf dist/host-rootfs.tar.gz
           install_name_tool -change "$sdl_library" '@executable_path/libSDL3.0.dylib' "$package/tabos_host"
           codesign --force --sign - "$package/libSDL3.0.dylib"
           codesign --force --sign - "$package/tabos_host"
           chmod +x "$package/tabos_host" "$package/run.sh"
           tar -C dist -czf dist/tabos-macos-arm64.tar.gz tabos-macos-arm64
+          clean_directory="$(mktemp -d)"
+          tar -C "$clean_directory" -xzf dist/tabos-macos-arm64.tar.gz
+          "$clean_directory/tabos-macos-arm64/run.sh" --startup-smoke
       - name: Upload macOS host
         if: matrix.configuration == 'release'
         uses: actions/upload-artifact@v7
@@ -48,6 +80,7 @@ jobs:
   linux:
     name: Linux / ${{ matrix.configuration }}
     runs-on: ubuntu-26.04
+    needs: host-applications
     strategy:
       fail-fast: false
       matrix:
@@ -58,6 +91,12 @@ jobs:
       - uses: actions/checkout@v7
       - name: Build and test
         run: ./tools/tabos linux ${{ matrix.configuration }} test
+      - name: Download host application rootfs
+        if: matrix.configuration == 'release'
+        uses: actions/download-artifact@v8
+        with:
+          name: tabos-host-rootfs
+          path: dist
       - name: Package Linux host
         if: matrix.configuration == 'release'
         shell: bash
@@ -70,8 +109,12 @@ jobs:
           test -n "$sdl_library"
           cp --dereference "$sdl_library" "$package/libSDL3.so.0"
           cp targets/host/packaging/linux/run.sh "$package/run.sh"
+          tar -C "$package" -xzf dist/host-rootfs.tar.gz
           chmod +x "$package/tabos_host" "$package/run.sh"
           tar -C dist -czf dist/tabos-linux-x64.tar.gz tabos-linux-x64
+          clean_directory="$(mktemp -d)"
+          tar -C "$clean_directory" -xzf dist/tabos-linux-x64.tar.gz
+          "$clean_directory/tabos-linux-x64/run.sh" --startup-smoke
       - name: Upload Linux host
         if: matrix.configuration == 'release'
         uses: actions/upload-artifact@v7

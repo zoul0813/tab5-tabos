@@ -68,6 +68,11 @@ The adapter rejects symbolic-link traversal so a TabOS path cannot escape the
 configured root. This storage is persistent between host runs. Automated tests
 instead create isolated temporary roots.
 
+Packaged host builds include a writable root filesystem beside `tabos_host`; their
+`run.sh` launcher selects it automatically. Set the `TABOS_HOST_ROOTFS` environment
+variable to an explicit user-data directory before invoking the launcher to keep
+writable files outside the extracted package.
+
 ## Tab5 Storage
 
 Tab5 exposes BSP-mounted TF/microSD card as `T:`. `T:/` maps internally to `/sdcard`.
