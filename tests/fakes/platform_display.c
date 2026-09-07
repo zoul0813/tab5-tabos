@@ -90,6 +90,12 @@ static platform_audio_error_fn fake_audio_error;
 static platform_audio_render_fn fake_audio_render;
 static platform_audio_capture_fn fake_audio_capture;
 static uint32_t fake_audio_sample_rate;
+static bool fake_audio_active;
+static bool fake_audio_fail_start;
+static unsigned int fake_audio_start_calls;
+static unsigned int fake_audio_stop_calls;
+static uint32_t fake_audio_route;
+static unsigned int fake_audio_route_calls;
 static platform_runtime_events_t fake_runtime_events;
 static uint64_t fake_runtime_wait_deadline;
 
@@ -332,6 +338,12 @@ bool platform_audio_init(platform_audio_render_fn render, platform_audio_capture
                      .ready               = true,
     };
     fake_audio_sample_rate = TABOS_AUDIO_DEFAULT_SAMPLE_RATE;
+    fake_audio_active      = false;
+    fake_audio_fail_start  = false;
+    fake_audio_start_calls = 0U;
+    fake_audio_stop_calls  = 0U;
+    fake_audio_route       = 0U;
+    fake_audio_route_calls = 0U;
     return true;
 }
 
@@ -340,16 +352,31 @@ void platform_audio_shutdown(void)
     fake_audio_render  = NULL;
     fake_audio_capture = NULL;
     fake_audio_error   = NULL;
+    fake_audio_active  = false;
 }
 
 bool platform_audio_set_route(uint32_t route)
 {
-    return route == TABOS_AUDIO_ROUTE_SPEAKER || route == TABOS_AUDIO_ROUTE_HEADPHONE ||
-           route == TABOS_AUDIO_ROUTE_MICROPHONE;
+    if (route != TABOS_AUDIO_ROUTE_SPEAKER && route != TABOS_AUDIO_ROUTE_HEADPHONE &&
+        route != TABOS_AUDIO_ROUTE_MICROPHONE) {
+        return false;
+    }
+    fake_audio_route = route;
+    ++fake_audio_route_calls;
+    return true;
 }
 
-bool platform_audio_set_sample_rate(uint32_t sample_rate)
+bool platform_audio_start(uint32_t sample_rate, uint32_t route)
 {
+    ++fake_audio_start_calls;
+    if (fake_audio_fail_start) {
+        fake_audio_fail_start = false;
+        return false;
+    }
+    if (route != TABOS_AUDIO_ROUTE_SPEAKER && route != TABOS_AUDIO_ROUTE_HEADPHONE &&
+        route != TABOS_AUDIO_ROUTE_MICROPHONE) {
+        return false;
+    }
     switch (sample_rate) {
         case TABOS_AUDIO_SAMPLE_RATE_8000:
         case TABOS_AUDIO_SAMPLE_RATE_11025:
@@ -361,14 +388,56 @@ bool platform_audio_set_sample_rate(uint32_t sample_rate)
         case TABOS_AUDIO_SAMPLE_RATE_44100:
         case TABOS_AUDIO_SAMPLE_RATE_48000:
         case TABOS_AUDIO_SAMPLE_RATE_88200:
-        case TABOS_AUDIO_SAMPLE_RATE_96000: fake_audio_sample_rate = sample_rate; return true;
+        case TABOS_AUDIO_SAMPLE_RATE_96000:
+            fake_audio_sample_rate = sample_rate;
+            fake_audio_active      = true;
+            fake_audio_route       = route;
+            return true;
         default: return false;
     }
+}
+
+void platform_audio_stop(void)
+{
+    if (fake_audio_active) {
+        ++fake_audio_stop_calls;
+    }
+    fake_audio_active = false;
 }
 
 uint32_t test_platform_audio_sample_rate(void)
 {
     return fake_audio_sample_rate;
+}
+
+bool test_platform_audio_active(void)
+{
+    return fake_audio_active;
+}
+
+unsigned int test_platform_audio_start_calls(void)
+{
+    return fake_audio_start_calls;
+}
+
+unsigned int test_platform_audio_stop_calls(void)
+{
+    return fake_audio_stop_calls;
+}
+
+void test_platform_audio_fail_start_once(void)
+{
+    fake_audio_fail_start = true;
+}
+
+uint32_t test_platform_audio_route(void)
+{
+    return fake_audio_route;
+}
+
+unsigned int test_platform_audio_route_calls(void)
+{
+    return fake_audio_route_calls;
 }
 
 void test_platform_audio_render(int16_t* stereo, size_t frames)

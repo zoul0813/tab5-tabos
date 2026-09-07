@@ -27,6 +27,12 @@ void test_platform_audio_render(int16_t* stereo, size_t frames);
 void test_platform_audio_capture(const int16_t* samples, size_t frames, uint32_t channels);
 void test_platform_audio_error(int error);
 uint32_t test_platform_audio_sample_rate(void);
+bool test_platform_audio_active(void);
+unsigned int test_platform_audio_start_calls(void);
+unsigned int test_platform_audio_stop_calls(void);
+void test_platform_audio_fail_start_once(void);
+uint32_t test_platform_audio_route(void);
+unsigned int test_platform_audio_route_calls(void);
 void test_platform_camera_frame(const void* data, size_t size, uint32_t width, uint32_t height, uint32_t stride_bytes,
                                 uint64_t timestamp_ms);
 void test_platform_camera_encoded_frame(const void* data, size_t size, uint32_t width, uint32_t height, uint32_t format,

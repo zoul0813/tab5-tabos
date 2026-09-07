@@ -1,11 +1,11 @@
 # Power baseline and measurement
 
-TabOS currently supports orderly reboot and shutdown. Transparent suspend and automatic
-idle dimming are not implemented. Blocking the runtime task does not put the board to
-sleep: other tasks, peripheral clocks, DMA, and external devices continue operating.
+TabOS currently supports orderly reboot, shutdown, and automatic idle dimming. Transparent
+suspend is not implemented. Blocking the runtime task does not put the board to sleep:
+other tasks, peripheral clocks, DMA, and external devices continue operating.
 
-This baseline describes the `740ba1d` power-plan revision plus the Phase 0 GPIO ownership
-fix and Debug peripheral activity counters. Rebuild and record fresh identity whenever code, SDK, components, configuration,
+This baseline began at `740ba1d` and now includes Phase 1 through Phase 3 implementation
+status. Rebuild and record fresh identity whenever code, SDK, components, configuration,
 board revision, or attached peripherals change.
 
 ## Suspend admission rule
@@ -38,8 +38,8 @@ The resolved component lock is `targets/tab5/dependencies.lock`.
 | Touch (`platform/esp32p4/pointer.c`, `touch_interrupt.c`) | GT911 0x14/0x5D or ST712x 0x55, I2C1, active-low GPIO23. ISR records POINTER readiness; bounded task-context drain, contact matching and cancellation. | Blocking: active contacts or unvalidated controller sleep/wake. Preserve first report, touch supply and reset levels. No idle report polling. |
 | LCD scanout / backlight (`platform/esp32p4/display.c`, BSP, `esp_lcd`) | Detected ILI9881C/ST7123/ST7121; MIPI DSI/DPI scanout, PSRAM framebuffers, display LDO, LEDC GPIO22, VSYNC ISR gives semaphore even at idle. | Blocking: no reversible blank/quiesce/restore preserving scanout buffers. Fullscreen ownership blocks all suspend requests. |
 | PPA / PIE (`platform/esp32p4/display.c`, `pie.c`) | PPA SRM/fill/blend clients initialized at display startup; completion IRQ, DMA/cache synchronization and semaphore. PIE is synchronous CPU work. | PPA operations inactive at unchanged idle frame, but display parent blocks; unfinished accelerator work always blocks. |
-| Audio codecs / I2S (`platform/esp32p4/audio.c`, BSP, `esp_codec_dev`) | ES8388 0x10 and ES7210 0x40 on I2C1. I2S clocks GPIO30/27/29, output26/input28; TX/RX DMA. `tabos_audio` starts at initialization, continuously renders/writes/reads/captures, including no-stream silence. | Blocking even with zero streams: demand-driven start/stop and bounded reversible drain absent. Existing shutdown deletes codecs and is not suspend. |
-| Headphone / speaker route (`platform/esp32p4/audio.c`) | `tabos_headphones` reads expander 0x43 P7 every 50 ms; two-sample debounce, route mutex, speaker enable. Runs without app streams. | Blocking: monitoring must stop and jack state must be sampled before speaker restoration. Known shared-I2C read errors remain separate work. |
+| Audio codecs / I2S (`platform/esp32p4/audio.c`, BSP, `esp_codec_dev`) | ES8388 0x10 and ES7210 0x40 on I2C1. I2S clocks GPIO30/27/29, output26/input28; TX/RX DMA. Codec device handles remain discovered but closed with zero streams. First open configures both codecs and starts `tabos_audio`; last close joins worker exit and closes both codecs. | Inactive and demand-driven with zero streams; any open stream remains a suspend blocker. Physical codec-clock/current shutdown requires validation. |
+| Headphone / speaker route (`platform/esp32p4/audio.c`) | Speaker-routed first open samples expander 0x43 P7 before enabling output, then `tabos_headphones` retains 50 ms two-sample debounce. Headphone/microphone routing or last-stream close stops monitoring and disables speaker. | Inactive with zero streams or non-speaker route. Known shared-I2C read errors during active monitoring remain separate work. |
 | PI4IO expanders / power rails (`platform/esp32p4/power.c`, BSP) | 0x43 controls speaker, extension 5V and LCD/touch/camera resets; 0x44 controls C6, USB-A 5V, board power-off and charging. I2C1 shared by every control operation. | Blocking: preserve output levels; never use board power-off pulse as suspend. USB-A remains safe-off in normal boot. |
 | INA226 / charger (`platform/esp32p4/power.c`) | INA226 0x41 configured for continuous conversion (0x4527), rail telemetry read on demand; charger enabled and fast charge disabled at boot. No INA226 IRQ handler. | Blocking: no reversible monitor/charger policy yet. Conversion and charging consume power independently of runtime wakes. |
 | RTC (`platform/esp32p4/rtc.c`) | RX8130 at 0x32, calendar reads/writes and health access on I2C1. No RTC alarm programming or interrupt handler. | Blocking for shared-bus drain; alarm operation inactive/unsupported. Keep wall clock independent from monotonic time. |
@@ -258,8 +258,8 @@ Host RV32 slicing is not native P4 task activity.
 | Observable | Baseline | Later isolated change | Method / interpretation |
 |---|---|---|---|
 | Runtime total and each source; deadline owners | Pending | Pending | Endpoint delta / elapsed seconds |
-| Audio codec transfers / worker CPU time | Pending | Pending | `audio_chunks` / `audio_frames` deltas; separate task trace for CPU time |
-| Headphone reads / errors | Pending | Pending | `headphone_reads` / `headphone_errors` deltas; trace I2C1 for transaction timing |
+| Audio codec transfers / worker CPU time | 6,000 chunks / 60 s quiet baseline | 199 chunks after one two-second speaker tone; consistent with no continuous idle transfer | `audio_chunks` / `audio_frames` deltas; separate task trace for CPU time |
+| Headphone reads / errors | 1,200 reads / 60 s quiet baseline | 41 reads after one two-second speaker tone; consistent with active-route-only monitoring | `headphone_reads` / `headphone_errors` deltas; trace I2C1 for transaction timing |
 | LCD VSYNC / PPA completions | Pending | Pending | `vsync` / `ppa` deltas; runtime wake counter does not count scanout interrupts |
 | Keyboard/touch I2C transfers at idle and activity | Pending | Pending | Bus trace; isolate shared-bus headphone and health traffic |
 | C6 SDIO, RPC, network/ISP/SDK worker CPU and timer activity | Pending | Pending | Task/bus trace; identify every unexplained wake |
@@ -272,6 +272,15 @@ Continuous INA226 battery-rail readings are useful diagnostics, not whole-system
 power evidence, especially with external power or charging. Measure dimming, idle audio
 stop, headphone monitoring changes, display quiescence and full sleep separately with
 identical setup. Do not claim current savings from runtime wake reductions alone.
+
+Phase 3 measurement uses a generic inline USB meter at the Tab5 USB-C input, reading 5.12 V.
+Battery is absent and charging disabled; keyboard and SD are attached, USB-A is connected to
+an unpowered host, and Wi-Fi is connected. After two seconds stable, idle shell at 75%
+brightness varies from 0.07 A to 0.09 A and 20% dimmed idle reads 0.04 A. This is coarse
+whole-system evidence. Unknown meter accuracy/resolution and the short sampling window still
+prevent precise energy or isolated Phase 3 savings claims. Available equipment cannot
+intercept the battery-only path, so current validation is explicitly limited to USB-C input.
+Battery telemetry may diagnose rail behavior but cannot replace that external measurement.
 
 For the initial physical GPIO fix, boot with keyboard and touch, verify no duplicate
 service-install error, rapid input/chords/repeat, touch down/move/up and retouch, and

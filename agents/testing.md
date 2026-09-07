@@ -1639,3 +1639,12 @@ configuration changes while idle, active brightness below idle brightness, and d
 failures with truthful desired/effective state. Input and pointer service tests distinguish
 physical ingress and held/contact state from software repeat, text, and cancellation. Host SDL
 must dim through texture modulation without changing framebuffer or screenshot pixels.
+
+Phase 3 audio tests require zero platform starts after service initialization, exactly one
+start on first open, no restart for additional streams, and one stop on last close or owner
+cleanup. Repeat across every supported native rate. Inject first-start failure, verify no
+handle or active hardware leaks, then prove next first-open recovers. Existing mixing,
+capture, route, fault, wait, and shared-clock assertions remain mandatory. Health-audit tests
+must prove suspended deadlines disappear, no audit occurs while paused, and resume runs one
+overdue audit while advancing directly to the next future deadline. Cross-build real Tab5
+audio code; host fakes do not prove codec shutdown, jack routing, or electrical savings.

@@ -36,6 +36,7 @@ static atomic_bool audio_task_active;
 static atomic_bool headphone_monitor_running;
 static atomic_bool headphone_task_active;
 static atomic_uint audio_sample_rate;
+static bool audio_hardware_active;
 static bool speaker_route_requested;
 static bool headphones_inserted;
 static bool speaker_enabled;
@@ -135,6 +136,9 @@ static void headphone_worker(void* argument)
 
 static bool start_headphone_monitor(void)
 {
+    if (atomic_load_explicit(&headphone_task_active, memory_order_acquire)) {
+        return true;
+    }
     atomic_store_explicit(&headphone_monitor_running, true, memory_order_release);
     atomic_store_explicit(&headphone_task_active, true, memory_order_release);
     if (xTaskCreate(headphone_worker, "tabos_headphones", TAB5_HEADPHONE_TASK_STACK, NULL, TAB5_HEADPHONE_TASK_PRIO,
@@ -152,6 +156,46 @@ static void stop_headphone_monitor(void)
     while (atomic_load_explicit(&headphone_task_active, memory_order_acquire)) {
         vTaskDelay(1);
     }
+}
+
+static bool set_output_route(uint32_t route)
+{
+    const bool speaker_requested = route == TABOS_AUDIO_ROUTE_SPEAKER;
+    if (!speaker_requested) {
+        stop_headphone_monitor();
+    }
+    xSemaphoreTake(route_mutex, portMAX_DELAY);
+    const bool previous_route = speaker_route_requested;
+    const bool previous_jack  = headphones_inserted;
+    speaker_route_requested   = speaker_requested;
+    bool configured           = true;
+    if (speaker_requested) {
+        bool inserted = false;
+        tab5_activity_record(TAB5_ACTIVITY_HEADPHONE_READS, 1U);
+        if (!read_headphones_inserted(&inserted)) {
+            tab5_activity_record(TAB5_ACTIVITY_HEADPHONE_ERRORS, 1U);
+            configured = false;
+        } else {
+            headphones_inserted = inserted;
+        }
+    }
+    if (configured) {
+        configured = apply_output_route_locked();
+    }
+    if (!configured) {
+        speaker_route_requested = previous_route;
+        headphones_inserted     = previous_jack;
+        (void) apply_output_route_locked();
+    }
+    xSemaphoreGive(route_mutex);
+    if (configured && speaker_requested && !start_headphone_monitor()) {
+        xSemaphoreTake(route_mutex, portMAX_DELAY);
+        speaker_route_requested = false;
+        (void) apply_output_route_locked();
+        xSemaphoreGive(route_mutex);
+        return false;
+    }
+    return configured;
 }
 
 static void stop_audio_task(void)
@@ -244,35 +288,23 @@ bool platform_audio_init(platform_audio_render_fn render, platform_audio_capture
         platform_audio_shutdown();
         return false;
     }
-    if (!configure_codecs(TABOS_AUDIO_DEFAULT_SAMPLE_RATE)) {
-        platform_audio_shutdown();
-        return false;
-    }
     headphone_expander = bsp_io_expander_init();
-    bool inserted      = false;
     if (headphone_expander == NULL ||
-        esp_io_expander_set_dir(headphone_expander, TAB5_HEADPHONE_DETECT_PIN, IO_EXPANDER_INPUT) != ESP_OK ||
-        !read_headphones_inserted(&inserted)) {
+        esp_io_expander_set_dir(headphone_expander, TAB5_HEADPHONE_DETECT_PIN, IO_EXPANDER_INPUT) != ESP_OK) {
         platform_audio_shutdown();
         return false;
     }
-    speaker_route_requested = true;
-    headphones_inserted     = inserted;
-    speaker_enabled         = true;
-    xSemaphoreTake(route_mutex, portMAX_DELAY);
-    const bool route_ready = apply_output_route_locked();
-    xSemaphoreGive(route_mutex);
-    if (!route_ready) {
+    if (bsp_feature_enable(BSP_FEATURE_SPEAKER, false) != ESP_OK) {
         platform_audio_shutdown();
         return false;
     }
-    render_callback  = render;
-    capture_callback = capture;
-    error_callback   = error;
-    if (!start_headphone_monitor() || !start_audio_task()) {
-        platform_audio_shutdown();
-        return false;
-    }
+    speaker_route_requested = false;
+    headphones_inserted     = false;
+    speaker_enabled         = false;
+    render_callback         = render;
+    capture_callback        = capture;
+    error_callback          = error;
+    atomic_store_explicit(&audio_sample_rate, TABOS_AUDIO_DEFAULT_SAMPLE_RATE, memory_order_release);
     info->ready = true;
     info->error = 0;
     return true;
@@ -280,8 +312,7 @@ bool platform_audio_init(platform_audio_render_fn render, platform_audio_capture
 
 void platform_audio_shutdown(void)
 {
-    stop_audio_task();
-    stop_headphone_monitor();
+    platform_audio_stop();
     if (microphone_codec != NULL) {
         (void) esp_codec_dev_close(microphone_codec);
         esp_codec_dev_delete(microphone_codec);
@@ -307,42 +338,51 @@ void platform_audio_shutdown(void)
     atomic_store_explicit(&audio_sample_rate, 0U, memory_order_release);
 }
 
-bool platform_audio_set_sample_rate(uint32_t sample_rate)
+bool platform_audio_start(uint32_t sample_rate, uint32_t route)
 {
-    if (!sample_rate_supported(sample_rate)) {
+    if (audio_hardware_active || !sample_rate_supported(sample_rate) ||
+        (route != TABOS_AUDIO_ROUTE_SPEAKER && route != TABOS_AUDIO_ROUTE_HEADPHONE &&
+         route != TABOS_AUDIO_ROUTE_MICROPHONE)) {
         return false;
     }
-    const uint32_t previous_sample_rate = atomic_load_explicit(&audio_sample_rate, memory_order_acquire);
-    if (sample_rate == previous_sample_rate) {
+    if (!configure_codecs(sample_rate)) {
+        return false;
+    }
+    audio_hardware_active = true;
+    if (set_output_route(route) && start_audio_task()) {
         return true;
+    }
+    platform_audio_stop();
+    return false;
+}
+
+void platform_audio_stop(void)
+{
+    if (!audio_hardware_active) {
+        stop_headphone_monitor();
+        return;
     }
     stop_audio_task();
+    stop_headphone_monitor();
+    xSemaphoreTake(route_mutex, portMAX_DELAY);
+    speaker_route_requested = false;
+    (void) apply_output_route_locked();
+    xSemaphoreGive(route_mutex);
     (void) esp_codec_dev_close(microphone_codec);
     (void) esp_codec_dev_close(speaker_codec);
-    if (configure_codecs(sample_rate) && start_audio_task()) {
-        return true;
-    }
-    (void) esp_codec_dev_close(microphone_codec);
-    (void) esp_codec_dev_close(speaker_codec);
-    if (configure_codecs(previous_sample_rate) && start_audio_task()) {
-        return false;
-    }
-    error_callback(EIO);
-    return false;
+    audio_hardware_active = false;
 }
 
 bool platform_audio_set_route(uint32_t route)
 {
-    if (route == TABOS_AUDIO_ROUTE_SPEAKER || route == TABOS_AUDIO_ROUTE_HEADPHONE) {
-        xSemaphoreTake(route_mutex, portMAX_DELAY);
-        const bool previous_route = speaker_route_requested;
-        speaker_route_requested   = route == TABOS_AUDIO_ROUTE_SPEAKER;
-        const bool configured     = apply_output_route_locked();
-        if (!configured) {
-            speaker_route_requested = previous_route;
-        }
-        xSemaphoreGive(route_mutex);
-        return configured;
+    if (!audio_hardware_active) {
+        return false;
     }
-    return route == TABOS_AUDIO_ROUTE_MICROPHONE;
+    if (route == TABOS_AUDIO_ROUTE_SPEAKER || route == TABOS_AUDIO_ROUTE_HEADPHONE) {
+        return set_output_route(route);
+    }
+    if (route == TABOS_AUDIO_ROUTE_MICROPHONE) {
+        return set_output_route(route);
+    }
+    return false;
 }

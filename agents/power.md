@@ -91,21 +91,47 @@ Phase 2 software validation: macOS Debug full suite passes, including exact-boun
 activity-race, held-input, inhibitor-release, policy-change, and brightness-failure cases;
 Tab5 Debug cross-build passes. Operator validates 60-second dimming, brightness restoration
 from touch and keyboard input, fullscreen `gdemo` inhibition, and held-contact inhibition.
-Meter reading changes from 0.09 A active to 0.04 A dimmed (90 mA to 40 mA, about 56% lower).
-Measurement setup remains to be captured before treating this as instrumented whole-system
-evidence. Light sleep remains disabled.
+Captured USB-C setup reads 0.07–0.09 A active and 0.04 A dimmed, a coarse 43–56% reduction.
+Meter precision and two-second stability interval limit accuracy. Light sleep remains disabled.
 
 **Tests:** exact timeout boundary, activity races, held input, graphics/media acquisition and release, configuration changes while idle, and brightness failure.
 
 ## Phase 3 — Remove avoidable idle service work
 
-- [ ] Make audio hardware processing demand-driven: stop codec transfers when no audio streams exist; restart before admitting first stream.
-- [ ] Preserve sample-rate arbitration, routing, capture/playback behavior, and error reporting across worker restarts.
-- [ ] Run headphone monitoring only while speaker routing needs detection. Sample jack state before enabling speaker.
-- [ ] Retain existing active-playback detection latency unless measurements support a change; no headphone polling while audio hardware suspended.
-- [ ] Keep 60-second health audit during normal operation initially; suppress it during suspend and perform one overdue audit after resume.
+- [x] Make audio hardware processing demand-driven: stop codec transfers when no audio streams exist; restart before admitting first stream.
+- [x] Preserve sample-rate arbitration, routing, capture/playback behavior, and error reporting across worker restarts.
+- [x] Run headphone monitoring only while speaker routing needs detection. Sample jack state before enabling speaker.
+- [x] Retain existing active-playback detection latency unless measurements support a change; no headphone polling while audio hardware suspended.
+- [x] Keep 60-second health audit during normal operation initially; suppress it during suspend and perform one overdue audit after resume.
 - [ ] Quiesce display scanout/VSYNC during system suspend; preserve display data and allocations.
 - [ ] Measure each optimization separately. Do not claim whole-system idle savings from runtime wake counters alone.
+
+Phase 3 audio implementation leaves codec devices discovered but closed at idle. First
+stream start configures selected rate and route before returning its handle; last close
+joins worker shutdown, disables speaker routing, closes codecs, and stops jack polling.
+Host lifecycle tests cover repeated start/stop, rate arbitration, shared streams, injected
+start failure, recovery, and owner cleanup. Health-audit pause/resume suppresses its deadline
+and runs one overdue audit immediately on resume. macOS Debug targeted tests and Tab5 Debug
+cross-build pass.
+
+Physical Tab5 validation confirms `audiotest tone speaker` opens ES8388 playback and
+ES7210 capture at 44.1 kHz, plays correctly, then releases hardware. At the next 60-second
+diagnostic report, cumulative activity is 199 audio chunks and 41 headphone reads: about
+two seconds at the unchanged 10 ms audio cadence and 50 ms jack cadence, consistent with
+work occurring only during the tone. Display dims at 89.19 seconds, about 60 seconds after
+the tone stream closes. A generic inline USB meter at the Tab5 USB-C input reads 5.12 V,
+0.07–0.09 A at 75% brightness with idle shell, and 0.04 A at 20% brightness after two
+seconds stable. Battery is absent and charging disabled; keyboard and SD are attached,
+USB-A is connected to an unpowered host, and Wi-Fi is connected. Meter resolution and
+short observation window make this a coarse whole-system observation, not precise energy
+or isolated Phase 3 savings. Available equipment cannot intercept the battery-only path;
+battery-powered current measurement is unavailable and is not a delivery expectation.
+
+Display scanout remains open: pinned ESP-IDF v5.4.4 has no public reversible MIPI-DPI
+pause operation. `esp_lcd_panel_disp_on_off()` sends the controller display command but
+does not stop DPI DMA/VSYNC, while panel deletion frees framebuffers. Do not use either as
+fake quiescence. This item remains blocked pending a safe retained-buffer driver lifecycle.
+Physical isolated current/activity measurement remains required.
 
 **Tests:** repeated first-open/last-close, idle audio silence, route correctness, fault recovery, and no new worker spin loops.
 

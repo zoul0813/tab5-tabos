@@ -1486,3 +1486,12 @@ headphone attempts/errors, VSYNC and PPA completions with boot-lifetime lock-fre
 atomics; no new periodic task/deadline exists. Release compiles out updates; host does
 not manufacture physical peripheral measurements. These counts are not PM policy or
 synchronization state.
+
+Audio hardware has an initialized-but-idle platform lifecycle. Service admission starts
+transport at requested shared sample rate and initial route before exposing first handle.
+Last-stream close stops transport after worker exit. Tab5 closes both codec devices, disables
+speaker routing, and runs jack polling only for active speaker routing; host SDL likewise owns
+audio streams only while TabOS streams exist. Backend-start failure updates device health and
+remains retryable after no stream was admitted. Maintenance audit supports suppressed deadlines
+and one overdue resume pass. Pinned ESP-IDF v5.4.4 exposes no public retained-buffer MIPI-DPI
+pause; controller display-off is not treated as scanout quiescence.

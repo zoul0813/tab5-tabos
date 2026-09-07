@@ -75,8 +75,19 @@
   inhibition, truthful brightness state, and SDL presentation modulation.
 - [x] Physically validate Tab5 dim/restore behavior, touch/keyboard restoration,
   fullscreen inhibition, and held-contact inhibition.
-- [ ] Capture measurement setup for reported 0.09 A active to 0.04 A dimmed current
-  before accepting instrumented whole-system power evidence.
+- [x] Power Phase 3 audio slice: make host and Tab5 audio hardware demand-driven,
+  stop headphone polling outside speaker-routed streams, preserve rate/routing/error
+  behavior across restarts, and add suspend-aware health-audit lifecycle.
+- [x] Physically validate Phase 3 speaker tone, codec start, bounded active audio/jack
+  counters, last-close idle-timer restart, and subsequent dimming.
+- [ ] Power Phase 3 display slice: add retained-buffer MIPI-DPI scanout quiescence when
+  pinned ESP-IDF exposes or TabOS supplies a safe reversible driver operation.
+- [ ] Physically measure unused-audio shutdown and headphone-monitor removal separately.
+- [x] Capture coarse measurement setup: generic inline USB-C meter at 5.12 V, no battery,
+  charging off, keyboard/SD attached, USB-A connected to unpowered host, Wi-Fi connected,
+  readings after two seconds stable; 0.07–0.09 A active and 0.04 A dimmed.
+- [x] Record measurement boundary: available equipment cannot intercept battery-only
+  power, so power validation uses USB-C input measurements only.
 
 ### Hardware Services Phase 6 Validation
 

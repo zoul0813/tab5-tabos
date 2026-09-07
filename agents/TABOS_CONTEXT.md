@@ -830,6 +830,15 @@ delivery. SDL modulates presentation without changing framebuffer pixels. No pub
 API, PM enablement, or Tab5 wake arming exists yet. Missing tested reversible service
 lifecycle remains a blocker, including initialized drivers with no application handles.
 
+Power Phase 3 makes audio transport demand-driven. Platform initialization discovers audio
+devices but leaves codecs closed and creates no transfer or headphone-monitor task. First
+stream start configures selected rate and route before admission; last close joins worker
+shutdown, disables speaker routing, closes codecs, and stops jack polling. Speaker routing
+samples jack state before enabling output, then keeps existing 50 ms active monitoring.
+Failed starts fault audio state but a later first-open retries cleanly. Health audit now has
+deadline-suppressing suspend/resume hooks with one overdue audit on resume. Retained-buffer
+MIPI-DPI scanout pause remains unavailable in pinned ESP-IDF and therefore still blocks sleep.
+
 Debug peripheral activity uses a narrow `platform_runtime_log_activity()` diagnostic
 hook beside the existing health-audit wake report. Tab5 counts codec pairs/frames/errors,
 headphone attempts/errors, VSYNC and PPA completions with boot-lifetime lock-free unsigned

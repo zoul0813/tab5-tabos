@@ -226,8 +226,9 @@ bool platform_battery_health(int* error);
 bool platform_audio_init(platform_audio_render_fn render, platform_audio_capture_fn capture,
                          platform_audio_error_fn error, platform_audio_info_t* info);
 void platform_audio_shutdown(void);
+bool platform_audio_start(uint32_t sample_rate, uint32_t route);
+void platform_audio_stop(void);
 bool platform_audio_set_route(uint32_t route);
-bool platform_audio_set_sample_rate(uint32_t sample_rate);
 bool platform_pointer_init(const char** driver, int* error);
 void platform_pointer_update(void);
 void platform_pointer_shutdown(void);

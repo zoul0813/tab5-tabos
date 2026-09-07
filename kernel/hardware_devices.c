@@ -28,6 +28,7 @@ static char storage_drive_letter;
 static tabos_device_id_t registered_devices[9];
 static size_t registered_device_count;
 static bool initialized;
+static bool health_audit_suspended;
 static tabos_timer_t health_audit_timer;
 
 static bool register_device(const char* name, const char* driver, tabos_device_class_t device_class,
@@ -196,7 +197,8 @@ bool hardware_devices_init(void)
         hardware_devices_shutdown();
         return false;
     }
-    initialized = true;
+    initialized            = true;
+    health_audit_suspended = false;
     tabos_timer_start(&health_audit_timer, HARDWARE_HEALTH_AUDIT_MS, HARDWARE_HEALTH_AUDIT_MS);
     return true;
 }
@@ -240,7 +242,7 @@ void hardware_devices_update(void)
     if (!initialized) {
         return;
     }
-    if (tabos_timer_poll(&health_audit_timer)) {
+    if (!health_audit_suspended && tabos_timer_poll(&health_audit_timer)) {
         audit_unreported_health();
     }
     if (audio_device != TABOS_DEVICE_ID_INVALID) {
@@ -280,7 +282,25 @@ void hardware_devices_update(void)
 
 uint64_t hardware_devices_next_deadline(void)
 {
-    return initialized ? time_timer_deadline(&health_audit_timer) : TIME_DEADLINE_NONE;
+    return initialized && !health_audit_suspended ? time_timer_deadline(&health_audit_timer) : TIME_DEADLINE_NONE;
+}
+
+void hardware_devices_suspend_audit(void)
+{
+    if (initialized) {
+        health_audit_suspended = true;
+    }
+}
+
+void hardware_devices_resume_audit(void)
+{
+    if (!initialized || !health_audit_suspended) {
+        return;
+    }
+    health_audit_suspended = false;
+    if (tabos_timer_poll(&health_audit_timer)) {
+        audit_unreported_health();
+    }
 }
 
 void hardware_devices_shutdown(void)
@@ -290,7 +310,8 @@ void hardware_devices_shutdown(void)
         (void) device_registry_remove(registered_devices[registered_device_count]);
         registered_devices[registered_device_count] = TABOS_DEVICE_ID_INVALID;
     }
-    initialized = false;
+    initialized            = false;
+    health_audit_suspended = false;
     tabos_timer_cancel(&health_audit_timer);
     network_device       = TABOS_DEVICE_ID_INVALID;
     keyboard_device      = TABOS_DEVICE_ID_INVALID;
