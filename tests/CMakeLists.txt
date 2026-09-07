@@ -805,6 +805,15 @@ add_test(
         -P "${CMAKE_CURRENT_LIST_DIR}/check_invalid_target.cmake"
 )
 
+add_test(
+    NAME build.application_tracking
+    COMMAND "${CMAKE_COMMAND}"
+        "-DTABOS_SOURCE_DIR=${TABOS_ROOT}"
+        "-DTABOS_TEST_DIR=${CMAKE_CURRENT_BINARY_DIR}/application-build-tracking"
+        "-DTABOS_C_COMPILER=${CMAKE_C_COMPILER}"
+        -P "${CMAKE_CURRENT_LIST_DIR}/check_application_build_tracking.cmake"
+)
+
 add_executable(tabos_camera_concurrency
     component/camera_concurrency.c
     "${TABOS_ROOT}/camera/camera.c"

@@ -23,6 +23,13 @@ this builds without installing:
 ./apps/build.sh build
 ```
 
+Application builds track included SDK and application headers, each application's
+Makefile, generated prerequisites, and effective compiler/linker resource settings.
+Changing heap, stack, ABI, capability, or pointer-contact values therefore rebuilds the
+ELF automatically; an unchanged invocation remains incremental. `./apps/build.sh clean`
+removes the shared application build tree so renamed or removed applications cannot
+leave stale outputs behind.
+
 Explicitly fetch, build, and install pinned optional DOOM application with:
 
 ```sh
@@ -37,8 +44,9 @@ eject it after copying:
 ```
 
 The default mount point is `/Volumes/TAB5`. Use `--msc-mount=/path` or set
-`TABOS_MSC_MOUNT` to override it. Runnable extensionless outputs are copied to the
-volume's `bin/` directory. Intermediate build files and source assets are excluded.
+`TABOS_MSC_MOUNT` to override it. Runnable extensionless outputs declared by each
+application are copied to the volume's `bin/` directory. Declared runtime assets are
+copied under `data/<application>/`; intermediate build files and source assets are excluded.
 Grouped utility outputs are flattened; for example, `build/apps/coreutils/ls/ls` is
 copied to `bin/ls`.
 
