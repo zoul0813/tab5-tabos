@@ -6,6 +6,8 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
 endif()
 
 add_executable(tabos_core_smoke unit/core_smoke.c ${TABOS_TEST_PLATFORM_FAKES})
+# Tests keep assertions enabled, but the linked runtime retains its build mode.
+target_compile_definitions(tabos_core_smoke PRIVATE TABOS_TEST_RUNTIME_DIAGNOSTICS=$<CONFIG:Debug>)
 target_include_directories(tabos_core_smoke PRIVATE
     "${TABOS_ROOT}/graphics/include"
     "${TABOS_ROOT}/input/include"
@@ -373,6 +375,18 @@ tabos_enable_warnings(tabos_runtime_event)
 tabos_enable_sanitizers(tabos_runtime_event)
 add_test(NAME unit.runtime_event COMMAND tabos_runtime_event)
 
+add_executable(tabos_power_manager unit/power_manager.c ${TABOS_TEST_PLATFORM_FAKES})
+target_include_directories(tabos_power_manager PRIVATE
+    "${TABOS_ROOT}/kernel/include"
+    "${TABOS_ROOT}/platform/include"
+    "${TABOS_ROOT}/sdk/include"
+    "${CMAKE_CURRENT_LIST_DIR}/fakes"
+)
+target_link_libraries(tabos_power_manager PRIVATE tabos_core)
+tabos_enable_warnings(tabos_power_manager)
+tabos_enable_sanitizers(tabos_power_manager)
+add_test(NAME unit.power_manager COMMAND tabos_power_manager)
+
 add_executable(tabos_host_runtime_event unit/host_runtime_event.c)
 target_include_directories(tabos_host_runtime_event PRIVATE
     "${TABOS_ROOT}/platform/include"
@@ -394,6 +408,25 @@ endif()
 tabos_enable_warnings(tabos_host_runtime_event)
 tabos_enable_sanitizers(tabos_host_runtime_event)
 add_test(NAME unit.host_runtime_event COMMAND tabos_host_runtime_event)
+
+add_executable(tabos_host_power_model unit/host_power_model.c)
+target_include_directories(tabos_host_power_model PRIVATE
+    "${TABOS_ROOT}/platform/host/sdl"
+    "${TABOS_ROOT}/platform/include"
+    "${TABOS_ROOT}/sdk/include"
+)
+if(TABOS_TARGET STREQUAL "linux")
+    # Power activity reaches portable input/pointer services, which call back
+    # into platform synchronization. Rescan both archives as for runtime events.
+    target_link_libraries(tabos_host_power_model PRIVATE
+        "-Wl,--start-group" tabos_core tabos_platform_host "-Wl,--end-group" SDL3::SDL3
+    )
+else()
+    target_link_libraries(tabos_host_power_model PRIVATE tabos_core tabos_platform_host SDL3::SDL3)
+endif()
+tabos_enable_warnings(tabos_host_power_model)
+tabos_enable_sanitizers(tabos_host_power_model)
+add_test(NAME unit.host_power_model COMMAND tabos_host_power_model)
 
 add_executable(tabos_wall_clock unit/wall_clock.c ${TABOS_TEST_PLATFORM_FAKES})
 target_include_directories(tabos_wall_clock PRIVATE
@@ -886,3 +919,15 @@ else()
 endif()
 tabos_enable_warnings(tabos_kilo_rv32)
 tabos_enable_sanitizers(tabos_kilo_rv32)
+
+add_executable(tabos_gpio_interrupt
+    unit/gpio_interrupt.c
+    "${TABOS_ROOT}/platform/esp32p4/gpio_interrupt.c"
+)
+target_include_directories(tabos_gpio_interrupt PRIVATE
+    "${CMAKE_CURRENT_LIST_DIR}/fakes/espidf"
+    "${TABOS_ROOT}/platform/esp32p4"
+)
+tabos_enable_warnings(tabos_gpio_interrupt)
+tabos_enable_sanitizers(tabos_gpio_interrupt)
+add_test(NAME unit.gpio_interrupt COMMAND tabos_gpio_interrupt)

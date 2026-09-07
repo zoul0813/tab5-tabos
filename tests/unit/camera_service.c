@@ -22,6 +22,7 @@ int main(void)
     static const int owner_a;
     static const int owner_b;
     expect(camera_service_init(), "initializes");
+    expect(!camera_service_power_inhibited(), "idle camera service does not inhibit power");
     camera_service_set_device_id(42U);
     tabos_camera_info_t info;
     expect(camera_service_info(&info, NULL, NULL, NULL) && info.device_id == 42U &&
@@ -31,6 +32,7 @@ int main(void)
         .device_id = 42U, .format = TABOS_CAMERA_FORMAT_RAW8, .width = 4U, .height = 2U, .fps = 10U};
     const tabos_camera_stream_t stream = camera_service_open(&owner_a, &config);
     expect(stream != TABOS_CAMERA_STREAM_INVALID, "opens owned stream");
+    expect(camera_service_power_inhibited(), "open camera stream inhibits power");
     expect(camera_service_open(&owner_b, &config) == -TABOS_EBUSY, "rejects conflicting stream");
 
     const uint8_t first[8] = {0, 1, 2, 3, 4, 5, 6, 7};
@@ -89,6 +91,7 @@ int main(void)
     expect(camera_service_copy(&owner_a, stream, frame.lease, 0U, copied, sizeof(copied)) == sizeof(copied),
            "foreign owner cleanup preserves active stream");
     camera_service_close_owner(&owner_a);
+    expect(!camera_service_power_inhibited(), "camera cleanup releases power inhibitor");
     expect(camera_service_acquire(&owner_a, stream, &frame) == -TABOS_EBADF,
            "process cleanup reclaims leases and stream");
     const tabos_camera_stream_t reused = camera_service_open(&owner_a, &config);

@@ -18,6 +18,20 @@ static platform_pixel_t* presented_pixels;
 static Uint64 graphics_present_deadline_ns;
 static bool renderer_vsync;
 
+bool host_display_set_brightness(uint8_t percent)
+{
+    if (percent > 100U) {
+        return false;
+    }
+    if (host_is_headless() || texture == NULL || renderer == NULL) {
+        return true;
+    }
+    const Uint8 modulation = (Uint8) (((unsigned int) percent * 255U + 50U) / 100U);
+    return SDL_SetTextureColorMod(texture, modulation, modulation, modulation) &&
+           SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE) && SDL_RenderClear(renderer) &&
+           SDL_RenderTexture(renderer, texture, NULL, NULL) && SDL_RenderPresent(renderer);
+}
+
 bool host_capture_screenshot(void)
 {
     if (presented_pixels == NULL || host_is_headless()) {

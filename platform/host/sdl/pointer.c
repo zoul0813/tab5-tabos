@@ -129,6 +129,7 @@ static bool mouse_event(const SDL_Event* event)
     mouse_x      = x;
     mouse_y      = y;
     if (type == TABOS_POINTER_MOVE && !mouse_active && previous_buttons == 0U) {
+        pointer_service_record_movement();
         return true;
     }
     const tabos_pointer_event_t pointer = {
