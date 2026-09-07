@@ -1,5 +1,10 @@
 set(TABOS_TEST_PLATFORM_FAKES fakes/platform_display.c fakes/platform_storage.c)
 
+# Test assertions must keep evaluating checks and setup calls in optimized builds.
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    add_compile_options($<$<COMPILE_LANGUAGE:C>:-UNDEBUG>)
+endif()
+
 add_executable(tabos_core_smoke unit/core_smoke.c ${TABOS_TEST_PLATFORM_FAKES})
 target_include_directories(tabos_core_smoke PRIVATE
     "${TABOS_ROOT}/graphics/include"
@@ -453,6 +458,11 @@ target_include_directories(tabos_shell_history_file_faults PRIVATE "${TABOS_ROOT
 target_compile_definitions(tabos_shell_history_file_faults PRIVATE
     fprintf=test_history_fprintf fclose=test_history_fclose rename=test_history_rename
 )
+# Optimized glibc fortify headers replace standard function names after command-line
+# macro substitution. Disable fortify only for objects whose libc calls are test seams.
+if(TABOS_TARGET STREQUAL "linux")
+    target_compile_options(tabos_shell_history_file_faults PRIVATE -U_FORTIFY_SOURCE)
+endif()
 tabos_enable_warnings(tabos_shell_history_file_faults)
 tabos_enable_sanitizers(tabos_shell_history_file_faults)
 add_executable(tabos_shell_history_file
@@ -464,6 +474,7 @@ target_include_directories(tabos_shell_history_file PRIVATE "${TABOS_ROOT}/apps/
 tabos_enable_warnings(tabos_shell_history_file)
 tabos_enable_sanitizers(tabos_shell_history_file)
 add_test(NAME component.shell_history_file COMMAND tabos_shell_history_file)
+set_tests_properties(component.shell_history_file PROPERTIES TIMEOUT 10)
 
 add_library(tabos_shell_session_main OBJECT "${TABOS_ROOT}/apps/shell/src/main.c")
 target_include_directories(tabos_shell_session_main PRIVATE
@@ -473,6 +484,9 @@ target_compile_definitions(tabos_shell_session_main PRIVATE
     main=shell_test_main read=test_shell_read getcwd=test_shell_getcwd
     ioctl=test_shell_ioctl tabos_spawn=test_shell_spawn waitpid=test_shell_waitpid
 )
+if(TABOS_TARGET STREQUAL "linux")
+    target_compile_options(tabos_shell_session_main PRIVATE -U_FORTIFY_SOURCE)
+endif()
 tabos_enable_warnings(tabos_shell_session_main)
 tabos_enable_sanitizers(tabos_shell_session_main)
 add_executable(tabos_shell_session
@@ -493,6 +507,7 @@ target_link_libraries(tabos_shell_session PRIVATE tabos_core)
 tabos_enable_warnings(tabos_shell_session)
 tabos_enable_sanitizers(tabos_shell_session)
 add_test(NAME component.shell_session COMMAND tabos_shell_session)
+set_tests_properties(component.shell_session PROPERTIES TIMEOUT 10)
 
 # Run explicitly with a freshly SDK-built shell path. Ordinary host tests must
 # remain independent of separately built/installed application artifacts.
