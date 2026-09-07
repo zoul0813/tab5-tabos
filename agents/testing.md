@@ -185,6 +185,22 @@ child execution wake a blocked runtime promptly. Late coalesced application read
 must be harmless after process teardown or process-slot reuse. Cleanup must stop native
 execution before releasing process-owned resources.
 
+`unit.native_task` compiles the production native task/gate implementation against a
+pthread scheduler model. It repeats return-before-self-suspend, forced computation,
+forced service-lock cancellation, delayed cross-core stop acknowledgement, idempotent
+stop, creation failure, and never-started cleanup. It also verifies argument/return
+forwarding through integer, pointer, 64-bit, and void gates. The fake IDF deletion helper
+includes the pinned helper's existing suspension handshake; the old task implementation
+still fails because deletion occurs while the service mutex remains owned.
+`component.native_socket_cancel` runs the actual native cancellation loop over real host
+sockets, checking blocked accept/receive/infinite wait, flag restoration, cancellation
+reset, and cleanup-close behavior. `unit.native_tls_cancel` compiles the native TLS loops
+with deterministic ESP-TLS WANT/completion responses, checking cancelled setup/read/write,
+repeated reuse, resource reclamation, and operation timeout. These run under host
+ASan/UBSan; scheduler/ESP-TLS models do not replace physical dual-core validation.
+Physical validation must force stop during socket/TLS/DNS calls and service contention
+on both cores, and verify repeated return/exit/parent restoration without leaked locks.
+
 Host RV32 tests must force multiple instruction-slice yields before child completion and
 verify retained PC, registers, memory, and parent state. Tab5 tests must keep native child
 active while independently proving keyboard polling, timer/cursor updates, display work,

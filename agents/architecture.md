@@ -109,6 +109,26 @@ dequeue deadline provides slow stall diagnostics, not normal polling. H.264 capa
 checked before dequeue, and lease release wakes a capacity-blocked worker. Stop and
 shutdown join capture work before frame pools, DMA mappings, or mutexes are destroyed.
 
+### Native application quiescence [DECIDED]
+
+Every native private ABI gate is guarded by `platform/esp32p4/application_task.c`;
+`application_gates.inc` covers all table fields, with an ABI-size assertion preventing
+silent omissions when fields are added. Task-local storage retains the execution
+context; portable gates still obtain only their application user data. Teardown sets
+stop, suspends the task, and checks `eTaskGetState()` until it is not running on either
+core. It may delete only when gate depth is zero. An active gate is resumed after
+nonblocking cancellation is issued and parks after releasing all service locks.
+Computing guest code outside gates does not need to cooperate. A completion flag alone
+is never treated as a stopped acknowledgement. The pinned IDF deletion helper already
+suspends/checks task execution, but cannot establish that service locks were released.
+
+Native socket and echo workers use bounded cancellation polls; TLS uses WANT retries.
+Callers retain their worker mutex and consume the reply before leaving the guarded
+call, preventing stale-response reuse. Close operations remain valid during cancellation
+for rollback. A DNS lookup already inside lwIP and the bounded ESP-TLS connect-select
+call may delay quiescence; do not delete either task or borrowed state to enforce a
+teardown timeout. Host stop abandons copied jobs using its existing continuation rules.
+
 ### Generic wait sources [DECIDED]
 
 Asynchronous application waits use opaque, generation-tagged `tabos_wait_source_t`

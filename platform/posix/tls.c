@@ -17,6 +17,7 @@
 #endif
 
 #include <stdio.h>
+#include <stdatomic.h>
 #include <string.h>
 
 enum {
@@ -73,6 +74,13 @@ static native_tls_t connection_get(int connection)
 }
 
 #if defined(ESP_PLATFORM)
+static atomic_bool tls_cancel_requested;
+
+void platform_tls_operations_cancel(void)
+{
+    atomic_store_explicit(&tls_cancel_requested, true, memory_order_release);
+}
+
 typedef enum {
     TLS_OPERATION_CONNECT,
     TLS_OPERATION_CLOSE,
@@ -100,25 +108,7 @@ static QueueHandle_t tls_responses;
 static SemaphoreHandle_t tls_mutex;
 static TaskHandle_t tls_task;
 
-static int tls_connect_direct(const char* hostname, uint16_t port)
-{
-    const esp_tls_cfg_t configuration = {
-        .crt_bundle_attach = esp_crt_bundle_attach,
-        .timeout_ms = 10000,
-    };
-    esp_tls_t* native = esp_tls_init();
-    if (native == NULL || esp_tls_conn_new_sync(hostname, (int) strlen(hostname), (int) port, &configuration, native) != 1) {
-        if (native != NULL) {
-            (void) esp_tls_conn_destroy(native);
-        }
-        return tls_error();
-    }
-    const int result = connection_allocate(native);
-    if (result < 0) {
-        (void) esp_tls_conn_destroy(native);
-    }
-    return result;
-}
+#include "native_tls.inc"
 
 static void tls_worker(void* argument)
 {
@@ -151,16 +141,8 @@ static void tls_worker(void* argument)
             } else if (request.operation == TLS_OPERATION_CLOSE) {
                 connections[request.connection - 1].native = NULL;
                 response.result = esp_tls_conn_destroy(native) == 0 ? 0 : tls_error();
-            } else if (request.operation == TLS_OPERATION_SEND) {
-                response.result = (int) esp_tls_conn_write(native, request.data, request.size);
-                if (response.result <= 0) {
-                    response.result = tls_error();
-                }
             } else {
-                response.result = (int) esp_tls_conn_read(native, response.data, request.size);
-                if (response.result < 0) {
-                    response.result = tls_error();
-                }
+                response.result = tls_transfer_direct(native, &request, &response);
             }
         }
         (void) xQueueSend(tls_responses, &response, portMAX_DELAY);
@@ -193,6 +175,11 @@ static int submit_request(const tls_request_t* request, tls_response_t* response
 {
     if (!platform_tls_operations_init() || xSemaphoreTake(tls_mutex, portMAX_DELAY) != pdTRUE) {
         return -TABOS_EIO;
+    }
+    atomic_store_explicit(&tls_cancel_requested, false, memory_order_release);
+    if (platform_riscv32_current_cancelled() && request->operation != TLS_OPERATION_CLOSE) {
+        (void) xSemaphoreGive(tls_mutex);
+        return -TABOS_ECANCELED;
     }
     const bool completed = xQueueSend(tls_requests, request, portMAX_DELAY) == pdTRUE &&
                            xQueueReceive(tls_responses, response, portMAX_DELAY) == pdTRUE;
@@ -260,6 +247,10 @@ int platform_tls_receive(int connection, void* data, uint32_t capacity)
 }
 
 #else
+
+void platform_tls_operations_cancel(void)
+{
+}
 
 bool platform_tls_operations_init(void)
 {

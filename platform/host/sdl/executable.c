@@ -1442,3 +1442,17 @@ void platform_riscv32_destroy(platform_riscv32_context_t* context)
         free(context);
     }
 }
+
+void platform_riscv32_stop(platform_riscv32_context_t* context, void (*cancel)(void*), void* user_data)
+{
+    (void) cancel;
+    (void) user_data;
+    if (context != NULL) {
+        host_io_cancel(&context->io);
+    }
+}
+
+bool platform_riscv32_current_cancelled(void)
+{
+    return false;
+}

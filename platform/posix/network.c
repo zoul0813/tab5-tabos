@@ -20,6 +20,7 @@
 #endif
 
 #include <errno.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -31,6 +32,18 @@ enum {
     ICMP6_ECHO_REPLY = 129,
     ECHO_BUFFER_BYTES = ICMP_HEADER_BYTES + 1024,
 };
+
+#if defined(ESP_PLATFORM)
+static atomic_bool network_cancel_requested;
+void platform_network_operations_cancel(void)
+{
+    atomic_store_explicit(&network_cancel_requested, true, memory_order_release);
+}
+#else
+void platform_network_operations_cancel(void)
+{
+}
+#endif
 
 typedef struct {
     uint8_t type;
@@ -194,12 +207,23 @@ static platform_network_operation_result_t network_echo_direct(const platform_ne
         return PLATFORM_NETWORK_OPERATION_IO;
     }
     for (;;) {
+#if defined(ESP_PLATFORM)
+        if (atomic_load_explicit(&network_cancel_requested, memory_order_acquire)) {
+            close_socket(descriptor);
+            return PLATFORM_NETWORK_OPERATION_IO;
+        }
+#endif
         const uint64_t elapsed = network_monotonic_ms() - started;
         if (elapsed >= timeout_ms) {
             close_socket(descriptor);
             return PLATFORM_NETWORK_OPERATION_TIMEOUT;
         }
-        const uint32_t remaining_ms = timeout_ms - (uint32_t) elapsed;
+        uint32_t remaining_ms = timeout_ms - (uint32_t) elapsed;
+#if defined(ESP_PLATFORM)
+        if (remaining_ms > 10U) {
+            remaining_ms = 10U;
+        }
+#endif
         const struct timeval timeout = {
             .tv_sec = (long) (remaining_ms / 1000U),
             .tv_usec = (int) ((remaining_ms % 1000U) * 1000U),
@@ -213,6 +237,11 @@ static platform_network_operation_result_t network_echo_direct(const platform_ne
         const ssize_t received = recvfrom(descriptor, packet, sizeof(packet), 0, (struct sockaddr*) &source, &source_size);
         if (received < 0) {
             const int failure = errno;
+#if defined(ESP_PLATFORM)
+            if (failure == EAGAIN || failure == EWOULDBLOCK || failure == ETIMEDOUT) {
+                continue;
+            }
+#endif
             char message[96];
             (void) snprintf(message, sizeof(message), "ICMP receive ended for %s: errno %d", address->text, failure);
             platform_log(message);
@@ -298,7 +327,9 @@ static void network_worker(void* argument)
             vTaskDelete(NULL);
             return;
         }
-        if (request.operation == NETWORK_WORKER_RESOLVE) {
+        if (atomic_load_explicit(&network_cancel_requested, memory_order_acquire)) {
+            response.operation = PLATFORM_NETWORK_OPERATION_IO;
+        } else if (request.operation == NETWORK_WORKER_RESOLVE) {
             response.operation = network_resolve_direct(request.hostname, request.family, &response.address);
         } else {
             response.operation = network_echo_direct(&request.address, request.sequence, request.payload_bytes,
@@ -341,6 +372,11 @@ static platform_network_operation_result_t submit_request(const network_worker_r
 {
     if (worker_task == NULL || request == NULL || response == NULL ||
         xSemaphoreTake(worker_mutex, portMAX_DELAY) != pdTRUE) {
+        return PLATFORM_NETWORK_OPERATION_IO;
+    }
+    atomic_store_explicit(&network_cancel_requested, false, memory_order_release);
+    if (platform_riscv32_current_cancelled()) {
+        (void) xSemaphoreGive(worker_mutex);
         return PLATFORM_NETWORK_OPERATION_IO;
     }
     const bool completed = xQueueSend(worker_requests, request, portMAX_DELAY) == pdTRUE &&

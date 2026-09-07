@@ -890,3 +890,25 @@ void platform_signal_wait(platform_signal_t* signal, uint32_t timeout_ms)
         signal->pending = false;
     }
 }
+
+void platform_riscv32_stop(platform_riscv32_context_t* context, void (*cancel)(void*), void* user_data)
+{
+    (void) context;
+    (void) cancel;
+    (void) user_data;
+}
+
+bool platform_riscv32_current_cancelled(void)
+{
+    return false;
+}
+
+void platform_network_operations_cancel(void)
+{
+}
+void platform_network_socket_operations_cancel(void)
+{
+}
+void platform_tls_operations_cancel(void)
+{
+}

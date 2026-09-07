@@ -166,7 +166,11 @@ Native Tab5 application return, ELF exit request, ELF child-exec request, proces
 and parent restoration notify runtime through a pointer-free coalesced readiness bit.
 Process state remains authoritative and late wakeups cannot target reused process slots.
 ELF teardown cancels waits and stops native execution before releasing process-owned
-resources. Teardown discards queued graphics commands without reading borrowed guest
+resources. Native task lifetime now lives in `platform/esp32p4/application_task.c`.
+All 97 private ABI gates track active depth. Stop waits for cross-core suspension,
+resumes active gates to drain cancelled work and release locks, then deletes only a
+stopped task outside every gate. Native workers return their replies before the calling
+gate exits; DNS and bounded driver calls may delay safe shutdown. Teardown discards queued graphics commands without reading borrowed guest
 buffers or presenting a final application frame; explicit graphics close still flushes
 live buffers. Host RV32 guests continue through explicit bounded interpreter slices.
 

@@ -641,6 +641,30 @@ target_compile_definitions(tabos_host_io PRIVATE _POSIX_C_SOURCE=200809L)
 tabos_enable_warnings(tabos_host_io)
 tabos_enable_sanitizers(tabos_host_io)
 add_test(NAME unit.host_io COMMAND tabos_host_io)
+add_executable(tabos_native_task unit/native_task.c "${TABOS_ROOT}/platform/esp32p4/application_task.c")
+target_include_directories(tabos_native_task PRIVATE
+    "${TABOS_ROOT}/tests/fakes/native_task"
+    "${TABOS_ROOT}/platform/include"
+    "${TABOS_ROOT}/sdk/include"
+    "${TABOS_GENERATED_INCLUDE_DIR}")
+target_link_libraries(tabos_native_task PRIVATE Threads::Threads)
+tabos_enable_warnings(tabos_native_task)
+tabos_enable_sanitizers(tabos_native_task)
+add_test(NAME unit.native_task COMMAND tabos_native_task)
+set_tests_properties(unit.native_task PROPERTIES TIMEOUT 15)
+add_executable(tabos_native_tls_cancel unit/native_tls_cancel.c)
+target_include_directories(tabos_native_tls_cancel PRIVATE "${TABOS_ROOT}/sdk/include")
+tabos_enable_warnings(tabos_native_tls_cancel)
+tabos_enable_sanitizers(tabos_native_tls_cancel)
+add_test(NAME unit.native_tls_cancel COMMAND tabos_native_tls_cancel)
+add_executable(tabos_native_socket_cancel component/native_socket_cancel.c
+    "${TABOS_ROOT}/platform/posix/host_io.c")
+target_include_directories(tabos_native_socket_cancel PRIVATE "${TABOS_ROOT}/platform/include" "${TABOS_ROOT}/sdk/include")
+target_link_libraries(tabos_native_socket_cancel PRIVATE Threads::Threads)
+tabos_enable_warnings(tabos_native_socket_cancel)
+tabos_enable_sanitizers(tabos_native_socket_cancel)
+add_test(NAME component.native_socket_cancel COMMAND tabos_native_socket_cancel)
+set_tests_properties(component.native_socket_cancel PROPERTIES TIMEOUT 10)
 set_tests_properties(unit.host_io PROPERTIES TIMEOUT 10)
 add_executable(tabos_host_network_io component/host_network_io.c
     "${TABOS_ROOT}/platform/posix/host_io.c"
