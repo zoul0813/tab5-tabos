@@ -214,9 +214,10 @@ Binary formats:
 - [x] Tilemap tests cover get/set, empty cells, every Tiled flip combination, negative camera,
   smooth scrolling, viewport edges, layer ordering, animation time, tile flags, objects,
   and invalid layers/cells.
-- [ ] Run tests through native and logical canvases; scalar output remains byte-identical
+- [x] Run tests through native and logical canvases; scalar output remains byte-identical
   across host and Tab5 fallback.
-- [ ] Extend the maintained `tester` with generated-C and binary asset coverage.
+- [x] Keep generated-C and binary asset equivalence in software tests rather than the
+  hardware tester.
 
 ### Build Matrix
 
@@ -277,6 +278,25 @@ Binary formats:
   comparisons against independent full-frame pixels.
 - Focused `unit.sdk_tiles`, `unit.asset_converter`, and `unit.sdk_asset_equivalence` tests
   pass 3/3 on macOS Debug with sanitizers and 3/3 on macOS Release.
+
+## Native and Logical Parity Evidence — 2026-09-07
+
+- `unit.sdk_asset_equivalence` renders the same generated-C and binary-backed scenes into
+  an SDK logical canvas and through copied native queued-blit descriptors. The native
+  harness rejects every acceleration attempt and drains each command through production
+  `raster_blit()`, the portable fallback called after host or Tab5 platform rejection.
+- The parity matrix covers 13 animation times, six positive/negative/sub-tile/far-outside
+  camera positions, both generated-C and binary assets, and the edited-map scene: 158
+  native/logical scene pairs in total.
+- Scenes combine both tile layers, empty cells, all eight Tiled transforms, looping and
+  finite animations, scaled/rotated/mirrored/clipped sprites, opacity, color-key
+  transparency, metasprites, cameras, viewports, objects, and authored layer order.
+- Every RGB565 framebuffer compares pixel for pixel and byte for byte. Independent expected
+  frames still verify known colors, transformed tiles, pivots, clipping, opacity,
+  transparency, layer order, and metasprite overlap so a shared-path defect cannot make
+  parity pass unnoticed.
+- Focused equivalence tests pass on macOS Debug with AddressSanitizer and
+  UndefinedBehaviorSanitizer and on macOS Release. No production renderer changed.
 
 ## Loader Review Evidence — 2026-09-05
 

@@ -243,8 +243,14 @@ add_custom_command(
 )
 add_executable(tabos_sdk_asset_equivalence unit/sdk_asset_equivalence.c
     "${TABOS_EQ_ASSETS}/equivalence.c"
+    "${TABOS_ROOT}/graphics/raster.c"
     "${TABOS_ROOT}/sdk/lib/graphics.c" "${TABOS_ROOT}/sdk/lib/sprite.c" "${TABOS_ROOT}/sdk/lib/tilemap.c")
-target_include_directories(tabos_sdk_asset_equivalence PRIVATE "${TABOS_ROOT}/sdk/include" "${TABOS_EQ_ASSETS}")
+target_include_directories(tabos_sdk_asset_equivalence PRIVATE
+    "${TABOS_ROOT}/graphics/include"
+    "${TABOS_ROOT}/platform/include"
+    "${TABOS_ROOT}/sdk/include"
+    "${TABOS_EQ_ASSETS}"
+)
 tabos_enable_warnings(tabos_sdk_asset_equivalence)
 tabos_enable_sanitizers(tabos_sdk_asset_equivalence)
 add_test(NAME unit.sdk_asset_equivalence COMMAND tabos_sdk_asset_equivalence

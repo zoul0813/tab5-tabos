@@ -30,6 +30,10 @@
   camera work. Combined private ELF API version is 21; macOS Debug and Release each pass
   60/60 tests, every standard RV32 application builds, and Tab5 Debug firmware builds.
 
+- [x] Verify native/logical rendering parity with 158 byte-identical scene pairs. Native
+  queued blits reject acceleration and execute through the shared host/Tab5 scalar fallback;
+  independent expected pixels guard against common-path defects.
+
 - [x] Verify normal tile games render fully in logical RGB565 memory and submit one final accelerated
   canvas blit per presentation; cover exact 426/427-pixel integer-scale boundary behavior.
 

@@ -1,6 +1,7 @@
 #include "equivalence.h"
 
 #include <tabos/internal/elf_api.h>
+#include <tabos/internal/raster.h>
 
 #include <errno.h>
 #include <stdio.h>
@@ -17,10 +18,19 @@
 #define SAME(a, b, field) CHECK((a)->field == (b)->field)
 
 enum {
-    WIDTH  = 32,
-    HEIGHT = 24,
-    PIXELS = WIDTH * HEIGHT
+    WIDTH                   = 32,
+    HEIGHT                  = 24,
+    PIXELS                  = WIDTH * HEIGHT,
+    NATIVE_COMMAND_CAPACITY = 128,
 };
+
+static platform_pixel_t native_pixels[PIXELS];
+static tabos_graphics_blit_options_t native_commands[NATIVE_COMMAND_CAPACITY];
+static size_t native_command_count;
+static size_t native_acceleration_rejections;
+static size_t native_scalar_blits;
+static platform_framebuffer_t native_framebuffer = {
+    .pixels = native_pixels, .width = WIDTH, .height = HEIGHT, .stride_pixels = WIDTH};
 
 static int graphics_open(uint32_t* width, uint32_t* height)
 {
@@ -31,13 +41,75 @@ static int graphics_open(uint32_t* width, uint32_t* height)
 
 static int graphics_close(void)
 {
+    return native_command_count == 0U ? 0 : -EIO;
+}
+
+static int graphics_clear(uint32_t color)
+{
+    if (native_command_count != 0U) {
+        return -EIO;
+    }
+    for (size_t index = 0U; index < PIXELS; ++index) {
+        native_pixels[index] = (platform_pixel_t) color;
+    }
+    return 0;
+}
+
+bool platform_graphics_blit(platform_framebuffer_t* framebuffer, const tabos_graphics_blit_options_t* options)
+{
+    (void) framebuffer;
+    (void) options;
+    ++native_acceleration_rejections;
+    return false;
+}
+
+bool platform_raster_fill_span(platform_pixel_t* destination, size_t count, platform_pixel_t color)
+{
+    (void) destination;
+    (void) count;
+    (void) color;
+    return false;
+}
+
+bool platform_raster_copy_span(platform_pixel_t* destination, const platform_pixel_t* source, size_t count)
+{
+    (void) destination;
+    (void) source;
+    (void) count;
+    return false;
+}
+
+static int graphics_blit_ex(const tabos_graphics_blit_options_t* options)
+{
+    if (native_command_count == NATIVE_COMMAND_CAPACITY) {
+        return -ENOMEM;
+    }
+    native_commands[native_command_count++] = *options;
+    return 0;
+}
+
+static int graphics_present(void)
+{
+    for (size_t index = 0U; index < native_command_count; ++index) {
+        if (platform_graphics_blit(&native_framebuffer, &native_commands[index])) {
+            continue;
+        }
+        if (!raster_blit(&native_framebuffer, &native_commands[index])) {
+            return -EIO;
+        }
+        ++native_scalar_blits;
+    }
+    native_command_count = 0U;
     return 0;
 }
 
 static const tabos_elf_api_t api = {
-    .abi_version    = TABOS_ELF_API_VERSION,
-    .graphics_open  = graphics_open,
-    .graphics_close = graphics_close,
+    .abi_version      = TABOS_ELF_API_VERSION,
+    .graphics_open    = graphics_open,
+    .graphics_close   = graphics_close,
+    .graphics_clear   = graphics_clear,
+    .graphics_present = graphics_present,
+    .graphics_blit_ex = graphics_blit_ex,
 };
 const tabos_elf_api_t* tabos_runtime_api = &api;
 
@@ -304,6 +376,18 @@ static void scene(tabos_graphics_t* graphics, const tabos_sprite_set_t* sprites,
     CHECK(tabos_graphics_end_camera(graphics) == 0);
 }
 
+static void compare_native_scene(tabos_graphics_t* graphics, const tabos_sprite_set_t* sprites,
+                                 const tabos_tilemap_t* map, uint64_t time, int32_t camera,
+                                 const tabos_color_t* expected)
+{
+    scene(graphics, sprites, map, time, camera);
+    CHECK(native_command_count != 0U);
+    CHECK(tabos_graphics_present(graphics) == 0);
+    CHECK(native_command_count == 0U);
+    compare_pixels(native_pixels, expected, "native scalar fallback matches logical canvas");
+    CHECK(memcmp(native_pixels, expected, sizeof(native_pixels)) == 0);
+}
+
 static void known_tiles(tabos_graphics_t* graphics, const tabos_sprite_set_t* sprites, const tabos_tilemap_t* map)
 {
     /* Independently specified output of all eight Tiled H/V/D combinations. */
@@ -521,11 +605,14 @@ int main(int argc, char** argv)
     known_tiles(&graphics, &loaded, &map);
     known_compositing(&graphics, &equivalence_sprites, &equivalence_world);
     known_compositing(&graphics, &loaded, &map);
+    tabos_graphics_t native = {0};
+    CHECK(tabos_graphics_open(&native) == 0 && native.pixels == NULL);
     const uint64_t times[]        = {0U, 6U, 7U, 9U, 10U, 19U, 20U, 29U, 30U, 39U, 40U, 60U, UINT64_MAX};
     const int32_t cameras[]       = {-3, -1, 0, 1, 3, 17};
     const uint32_t cycle_frames[] = {0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 1};
     const uint32_t hold_frames[]  = {2, 2, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1};
     size_t scenes                 = 0U;
+    size_t native_scenes          = 0U;
     for (size_t i = 0U; i < sizeof(times) / sizeof(times[0]); ++i) {
         CHECK(tabos_sprite_animation_sprite(&loaded, EQUIVALENCE_ANIMATION_CYCLE, times[i]) == cycle_frames[i]);
         CHECK(tabos_sprite_animation_sprite(&loaded, EQUIVALENCE_ANIMATION_HOLD, times[i]) == hold_frames[i]);
@@ -539,7 +626,10 @@ int main(int argc, char** argv)
             memcpy(expected, graphics.pixels, sizeof(expected));
             scene(&graphics, &loaded, &map, times[i], cameras[j]);
             compare_pixels(graphics.pixels, expected, "generated-C/binary scene");
+            compare_native_scene(&native, &equivalence_sprites, &equivalence_world, times[i], cameras[j], expected);
+            compare_native_scene(&native, &loaded, &map, times[i], cameras[j], expected);
             ++scenes;
+            native_scenes += 2U;
         }
     }
     CHECK(tabos_tilemap_set(&equivalence_world, 0U, 1U, 1U, TABOS_TILE(2U)) == 0);
@@ -551,11 +641,17 @@ int main(int argc, char** argv)
     memcpy(edited, graphics.pixels, sizeof(edited));
     scene(&graphics, &loaded, &map, 0U, 0);
     compare_pixels(graphics.pixels, edited, "edited generated-C/binary scene");
+    compare_native_scene(&native, &equivalence_sprites, &equivalence_world, 0U, 0, edited);
+    compare_native_scene(&native, &loaded, &map, 0U, 0, edited);
     ++scenes;
+    native_scenes += 2U;
+    CHECK(native_acceleration_rejections != 0U && native_acceleration_rejections == native_scalar_blits);
+    CHECK(tabos_graphics_close(&native) == 0);
     CHECK(tabos_graphics_close(&graphics) == 0);
     tabos_tilemap_unload(&map);
     tabos_sprite_set_unload(&loaded);
-    printf("asset equivalence: all metadata, %zu scene pairs, independent pixel and animation expectations passed\n",
-           scenes);
+    printf("asset equivalence: all metadata, %zu generated-C/binary logical scene pairs, %zu native/logical scalar "
+           "scene pairs, independent pixel and animation expectations passed\n",
+           scenes, native_scenes);
     return 0;
 }

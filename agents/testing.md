@@ -11,9 +11,8 @@
 The post-merge baseline at `6589874` passes all 60 macOS Debug tests with sanitizers,
 all 60 macOS Release tests, every standard RV32 application build including `tdemo`, and
 the Tab5 Debug firmware build. This validates integration with the event-driven runtime,
-ISR, pointer, and camera work merged from `main`. Linux Debug/Release, complete
-native/logical pixel parity, physical Tab5 behavior, and the performance fixture remain
-separate acceptance work.
+ISR, pointer, and camera work merged from `main`. Linux Debug/Release, physical Tab5
+behavior, and the performance fixture remain separate acceptance work.
 
 Converter tests verify developer-facing header output carries its generated-file warning,
 contains generated constants, and omits generated-C declarations and SDK includes. The
@@ -29,9 +28,12 @@ Shared camera checks cover pixel/line/rectangle/blit translation, unchanged sour
 clip rectangles, camera replacement/reset, clear/present independence, overflow rejection,
 and native submission coordinates. Generated-C and binary fixtures verify whole-frame
 world shifts for sprites/animations/metasprites/maps, fixed HUD pixels, clipped viewports,
-and far-outside-map cameras. Native command checks do not replace full native/logical
-raster parity or physical presentation acceptance. Maintained tester checks camera-based
-animated drawing and screen-space HUD restoration; execution on target remains required.
+and far-outside-map cameras. The same scenes render through native queued commands after
+forced acceleration rejection and drain through the shared scalar fallback used by host
+and Tab5. Their RGB565 framebuffers compare byte for byte with logical output. This does
+not replace physical presentation acceptance. Maintained tester checks camera-based
+animated drawing and screen-space HUD restoration. Tile asset conversion, descriptor
+equivalence, and pixel-exact rendering remain software tests outside the hardware tester.
 
 Host tests cover clip behavior, sprite pivots/transparency/animation/metasprites, tile
 get/set/camera/transforms, binary loading and cleanup, deterministic conversion, GIF
@@ -73,8 +75,9 @@ object layers, high-bit flags, signed properties, loop/hold animations, metaspri
 and all eight Tiled transformations are represented. It compares 79 logical-canvas scene
 pairs across camera and animation boundaries, including an edited map. Independent full
 pixel expectations cover pivots, transparency, clipping, opacity, tile transforms,
-layer order, and metasprite overlap. Native-path parity and RV32 execution remain separate
-acceptance work; the host test does not submit a real display presentation.
+layer order, and metasprite overlap. Another 158 scene pairs compare logical pixels with
+native queued commands executed by the shared scalar raster fallback. RV32 execution and
+physical display presentation remain separate acceptance work.
 
 `architecture.portable_header_boundary` scans both public SDK headers and portable SDK library
 sources for SDL, ESP-IDF, FreeRTOS, driver/HAL/SOC, and private ESP include leakage. Public headers
