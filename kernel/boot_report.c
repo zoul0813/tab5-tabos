@@ -40,11 +40,10 @@ bool kernel_boot_report_add(kernel_boot_report_t* report, const char* component,
         report->entry_count >= KERNEL_BOOT_REPORT_MAX_ENTRIES) {
         return false;
     }
-    report->entries[report->entry_count++] = (kernel_boot_entry_t) {
-        .component = component,
-        .detail    = detail,
-        .status    = status,
-    };
+    kernel_boot_entry_t* entry = &report->entries[report->entry_count++];
+    (void) snprintf(entry->component, sizeof(entry->component), "%s", component);
+    (void) snprintf(entry->detail, sizeof(entry->detail), "%s", detail);
+    entry->status = status;
     return true;
 }
 

@@ -2011,12 +2011,14 @@ static int elf_graphics_blit(int32_t x, int32_t y, uint32_t width, uint32_t heig
 {
     loader_elf_application_t* application = platform_riscv32_current_user_data();
     platform_framebuffer_t* framebuffer   = display_framebuffer();
-    const size_t pixel_bytes = width <= SIZE_MAX / height && (size_t) width * height <= SIZE_MAX / sizeof(*pixels) ?
-                                   (size_t) width * height * sizeof(*pixels) :
-                                   0U;
+    if (application == NULL || !application->graphics_active || framebuffer == NULL || pixels == NULL || width == 0U ||
+        height == 0U || width > SIZE_MAX / height ||
+        (size_t) width * height > SIZE_MAX / sizeof(*pixels)) {
+        return -TABOS_EINVAL;
+    }
+    const size_t pixel_bytes = (size_t) width * height * sizeof(*pixels);
     const uint16_t* source   = platform_executable_data_pointer(pixels, pixel_bytes);
-    if (application == NULL || !application->graphics_active || framebuffer == NULL || source == NULL || width == 0U ||
-        height == 0U || width > SIZE_MAX / height) {
+    if (source == NULL) {
         return -TABOS_EINVAL;
     }
     const elf_graphics_command_t command = {
