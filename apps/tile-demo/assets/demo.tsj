@@ -5,13 +5,6 @@
   "imagewidth": 64,
   "margin": 0,
   "name": "demo",
-  "properties": [
-    {
-      "name": "transparent_tolerance",
-      "type": "int",
-      "value": 20
-    }
-  ],
   "spacing": 0,
   "tilecount": 16,
   "tiledversion": "1.11.2",
@@ -148,7 +141,6 @@
     }
   ],
   "tilewidth": 16,
-  "transparentcolor": "#f803f7",
   "type": "tileset",
   "version": "1.10"
 }

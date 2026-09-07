@@ -65,14 +65,21 @@ Individual application commands such as `make -C apps/shell` remain available.
 files with `TABOS_RUNTIME_ASSETS`. Its source lives in `apps/tile-demo`; build it with
 `make -C apps/tile-demo` and run `T:/bin/tdemo` after installation. Edit its source map by opening
 `apps/tile-demo/assets/world.tmj` in Tiled; the map references the external
-`demo.tsj` tileset and `sprites-64.png` image from the same directory. Its build regenerates
+`demo.tsj` tileset and `sprites-64.png` image from the same directory. The checked-in
+`sprites.png` RGBA master and its nearest-neighbor 64x64 derivative both use only alpha
+values 0 and 255, so the smaller runtime sheet can be reproduced without blending its
+opaque shadow colors into the transparent background. Its build regenerates
 `apps/tile-demo/include/tdemo.h` before compiling. Application code includes this
 developer-facing header and uses generated sprite, animation, metasprite, layer, object,
 and flag constants instead of numeric asset IDs. It looks up the named spawn and grove
 markers, uses the grove's `trees` property to place metasprites, and iterates the object
-layer to process every marker. Hold WASD to move the animated robot four pixels per frame
+layer to process every marker. The RGBA sprite sheet uses only fully transparent and fully
+opaque pixels; shadows use opaque RGB shades instead of partial alpha or chroma-key fringe.
+Hold WASD to move the animated robot four pixels per frame
 while solid and water tile flags block movement. Hold the arrow keys to scroll the shared
-camera at the same rate, press E to edit one foreground cell, and press Q or Escape to exit.
+camera at the same rate. A short directional tap always applies one four-pixel step, even
+when its key-down and key-up events are consumed during the same rendered frame. Press E
+to edit one foreground cell, and press Q or Escape to exit.
 
 Core utilities are grouped under `apps/coreutils/`, but each utility remains a separate
 program. Build one with `make -C apps/coreutils ls` or `make -C apps/coreutils mkdir`.

@@ -44,6 +44,17 @@ static bool position_blocks(const tabos_tilemap_t* map, const tabos_sprite_set_t
            tile_blocks(map, sprites, TDEMO_LAYER_WORLD_FOREGROUND, x, y);
 }
 
+static void move_robot(const tabos_tilemap_t* map, const tabos_sprite_set_t* sprites, int32_t* robot_x,
+                       int32_t* robot_y, int32_t dx, int32_t dy)
+{
+    if (dx != 0 && !position_blocks(map, sprites, *robot_x + dx, *robot_y)) {
+        *robot_x += dx;
+    }
+    if (dy != 0 && !position_blocks(map, sprites, *robot_x, *robot_y + dy)) {
+        *robot_y += dy;
+    }
+}
+
 int main(void)
 {
     uint32_t tty_mode = 0U;
@@ -97,6 +108,10 @@ int main(void)
     int32_t camera_y  = 0;
     uint64_t started  = tabos_monotonic_ms();
     while (running) {
+        bool robot_horizontal_press  = false;
+        bool robot_vertical_press    = false;
+        bool camera_horizontal_press = false;
+        bool camera_vertical_press   = false;
         tabos_input_event_t event;
         while (tabos_input_poll(&event)) {
             if (event.type != TABOS_INPUT_KEY_DOWN && event.type != TABOS_INPUT_KEY_UP) {
@@ -107,20 +122,52 @@ int main(void)
                 running = false;
             } else if (event.key == TABOS_KEY_A) {
                 move_left = down;
+                if (down && !event.repeat) {
+                    move_robot(&map, &sprites, &robot_x, &robot_y, -DEMO_MOVE_STEP, 0);
+                    robot_horizontal_press = true;
+                }
             } else if (event.key == TABOS_KEY_D) {
                 move_right = down;
+                if (down && !event.repeat) {
+                    move_robot(&map, &sprites, &robot_x, &robot_y, DEMO_MOVE_STEP, 0);
+                    robot_horizontal_press = true;
+                }
             } else if (event.key == TABOS_KEY_W) {
                 move_up = down;
+                if (down && !event.repeat) {
+                    move_robot(&map, &sprites, &robot_x, &robot_y, 0, -DEMO_MOVE_STEP);
+                    robot_vertical_press = true;
+                }
             } else if (event.key == TABOS_KEY_S) {
                 move_down = down;
+                if (down && !event.repeat) {
+                    move_robot(&map, &sprites, &robot_x, &robot_y, 0, DEMO_MOVE_STEP);
+                    robot_vertical_press = true;
+                }
             } else if (event.key == TABOS_KEY_LEFT) {
                 camera_left = down;
+                if (down && !event.repeat) {
+                    camera_x                -= DEMO_MOVE_STEP;
+                    camera_horizontal_press  = true;
+                }
             } else if (event.key == TABOS_KEY_RIGHT) {
                 camera_right = down;
+                if (down && !event.repeat) {
+                    camera_x                += DEMO_MOVE_STEP;
+                    camera_horizontal_press  = true;
+                }
             } else if (event.key == TABOS_KEY_UP) {
                 camera_up = down;
+                if (down && !event.repeat) {
+                    camera_y              -= DEMO_MOVE_STEP;
+                    camera_vertical_press  = true;
+                }
             } else if (event.key == TABOS_KEY_DOWN) {
                 camera_down = down;
+                if (down && !event.repeat) {
+                    camera_y              += DEMO_MOVE_STEP;
+                    camera_vertical_press  = true;
+                }
             } else if (down && !event.repeat && event.key == TABOS_KEY_E) {
                 tabos_tile_t tile = 0U;
                 if (tabos_tilemap_get(&map, TDEMO_LAYER_WORLD_FOREGROUND, 5U, 3U, &tile) == 0) {
@@ -129,16 +176,16 @@ int main(void)
                 }
             }
         }
-        camera_x               += ((int32_t) camera_right - (int32_t) camera_left) * DEMO_MOVE_STEP;
-        camera_y               += ((int32_t) camera_down - (int32_t) camera_up) * DEMO_MOVE_STEP;
-        const int32_t robot_dx  = ((int32_t) move_right - (int32_t) move_left) * DEMO_MOVE_STEP;
-        const int32_t robot_dy  = ((int32_t) move_down - (int32_t) move_up) * DEMO_MOVE_STEP;
-        if (robot_dx != 0 && !position_blocks(&map, &sprites, robot_x + robot_dx, robot_y)) {
-            robot_x += robot_dx;
+        if (!camera_horizontal_press) {
+            camera_x += ((int32_t) camera_right - (int32_t) camera_left) * DEMO_MOVE_STEP;
         }
-        if (robot_dy != 0 && !position_blocks(&map, &sprites, robot_x, robot_y + robot_dy)) {
-            robot_y += robot_dy;
+        if (!camera_vertical_press) {
+            camera_y += ((int32_t) camera_down - (int32_t) camera_up) * DEMO_MOVE_STEP;
         }
+        const int32_t robot_dx =
+            robot_horizontal_press ? 0 : ((int32_t) move_right - (int32_t) move_left) * DEMO_MOVE_STEP;
+        const int32_t robot_dy = robot_vertical_press ? 0 : ((int32_t) move_down - (int32_t) move_up) * DEMO_MOVE_STEP;
+        move_robot(&map, &sprites, &robot_x, &robot_y, robot_dx, robot_dy);
         const uint64_t elapsed            = tabos_monotonic_ms() - started;
         tabos_tilemap_draw_options_t draw = TABOS_TILEMAP_DRAW_OPTIONS_DEFAULT;
         draw.animation_ms                 = elapsed;

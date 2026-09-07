@@ -228,11 +228,18 @@ Binary formats:
 
 ### Physical Tab5 Acceptance
 
-- [ ] Verify `tdemo` rendering, layer order, animation, editable cells, and object markers on physical Tab5.
-- [ ] Verify seam-free scrolling and exact viewport clipping, including negative camera positions.
+- [x] Verify `tdemo` rendering, layer order, animation, editable cells, and object markers on physical Tab5.
+- [x] Verify seam-free scrolling and exact viewport clipping, including negative camera positions.
 - [ ] Verify RGB565 color-key transparency and all Tiled transforms on physical Tab5.
-- [ ] Verify repeated load/unload and repeated application launch/exit without resource loss.
-- [ ] Verify terminal and input restoration on exit.
+- [x] Verify repeated load/unload and repeated application launch/exit without resource loss.
+- [x] Verify terminal and input restoration on exit.
+
+Physical evidence — 2026-09-07: `tdemo` was launched and exited three times on a physical
+Tab5. Rendering and interaction matched the host simulator, including animated/layered
+content, object-driven content, and editable-cell behavior. Short directional taps moved,
+camera scrolling remained correct through negative coordinates and beyond the visible map,
+and shell typing worked after exit. No resource loss appeared across the three application
+load/unload cycles. The corrected transparency and Tiled-transform checks remain open.
 
 ### Performance Acceptance
 
@@ -673,10 +680,14 @@ Validated working-tree changes based on `7e43d93`:
   grove draws after the opaque foreground so its trees remain visible. This replaces the demo's
   hard-coded metasprite position and demonstrates generated object lookup, named property lookup,
   ordered metasprite parts, and authored object geometry together.
-- Movement and camera controls retain key-down/key-up state and move four pixels per rendered frame.
-  The editable-cell action ignores repeated key-down events so one press produces one toggle. Host
-  CP437 text derives directly from physical SDL key events without macOS press-and-hold IME
-  interception.
+- Movement and camera controls process each non-repeat key-down in queue order, guaranteeing one
+  four-pixel step even when its key-up is drained in the same frame. Retained key state continues
+  movement at four pixels per later rendered frame. The editable-cell action ignores repeated
+  key-down events so one press produces one toggle. Host CP437 text derives directly from physical
+  SDL key events without macOS press-and-hold IME interception.
+- The demo's checked-in RGBA master and nearest-neighbor 64x64 runtime sheet use binary
+  transparency. Their opaque shadow colors remain visible without blending against or keying a
+  magenta backdrop, and the runtime sheet can be reproduced directly from the aligned master.
 - Regenerating assets produced the expected rounding diagnostics and left `include/tdemo.h`
   unchanged. All standard RV32 applications cross-built successfully. Focused tile, converter,
   application-asset, and generated-C/binary-equivalence tests pass on macOS Debug and Release.
