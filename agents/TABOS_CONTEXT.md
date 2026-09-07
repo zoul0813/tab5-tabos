@@ -162,7 +162,9 @@ Native Tab5 application return, ELF exit request, ELF child-exec request, proces
 and parent restoration notify runtime through a pointer-free coalesced readiness bit.
 Process state remains authoritative and late wakeups cannot target reused process slots.
 ELF teardown cancels waits and stops native execution before releasing process-owned
-resources. Host RV32 guests continue through explicit bounded interpreter slices.
+resources. Teardown discards queued graphics commands without reading borrowed guest
+buffers or presenting a final application frame; explicit graphics close still flushes
+live buffers. Host RV32 guests continue through explicit bounded interpreter slices.
 
 Portable application foundation defines descriptor and cooperative lifecycle API in
 `<tabos/application.h>`. Fixed-capacity process table exposes PID, parent, and state

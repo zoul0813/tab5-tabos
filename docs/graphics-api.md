@@ -65,8 +65,11 @@ color-key range. Query portable behavior and active acceleration with
 
 Drawing calls enqueue commands. Their source buffers must remain valid and unchanged
 until `tabos_graphics_present()` returns. Present is the completion fence and scanout
-boundary. A full command queue drains old work until room exists. Closing or terminating
-an application also fences pending work and restores the terminal.
+boundary. A full command queue drains old work until room exists. Explicitly closing
+the graphics context also completes pending work before restoring the terminal.
+Process teardown (return, exit request, fault, forced termination, or system shutdown)
+discards queued drawing and restores the terminal without presenting a final application
+frame. Teardown never reads borrowed bitmap buffers after execution memory is released.
 
 The SDL host uses native surface fills and nearest-neighbor scaled blits for operations
 matching its accelerated path, with the portable renderer preserving all other pixel

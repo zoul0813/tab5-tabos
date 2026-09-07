@@ -944,6 +944,11 @@ Fullscreen graphics tests must verify terminal writes, redraws, cursor timers, a
 scrollback navigation cannot alter or present the graphics framebuffer. TTY navigation
 keys must reach the graphics application regardless of its inherited TTY mode. Closing
 or faulting the application must redraw and present the retained terminal exactly once.
+`component.elf_graphics_cleanup` runs a real RV32 child with a queued stack-backed
+rotated blit through return, exit request, illegal-instruction fault, and forced
+termination, then repeats the cases to exercise cleanup and parent restoration. A live
+present/close control proves explicit flushing still works. The regression must pass
+under ASan/UBSan; teardown discards pending drawing without accessing freed guest RAM.
 
 Scaled-canvas tests must cover zero-initialized native opening, dimensions supplied before
 the single open call, rejection when only one dimension is supplied, fullscreen and 4:3

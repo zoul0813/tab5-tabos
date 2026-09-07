@@ -590,6 +590,25 @@ tabos_enable_sanitizers(tabos_rv32_execution)
 
 add_test(NAME component.rv32_execution COMMAND tabos_rv32_execution)
 
+add_executable(tabos_elf_graphics_cleanup component/elf_graphics_cleanup.c)
+target_include_directories(tabos_elf_graphics_cleanup PRIVATE
+    "${TABOS_ROOT}/kernel/include"
+    "${TABOS_ROOT}/console/include"
+    "${TABOS_ROOT}/graphics/include"
+    "${TABOS_ROOT}/platform/include"
+)
+if(TABOS_TARGET STREQUAL "linux")
+    target_link_libraries(tabos_elf_graphics_cleanup PRIVATE
+        "-Wl,--start-group" tabos_core tabos_platform_host "-Wl,--end-group" SDL3::SDL3
+    )
+else()
+    target_link_libraries(tabos_elf_graphics_cleanup PRIVATE tabos_core tabos_platform_host SDL3::SDL3)
+endif()
+tabos_enable_warnings(tabos_elf_graphics_cleanup)
+tabos_enable_sanitizers(tabos_elf_graphics_cleanup)
+add_test(NAME component.elf_graphics_cleanup COMMAND tabos_elf_graphics_cleanup)
+set_tests_properties(component.elf_graphics_cleanup PROPERTIES TIMEOUT 30)
+
 add_executable(tabos_network_socket
     component/network_socket.c
     "${TABOS_ROOT}/platform/posix/socket.c"

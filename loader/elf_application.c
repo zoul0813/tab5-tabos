@@ -2347,6 +2347,11 @@ static void elf_release_resources(loader_elf_application_t* application)
      * object that an application call gate could still access. */
     platform_riscv32_destroy(application->execution);
     application->execution = NULL;
+    /* Queued blits borrow guest memory, including the execution stack just
+     * released above. Teardown discards unfinished drawing rather than
+     * dereferencing those buffers or presenting a final application frame. */
+    application->graphics_command_head  = 0U;
+    application->graphics_command_count = 0U;
     audio_service_close_owner(application);
     pointer_service_close_owner(application);
     camera_service_close_owner(application);
@@ -2362,8 +2367,6 @@ static void elf_release_resources(loader_elf_application_t* application)
         }
     }
     if (application->graphics_active) {
-        (void) elf_graphics_drain(application);
-        (void) display_graphics_present();
         application->graphics_active        = false;
         application->graphics_overlay_flags = TABOS_GRAPHICS_OVERLAY_ALL;
         display_overlay_set_flags(TABOS_GRAPHICS_OVERLAY_ALL);
