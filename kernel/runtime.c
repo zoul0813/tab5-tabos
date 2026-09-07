@@ -102,6 +102,7 @@ static void log_wake_counts(void)
                     wake_counts.input_deadline, wake_counts.console_deadline, wake_counts.network_deadline,
                     wake_counts.health_deadline, wake_counts.application_slice);
     platform_log(message);
+    platform_runtime_log_activity();
 }
 #endif
 

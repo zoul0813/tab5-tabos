@@ -635,3 +635,15 @@ tabos_enable_warnings(tabos_camera_concurrency)
 tabos_enable_sanitizers(tabos_camera_concurrency)
 add_test(NAME component.camera_concurrency COMMAND tabos_camera_concurrency)
 set_tests_properties(component.camera_concurrency PROPERTIES TIMEOUT 15)
+
+add_executable(tabos_gpio_interrupt
+    unit/gpio_interrupt.c
+    "${TABOS_ROOT}/platform/esp32p4/gpio_interrupt.c"
+)
+target_include_directories(tabos_gpio_interrupt PRIVATE
+    "${CMAKE_CURRENT_LIST_DIR}/fakes/espidf"
+    "${TABOS_ROOT}/platform/esp32p4"
+)
+tabos_enable_warnings(tabos_gpio_interrupt)
+tabos_enable_sanitizers(tabos_gpio_interrupt)
+add_test(NAME unit.gpio_interrupt COMMAND tabos_gpio_interrupt)

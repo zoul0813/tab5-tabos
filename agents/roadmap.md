@@ -50,6 +50,23 @@
 ### Low-Power Integration Milestone
 
 - [x] Accept interrupt/event-runtime handoff as power-policy foundation.
+- [x] Power Phase 0 source inventory, conservative blocker classification, SDK/wake-route
+  audit, measurement worksheet, and shared GPIO service ownership; macOS Debug 53/53
+  tests and Tab5 Debug cross-build pass. Evidence: `validation/power-phase0-2026-09-07.md`.
+- [x] Power Phase 0 continuation: capture P4 v1.3/ST7121 boot identity and 60-second
+  runtime baseline (101 wakes, 100 cursor expirations, one health audit) on installed
+  `dd9031b-dirty`; complete SDK-source restrictions and conservative wake classification.
+- [x] Power Phase 0 diagnostic firmware: Debug/Release cross-builds, 53/53 macOS Debug
+  tests, forced matching-app rebuild/install, healthy shell boot without duplicate GPIO
+  service error, and measured audio/headphone/VSYNC/PPA activity at idle.
+- [x] Power Phase 0 board continuation: operator confirms `hello`/`touchtest`; trace
+  published keyboard/touch connectors, RTC/IMU conditioning and PMS150G connections.
+  Record differing IMU supply circuits in `docs/power-routing.md`.
+- [x] Power Phase 0 setup: operator confirms battery plus USB-C, keyboard and SD,
+  no headphones, and USB-A host connection for MSC.
+- [x] Close Power Phase 0: user accepts PCB revision `unknown` and defers exact
+  matching plus circuit-specific RTC/IMU/power-button wake. All ten items complete
+  with documented limits; later sleep tests and instrumented power evidence remain open.
 - [ ] Slice 1: implement portable power manager, dependency-ordered service registration,
   platform sleep contract, and deterministic host controls.
 - [ ] Slice 2: implement activity-driven idle dimming and measure each power reduction.
@@ -633,9 +650,9 @@ but is not a substitute for this execution path.
 
 ## Maintenance and Technical Debt
 
-- [ ] Centralize or make idempotent Tab5 GPIO ISR-service installation. Keyboard may
-  install the shared ESP-IDF service before ST7121 touch initialization, currently
-  producing a benign `GPIO isr service already installed` error-level boot message.
+- [x] Centralize Tab5 GPIO ISR-service ownership; touch attaches directly with checked
+  errors instead of invoking component global installation. Failure/retry and shared
+  consumer lifetime regression passes; physical boot verification remains above.
 - [ ] Replace or reduce the 50 ms PI4IO headphone-detect poll; shared-I2C read failures
   currently produce intermittent error logs during touch activity.
 - [x] Migrate existing generic `tab_*` and internal-only `tabos_*` symbols to decided

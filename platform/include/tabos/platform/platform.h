@@ -186,6 +186,8 @@ const char* platform_name(void);
 const char* platform_display_name(void);
 bool platform_get_diagnostics(platform_diagnostics_t* diagnostics);
 void platform_log(const char* message);
+/* Debug diagnostics only; called by existing health audit, creates no timer. */
+void platform_runtime_log_activity(void);
 uint64_t platform_time_ms(void);
 bool platform_wall_clock_get(int64_t* seconds);
 bool platform_wall_clock_set(int64_t seconds);

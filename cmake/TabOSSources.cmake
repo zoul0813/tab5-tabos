@@ -69,10 +69,12 @@ set(TABOS_HOST_PLATFORM_SOURCES
 
 set(TABOS_ESP32P4_PLATFORM_SOURCES
     "${TABOS_ROOT}/platform/esp32p4/runtime.c"
+    "${TABOS_ROOT}/platform/esp32p4/activity.c"
     "${TABOS_ROOT}/platform/esp32p4/power.c"
     "${TABOS_ROOT}/platform/esp32p4/audio.c"
     "${TABOS_ROOT}/platform/esp32p4/rtc.c"
     "${TABOS_ROOT}/platform/esp32p4/mutex.c"
+    "${TABOS_ROOT}/platform/esp32p4/gpio_interrupt.c"
     "${TABOS_ROOT}/platform/esp32p4/keyboard.c"
     "${TABOS_ROOT}/platform/esp32p4/keyboard_interrupt.c"
     "${TABOS_ROOT}/platform/esp32p4/pointer.c"

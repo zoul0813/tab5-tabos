@@ -1,3 +1,4 @@
+#include "gpio_interrupt.h"
 #include "touch_interrupt.h"
 
 #include <tabos/internal/pointer.h>
@@ -21,7 +22,7 @@ static esp_lcd_panel_io_handle_t touch_io;
 static esp_lcd_touch_handle_t touch_handle;
 static tab5_touch_interrupt_state_t touch_state;
 static atomic_bool touch_interrupt_pending;
-static bool touch_callback_installed;
+static bool touch_isr_installed;
 static bool touch_ready;
 static int touch_error;
 
@@ -92,9 +93,9 @@ static tab5_touch_interrupt_ops_t touch_operations(void)
     };
 }
 
-static void IRAM_ATTR touch_interrupt(esp_lcd_touch_handle_t handle)
+static void IRAM_ATTR touch_interrupt(void* context)
 {
-    (void) handle;
+    (void) context;
     atomic_store_explicit(&touch_interrupt_pending, true, memory_order_release);
     platform_runtime_notify_from_isr(PLATFORM_RUNTIME_EVENT_POINTER);
 }
@@ -102,12 +103,12 @@ static void IRAM_ATTR touch_interrupt(esp_lcd_touch_handle_t handle)
 static void touch_interrupt_disable(void)
 {
     (void) gpio_intr_disable(BSP_LCD_TOUCH_INT);
-    if (touch_callback_installed && touch_handle != NULL) {
-        const esp_err_t result = esp_lcd_touch_register_interrupt_callback(touch_handle, NULL);
+    if (touch_isr_installed) {
+        const esp_err_t result = gpio_isr_handler_remove(BSP_LCD_TOUCH_INT);
         if (result != ESP_OK) {
-            ESP_LOGW(TAG, "Could not remove touch interrupt callback: %s", esp_err_to_name(result));
+            ESP_LOGW(TAG, "Could not remove touch interrupt handler: %s", esp_err_to_name(result));
         }
-        touch_callback_installed = false;
+        touch_isr_installed = false;
     }
     atomic_store_explicit(&touch_interrupt_pending, false, memory_order_release);
 }
@@ -126,7 +127,7 @@ bool platform_pointer_init(const char** driver, int* error)
 {
     tab5_touch_interrupt_state_init(&touch_state);
     atomic_store_explicit(&touch_interrupt_pending, false, memory_order_release);
-    touch_callback_installed          = false;
+    touch_isr_installed               = false;
     touch_ready                       = false;
     touch_error                       = 0;
     const i2c_master_bus_handle_t bus = bsp_i2c_get_handle();
@@ -157,15 +158,20 @@ bool platform_pointer_init(const char** driver, int* error)
     result = esp_lcd_new_panel_io_i2c(bus, &io_config, &touch_io);
     if (result == ESP_OK) {
         const esp_lcd_touch_config_t config = {
-            .x_max              = BSP_LCD_H_RES,
-            .y_max              = BSP_LCD_V_RES,
-            .rst_gpio_num       = GPIO_NUM_NC,
-            .int_gpio_num       = BSP_LCD_TOUCH_INT,
-            .interrupt_callback = touch_interrupt,
+            .x_max        = BSP_LCD_H_RES,
+            .y_max        = BSP_LCD_V_RES,
+            .rst_gpio_num = GPIO_NUM_NC,
+            .int_gpio_num = BSP_LCD_TOUCH_INT,
+            /* TabOS owns GPIO registration; component callback registration
+             * attempts another global ISR-service install and ignores failures. */
+            .interrupt_callback = NULL,
         };
-        result                   = gt911 ? esp_lcd_touch_new_i2c_gt911(touch_io, &config, &touch_handle) :
-                                           esp_lcd_touch_new_i2c_st7123(touch_io, &config, &touch_handle);
-        touch_callback_installed = result == ESP_OK;
+        result = gt911 ? esp_lcd_touch_new_i2c_gt911(touch_io, &config, &touch_handle) :
+                         esp_lcd_touch_new_i2c_st7123(touch_io, &config, &touch_handle);
+        if (result == ESP_OK) {
+            result              = tab5_gpio_interrupt_add(BSP_LCD_TOUCH_INT, touch_interrupt, NULL);
+            touch_isr_installed = result == ESP_OK;
+        }
     }
     if (driver != NULL) {
         *driver = gt911 ? "GT911" : "ST712x";

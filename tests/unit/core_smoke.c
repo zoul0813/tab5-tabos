@@ -94,6 +94,9 @@ int main(void)
         return 1;
     }
 
+    if (test_platform_activity_reports() != 0U) {
+        return 1;
+    }
     test_platform_keyboard_set_status(false, EIO);
     test_platform_advance_time_ms(60000U);
     kernel_runtime_update(PLATFORM_RUNTIME_EVENT_DEADLINE);
@@ -101,6 +104,15 @@ int main(void)
         device.last_error != EIO) {
         return 1;
     }
+#ifndef NDEBUG
+    if (test_platform_activity_reports() != 1U) {
+        return 1;
+    }
+#else
+    if (test_platform_activity_reports() != 0U) {
+        return 1;
+    }
+#endif
     test_platform_keyboard_set_status(true, 0);
     test_platform_advance_time_ms(60000U);
     kernel_runtime_update(PLATFORM_RUNTIME_EVENT_DEADLINE);

@@ -57,3 +57,16 @@ telemetry, source, state, and charger-control fields are meaningful. Callers mus
 interpret fields whose matching `TABOS_BATTERY_VALID_*` bit is clear. INA226 read or
 charger-control failures move registry device `battery0` to `fault`; a successful retry
 restores `ready`.
+
+## Power-management development
+
+Transparent suspend and automatic idle dimming are not yet available. The
+[power baseline](power-baseline.md) records initialized services, suspend blockers,
+GPIO interrupt ownership, pinned-SDK restrictions, unverified wake paths, and the
+repeatable measurement worksheet. Functional sleep/wake and instrumented power
+measurements remain separate validation gates.
+
+Debug firmware also reports cumulative `Platform activity:` counters beside the
+60-second runtime wake report. They expose codec, headphone-monitor, display-refresh
+and accelerator work that can continue while the runtime is blocked. See the baseline
+for units, wrap handling and measurement limits.

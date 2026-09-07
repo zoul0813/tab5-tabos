@@ -1,3 +1,5 @@
+#include "activity.h"
+
 #include <tabos/audio.h>
 #include <tabos/platform/platform.h>
 
@@ -58,9 +60,12 @@ static void audio_worker(void* argument)
         render_callback(playback, frames);
         if (esp_codec_dev_write(speaker_codec, playback, bytes) != ESP_CODEC_DEV_OK ||
             esp_codec_dev_read(microphone_codec, capture, bytes) != ESP_CODEC_DEV_OK) {
+            tab5_activity_record(TAB5_ACTIVITY_AUDIO_ERRORS, 1U);
             error_callback(EIO);
             break;
         }
+        tab5_activity_record(TAB5_ACTIVITY_AUDIO_CHUNKS, 1U);
+        tab5_activity_record(TAB5_ACTIVITY_AUDIO_FRAMES, (unsigned int) frames);
         capture_callback(capture, frames, 2U);
     }
     atomic_store_explicit(&audio_task_active, false, memory_order_release);
@@ -98,6 +103,7 @@ static void headphone_worker(void* argument)
     uint32_t stable_samples = 0U;
     while (atomic_load_explicit(&headphone_monitor_running, memory_order_acquire)) {
         bool inserted = false;
+        tab5_activity_record(TAB5_ACTIVITY_HEADPHONE_READS, 1U);
         if (read_headphones_inserted(&inserted)) {
             if (inserted == candidate) {
                 ++stable_samples;
@@ -118,6 +124,7 @@ static void headphone_worker(void* argument)
                 stable_samples = 0U;
             }
         } else {
+            tab5_activity_record(TAB5_ACTIVITY_HEADPHONE_ERRORS, 1U);
             stable_samples = 0U;
         }
         vTaskDelay(pdMS_TO_TICKS(TAB5_HEADPHONE_POLL_MS));

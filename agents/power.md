@@ -24,16 +24,33 @@ Deliver portable power manager and idle dimming first; coordinated light sleep f
 
 ## Phase 0 — Establish evidence and platform limits
 
-- [ ] Record firmware revision, pinned ESP-IDF v5.4.4, resolved components, P4 silicon revision, display/touch controller, power source, and attached peripherals.
-- [ ] Inventory every initialized driver, worker, timer, interrupt, DMA operation, bus dependency, and existing PM lock. Include idle services with no application handles.
-- [ ] Classify each participant as safely suspendable, inactive, or blocking. Missing lifecycle support must prevent suspend.
-- [ ] Record current runtime wake counters and worker activity. Include continuous audio codec I/O, headphone monitoring, display VSYNC, cursor blink, and hardware-health audit.
-- [ ] Resolve shared GPIO ISR-service ownership before adding more interrupt consumers.
-- [ ] Trace keyboard/touch wake paths and RTC/IMU/power-controller routing against schematic and physical board.
-- [ ] Distinguish transparent light-sleep wake from hardware power-on/reset. RTC and BMI270 routing through PMS150G requires particular attention. [Tab5 hardware documentation](https://docs.m5stack.com/en/core/Tab5)
-- [ ] Confirm pinned SDK sleep restrictions, PSRAM retention, GPIO wake support, and chip-revision workarounds. Initial profile retains digital peripheral power, flash, and PSRAM; deeper power-domain shutdown remains disabled.
-- [ ] Carry forward outstanding ISR cross-target and board-validation evidence without repeating completed interrupt conversion.
-- [ ] Define measurement worksheet now. Current board permits functional testing; instrumented power evidence remains pending until equipment available.
+- [x] Record firmware revision, pinned ESP-IDF v5.4.4, resolved components, P4 silicon revision, display/touch controller, power source, and attached peripherals.
+- [x] Inventory every initialized driver, worker, timer, interrupt, DMA operation, bus dependency, and existing PM lock. Include idle services with no application handles.
+- [x] Classify each participant as safely suspendable, inactive, or blocking. Missing lifecycle support must prevent suspend.
+- [x] Record current runtime wake counters and worker activity. Include continuous audio codec I/O, headphone monitoring, display VSYNC, cursor blink, and hardware-health audit.
+- [x] Resolve shared GPIO ISR-service ownership before adding more interrupt consumers.
+- [x] Trace keyboard/touch and RTC/IMU/power-controller routes using published schematics and available physical evidence. Published net trace and physical input checks complete. User accepts PCB revision `unknown` and defers exact matching and circuit-specific wake features ([routing evidence](../docs/power-routing.md)); no electrical or retained-wake validation claimed.
+- [x] Distinguish transparent light-sleep wake from hardware power-on/reset. RTC and BMI270 routing through PMS150G requires particular attention. [Tab5 hardware documentation](https://docs.m5stack.com/en/core/Tab5)
+- [x] Confirm pinned SDK sleep restrictions, PSRAM retention, GPIO wake support, and chip-revision workarounds. Initial profile retains digital peripheral power, flash, and PSRAM; deeper power-domain shutdown remains disabled.
+- [x] Carry forward outstanding ISR cross-target and board-validation evidence without repeating completed interrupt conversion.
+- [x] Define measurement worksheet now. Current board permits functional testing; instrumented power evidence remains pending until equipment available.
+
+Source audit and software validation recorded in
+[Phase 0 evidence](validation/power-phase0-2026-09-07.md); maintained procedure and
+inventory in [power baseline](../docs/power-baseline.md). Local build identity/config
+and resolved-component snapshot are complete. Final `740ba1d-dirty` Debug firmware
+boots matching rebuilt apps on P4 v1.3, ST7121/ST712x-v1, keyboard FW1 and C6 FW1.4.1.
+A quiet 60-second interval records 101 runtime wakes (100 cursor, one health), 6,000
+codec I/O pairs, 1,200 headphone reads, 3,928 VSYNC and 100 PPA completions, with no
+codec/headphone errors. Duplicate GPIO service-install error is absent at boot.
+Operator confirms keyboard/touch with `hello` and `touchtest`. Published connector,
+RTC/IMU conditioning and power-controller nets are traced. Operator confirms battery
+and USB-C connected, no headphones, Tab5 keyboard expansion and microSD attached,
+and USB-A connected to the host for MSC. PCB revision is `unknown`; user explicitly
+accepts deferring exact matching and circuit-specific RTC, BMI270 and power-button
+wake support. SDK source audit and conservative unavailable-wake classification are
+complete. All ten Phase 0 items are closed with this documented limitation. Actual
+sleep-retention validation belongs to Phase 7. No sleep path enabled.
 
 **Exit gate:** participant inventory complete; unsupported paths explicit; baseline reproducible.
 
@@ -215,6 +232,7 @@ Initial blockers include:
 - [ ] Measure active baseline, dimming, unused-audio shutdown, headphone-monitor reduction, tickless idle, DFS, and coordinated sleep separately.
 - [ ] Record instrument, setup, charging state, repeated samples, and measurement variability. Require savings beyond measurement uncertainty before marking power optimization validated.
 - [ ] Keep instrumented measurements pending with current equipment; onboard telemetry is supplementary evidence.
+- [ ] Before completing the power milestone, reevaluate Phase 0 investigation diagnostics: the kernel `platform_runtime_log_activity()` hook and Debug codec/headphone/VSYNC/PPA counters. Decide whether to retain, make explicitly opt-in, or remove them; record rationale and overhead, preserve baseline evidence, and update affected tests/documentation. Keep the shared GPIO ISR ownership correctness fix independent of this decision.
 - [ ] Keep ILI9881C/GT911, ST7123, and ST7121 recovery validation separately tracked. Do not enable unverified revision-specific sleep support.
 - [ ] Update architecture, testing, context, roadmap, hardware-services completion tracking, and user-facing power/time/application documentation as phases land.
 - [ ] Document paused application deadlines, Wi-Fi interruption, blockers, unsupported wake sources, panic behavior, and every enabled default.

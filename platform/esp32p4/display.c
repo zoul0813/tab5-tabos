@@ -1,3 +1,5 @@
+#include "activity.h"
+
 #include <tabos/platform/platform.h>
 
 #include <tabos/config/identity.h>
@@ -55,6 +57,7 @@ static bool IRAM_ATTR display_refresh_done(esp_lcd_panel_handle_t panel, esp_lcd
 {
     (void) panel;
     (void) event_data;
+    tab5_activity_record(TAB5_ACTIVITY_VSYNC, 1U);
     BaseType_t task_woken = pdFALSE;
     xSemaphoreGiveFromISR((SemaphoreHandle_t) user_data, &task_woken);
     return task_woken == pdTRUE;
@@ -83,6 +86,7 @@ static bool ppa_transaction_done(ppa_client_handle_t client, ppa_event_data_t* e
 {
     (void) client;
     (void) event_data;
+    tab5_activity_record(TAB5_ACTIVITY_PPA, 1U);
     BaseType_t task_woken = pdFALSE;
     xSemaphoreGiveFromISR((SemaphoreHandle_t) user_data, &task_woken);
     return task_woken == pdTRUE;

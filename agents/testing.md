@@ -1606,3 +1606,21 @@ A developer working on the shell, filesystem, graphics model, UI, utilities, or 
 The real Tab5 remains the final source of truth for hardware behavior.
 
 The purpose of the macOS/Linux SDL3 builds is to make the shared TabOS implementation fast to develop, easy to debug, and continuously testable without compromising the architecture of the actual device.
+
+## Power Phase 0 validation
+
+`unit.gpio_interrupt` compiles the real Tab5 GPIO owner against a narrow fake IDF driver.
+It verifies install failure/retry, unexpected external ownership, failed second consumer,
+independent delivery, teardown isolation and boot-lifetime reuse. Existing touch/keyboard
+drain tests retain their source-order coverage; these tests do not prove electrical wake.
+
+Follow `docs/power-baseline.md` for identity capture, participant/PM-lock audit, cumulative
+wake-counter deltas, worker/IRQ/bus traces, and the instrumented measurement worksheet.
+Record physical validation separately from host tests and cross-builds. GPIO50/GPIO23
+runtime IRQ success does not establish light-sleep wake; RTC/IMU power-controller routing
+must not be labeled transparent resume without retained-state proof.
+
+Power baseline instrumentation extends `unit.core_smoke`: ordinary event dispatch must
+not report peripheral activity; the existing health deadline reports once in Debug and
+not in Release. Cross-build both configurations to verify counter compile guards; use
+physical consecutive serial snapshots for actual codec/headphone/VSYNC rates.

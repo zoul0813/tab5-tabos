@@ -809,3 +809,23 @@ When modifying TabOS:
 ## 19. Current Architectural Summary
 
 The intended system is a **small native-computing environment layered on ESP-IDF/FreeRTOS**. FreeRTOS handles low-level scheduling and hardware-runtime concerns; TabOS supplies the user-visible OS abstraction. Applications are independently compiled native RISC-V programs targeting a stable TabOS API. The shell and filesystem are first-class. Graphics, input, networking, and other hardware are mediated by TabOS services. The GUI is optional and non-privileged. Most higher-level OS code should also run in a native macOS host environment, while actual hardware-specific behavior remains in the ESP32-P4 backend.
+
+## GPIO service ownership and power baseline
+
+Tab5 GPIO interrupt registration is owned by `platform/esp32p4/gpio_interrupt.c`.
+Serialized platform initialization installs one non-IRAM service for the boot; keyboard
+and touch own only their pin handlers. A consumer must never uninstall the shared service.
+Touch constructors retain GPIO configuration but receive no component callback; TabOS
+checks direct attachment and removes it before controller teardown. Concurrent registration
+and new consumers require an explicit lifecycle audit.
+
+Power Phase 0 inventory and wake-source restrictions live in `docs/power-baseline.md`.
+No suspend API, PM enablement or wake arming exists yet. Missing tested reversible service
+lifecycle remains a blocker, including initialized drivers with no application handles.
+
+Debug peripheral activity uses a narrow `platform_runtime_log_activity()` diagnostic
+hook beside the existing health-audit wake report. Tab5 counts codec pairs/frames/errors,
+headphone attempts/errors, VSYNC and PPA completions with boot-lifetime lock-free unsigned
+atomics; no new periodic task/deadline exists. Release compiles out updates; host does
+not manufacture physical peripheral measurements. These counts are not PM policy or
+synchronization state.

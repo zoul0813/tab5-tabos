@@ -859,3 +859,15 @@ void platform_mutex_unlock(platform_mutex_t* mutex)
 {
     (void) mutex;
 }
+
+static unsigned int activity_reports;
+
+void platform_runtime_log_activity(void)
+{
+    ++activity_reports;
+}
+
+unsigned int test_platform_activity_reports(void)
+{
+    return activity_reports;
+}

@@ -402,3 +402,8 @@ uint64_t platform_time_ms(void)
 {
     return SDL_GetTicks();
 }
+
+void platform_runtime_log_activity(void)
+{
+    /* Host activity is not evidence of physical Tab5 peripheral work. */
+}
