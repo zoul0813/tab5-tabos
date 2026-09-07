@@ -103,6 +103,7 @@ This should make normal development substantially faster.
 - Info-level serial logging is required in debug and release so detected hardware remains visible during boot.
 - Current host suite has unit, integration, architecture-boundary, and invalid-target tests. Display transforms must remain host-unit-tested.
 - Host test targets keep C assertions enabled in optimized configurations because assertions contain validation and, in some older tests, required setup calls.
+- Timing-sensitive component tests rely on their CTest timeout and observable runtime state instead of sub-second wall-clock assertions that can fail under CI scheduler load.
 
 ### Event and deadline runtime validation
 

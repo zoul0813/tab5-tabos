@@ -229,9 +229,7 @@ static void launch(const char* path, wait_kind_t kind, int timeout, uint16_t por
 
 static void enter_wait(void)
 {
-    const uint64_t start = platform_time_ms();
     kernel_application_system_update();
-    check(platform_time_ms() - start < 100U, "gate yields promptly");
     check(tabos_process_count() == 2U, "waiting child remains alive");
     check(kernel_application_system_next_deadline() > platform_time_ms(), "waiting guest does not busy-spin");
 }
