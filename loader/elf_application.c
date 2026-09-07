@@ -1363,12 +1363,8 @@ static int elf_wait_sources(loader_elf_application_t* application, tabos_elf_wai
         }
 
         const uint64_t now_ms = platform_time_ms();
-        if (ready == 0 && finite_timeout && now_ms >= deadline_ms) {
-            return 0;
-        }
-
         uint32_t socket_timeout = 0U;
-        if (ready == 0 && timeout_ms != 0U) {
+        if (ready == 0 && timeout_ms != 0U && (!finite_timeout || now_ms < deadline_ms)) {
             if (!requires_polling) {
                 socket_timeout = finite_timeout ? (uint32_t) (deadline_ms - now_ms) : TABOS_WAIT_TIMEOUT_INFINITE;
             } else if (!finite_timeout) {
@@ -1397,7 +1393,8 @@ static int elf_wait_sources(loader_elf_application_t* application, tabos_elf_wai
             }
         }
 
-        if (ready > 0 || timeout_ms == 0U || !requires_polling) {
+        if (ready > 0 || timeout_ms == 0U || !requires_polling ||
+            (finite_timeout && platform_time_ms() >= deadline_ms)) {
             return ready;
         }
         if (atomic_load_explicit(&application->wait_cancel_requested, memory_order_acquire)) {
@@ -2517,5 +2514,15 @@ bool loader_elf_application_runtime_runnable(const tabos_app_descriptor_t* descr
         return false;
     }
     const loader_elf_application_t* application = application_data;
-    return application->execution != NULL && platform_riscv32_requires_runtime_slices();
+    return application->execution != NULL && platform_riscv32_requires_runtime_slices() &&
+           platform_riscv32_next_deadline(application->execution) <= platform_time_ms();
+}
+
+uint64_t loader_elf_application_next_deadline(const tabos_app_descriptor_t* descriptor, const void* application_data)
+{
+    if (descriptor == NULL || descriptor->update != elf_update || application_data == NULL) {
+        return PLATFORM_RUNTIME_DEADLINE_NONE;
+    }
+    const loader_elf_application_t* application = application_data;
+    return platform_riscv32_next_deadline(application->execution);
 }

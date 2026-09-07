@@ -189,6 +189,16 @@ bool kernel_application_system_runnable(void)
                                                    foreground_process->context.application_data);
 }
 
+uint64_t kernel_application_system_next_deadline(void)
+{
+    if (foreground_process == NULL || foreground_process->state != TABOS_PROCESS_RUNNING ||
+        foreground_process->context.exit_requested) {
+        return PLATFORM_RUNTIME_DEADLINE_NONE;
+    }
+    return loader_elf_application_next_deadline(foreground_process->context.descriptor,
+                                                foreground_process->context.application_data);
+}
+
 void kernel_application_system_shutdown(void)
 {
     pointer_service_set_foreground_owner(NULL);

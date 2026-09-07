@@ -15,6 +15,8 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include <time.h>
+#include "host_io.h"
 #endif
 
 #include <errno.h>
@@ -64,6 +66,18 @@ static void close_socket(int descriptor)
     (void) lwip_close(descriptor);
 #else
     (void) close(descriptor);
+#endif
+}
+
+static uint64_t network_monotonic_ms(void)
+{
+#if defined(ESP_PLATFORM)
+    return platform_time_ms();
+#else
+    /* Detached echo work may finish after SDL runtime shutdown. */
+    struct timespec now;
+    (void) clock_gettime(CLOCK_MONOTONIC, &now);
+    return (uint64_t) now.tv_sec * 1000U + (uint64_t) now.tv_nsec / 1000000U;
 #endif
 }
 
@@ -171,7 +185,7 @@ static platform_network_operation_result_t network_echo_direct(const platform_ne
         header->checksum = htons(checksum(packet, packet_size));
 #endif
     }
-    const uint64_t started = platform_time_ms();
+    const uint64_t started = network_monotonic_ms();
     if (sendto(descriptor, packet, packet_size, 0, (const struct sockaddr*) &target, target_size) < 0) {
         char message[96];
         (void) snprintf(message, sizeof(message), "ICMP send failed for %s: errno %d", address->text, errno);
@@ -180,7 +194,7 @@ static platform_network_operation_result_t network_echo_direct(const platform_ne
         return PLATFORM_NETWORK_OPERATION_IO;
     }
     for (;;) {
-        const uint64_t elapsed = platform_time_ms() - started;
+        const uint64_t elapsed = network_monotonic_ms() - started;
         if (elapsed >= timeout_ms) {
             close_socket(descriptor);
             return PLATFORM_NETWORK_OPERATION_TIMEOUT;
@@ -228,7 +242,7 @@ static platform_network_operation_result_t network_echo_direct(const platform_ne
         close_socket(descriptor);
         result->sequence = sequence;
         result->bytes = (uint32_t) received - (uint32_t) offset - ICMP_HEADER_BYTES;
-        const uint64_t final_elapsed = platform_time_ms() - started;
+        const uint64_t final_elapsed = network_monotonic_ms() - started;
         result->round_trip_ms = final_elapsed > UINT32_MAX ? UINT32_MAX : (uint32_t) final_elapsed;
         return PLATFORM_NETWORK_OPERATION_OK;
     }
@@ -392,6 +406,29 @@ platform_network_operation_result_t platform_network_echo(const platform_network
 
 #else
 
+typedef struct {
+        bool resolve;
+        char hostname[254];
+        uint32_t family;
+        platform_network_address_t address;
+        uint16_t sequence;
+        uint16_t payload_bytes;
+        uint32_t timeout_ms;
+        platform_network_echo_result_t echo;
+        platform_network_operation_result_t result;
+} host_network_request_t;
+
+static void host_network_work(void* data)
+{
+    host_network_request_t* request = data;
+    if (request->resolve) {
+        request->result = network_resolve_direct(request->hostname, request->family, &request->address);
+    } else {
+        request->result = network_echo_direct(&request->address, request->sequence, request->payload_bytes,
+                                              request->timeout_ms, &request->echo);
+    }
+}
+
 bool platform_network_operations_init(void)
 {
     return true;
@@ -404,7 +441,18 @@ void platform_network_operations_shutdown(void)
 platform_network_operation_result_t platform_network_resolve(const char* hostname, uint32_t family,
                                                              platform_network_address_t* address)
 {
-    return network_resolve_direct(hostname, family, address);
+    if (hostname == NULL || address == NULL || strnlen(hostname, 254U) == 254U) {
+        return PLATFORM_NETWORK_OPERATION_INVALID;
+    }
+    host_network_request_t request = {.resolve = true, .family = family};
+    (void) snprintf(request.hostname, sizeof(request.hostname), "%s", hostname);
+    if (host_io_call(&request, sizeof(request), host_network_work, NULL) != 1) {
+        return PLATFORM_NETWORK_OPERATION_IO;
+    }
+    if (request.result == PLATFORM_NETWORK_OPERATION_OK) {
+        *address = request.address;
+    }
+    return request.result;
 }
 
 platform_network_operation_result_t platform_network_echo(const platform_network_address_t* address,
@@ -412,7 +460,18 @@ platform_network_operation_result_t platform_network_echo(const platform_network
                                                           uint32_t timeout_ms,
                                                           platform_network_echo_result_t* result)
 {
-    return network_echo_direct(address, sequence, payload_bytes, timeout_ms, result);
+    if (address == NULL || result == NULL) {
+        return PLATFORM_NETWORK_OPERATION_INVALID;
+    }
+    host_network_request_t request = {
+        .address = *address, .sequence = sequence, .payload_bytes = payload_bytes, .timeout_ms = timeout_ms};
+    if (host_io_call(&request, sizeof(request), host_network_work, NULL) != 1) {
+        return PLATFORM_NETWORK_OPERATION_IO;
+    }
+    if (request.result == PLATFORM_NETWORK_OPERATION_OK) {
+        *result = request.echo;
+    }
+    return request.result;
 }
 
 #endif

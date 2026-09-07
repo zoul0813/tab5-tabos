@@ -113,12 +113,12 @@ bool host_is_headless(void)
 void host_request_quit(void)
 {
     quit_requested = true;
+    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_SHUTDOWN);
 }
 
 void platform_stop_run_loop(void)
 {
     host_request_quit();
-    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_SHUTDOWN);
 }
 
 void platform_runtime_notify(platform_runtime_events_t events)

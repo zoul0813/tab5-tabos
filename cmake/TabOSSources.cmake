@@ -51,6 +51,7 @@ if(TABOS_ENABLE_FILESYSTEM_DIAGNOSTIC_APP)
 endif()
 
 set(TABOS_HOST_PLATFORM_SOURCES
+    "${TABOS_ROOT}/platform/posix/host_io.c"
     "${TABOS_ROOT}/platform/host/sdl/runtime.c"
     "${TABOS_ROOT}/platform/host/sdl/clock.c"
     "${TABOS_ROOT}/platform/host/sdl/mutex.c"

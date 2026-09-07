@@ -203,6 +203,17 @@ Process module must remain self-contained: tester parent launches tester child, 
 launches tester grandchild, known statuses unwind in reverse, and parent repeats chain to
 prove cleanup and reload. Run tester from shell so this also exercises persistent PID 0.
 
+`component.elf_wait` executes real RV32 fixtures through the loader and headless SDL
+runtime. It checks finite/infinite pointer waits, SDL pointer delivery and shutdown,
+blocking UDP receive, socket-only/mixed zero and infinite waits, DNS continuation,
+repeated forced socket/DNS teardown, and parent restoration. `unit.host_io` holds 16
+cancelled workers behind a barrier, checks bounded exhaustion and copied inputs, then
+checks disposal and normal delivery. `component.host_network_io` exercises suspended
+TCP accept/connect/receive, explicit EAGAIN, DNS, verified TLS connection setup and
+TLS read/write against an ephemeral local CA/server. These tests use host sanitizers;
+loopback tests need permission to bind local ports. TLS transport tests ignore SIGPIPE
+because AUD-016 is tracked separately.
+
 Generic-wait validation covers zero and finite application waits, cancellable infinite
 backend waits, monotonic timeout, readiness clearing, source ordering, mixed socket/device
 readiness, stale and foreign handles, interrupted waits, and leaked-source process cleanup. With configured

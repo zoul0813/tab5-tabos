@@ -609,11 +609,54 @@ tabos_enable_sanitizers(tabos_elf_graphics_cleanup)
 add_test(NAME component.elf_graphics_cleanup COMMAND tabos_elf_graphics_cleanup)
 set_tests_properties(component.elf_graphics_cleanup PROPERTIES TIMEOUT 30)
 
+add_executable(tabos_elf_wait component/elf_wait.c)
+target_include_directories(tabos_elf_wait PRIVATE
+    "${TABOS_ROOT}/net/include"
+    "${TABOS_ROOT}/kernel/include"
+    "${TABOS_ROOT}/console/include"
+    "${TABOS_ROOT}/graphics/include"
+    "${TABOS_ROOT}/platform/include"
+)
+if(TABOS_TARGET STREQUAL "linux")
+    target_link_libraries(tabos_elf_wait PRIVATE
+        "-Wl,--start-group" tabos_core tabos_platform_host "-Wl,--end-group" SDL3::SDL3
+    )
+else()
+    target_link_libraries(tabos_elf_wait PRIVATE tabos_core tabos_platform_host SDL3::SDL3)
+endif()
+tabos_enable_warnings(tabos_elf_wait)
+tabos_enable_sanitizers(tabos_elf_wait)
+add_test(NAME component.elf_wait COMMAND tabos_elf_wait)
+set_tests_properties(component.elf_wait PROPERTIES TIMEOUT 30)
+
 add_executable(tabos_network_socket
     component/network_socket.c
     "${TABOS_ROOT}/platform/posix/socket.c"
+    "${TABOS_ROOT}/platform/posix/host_io.c"
 )
 find_package(Threads REQUIRED)
+add_executable(tabos_host_io unit/host_io.c "${TABOS_ROOT}/platform/posix/host_io.c")
+target_link_libraries(tabos_host_io PRIVATE Threads::Threads)
+target_compile_definitions(tabos_host_io PRIVATE _POSIX_C_SOURCE=200809L)
+tabos_enable_warnings(tabos_host_io)
+tabos_enable_sanitizers(tabos_host_io)
+add_test(NAME unit.host_io COMMAND tabos_host_io)
+set_tests_properties(unit.host_io PROPERTIES TIMEOUT 10)
+add_executable(tabos_host_network_io component/host_network_io.c
+    "${TABOS_ROOT}/platform/posix/host_io.c"
+    "${TABOS_ROOT}/platform/posix/socket.c"
+    "${TABOS_ROOT}/platform/posix/network.c"
+    "${TABOS_ROOT}/platform/posix/tls.c")
+target_include_directories(tabos_host_network_io PRIVATE "${TABOS_ROOT}/platform/include" "${TABOS_ROOT}/sdk/include")
+target_compile_definitions(tabos_host_network_io PRIVATE _POSIX_C_SOURCE=200809L)
+if(TABOS_TARGET STREQUAL "macos")
+    target_compile_definitions(tabos_host_network_io PRIVATE _DARWIN_C_SOURCE)
+endif()
+target_link_libraries(tabos_host_network_io PRIVATE Threads::Threads OpenSSL::SSL OpenSSL::Crypto)
+tabos_enable_warnings(tabos_host_network_io)
+tabos_enable_sanitizers(tabos_host_network_io)
+add_test(NAME component.host_network_io COMMAND tabos_host_network_io)
+set_tests_properties(component.host_network_io PROPERTIES TIMEOUT 15)
 target_link_libraries(tabos_network_socket PRIVATE Threads::Threads)
 if(TABOS_TARGET STREQUAL "linux")
     target_compile_definitions(tabos_network_socket PRIVATE _POSIX_C_SOURCE=200809L)

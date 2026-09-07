@@ -710,6 +710,12 @@ bool platform_riscv32_requires_runtime_slices(void)
     return false;
 }
 
+uint64_t platform_riscv32_next_deadline(const platform_riscv32_context_t* context)
+{
+    (void) context;
+    return PLATFORM_RUNTIME_DEADLINE_NONE;
+}
+
 void platform_riscv32_destroy(platform_riscv32_context_t* context)
 {
     (void) context;

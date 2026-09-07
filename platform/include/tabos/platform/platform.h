@@ -276,6 +276,7 @@ platform_riscv32_context_t* platform_riscv32_create(const void* entry, const voi
 platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* context, unsigned int instruction_budget,
                                                 int* returned_status);
 bool platform_riscv32_requires_runtime_slices(void);
+uint64_t platform_riscv32_next_deadline(const platform_riscv32_context_t* context);
 void platform_riscv32_destroy(platform_riscv32_context_t* context);
 void* platform_riscv32_current_user_data(void);
 void platform_input_wait(void);

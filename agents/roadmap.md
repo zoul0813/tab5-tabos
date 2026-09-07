@@ -399,6 +399,9 @@
 - [x] Execute `hello_elf` completely in host tests and verify output and exit status.
 - [x] Bound guest instruction execution so runaway applications cannot hang host tests.
 - [x] Retain guest CPU and memory state across bounded runtime-update slices.
+- [x] Resolve AUD-005: suspend host generic/socket/TLS waits, retain finite deadlines,
+  bound copied DNS/echo/TLS setup workers, and cancel without retaining guest memory.
+  Add RV32 SDL/input/shutdown, forced teardown, socket, and local TLS regressions.
 - [x] Report illegal instructions and invalid guest memory accesses without crashing host.
 - [ ] Add optional instruction/register tracing for application debugging.
 - [ ] Evaluate GDB remote debugging after basic interpreter execution is stable.

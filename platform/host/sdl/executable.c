@@ -1,5 +1,6 @@
 #include <tabos/platform/platform.h>
 #include <tabos/wait.h>
+#include "../../posix/host_io.h"
 
 #include <limits.h>
 #include <stdint.h>
@@ -182,6 +183,11 @@ struct platform_riscv32_context {
         uint32_t heap_base;
         uint32_t heap_break;
         uint32_t heap_end;
+        host_io_scope_t io;
+        struct MiniRV32IMAState gate_state;
+        uint64_t resume_at;
+        uint64_t wait_deadline;
+        bool waiting;
 };
 
 static void* current_user_data;
@@ -370,14 +376,22 @@ platform_riscv32_context_t* platform_riscv32_create(const void* entry, const voi
     return context;
 }
 
-platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* context, unsigned int instruction_budget,
-                                                int* returned_status)
+static platform_riscv32_result_t step_inner(platform_riscv32_context_t* context, unsigned int instruction_budget,
+                                            int* returned_status)
 {
     if (context == NULL || instruction_budget == 0U || returned_status == NULL) {
         return PLATFORM_RISCV32_FAULT;
     }
     host_rv32_active_ram_size = context->memory_size;
     for (unsigned int count = 0U; count < instruction_budget; ++count) {
+        if (context->io.pending) {
+            return PLATFORM_RISCV32_YIELDED;
+        }
+        if (context->state.pc != context->gate_state.pc) {
+            context->io.retrying = false;
+            host_io_cancel(&context->io);
+        }
+        context->gate_state = context->state;
         if (context->state.pc == HOST_RV32_RETURN) {
             *returned_status = (int) context->state.regs[10];
             return PLATFORM_RISCV32_RETURNED;
@@ -847,9 +861,25 @@ platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* cont
             if (items == NULL || context->api.wait == NULL) {
                 return PLATFORM_RISCV32_FAULT;
             }
-            current_user_data       = context->user_data;
-            context->state.regs[10] = (uint32_t) context->api.wait(items, item_count, context->state.regs[12]);
-            current_user_data       = NULL;
+            const uint64_t now = platform_time_ms();
+            if (!context->waiting) {
+                const uint32_t timeout = context->state.regs[12];
+                if (timeout == TABOS_WAIT_TIMEOUT_INFINITE) {
+                    context->wait_deadline = UINT64_MAX;
+                } else {
+                    context->wait_deadline = UINT64_MAX - now <= timeout ? UINT64_MAX - 1U : now + timeout;
+                }
+                context->waiting = true;
+            }
+            current_user_data = context->user_data;
+            const int ready   = context->api.wait(items, item_count, 0U);
+            current_user_data = NULL;
+            if (ready == 0 && now < context->wait_deadline) {
+                host_io_retry();
+                return PLATFORM_RISCV32_YIELDED;
+            }
+            context->waiting        = false;
+            context->state.regs[10] = (uint32_t) ready;
             context->state.pc       = context->state.regs[1];
             return PLATFORM_RISCV32_YIELDED;
         }
@@ -1345,6 +1375,37 @@ bool platform_riscv32_requires_runtime_slices(void)
     return true;
 }
 
+uint64_t platform_riscv32_next_deadline(const platform_riscv32_context_t* context)
+{
+    return context != NULL ? context->resume_at : PLATFORM_RUNTIME_DEADLINE_NONE;
+}
+
+platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* context, unsigned int instruction_budget,
+                                                int* returned_status)
+{
+    if (context == NULL) {
+        return PLATFORM_RISCV32_FAULT;
+    }
+    host_io_enter(&context->io);
+    platform_riscv32_result_t result = step_inner(context, instruction_budget, returned_status);
+    host_io_leave();
+    current_user_data = NULL;
+    if (context->io.pending) {
+        context->state       = context->gate_state;
+        context->io.retrying = true;
+        const uint64_t now   = platform_time_ms();
+        context->resume_at   = UINT64_MAX - now <= 10U ? UINT64_MAX - 1U : now + 10U;
+        if (context->waiting && context->wait_deadline < context->resume_at) {
+            context->resume_at = context->wait_deadline;
+        }
+        result = PLATFORM_RISCV32_YIELDED;
+    } else {
+        context->resume_at = 0U;
+        host_io_cancel(&context->io);
+    }
+    return result;
+}
+
 void* platform_riscv32_current_user_data(void)
 {
     return current_user_data;
@@ -1353,6 +1414,7 @@ void* platform_riscv32_current_user_data(void)
 void platform_riscv32_destroy(platform_riscv32_context_t* context)
 {
     if (context != NULL) {
+        host_io_cancel(&context->io);
         free(context->memory);
         free(context);
     }
