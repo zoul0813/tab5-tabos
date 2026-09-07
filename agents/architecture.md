@@ -320,6 +320,9 @@ protocol to remain blocked until process manager restores it with child status.
 Process teardown cancels blocking application waits and stops the native execution
 context before releasing any process-owned service, descriptor, heap, or executable
 mapping. This prevents cleanup from racing a final application API call.
+Queued graphics commands borrow application buffers. Teardown discards that queue after
+stopping execution; it must not drain blits after guest RAM or the native stack is freed.
+Explicit graphics close still fences pending work while application memory is live.
 
 ELF ABI version 3 entry and nested execution carry bounded `argc`/`argv`. Child loader
 state owns copied arguments for full process lifetime. Tokenization, quoting, and escaping

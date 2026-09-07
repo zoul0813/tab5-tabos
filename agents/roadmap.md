@@ -145,6 +145,8 @@
 
 ### Process Ownership and Failure Containment
 
+- [x] Resolve AUD-003: discard borrowed-buffer graphics commands on teardown; validate
+  RV32 return, exit, fault, forced stop, and explicit present/close under host sanitizers.
 - [x] Audit process, ELF mapping, execution task, descriptor, heap, graphics,
   console, and nested-parent ownership.
 - [x] Make filesystem ELF resource teardown idempotent across partial startup,
