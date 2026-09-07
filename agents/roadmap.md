@@ -538,6 +538,7 @@ but is not a substitute for this execution path.
 - [x] Add direct native-orientation scanout for fullscreen Tab5 graphics applications.
 - [x] Add VSYNC-paced native double buffering for tear-free Tab5 graphics.
 - [x] Add deterministic pixel-level clipping and framebuffer regression tests.
+- [x] Resolve AUD-008: reject empty raster-fill intersections before pointer and span arithmetic.
 - [x] Add a portable graphics benchmark application.
 - [x] Add application-owned integer-scaled logical canvases with automatic presentation.
 - [ ] Validate PPA orientation, transforms, and fallback on physical Tab5 variants.
