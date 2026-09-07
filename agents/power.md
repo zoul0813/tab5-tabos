@@ -56,18 +56,21 @@ sleep-retention validation belongs to Phase 7. No sleep path enabled.
 
 ## Phase 1 — Portable manager and deterministic host model
 
-- [ ] Add internal power subsystem with `active`, `idle`, `suspending`, `suspended`, `resuming`, and `shutting-down` states.
-- [ ] Store current policy, last activity, transition generation/reason, blockers, wake causes, transition timings, and last failure.
-- [ ] Keep runtime dispatcher as sole transition owner. Requests and worker completions notify existing runtime event mechanism.
-- [ ] Add power deadline to existing nearest-deadline calculation; introduce no periodic power tick.
-- [ ] Add fixed-capacity participant registration with stable name, dependency list, blocker query, suspend operation, and resume operation.
-- [ ] Reject duplicate names, missing dependencies, cycles, and capacity overflow during initialization. Disable suspend on invalid registration; retain normal operation and diagnostics.
-- [ ] Compute deterministic dependency order once. Registration order breaks ties between independent participants.
-- [ ] Support asynchronous callback completion through events and transition generations. Ignore stale completions; never retain unprotected process pointers.
-- [ ] Require callbacks to report success, pending, or failure. No unbounded callback may run on runtime task.
-- [ ] Add narrow platform contracts for brightness, sleep preparation/abort, sleep entry, wake-cause collection, and restoration.
-- [ ] Add host fake clock, synthetic activity/wake injection, callback-failure injection, and ordered callback trace. Simulator suspends TabOS execution without suspending host operating system.
-- [ ] Keep this phase internal; public SDK additions land with actual shell controls.
+- [x] Add internal power subsystem with `active`, `idle`, `suspending`, `suspended`, `resuming`, and `shutting-down` states.
+- [x] Store current policy, last activity, transition generation/reason, blockers, wake causes, transition timings, and last failure.
+- [x] Keep runtime dispatcher as sole transition owner. Requests and worker completions notify existing runtime event mechanism.
+- [x] Add power deadline to existing nearest-deadline calculation; introduce no periodic power tick.
+- [x] Add fixed-capacity participant registration with stable name, dependency list, blocker query, suspend operation, and resume operation.
+- [x] Reject duplicate names, missing dependencies, cycles, and capacity overflow during initialization. Disable suspend on invalid registration; retain normal operation and diagnostics.
+- [x] Compute deterministic dependency order once. Registration order breaks ties between independent participants.
+- [x] Support asynchronous callback completion through events and transition generations. Ignore stale completions; never retain unprotected process pointers.
+- [x] Require callbacks to report success, pending, or failure. No unbounded callback may run on runtime task.
+- [x] Add narrow platform contracts for brightness, sleep preparation/abort, sleep entry, wake-cause collection, and restoration.
+- [x] Add host fake clock, synthetic activity/wake injection, callback-failure injection, and ordered callback trace. Simulator suspends TabOS execution without suspending host operating system.
+- [x] Keep this phase internal; public SDK additions land with actual shell controls.
+
+Phase 1 validation: macOS Debug power tests and full suite pass (socket test requires
+normal loopback permission); Tab5 Debug cross-build passes. No Tab5 sleep path is enabled.
 
 **Tests:** every legal/illegal transition, registration failures, ordering, stale completion, deadline saturation, and indefinite blocking.
 

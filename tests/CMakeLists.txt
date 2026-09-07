@@ -354,6 +354,18 @@ tabos_enable_warnings(tabos_runtime_event)
 tabos_enable_sanitizers(tabos_runtime_event)
 add_test(NAME unit.runtime_event COMMAND tabos_runtime_event)
 
+add_executable(tabos_power_manager unit/power_manager.c ${TABOS_TEST_PLATFORM_FAKES})
+target_include_directories(tabos_power_manager PRIVATE
+    "${TABOS_ROOT}/kernel/include"
+    "${TABOS_ROOT}/platform/include"
+    "${TABOS_ROOT}/sdk/include"
+    "${CMAKE_CURRENT_LIST_DIR}/fakes"
+)
+target_link_libraries(tabos_power_manager PRIVATE tabos_core)
+tabos_enable_warnings(tabos_power_manager)
+tabos_enable_sanitizers(tabos_power_manager)
+add_test(NAME unit.power_manager COMMAND tabos_power_manager)
+
 add_executable(tabos_host_runtime_event unit/host_runtime_event.c)
 target_include_directories(tabos_host_runtime_event PRIVATE
     "${TABOS_ROOT}/platform/include"
@@ -375,6 +387,17 @@ endif()
 tabos_enable_warnings(tabos_host_runtime_event)
 tabos_enable_sanitizers(tabos_host_runtime_event)
 add_test(NAME unit.host_runtime_event COMMAND tabos_host_runtime_event)
+
+add_executable(tabos_host_power_model unit/host_power_model.c)
+target_include_directories(tabos_host_power_model PRIVATE
+    "${TABOS_ROOT}/platform/host/sdl"
+    "${TABOS_ROOT}/platform/include"
+    "${TABOS_ROOT}/sdk/include"
+)
+target_link_libraries(tabos_host_power_model PRIVATE tabos_core tabos_platform_host SDL3::SDL3)
+tabos_enable_warnings(tabos_host_power_model)
+tabos_enable_sanitizers(tabos_host_power_model)
+add_test(NAME unit.host_power_model COMMAND tabos_host_power_model)
 
 add_executable(tabos_wall_clock unit/wall_clock.c ${TABOS_TEST_PLATFORM_FAKES})
 target_include_directories(tabos_wall_clock PRIVATE

@@ -207,6 +207,30 @@ uint64_t platform_time_ms(void)
     return monotonic_ms;
 }
 
+bool platform_power_set_brightness(uint8_t percent)
+{
+    return percent <= 100U;
+}
+bool platform_power_prepare_sleep(void)
+{
+    return true;
+}
+void platform_power_abort_sleep(void)
+{
+}
+bool platform_power_enter_light_sleep(void)
+{
+    return true;
+}
+platform_power_wake_cause_t platform_power_collect_wake_causes(void)
+{
+    return PLATFORM_POWER_WAKE_KEYBOARD;
+}
+bool platform_power_restore(void)
+{
+    return true;
+}
+
 bool platform_wall_clock_get(int64_t* seconds)
 {
     if (seconds == NULL) {

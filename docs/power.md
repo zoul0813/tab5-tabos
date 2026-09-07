@@ -66,6 +66,11 @@ GPIO interrupt ownership, pinned-SDK restrictions, unverified wake paths, and th
 repeatable measurement worksheet. Functional sleep/wake and instrumented power
 measurements remain separate validation gates.
 
+TabOS now contains an internal portable power-state manager and deterministic host
+simulation used for development tests. This does not add an application API or enable
+automatic dimming or Tab5 light sleep. Those behaviors remain disabled until later
+power phases add service participation, safety gates, and hardware validation.
+
 Debug firmware also reports cumulative `Platform activity:` counters beside the
 60-second runtime wake report. They expose codec, headphone-monitor, display-refresh
 and accelerator work that can continue while the runtime is blocked. See the baseline

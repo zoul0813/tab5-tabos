@@ -67,8 +67,10 @@
 - [x] Close Power Phase 0: user accepts PCB revision `unknown` and defers exact
   matching plus circuit-specific RTC/IMU/power-button wake. All ten items complete
   with documented limits; later sleep tests and instrumented power evidence remain open.
-- [ ] Slice 1: implement portable power manager, dependency-ordered service registration,
-  platform sleep contract, and deterministic host controls.
+- [x] Phase 1: implement portable asynchronous power manager, dependency-ordered
+  participant registration, runtime deadline/event integration, platform sleep contract,
+  and deterministic host controls. macOS Debug tests and Tab5 Debug cross-build pass;
+  hardware sleep remains disabled.
 - [ ] Slice 2: implement activity-driven idle dimming and measure each power reduction.
 
 ### Hardware Services Phase 6 Validation

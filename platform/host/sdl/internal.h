@@ -13,5 +13,6 @@ void host_input_update(bool wait);
 void host_input_wait_until(uint64_t deadline_ms);
 bool host_capture_screenshot(void);
 bool host_pointer_event(const SDL_Event* event);
+uint64_t host_power_time_offset(void);
 
 #endif

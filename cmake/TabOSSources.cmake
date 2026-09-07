@@ -4,6 +4,7 @@ endif()
 
 set(TABOS_CORE_SOURCES
     "${TABOS_ROOT}/kernel/runtime.c"
+    "${TABOS_ROOT}/kernel/power.c"
     "${TABOS_ROOT}/process/process.c"
     "${TABOS_ROOT}/kernel/application_registry.c"
     "${TABOS_ROOT}/kernel/device_registry.c"
@@ -52,6 +53,7 @@ endif()
 
 set(TABOS_HOST_PLATFORM_SOURCES
     "${TABOS_ROOT}/platform/host/sdl/runtime.c"
+    "${TABOS_ROOT}/platform/host/sdl/power.c"
     "${TABOS_ROOT}/platform/host/sdl/clock.c"
     "${TABOS_ROOT}/platform/host/sdl/mutex.c"
     "${TABOS_ROOT}/platform/host/sdl/input.c"

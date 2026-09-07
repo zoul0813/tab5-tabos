@@ -1463,8 +1463,14 @@ checks direct attachment and removes it before controller teardown. Concurrent r
 and new consumers require an explicit lifecycle audit.
 
 Power Phase 0 inventory and wake-source restrictions live in `docs/power-baseline.md`.
-No suspend API, PM enablement or wake arming exists yet. Missing tested reversible service
-lifecycle remains a blocker, including initialized drivers with no application handles.
+Portable Phase 1 power management is internal to kernel. Runtime dispatcher owns state
+transitions and combines its absolute deadline with existing service deadlines. Fixed-capacity
+participants are ordered once by stable dependency names; asynchronous completions carry a
+transition generation so stale replies cannot advance current state. Invalid graphs disable
+suspend while normal operation remains available. Platform boundary supplies brightness,
+preparation/abort, sleep entry, wake-cause collection, and restoration. No public suspend API,
+PM enablement, or Tab5 wake arming exists yet. Missing tested reversible service lifecycle
+remains a blocker, including initialized drivers with no application handles.
 
 Debug peripheral activity uses a narrow `platform_runtime_log_activity()` diagnostic
 hook beside the existing health-audit wake report. Tab5 counts codec pairs/frames/errors,

@@ -1624,3 +1624,11 @@ Power baseline instrumentation extends `unit.core_smoke`: ordinary event dispatc
 not report peripheral activity; the existing health deadline reports once in Debug and
 not in Release. Cross-build both configurations to verify counter compile guards; use
 physical consecutive serial snapshots for actual codec/headphone/VSYNC rates.
+
+`unit.power_manager` validates deterministic dependency and callback order, blockers,
+failure rollback, pending callbacks, generation-stale completion, wake collection,
+saturated deadlines, indefinite transition blocking, duplicate names, missing
+dependencies, cycles, and capacity overflow. `unit.host_power_model` validates synthetic
+monotonic advancement, activity injection, brightness state, one-shot platform failure,
+coalesced wake injection, and wake-cause consumption. Tab5 builds retain stubbed sleep
+entry until validated hardware sleep lands in Phase 7.

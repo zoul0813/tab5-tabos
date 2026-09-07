@@ -895,6 +895,19 @@ bool platform_display_present(const platform_framebuffer_t* framebuffer)
     return true;
 }
 
+bool platform_power_set_brightness(uint8_t percent)
+{
+    if (!display_created || percent > 100U) {
+        return false;
+    }
+    const esp_err_t result = bsp_display_brightness_set(percent);
+    if (result != ESP_OK) {
+        return false;
+    }
+    backlight_enabled = percent > 0U;
+    return true;
+}
+
 void platform_display_shutdown(void)
 {
     ppa_ready = false;

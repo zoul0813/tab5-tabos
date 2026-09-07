@@ -33,9 +33,23 @@ enum {
     PLATFORM_RUNTIME_EVENT_DEVICE      = 1U << 6U,
     PLATFORM_RUNTIME_EVENT_DEADLINE    = 1U << 7U,
     PLATFORM_RUNTIME_EVENT_SHUTDOWN    = 1U << 8U,
+    PLATFORM_RUNTIME_EVENT_POWER       = 1U << 9U,
 };
 
 #define PLATFORM_RUNTIME_DEADLINE_NONE UINT64_MAX
+
+typedef uint32_t platform_power_wake_cause_t;
+
+enum {
+    PLATFORM_POWER_WAKE_NONE         = 0U,
+    PLATFORM_POWER_WAKE_KEYBOARD     = 1U << 0U,
+    PLATFORM_POWER_WAKE_POINTER      = 1U << 1U,
+    PLATFORM_POWER_WAKE_TIMER        = 1U << 2U,
+    PLATFORM_POWER_WAKE_POWER_BUTTON = 1U << 3U,
+    PLATFORM_POWER_WAKE_RTC          = 1U << 4U,
+    PLATFORM_POWER_WAKE_MOTION       = 1U << 5U,
+    PLATFORM_POWER_WAKE_OTHER        = 1U << 30U,
+};
 
 typedef void (*platform_audio_render_fn)(int16_t* stereo, size_t frames);
 typedef void (*platform_audio_capture_fn)(const int16_t* samples, size_t frames, uint32_t channels);
@@ -189,6 +203,12 @@ void platform_log(const char* message);
 /* Debug diagnostics only; called by existing health audit, creates no timer. */
 void platform_runtime_log_activity(void);
 uint64_t platform_time_ms(void);
+bool platform_power_set_brightness(uint8_t percent);
+bool platform_power_prepare_sleep(void);
+void platform_power_abort_sleep(void);
+bool platform_power_enter_light_sleep(void);
+platform_power_wake_cause_t platform_power_collect_wake_causes(void);
+bool platform_power_restore(void);
 bool platform_wall_clock_get(int64_t* seconds);
 bool platform_wall_clock_set(int64_t seconds);
 bool platform_wall_clock_status(int* error);
