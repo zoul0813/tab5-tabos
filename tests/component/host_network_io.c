@@ -10,7 +10,6 @@
 #include <openssl/ssl.h>
 #include <openssl/x509v3.h>
 #include <pthread.h>
-#include <signal.h>
 #include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -215,8 +214,6 @@ static void tls_continuations(void)
 
 int main(void)
 {
-    /* SIGPIPE handling is tracked separately as AUD-016. */
-    signal(SIGPIPE, SIG_IGN);
     socket_continuations();
     host_io_scope_t scope = {0};
     platform_network_address_t address;

@@ -80,7 +80,8 @@ closes the native accepted socket before returning.
 Socket payload calls are bounded to `TABOS_NETWORK_IO_MAX` bytes. Applications
 must loop when transferring larger streams. A zero return from receive means the
 peer performed an orderly shutdown. Nonblocking operations report `EAGAIN`
-through `errno`.
+through `errno`. Host sends suppress the native SIGPIPE signal, so sending after a
+peer disconnect returns an application error without terminating TabOS.
 
 Sockets belong to the loaded application that opened or accepted them. TabOS
 closes remaining sockets during normal exit and fault cleanup. Public headers do
