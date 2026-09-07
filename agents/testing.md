@@ -1629,3 +1629,20 @@ A developer working on the shell, filesystem, graphics model, UI, utilities, or 
 The real Tab5 remains the final source of truth for hardware behavior.
 
 The purpose of the macOS/Linux SDL3 builds is to make the shared TabOS implementation fast to develop, easy to debug, and continuously testable without compromising the architecture of the actual device.
+
+## Kilo validation (2026-09-07)
+
+`component.kilo` tests bounded editing, duplicate input suppression, search, CP437,
+allocation failures, line endings, short I/O, save/close/install/rollback/cleanup errors,
+and real-terminal rendering after ring overflow. `tabos_kilo_rv32` is an optional
+actual-application harness using temporary drive roots. Pass shell, Kilo, and optionally
+tester artifacts; ordinary CTest remains independent of application builds.
+`tester --input` checks copied geometry, keyboard sources, finite deadlines, foreign
+and stale handles, and retained parent TTY mode. Console and runtime-event regressions
+cover lifecycle reset and retained/coalesced wake signals.
+
+For this implementation session the user explicitly excludes Linux host tests.
+Validate macOS Debug/Release and Tab5 cross-builds. The operator reported Kilo physical
+Tab5 functional requirements passing on 2026-09-07 and subsequently confirmed
+`tester --input` worked on physical Tab5. Quantitative memory and power measurements
+were not reported.

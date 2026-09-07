@@ -1,4 +1,5 @@
 #include <tabos/internal/elf_application.h>
+#include <tabos/internal/input.h>
 #include <tabos/internal/audio.h>
 #include <tabos/internal/pointer.h>
 #include <tabos/internal/camera.h>
@@ -95,6 +96,7 @@ typedef enum {
     ELF_WAIT_SOURCE_AUDIO,
     ELF_WAIT_SOURCE_POINTER,
     ELF_WAIT_SOURCE_CAMERA,
+    ELF_WAIT_SOURCE_INPUT,
     ELF_WAIT_SOURCE_TYPE_COUNT,
 } elf_wait_source_type_t;
 
@@ -162,6 +164,8 @@ struct loader_elf_application {
         size_t heap_used;
         size_t heap_limit;
         uint32_t tty_mode;
+        bool input_wait_pending;
+        uint64_t input_wait_deadline;
         char input_pending[4];
         uint8_t input_pending_offset;
         uint8_t input_pending_length;
@@ -495,6 +499,19 @@ static int elf_tty_get_mode(int descriptor)
         return -TABOS_ENOTTY;
     }
     return (int) application->tty_mode;
+}
+
+static int elf_tty_get_size(int descriptor, tabos_tty_size_t* size)
+{
+    loader_elf_application_t* application = platform_riscv32_current_user_data();
+    if (application == NULL || descriptor < 0 || descriptor > 2) {
+        return -TABOS_ENOTTY;
+    }
+    tabos_tty_size_t* writable = (tabos_tty_size_t*) platform_executable_data_pointer(size, sizeof(*size));
+    if (writable == NULL) {
+        return -TABOS_EINVAL;
+    }
+    return console_get_size(application->console, writable) ? 0 : -TABOS_EBADF;
 }
 
 static int elf_tty_set_mode(int descriptor, uint32_t mode)
@@ -1225,6 +1242,29 @@ static int elf_socket_receive_from(int socket, void* data, uint32_t capacity, ta
     return received;
 }
 
+static int elf_input_wait_source(void)
+{
+    loader_elf_application_t* application = platform_riscv32_current_user_data();
+    if (application == NULL || !tabos_console_is_foreground(application->console)) {
+        return -TABOS_EBADF;
+    }
+    tabos_wait_source_t source = elf_wait_source_find(application, ELF_WAIT_SOURCE_INPUT, 0U);
+    if (source == TABOS_WAIT_SOURCE_INVALID) {
+        source = elf_wait_source_allocate(application, ELF_WAIT_SOURCE_INPUT, 0U);
+    }
+    return source == TABOS_WAIT_SOURCE_INVALID ? -TABOS_EMFILE : source;
+}
+static int elf_wait_poll_input(loader_elf_application_t* application, uintptr_t parent, uint32_t requested_events,
+                               uint32_t* returned_events)
+{
+    (void) parent;
+    if (!tabos_console_is_foreground(application->console)) {
+        return -TABOS_EBADF;
+    }
+    *returned_events = input_pending() ? requested_events & TABOS_WAIT_READABLE : 0U;
+    return 0;
+}
+
 static int elf_wait_poll_device_subscription(loader_elf_application_t* application, uintptr_t parent,
                                              uint32_t requested_events, uint32_t* returned_events)
 {
@@ -1266,31 +1306,32 @@ static int elf_wait_prepare_socket(loader_elf_application_t* application, uintpt
 }
 
 static const elf_wait_source_adapter_t elf_wait_source_adapters[ELF_WAIT_SOURCE_TYPE_COUNT] = {
+    [ELF_WAIT_SOURCE_INPUT] = {.valid_events = TABOS_WAIT_READABLE, .poll = elf_wait_poll_input},
     [ELF_WAIT_SOURCE_SOCKET] =
         {
-                                  .valid_events = TABOS_WAIT_READABLE | TABOS_WAIT_WRITABLE | TABOS_WAIT_ERROR | TABOS_WAIT_HANGUP,
-                                  .socket       = elf_wait_prepare_socket,
-                                  },
+                               .valid_events = TABOS_WAIT_READABLE | TABOS_WAIT_WRITABLE | TABOS_WAIT_ERROR | TABOS_WAIT_HANGUP,
+                               .socket       = elf_wait_prepare_socket,
+                               },
     [ELF_WAIT_SOURCE_DEVICE_SUBSCRIPTION] =
         {
-                                  .valid_events = TABOS_WAIT_READABLE | TABOS_WAIT_STATE_CHANGED | TABOS_WAIT_ERROR | TABOS_WAIT_HANGUP,
-                                  .poll         = elf_wait_poll_device_subscription,
-                                  },
+                               .valid_events = TABOS_WAIT_READABLE | TABOS_WAIT_STATE_CHANGED | TABOS_WAIT_ERROR | TABOS_WAIT_HANGUP,
+                               .poll         = elf_wait_poll_device_subscription,
+                               },
     [ELF_WAIT_SOURCE_AUDIO] =
         {
-                                  .valid_events = TABOS_WAIT_READABLE | TABOS_WAIT_WRITABLE | TABOS_WAIT_ERROR | TABOS_WAIT_HANGUP,
-                                  .poll         = elf_wait_poll_audio,
-                                  },
+                               .valid_events = TABOS_WAIT_READABLE | TABOS_WAIT_WRITABLE | TABOS_WAIT_ERROR | TABOS_WAIT_HANGUP,
+                               .poll         = elf_wait_poll_audio,
+                               },
     [ELF_WAIT_SOURCE_POINTER] =
         {
-                                  .valid_events = TABOS_WAIT_READABLE | TABOS_WAIT_ERROR | TABOS_WAIT_HANGUP,
-                                  .poll         = elf_wait_poll_pointer,
-                                  },
+                               .valid_events = TABOS_WAIT_READABLE | TABOS_WAIT_ERROR | TABOS_WAIT_HANGUP,
+                               .poll         = elf_wait_poll_pointer,
+                               },
     [ELF_WAIT_SOURCE_CAMERA] =
         {
-                                  .valid_events = TABOS_WAIT_READABLE | TABOS_WAIT_ERROR | TABOS_WAIT_HANGUP,
-                                  .poll         = elf_wait_poll_camera,
-                                  },
+                               .valid_events = TABOS_WAIT_READABLE | TABOS_WAIT_ERROR | TABOS_WAIT_HANGUP,
+                               .poll         = elf_wait_poll_camera,
+                               },
 };
 
 static int elf_wait_sources(loader_elf_application_t* application, tabos_elf_wait_item_t* items, uint32_t count,
@@ -1303,12 +1344,14 @@ static int elf_wait_sources(loader_elf_application_t* application, tabos_elf_wai
     uint32_t socket_item_indices[TABOS_SOCKET_MAX];
     uint32_t socket_count                           = 0U;
     bool requires_polling                           = false;
+    bool input_only                                 = true;
     bool update_sources[ELF_WAIT_SOURCE_TYPE_COUNT] = {false};
     for (uint32_t index = 0U; index < count; ++index) {
         elf_wait_source_t* source = elf_wait_source(application, items[index].source);
         if (source == NULL || source->type >= ELF_WAIT_SOURCE_TYPE_COUNT) {
             return -TABOS_EBADF;
         }
+        input_only                               = input_only && source->type == ELF_WAIT_SOURCE_INPUT;
         const elf_wait_source_adapter_t* adapter = &elf_wait_source_adapters[source->type];
         if (items[index].events == 0U || (items[index].events & ~adapter->valid_events) != 0U) {
             return -TABOS_EINVAL;
@@ -1336,6 +1379,7 @@ static int elf_wait_sources(loader_elf_application_t* application, tabos_elf_wai
     const bool finite_timeout = timeout_ms != TABOS_WAIT_TIMEOUT_INFINITE;
     const uint64_t deadline_ms =
         finite_timeout ? time_deadline_after(platform_time_ms(), timeout_ms) : TIME_DEADLINE_NONE;
+    const uint64_t input_deadline = application->input_wait_pending ? application->input_wait_deadline : deadline_ms;
     while (true) {
         int ready = 0;
         for (uint32_t type = 0U; type < ELF_WAIT_SOURCE_TYPE_COUNT; ++type) {
@@ -1363,6 +1407,23 @@ static int elf_wait_sources(loader_elf_application_t* application, tabos_elf_wai
         }
 
         const uint64_t now_ms = platform_time_ms();
+        if (input_only) {
+            if (ready > 0 || timeout_ms == 0U || now_ms >= input_deadline) {
+                application->input_wait_pending = false;
+                return ready;
+            }
+            if (atomic_load_explicit(&application->wait_cancel_requested, memory_order_acquire)) {
+                application->input_wait_pending = false;
+                return -TABOS_ECANCELED;
+            }
+            if (platform_riscv32_requires_runtime_slices()) {
+                application->input_wait_pending  = true;
+                application->input_wait_deadline = input_deadline;
+                return TABOS_ELF_WAIT_PENDING;
+            }
+            input_wait_ready(input_deadline == TIME_DEADLINE_NONE ? UINT32_MAX : (uint32_t) (input_deadline - now_ms));
+            continue;
+        }
         if (ready == 0 && finite_timeout && now_ms >= deadline_ms) {
             return 0;
         }
@@ -2238,6 +2299,8 @@ static bool elf_entry(tabos_app_context_t* context)
         .camera_copy                     = elf_camera_copy,
         .camera_release                  = elf_camera_release,
         .camera_wait_source              = elf_camera_wait_source,
+        .tty_get_size                    = elf_tty_get_size,
+        .input_wait_source               = elf_input_wait_source,
     };
     application->execution = platform_riscv32_create(
         application->image.entry, application->image.memory, application->image.memory_size,
@@ -2322,6 +2385,7 @@ static bool elf_heap_guards_intact(const loader_elf_application_t* application)
 static void elf_cancel_wait(loader_elf_application_t* application)
 {
     atomic_store_explicit(&application->wait_cancel_requested, true, memory_order_release);
+    input_wake_waiter();
     if (!atomic_load_explicit(&application->wait_active, memory_order_acquire)) {
         return;
     }
@@ -2356,7 +2420,8 @@ static void elf_release_resources(loader_elf_application_t* application)
             (application->wait_sources[index].type == ELF_WAIT_SOURCE_DEVICE_SUBSCRIPTION ||
              application->wait_sources[index].type == ELF_WAIT_SOURCE_AUDIO ||
              application->wait_sources[index].type == ELF_WAIT_SOURCE_POINTER ||
-             application->wait_sources[index].type == ELF_WAIT_SOURCE_CAMERA)) {
+             application->wait_sources[index].type == ELF_WAIT_SOURCE_CAMERA ||
+             application->wait_sources[index].type == ELF_WAIT_SOURCE_INPUT)) {
             const uint32_t generation        = application->wait_sources[index].generation;
             application->wait_sources[index] = (elf_wait_source_t) {.generation = generation};
         }
@@ -2514,5 +2579,16 @@ bool loader_elf_application_runtime_runnable(const tabos_app_descriptor_t* descr
         return false;
     }
     const loader_elf_application_t* application = application_data;
-    return application->execution != NULL && platform_riscv32_requires_runtime_slices();
+    return application->execution != NULL && platform_riscv32_requires_runtime_slices() &&
+           (!application->input_wait_pending || input_pending() ||
+            platform_time_ms() >= application->input_wait_deadline);
+}
+
+uint64_t loader_elf_application_deadline(const tabos_app_descriptor_t* descriptor, const void* data)
+{
+    if (descriptor == NULL || descriptor->update != elf_update || data == NULL) {
+        return TIME_DEADLINE_NONE;
+    }
+    const loader_elf_application_t* application = data;
+    return application->input_wait_pending ? application->input_wait_deadline : TIME_DEADLINE_NONE;
 }

@@ -19,6 +19,7 @@ static char held_text[TABOS_INPUT_TEXT_MAX_BYTES + 1U];
 static uint8_t held_text_modifiers;
 static tabos_timer_t repeat_timer;
 static platform_mutex_t* queue_mutex;
+static platform_signal_t* queue_signal;
 
 static bool modifier_key(tabos_key_t key)
 {
@@ -44,6 +45,14 @@ bool input_init(void)
     if (queue_mutex == NULL) {
         queue_mutex = platform_mutex_create();
         if (queue_mutex == NULL) {
+            return false;
+        }
+    }
+    if (queue_signal == NULL) {
+        queue_signal = platform_signal_create();
+        if (queue_signal == NULL) {
+            platform_mutex_destroy(queue_mutex);
+            queue_mutex = NULL;
             return false;
         }
     }
@@ -74,6 +83,8 @@ void input_shutdown(void)
     unlock_queue();
     platform_mutex_destroy(queue_mutex);
     queue_mutex = NULL;
+    platform_signal_destroy(queue_signal);
+    queue_signal = NULL;
 }
 
 bool input_submit(const tabos_input_event_t* event)
@@ -114,6 +125,7 @@ bool input_submit(const tabos_input_event_t* event)
     ++queue_count;
     unlock_queue();
     platform_runtime_notify(PLATFORM_RUNTIME_EVENT_INPUT);
+    input_wake_waiter();
     input_diagnostic_log(event);
     return true;
 }
@@ -162,6 +174,7 @@ void input_update(void)
         text_repeated = true;
     }
     unlock_queue();
+    input_wake_waiter();
     input_diagnostic_log(&key_event);
     if (text_repeated) {
         input_diagnostic_log(&text_event);
@@ -250,4 +263,22 @@ size_t input_text_from_hid(uint8_t usage, uint8_t modifiers, char* text, size_t 
     text[0] = character;
     text[1] = '\0';
     return 1U;
+}
+
+bool input_pending(void)
+{
+    if (!lock_queue()) {
+        return false;
+    }
+    const bool pending = queue_count != 0U;
+    unlock_queue();
+    return pending;
+}
+void input_wait_ready(uint32_t timeout_ms)
+{
+    platform_signal_wait(queue_signal, timeout_ms);
+}
+void input_wake_waiter(void)
+{
+    platform_signal_notify(queue_signal);
 }

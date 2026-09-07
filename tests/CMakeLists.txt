@@ -709,3 +709,30 @@ tabos_enable_warnings(tabos_camera_concurrency)
 tabos_enable_sanitizers(tabos_camera_concurrency)
 add_test(NAME component.camera_concurrency COMMAND tabos_camera_concurrency)
 set_tests_properties(component.camera_concurrency PROPERTIES TIMEOUT 15)
+
+add_executable(tabos_kilo component/kilo.c ${TABOS_TEST_PLATFORM_FAKES}
+    "${TABOS_ROOT}/apps/kilo/src/editor.c"
+    "${TABOS_ROOT}/apps/kilo/src/input.c"
+    "${TABOS_ROOT}/apps/kilo/src/storage.c"
+    "${TABOS_ROOT}/apps/kilo/src/render.c")
+target_include_directories(tabos_kilo PRIVATE "${TABOS_ROOT}/apps/kilo/include"
+    "${TABOS_ROOT}/platform/include" "${TABOS_ROOT}/graphics/include"
+    "${TABOS_ROOT}/kernel/include" "${TABOS_GENERATED_INCLUDE_DIR}")
+target_link_libraries(tabos_kilo PRIVATE tabos_core)
+tabos_enable_warnings(tabos_kilo)
+tabos_enable_sanitizers(tabos_kilo)
+add_test(NAME component.kilo COMMAND tabos_kilo)
+
+add_executable(tabos_kilo_rv32 component/kilo_rv32.c)
+target_include_directories(tabos_kilo_rv32 PRIVATE
+    "${TABOS_ROOT}/kernel/include" "${TABOS_ROOT}/input/include" "${TABOS_ROOT}/platform/include"
+)
+if(TABOS_TARGET STREQUAL "linux")
+    target_link_libraries(tabos_kilo_rv32 PRIVATE
+        "-Wl,--start-group" tabos_core tabos_platform_host "-Wl,--end-group" SDL3::SDL3
+    )
+else()
+    target_link_libraries(tabos_kilo_rv32 PRIVATE tabos_core tabos_platform_host SDL3::SDL3)
+endif()
+tabos_enable_warnings(tabos_kilo_rv32)
+tabos_enable_sanitizers(tabos_kilo_rv32)

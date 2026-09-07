@@ -20,6 +20,15 @@
 
 ## Current Work
 
+### Kilo Terminal Editor
+
+- [x] Implement terminal geometry, bounded ANSI controls, and keyboard readiness waits.
+- [x] Port attributed upstream Kilo with bounded editing and recoverable byte-preserving saves.
+- [x] Validate macOS sanitizers, actual RV32 sessions, and macOS/Tab5 Debug/Release builds.
+- Linux host testing excluded for this implementation by explicit user direction.
+- [x] Physical Tab5 Kilo functional acceptance: operator reports requirements pass (2026-09-07).
+- [x] Physical Tab5 `tester --input` passes (operator confirmed, 2026-09-07).
+
 ### Persistent Shell History
 
 - [x] Implement shell-local 32-entry recall, editable drafts, and `history` listing.

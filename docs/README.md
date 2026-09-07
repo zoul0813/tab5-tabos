@@ -18,6 +18,7 @@ This directory contains user and contributor documentation for TabOS.
 - [Time and Timers](time.md): monotonic clock and reusable polling timers.
 - [Reboot and Shutdown](power.md): orderly restart, power-off commands, and application API.
 - [Filesystem and Storage](filesystem.md): POSIX-style file API, host root, and Tab5 microSD behavior.
+- [Kilo](kilo.md): terminal editing, search, byte-preserving saves, and recovery.
 - [Shell](shell.md): build, install, start, and use filesystem-backed PID 0 shell.
 - [Networking](networking.md): saved Wi-Fi configuration, network status, and connection control.
 - [Audio Service](audio.md): PCM streams, waits, mixing, routes, and the audio test utility.

@@ -149,6 +149,9 @@ void tabos_console_release(tabos_console_session_t* session)
     bool deadline_changed = false;
     lock_console();
     if (owns_console(session)) {
+        active_terminal->ansi_state = 0U;
+        active_terminal->reverse    = false;
+        terminal_set_colors(active_terminal, 0xffff, 0x0000);
         terminal_set_cursor_visible(active_terminal, false);
         tabos_timer_cancel(&cursor_timer);
         (void) present_console();
@@ -395,4 +398,16 @@ void console_set_graphics_active(bool active)
     }
     unlock_console();
     platform_runtime_notify(PLATFORM_RUNTIME_EVENT_DEADLINE);
+}
+
+bool console_get_size(const tabos_console_session_t* session, tabos_tty_size_t* size)
+{
+    lock_console();
+    const bool valid = size != NULL && owns_console(session) && active_terminal != NULL;
+    if (valid) {
+        size->rows    = (uint32_t) active_terminal->rows;
+        size->columns = (uint32_t) active_terminal->columns;
+    }
+    unlock_console();
+    return valid;
 }

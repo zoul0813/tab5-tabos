@@ -87,3 +87,9 @@ audio streams and wait sources so process teardown also validates reclamation.
 Add future API coverage as another focused source module and register it in
 `apps/tester/src/main.c`. Tests should remain deterministic, clean up persistent state,
 and behave identically on host and Tab5.
+
+Run `tester --input` for focused terminal geometry, keyboard readiness, finite wait,
+foreign/stale source, nested cleanup, and parent TTY policy checks. This module uses
+only public SDK services and also runs in the ordinary tester suite.
+When launched by bare command name, its child checks use `T:/bin/tester` because
+`tabos_exec` does not search the shell PATH. Explicit launch paths are retained.

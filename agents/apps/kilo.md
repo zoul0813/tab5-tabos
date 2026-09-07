@@ -1,6 +1,6 @@
 # Kilo Implementation Plan
 
-Status: proposed implementation plan, 2026-09-07. Implementation has not started.
+Status: implemented and host-validated, 2026-09-07; operator reports Kilo passes physical Tab5 requirements.
 
 This plan develops the Kilo candidate from [Application Port Candidates](../milestone-apps.md). Proposed API names, resource budgets, and feature choices below are implementation recommendations, not new `[DECIDED]` architecture requirements.
 
@@ -34,7 +34,9 @@ Use [architecture](../architecture.md), [context](../TABOS_CONTEXT.md), [testing
 
 Upstream is [antirez/kilo](https://github.com/antirez/kilo), licensed BSD-2-Clause. Its [source](https://github.com/antirez/kilo/blob/master/kilo.c) combines editing, terminal handling, search, highlighting, and file I/O. Relevant dependencies include `termios`, `TIOCGWINSZ`, cursor-report fallback, and `SIGWINCH`. Its save path uses `ftruncate` and a single write; allocation/error paths need hardening for bounded memory. These are porting areas, not supported TabOS contracts.
 
-| Current repository surface | Consequence for implementation |
+The following table records the pre-implementation baseline.
+
+| Original repository surface | Consequence for implementation |
 | --- | --- |
 | `sdk/make/application.mk` | Use the existing C17 RV32I/`ilp32` build and generated metadata. Current defaults are 256 KiB heap and 16 KiB stack. |
 | `sdk/include/tabos/tty.h`, `sdk/libc/syscalls.c` | `ioctl` supports GET/SET mode only; no terminal-size query exists. |
@@ -165,7 +167,7 @@ Use deterministic synthetic events, temporary drive roots, and injected failures
 
 Extend `apps/tester` for new public terminal-size and keyboard-wait APIs, keeping tests self-contained and platform-neutral. Application-specific editing tests belong with Kilo's host tests. Keep optional real-RV32 application harnesses separate from ordinary CTest if the existing suite does not build application artifacts itself.
 
-Build and validate macOS and Linux Debug/Release and cross-build Tab5 through the project workflow. Use `./apps/build.sh`, `make -C apps/kilo metadata`, and the relevant `./tools/tabos <target> ...` commands with the pinned toolchain. Include incremental rebuild checks when Kilo headers, Makefile resource settings, or shared SDK headers change.
+Build and validate macOS Debug/Release and cross-build Tab5 through the project workflow. Linux host testing is excluded by explicit user direction for this implementation; no Podman workflow is required. Use `./apps/build.sh`, `make -C apps/kilo metadata`, and the relevant `./tools/tabos <target> ...` commands with the pinned toolchain. Include incremental rebuild checks when Kilo headers, Makefile resource settings, or shared SDK headers change.
 
 Physical Tab5 acceptance remains separate:
 
@@ -180,13 +182,25 @@ Physical Tab5 acceptance remains separate:
 
 Implement in reviewable slices: terminal/input prerequisites; attributed application skeleton; editing/rendering; storage hardening; end-to-end integration and documentation. Record actual results after each slice rather than marking this whole plan complete after the first working screen.
 
-- [ ] Record upstream revision, license, and local adaptation policy.
-- [ ] Implement and validate required terminal geometry, CSI, lifecycle, and input-wait support.
-- [ ] Build independent Kilo and validate editing, search, highlighting, and keyboard behavior.
-- [ ] Validate bounded memory, byte-preserving load/save, and recovery from save failures.
-- [ ] Pass native sanitizer tests and actual RV32 host integration.
-- [ ] Complete supported-target builds and separate physical Tab5 acceptance.
-- [ ] Write `docs/kilo.md`; update `docs/README.md`, `docs/applications.md`, and relevant SDK/input/console documentation for implemented behavior.
-- [ ] Update `agents/roadmap.md` when implementation starts and as slices gain validation; record accepted API decisions in architecture/context/testing documents as needed.
+- [x] Record upstream revision, license, and local adaptation policy.
+- [x] Implement and validate required terminal geometry, CSI, lifecycle, and input-wait support on host.
+- [x] Build independent Kilo and validate editing, search, highlighting, and synthetic keyboard behavior.
+- [x] Validate bounded memory, byte-preserving load/save, and recovery from injected save failures.
+- [x] Pass native sanitizer tests and actual RV32 host integration.
+- [x] Complete macOS and Tab5 Debug/Release builds; rebuild bundled RV32 applications.
+- [x] Complete physical Tab5 functional acceptance (operator report, 2026-09-07).
+- [x] Write `docs/kilo.md`; update `docs/README.md`, `docs/applications.md`, and relevant SDK/input/console documentation for implemented behavior.
+- [x] Update `agents/roadmap.md` and architecture/context/testing documents.
+
+### Implementation evidence
+
+- Pinned upstream `323d93b29bd89a2cb446de90c4ed4fea1764176e`; unchanged source retained beside maintained adaptation and BSD-2-Clause notices. Install and MSC copy paths include notices.
+- All 56 macOS Debug tests passed under the configured sanitizers. The socket test required an unsandboxed rerun to bind its loopback fixture. Final Kilo component rerun passed after the status-row adjustment.
+- Actual SDK-built RV32 shell/Kilo sessions passed edit/search/save/reopen/discard, failed save followed by retry, parent restoration, repeated launch, and forced teardown while suspended followed by runtime restart.
+- A 256,000-byte tab-heavy file with 8,001 rows loaded, edited, and saved through the RV32 interpreter within the declared 2 MiB heap and 32 KiB stack budget. Allocation, storage, and terminal failures have deterministic component coverage.
+- RV32 tester coverage passed geometry, keyboard source ownership, stale handles, finite waits, and nested child isolation. Keyboard-only waits suspend execution; unrelated mixed-source waits retain their existing behavior.
+- macOS and Tab5 Debug/Release builds passed. Bundled applications rebuilt; Kilo metadata and incremental rebuild dependencies checked. Linux tests were not run.
+- Renderer reserves the last terminal column to preserve existing immediate-wrap behavior. Saves use a sibling backup transaction on both host and FAT; FAT semantics were checked against the pinned backend source.
+- After the supplied hardware checklist, the operator reported that Kilo "seems to pass all the req's" on Tab5. This records functional acceptance, not measured heap/stack or idle-power results. The tester child-path fix passed RV32 regression; the operator also confirmed `tester --input` worked on physical Tab5 (2026-09-07).
 
 Completion means a user can edit a file, recover from an ordinary save failure, save successfully, return to a working shell, and reopen the expected bytes on host and Tab5. A compiling binary or a screenshot alone is insufficient.

@@ -1462,3 +1462,18 @@ ESP32-C6 transport details
 ```
 
 Maintaining that separation is the central architectural constraint of the project.
+
+## Kilo terminal service implementation (2026-09-07)
+
+Kilo uses public copied `TABOS_TTY_GET_SIZE` geometry and a foreground process-owned
+`tabos_input_wait_source()` adapter. Keyboard-only waits use retained coalesced wake
+signals, with absolute deadlines and host RV32 suspension; other generic service
+waits retain their existing behavior. Source handles use existing generation and
+teardown rules. Terminal CSI parsing is bounded to eight parameters; cursor addressing
+uses the live screen rather than the oldest retained scrollback line. Immediate
+wrapping is preserved, so Kilo reserves the final column. Console release resets
+attributes and incomplete escape state before parent acquisition.
+
+Kilo is an independent RV32 application, with a 2 MiB heap and 32 KiB stack metadata
+request, byte-oriented rows, bounded edits, and an application-local backup/rename save
+transaction. No POSIX emulation or hardware dependency was added to the application.

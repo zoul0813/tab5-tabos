@@ -533,3 +533,12 @@ bool tabos_app_last_exit_status(int* exit_status)
     *exit_status = last_exit_status;
     return true;
 }
+
+uint64_t kernel_application_system_deadline(void)
+{
+    if (foreground_process == NULL) {
+        return UINT64_MAX;
+    }
+    return loader_elf_application_deadline(foreground_process->context.descriptor,
+                                           foreground_process->context.application_data);
+}

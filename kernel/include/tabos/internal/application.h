@@ -20,6 +20,7 @@ struct tabos_app_context {
 
 void kernel_application_system_init(void);
 void kernel_application_system_update(void);
+uint64_t kernel_application_system_deadline(void);
 bool kernel_application_system_runnable(void);
 void kernel_application_system_shutdown(void);
 

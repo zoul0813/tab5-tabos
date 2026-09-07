@@ -52,6 +52,11 @@ it with other applications, use:
 When `build/apps/doom/doom` exists, `--msc --with-doom` copies that extensionless
 executable to `T:/bin/doom`. Build and installation never copy or download WAD data.
 
+Kilo is included in ordinary application builds as `T:/bin/kilo`. It edits one named
+file and provides search, C/C++ highlighting, and recoverable staged saves. See
+[Kilo](kilo.md). Installed license materials under `T:/share/licenses/` are also copied
+by `--msc`; separate binary distributions must preserve their notices.
+
 Individual application commands such as `make -C apps/shell` remain available.
 
 Core utilities are grouped under `apps/coreutils/`, but each utility remains a separate

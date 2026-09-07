@@ -859,3 +859,28 @@ void platform_mutex_unlock(platform_mutex_t* mutex)
 {
     (void) mutex;
 }
+
+struct platform_signal {
+        bool pending;
+};
+platform_signal_t* platform_signal_create(void)
+{
+    return calloc(1U, sizeof(platform_signal_t));
+}
+void platform_signal_destroy(platform_signal_t* signal)
+{
+    free(signal);
+}
+void platform_signal_notify(platform_signal_t* signal)
+{
+    if (signal != NULL) {
+        signal->pending = true;
+    }
+}
+void platform_signal_wait(platform_signal_t* signal, uint32_t timeout_ms)
+{
+    (void) timeout_ms;
+    if (signal != NULL) {
+        signal->pending = false;
+    }
+}

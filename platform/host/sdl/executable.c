@@ -116,7 +116,9 @@ static _Thread_local uint32_t host_rv32_active_ram_size;
     X(CAMERA_ACQUIRE, 376U)                  \
     X(CAMERA_COPY, 380U)                     \
     X(CAMERA_RELEASE, 384U)                  \
-    X(CAMERA_WAIT_SOURCE, 388U)
+    X(CAMERA_WAIT_SOURCE, 388U)              \
+    X(TTY_GET_SIZE, 392U)                    \
+    X(INPUT_WAIT_SOURCE, 396U)
 
 enum {
 #define HOST_RV32_GATE_INDEX(name, api_offset) HOST_RV32_GATE_INDEX_##name,
@@ -619,6 +621,27 @@ platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* cont
             context->state.pc = context->state.regs[1];
             continue;
         }
+        if (context->state.pc == HOST_RV32_INPUT_WAIT_SOURCE) {
+            if (context->api.input_wait_source == NULL) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data       = context->user_data;
+            context->state.regs[10] = (uint32_t) context->api.input_wait_source();
+            current_user_data       = NULL;
+            context->state.pc       = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_TTY_GET_SIZE) {
+            tabos_tty_size_t* size = guest_buffer(context->memory, context->state.regs[11], sizeof(*size));
+            if (size == NULL || context->api.tty_get_size == NULL) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data       = context->user_data;
+            context->state.regs[10] = (uint32_t) context->api.tty_get_size((int) context->state.regs[10], size);
+            current_user_data       = NULL;
+            context->state.pc       = context->state.regs[1];
+            continue;
+        }
         if (context->state.pc == HOST_RV32_TTY_GET_MODE) {
             if (context->api.tty_get_mode == NULL) {
                 return PLATFORM_RISCV32_FAULT;
@@ -847,8 +870,13 @@ platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* cont
             if (items == NULL || context->api.wait == NULL) {
                 return PLATFORM_RISCV32_FAULT;
             }
-            current_user_data       = context->user_data;
-            context->state.regs[10] = (uint32_t) context->api.wait(items, item_count, context->state.regs[12]);
+            current_user_data = context->user_data;
+            const int result  = context->api.wait(items, item_count, context->state.regs[12]);
+            if (result == TABOS_ELF_WAIT_PENDING) {
+                current_user_data = NULL;
+                return PLATFORM_RISCV32_YIELDED;
+            }
+            context->state.regs[10] = (uint32_t) result;
             current_user_data       = NULL;
             context->state.pc       = context->state.regs[1];
             return PLATFORM_RISCV32_YIELDED;

@@ -818,3 +818,18 @@ When modifying TabOS:
 ## 19. Current Architectural Summary
 
 The intended system is a **small native-computing environment layered on ESP-IDF/FreeRTOS**. FreeRTOS handles low-level scheduling and hardware-runtime concerns; TabOS supplies the user-visible OS abstraction. Applications are independently compiled native RISC-V programs targeting a stable TabOS API. The shell and filesystem are first-class. Graphics, input, networking, and other hardware are mediated by TabOS services. The GUI is optional and non-privileged. Most higher-level OS code should also run in a native macOS host environment, while actual hardware-specific behavior remains in the ESP32-P4 backend.
+
+## Kilo terminal service implementation (2026-09-07)
+
+Kilo uses public copied `TABOS_TTY_GET_SIZE` geometry and a foreground process-owned
+`tabos_input_wait_source()` adapter. Keyboard-only waits use retained coalesced wake
+signals, with absolute deadlines and host RV32 suspension; other generic service
+waits retain their existing behavior. Source handles use existing generation and
+teardown rules. Terminal CSI parsing is bounded to eight parameters; cursor addressing
+uses the live screen rather than the oldest retained scrollback line. Immediate
+wrapping is preserved, so Kilo reserves the final column. Console release resets
+attributes and incomplete escape state before parent acquisition.
+
+Kilo is an independent RV32 application, with a 2 MiB heap and 32 KiB stack metadata
+request, byte-oriented rows, bounded edits, and an application-local backup/rename save
+transaction. No POSIX emulation or hardware dependency was added to the application.

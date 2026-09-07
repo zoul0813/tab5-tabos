@@ -515,7 +515,7 @@ uint64_t kernel_runtime_next_deadline(void)
     if (kernel_application_system_runnable()) {
         return platform_time_ms();
     }
-    uint64_t deadline = input_next_deadline();
+    uint64_t deadline = earliest_deadline(input_next_deadline(), kernel_application_system_deadline());
     deadline          = earliest_deadline(deadline, console_next_deadline());
     deadline          = earliest_deadline(deadline, network_service_next_deadline());
     deadline          = earliest_deadline(deadline, hardware_devices_next_deadline());
