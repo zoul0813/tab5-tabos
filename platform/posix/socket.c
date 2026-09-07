@@ -142,6 +142,26 @@ static int close_native_socket(int descriptor)
 #endif
 }
 
+static bool suppress_socket_sigpipe(int descriptor)
+{
+#if !defined(ESP_PLATFORM) && defined(SO_NOSIGPIPE)
+    const int enabled = 1;
+    return setsockopt(descriptor, SOL_SOCKET, SO_NOSIGPIPE, &enabled, sizeof(enabled)) == 0;
+#else
+    (void) descriptor;
+    return true;
+#endif
+}
+
+static int socket_send_flags(void)
+{
+#if !defined(ESP_PLATFORM) && defined(MSG_NOSIGNAL)
+    return MSG_NOSIGNAL;
+#else
+    return 0;
+#endif
+}
+
 static bool native_endpoint(const platform_network_address_t* address, uint16_t port, struct sockaddr_storage* storage,
                             socklen_t* size)
 {
@@ -246,7 +266,16 @@ static void execute_socket_request(const socket_request_t* request, socket_respo
             return;
         }
         const int descriptor = socket(family, type, 0);
-        response->result     = descriptor >= 0 ? descriptor : socket_error();
+        if (descriptor < 0) {
+            response->result = socket_error();
+            return;
+        }
+        if (!suppress_socket_sigpipe(descriptor)) {
+            response->result = socket_error();
+            (void) close_native_socket(descriptor);
+            return;
+        }
+        response->result = descriptor;
         return;
     }
     if (request->operation == SOCKET_OPERATION_CLOSE) {
@@ -275,7 +304,7 @@ static void execute_socket_request(const socket_request_t* request, socket_respo
         return;
     }
     if (request->operation == SOCKET_OPERATION_SEND) {
-        const ssize_t sent = send(request->socket, request->data, request->size, 0);
+        const ssize_t sent = send(request->socket, request->data, request->size, socket_send_flags());
         response->result   = sent >= 0 ? (int) sent : socket_error();
         return;
     }
@@ -290,6 +319,11 @@ static void execute_socket_request(const socket_request_t* request, socket_respo
         const int accepted = accept(request->socket, (struct sockaddr*) &endpoint, &endpoint_size);
         if (accepted < 0) {
             response->result = socket_error();
+            return;
+        }
+        if (!suppress_socket_sigpipe(accepted)) {
+            response->result = socket_error();
+            (void) close_native_socket(accepted);
             return;
         }
         if (!portable_endpoint(&endpoint, &response->address, &response->port)) {
@@ -330,9 +364,9 @@ static void execute_socket_request(const socket_request_t* request, socket_respo
         response->result =
             connect(request->socket, (const struct sockaddr*) &endpoint, endpoint_size) == 0 ? 0 : socket_error();
     } else {
-        const ssize_t sent =
-            sendto(request->socket, request->data, request->size, 0, (const struct sockaddr*) &endpoint, endpoint_size);
-        response->result = sent >= 0 ? (int) sent : socket_error();
+        const ssize_t sent = sendto(request->socket, request->data, request->size, socket_send_flags(),
+                                    (const struct sockaddr*) &endpoint, endpoint_size);
+        response->result   = sent >= 0 ? (int) sent : socket_error();
     }
 }
 
