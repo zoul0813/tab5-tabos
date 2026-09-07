@@ -16,11 +16,6 @@ enum {
     DEMO_MOVE_STEP = 4,
 };
 
-static void restore_tty(uint32_t mode)
-{
-    (void) ioctl(STDIN_FILENO, TABOS_TTY_SET_MODE, mode);
-}
-
 static bool tile_blocks(const tabos_tilemap_t* map, const tabos_sprite_set_t* sprites, uint32_t layer, int32_t x,
                         int32_t y)
 {
@@ -88,7 +83,6 @@ int main(void)
         if (graphics.open) {
             (void) tabos_graphics_close(&graphics);
         }
-        restore_tty(tty_mode);
         return 1;
     }
     const tabos_tilemap_object_t* spawn =
@@ -110,7 +104,6 @@ int main(void)
         tabos_tilemap_unload(&map);
         tabos_sprite_set_unload(&sprites);
         (void) tabos_graphics_close(&graphics);
-        restore_tty(tty_mode);
         return 1;
     }
     int32_t robot_x   = spawn->x;
@@ -244,6 +237,5 @@ int main(void)
     tabos_tilemap_unload(&map);
     tabos_sprite_set_unload(&sprites);
     const int result = tabos_graphics_close(&graphics);
-    restore_tty(tty_mode);
     return result == 0 ? 0 : 1;
 }

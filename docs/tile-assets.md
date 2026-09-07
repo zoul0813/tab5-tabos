@@ -1,5 +1,8 @@
 # Sprite and Tile Assets
 
+New to the system? Start with [Getting Started with the TabOS Tile Engine](getting-started/tile-engine/README.md),
+then return here for complete API and asset-format details.
+
 TabOS sprite/tile support is a portable SDK layer over RGB565 blits. It owns no
 textures, scene graph, entities, collision solver, or physics state. Keep asset memory
 unchanged until `tabos_graphics_present()` completes.
@@ -334,6 +337,9 @@ Object layers do not render themselves; game code may create entities, triggers,
 markers from them.
 
 ## Authoring
+
+For an editor-oriented walkthrough with concrete tileset, animation, layer, and object
+examples, see [Work with Tiled](getting-started/tile-engine/tiled-workflow.md).
 
 The normal workflow is:
 

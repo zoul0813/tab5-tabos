@@ -4,6 +4,7 @@ This directory contains user and contributor documentation for TabOS.
 
 ## Guides
 
+- [Getting Started with the Tile Engine](getting-started/tile-engine/README.md): beginner path from Tiled source assets to a scrolling, interactive game world.
 - [Project Configuration](configuration.md): persistent host and device options managed by `tools/tabos config`.
 - [Directory Structure](directory-structure.md): repository layout, directory responsibilities, and dependency boundaries.
 - [Display System](display.md): logical framebuffer contract, host presentation, and Tab5 display behavior.
