@@ -63,6 +63,7 @@ TABOS_RUNTIME_SOURCES := $(SDK_ROOT)/crt/crt0.c $(SDK_ROOT)/crt/metadata.S $(SDK
                          $(SDK_ROOT)/lib/posix_filesystem.c
 TABOS_BUILD_CONFIG := $(BUILD_DIR)/.tabos-build-config
 TABOS_DEPENDENCY_FILE := $(BUILD_DIR)/.tabos-dependencies.mk
+TABOS_CONFIG_INVALIDATES ?= $(UNSTRIPPED) $(OUTPUT) $(TABOS_DEPENDENCY_FILE)
 
 .PHONY: all build clean install stage-assets install-assets size metadata tabos-list-outputs tabos-list-runtime-assets
 .PHONY: tabos-force-build-config
@@ -85,10 +86,15 @@ $(TABOS_BUILD_CONFIG): tabos-force-build-config
 		'SOURCES=$(SOURCES)' \
 		'TABOS_RUNTIME_SOURCES=$(TABOS_RUNTIME_SOURCES)' \
 		'TABOS_BUILD_PREREQUISITES=$(TABOS_BUILD_PREREQUISITES)' > "$@.tmp"
-	@if [ -f "$@" ] && cmp -s "$@.tmp" "$@"; then rm -f "$@.tmp"; else mv "$@.tmp" "$@"; fi
+	@if [ -f "$@" ] && cmp -s "$@.tmp" "$@"; then \
+		rm -f "$@.tmp"; \
+	else \
+		mv "$@.tmp" "$@"; \
+		rm -f $(TABOS_CONFIG_INVALIDATES); \
+	fi
 
 ifndef TABOS_CUSTOM_BUILD
-$(TABOS_DEPENDENCY_FILE): $(SOURCES) $(TABOS_RUNTIME_SOURCES) $(TABOS_BUILD_PREREQUISITES) $(TABOS_APPLICATION_MAKEFILES)
+$(TABOS_DEPENDENCY_FILE): $(TABOS_BUILD_CONFIG) $(SOURCES) $(TABOS_RUNTIME_SOURCES) $(TABOS_BUILD_PREREQUISITES) $(TABOS_APPLICATION_MAKEFILES)
 	@mkdir -p $(dir $@)
 	@$(CC) $(TABOS_CPPFLAGS) $(TABOS_CFLAGS) -MM -MP -MT "$(UNSTRIPPED)" -MT "$@" \
 		$(TABOS_RUNTIME_SOURCES) $(SOURCES) > "$@.tmp"
