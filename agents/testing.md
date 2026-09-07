@@ -102,6 +102,7 @@ This should make normal development substantially faster.
 - Generated firmware lives in `build/tab5-debug/` or `build/tab5-release/` and uses `TabOS.bin` capitalization.
 - Info-level serial logging is required in debug and release so detected hardware remains visible during boot.
 - Current host suite has unit, integration, architecture-boundary, and invalid-target tests. Display transforms must remain host-unit-tested.
+- Host test targets keep C assertions enabled in optimized configurations because assertions contain validation and, in some older tests, required setup calls.
 
 ### Event and deadline runtime validation
 
