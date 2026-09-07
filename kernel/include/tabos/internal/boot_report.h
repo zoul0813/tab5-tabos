@@ -13,9 +13,14 @@ typedef enum {
     KERNEL_BOOT_STATUS_ERROR,
 } kernel_boot_status_t;
 
+enum {
+    KERNEL_BOOT_REPORT_COMPONENT_CAPACITY = 32,
+    KERNEL_BOOT_REPORT_DETAIL_CAPACITY    = 512,
+};
+
 typedef struct {
-        const char* component;
-        const char* detail;
+        char component[KERNEL_BOOT_REPORT_COMPONENT_CAPACITY];
+        char detail[KERNEL_BOOT_REPORT_DETAIL_CAPACITY];
         kernel_boot_status_t status;
 } kernel_boot_entry_t;
 
