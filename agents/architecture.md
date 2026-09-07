@@ -660,6 +660,11 @@ subset. SDK compatibility headers map familiar names such as `open`, `read`, and
 `stat` to a TabOS-owned prefixed ABI; TabOS does not expose host or ESP-IDF libc
 objects as its ABI. The portable core owns path normalization, descriptors, errors,
 and dispatch. Drive table enumerates backend-owned letters; host exposes controlled `A:` and `T:` directories, while Tab5 currently exposes BSP-mounted microSD FAT as `T:`. Missing drives return `ENODEV`; cross-drive rename returns `EXDEV`. Internal-flash `A:` implementation, permissions, links, and removal recovery remain pending.
+Portable metadata includes device/file identity for same-file comparisons. Host
+backends retain native device/inode identity and therefore recognize hard links.
+ESP-IDF FAT reports no inode, so portable core supplies case-folded normalized-path
+identity and updates open-file fallback identity across rename. Identity values are
+comparison data for current files, not persistent storage IDs.
 Tab5 FAT uses heap-backed long-filename buffers with a 255-character maximum so
 the backend honors the public filesystem name limit instead of silently imposing
 8.3 names.

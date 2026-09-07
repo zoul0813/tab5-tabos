@@ -10,9 +10,15 @@ typedef tabos_off_t off_t;
 #define STDOUT_FILENO 1
 #define STDERR_FILENO 2
 
+#ifndef SEEK_SET
 #define SEEK_SET TABOS_SEEK_SET
+#endif
+#ifndef SEEK_CUR
 #define SEEK_CUR TABOS_SEEK_CUR
+#endif
+#ifndef SEEK_END
 #define SEEK_END TABOS_SEEK_END
+#endif
 
 #define close  tabos_posix_close
 #define read   tabos_posix_read

@@ -10,7 +10,9 @@ ESP-IDF, FreeRTOS, or SDL.
 The SDK uses newlib. Standard `main(argc, argv)`, stdio, `malloc`, `calloc`, `realloc`,
 `free`, and process exit are supported. File APIs include `open`, `close`, `read`, `write`,
 `lseek`, `stat`, `fstat`, `mkdir`, `rmdir`, `unlink`, `rename`, `chdir`, `getcwd`, directory
-iteration, and nonblocking flags. TabOS does not claim full POSIX compatibility.
+iteration, and nonblocking flags. `stat`/`fstat` expose `st_dev` and `st_ino` for
+same-file checks; applications must not treat them as persistent identifiers. TabOS
+does not claim full POSIX compatibility.
 
 ## Time and System Information
 

@@ -9,6 +9,8 @@
 
 typedef struct {
         platform_file_t platform_file;
+        uint64_t fallback_device_id;
+        uint64_t fallback_file_id;
         uint16_t generation;
         bool open;
 } file_slot_t;
@@ -41,6 +43,34 @@ static int fail(int error)
 {
     filesystem_errno = error;
     return -1;
+}
+
+static uint64_t fallback_file_id(const char* resolved)
+{
+    uint64_t hash = UINT64_C(14695981039346656037);
+    while (*resolved != '\0') {
+        unsigned char byte = (unsigned char) *resolved++;
+        if (byte >= (unsigned char) 'A' && byte <= (unsigned char) 'Z') {
+            byte = (unsigned char) (byte - (unsigned char) 'A' + (unsigned char) 'a');
+        }
+        hash ^= byte;
+        hash *= UINT64_C(1099511628211);
+    }
+    return hash == 0U ? 1U : hash;
+}
+
+static uint64_t fallback_device_id(char drive)
+{
+    return (uint64_t) (drive - 'A' + 1);
+}
+
+static void supply_fallback_identity(const char* resolved, tabos_stat_t* status)
+{
+    if (status->file_id != 0U) {
+        return;
+    }
+    status->device_id = fallback_device_id(resolved[0]);
+    status->file_id   = fallback_file_id(resolved);
 }
 
 static bool resolve_path(const char* path, char resolved[TABOS_FS_PATH_MAX])
@@ -198,6 +228,8 @@ tabos_fd_t tabos_fs_open(const char* path, int flags, uint32_t mode)
         ++slot->generation;
     }
     slot->platform_file         = platform_file;
+    slot->fallback_device_id    = fallback_device_id(resolved[0]);
+    slot->fallback_file_id      = fallback_file_id(resolved);
     slot->open                  = true;
     const tabos_fd_t descriptor = encode_file(index, slot->generation);
     filesystem_errno            = 0;
@@ -279,6 +311,9 @@ int tabos_fs_stat(const char* path, tabos_stat_t* status)
         return -1;
     }
     const int error = platform_storage_stat(resolved[0], resolved + 2U, status);
+    if (error == 0) {
+        supply_fallback_identity(resolved, status);
+    }
     unlock_filesystem();
     return error == 0 ? 0 : fail(error);
 }
@@ -295,6 +330,10 @@ int tabos_fs_fstat(tabos_fd_t descriptor, tabos_stat_t* status)
         return fail(TABOS_EBADF);
     }
     const int error = platform_storage_fstat(slot->platform_file, status);
+    if (error == 0 && status->file_id == 0U) {
+        status->device_id = slot->fallback_device_id;
+        status->file_id   = slot->fallback_file_id;
+    }
     unlock_filesystem();
     return error == 0 ? 0 : fail(error);
 }
@@ -349,6 +388,17 @@ int tabos_fs_rename(const char* old_path, const char* new_path)
         return fail(TABOS_EXDEV);
     }
     const int error = platform_storage_rename(old_resolved[0], old_resolved + 2U, new_resolved + 2U);
+    if (error == 0) {
+        const uint64_t old_file_id = fallback_file_id(old_resolved);
+        const uint64_t new_file_id = fallback_file_id(new_resolved);
+        const uint64_t device_id   = fallback_device_id(old_resolved[0]);
+        for (size_t index = 0U; index < TABOS_FILESYSTEM_MAX_FILES; ++index) {
+            if (files[index].open && files[index].fallback_device_id == device_id &&
+                files[index].fallback_file_id == old_file_id) {
+                files[index].fallback_file_id = new_file_id;
+            }
+        }
+    }
     unlock_filesystem();
     return error == 0 ? 0 : fail(error);
 }

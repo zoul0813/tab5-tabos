@@ -10,7 +10,7 @@
 
 #include <stdint.h>
 
-#define TABOS_ELF_API_VERSION  20U
+#define TABOS_ELF_API_VERSION  21U
 #define TABOS_ELF_EXEC_PENDING (-2147483647 - 1)
 
 enum {
@@ -26,6 +26,10 @@ typedef struct {
         uint32_t size_high;
         int32_t modified_time_low;
         int32_t modified_time_high;
+        uint32_t device_id_low;
+        uint32_t device_id_high;
+        uint32_t file_id_low;
+        uint32_t file_id_high;
 } tabos_elf_stat_t;
 
 typedef struct {

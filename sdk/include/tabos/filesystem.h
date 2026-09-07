@@ -71,6 +71,8 @@ typedef struct {
         uint32_t mode;
         uint64_t size;
         int64_t modified_time;
+        uint64_t device_id;
+        uint64_t file_id;
 } tabos_stat_t;
 
 typedef struct {

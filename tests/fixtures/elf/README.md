@@ -6,8 +6,8 @@ user-facing `apps/hello_elf` newlib application so ordinary application growth
 does not create a large or unstable embedded test fixture.
 
 `hello_elf.c` is the stripped ELF converted to a C byte array. Regenerate it
-whenever the application ABI changes, then update only parser assertions tied
-to the resulting ELF layout.
+whenever the application ABI or private ELF API version changes, then update only
+parser assertions tied to the resulting ELF layout.
 
 The fixture uses the same RV32 compiler flags and `sdk/linker/app-riscv32.ld`
 as applications, but links only `guest.c` with `-nostdlib`. Strip debug data,

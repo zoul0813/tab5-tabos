@@ -76,14 +76,17 @@ int main(void)
     if (tabos_fs_stat("T:/missing", &status) == 0 || *tabos_errno_location() != TABOS_ENODEV) {
         return 1;
     }
-    if (tabos_fs_fstat(descriptor, &status) != 0 || status.size != sizeof(message) ||
-        (status.mode & TABOS_S_IFREG) == 0U || tabos_fs_close(descriptor) != 0 || tabos_fs_close(descriptor) == 0 ||
-        *tabos_errno_location() != TABOS_EBADF) {
+    tabos_stat_t path_status;
+    if (tabos_fs_fstat(descriptor, &status) != 0 || tabos_fs_stat("./hello.txt", &path_status) != 0 ||
+        status.size != sizeof(message) || (status.mode & TABOS_S_IFREG) == 0U || status.file_id == 0U ||
+        status.device_id != path_status.device_id || status.file_id != path_status.file_id) {
         return 1;
     }
 
     if (tabos_fs_rename("hello.txt", "renamed.txt") != 0 || tabos_fs_stat("/apps/renamed.txt", &status) != 0 ||
-        status.size != sizeof(message)) {
+        tabos_fs_fstat(descriptor, &path_status) != 0 || status.size != sizeof(message) ||
+        status.device_id != path_status.device_id || status.file_id != path_status.file_id ||
+        tabos_fs_close(descriptor) != 0 || tabos_fs_close(descriptor) == 0 || *tabos_errno_location() != TABOS_EBADF) {
         return 1;
     }
     tabos_dir_t directory = tabos_fs_opendir(".");

@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 int main(int argc, char** argv)
@@ -9,6 +10,23 @@ int main(int argc, char** argv)
         fprintf(stderr, "usage: cp source destination\n");
         return 1;
     }
+    struct stat source_status;
+    if (stat(argv[1], &source_status) != 0) {
+        fprintf(stderr, "cp: %s: errno %d\n", argv[1], errno);
+        return 1;
+    }
+
+    struct stat destination_status;
+    if (stat(argv[2], &destination_status) == 0) {
+        if (source_status.st_dev == destination_status.st_dev && source_status.st_ino == destination_status.st_ino) {
+            fprintf(stderr, "cp: %s and %s are the same file\n", argv[1], argv[2]);
+            return 1;
+        }
+    } else if (errno != ENOENT) {
+        fprintf(stderr, "cp: %s: errno %d\n", argv[2], errno);
+        return 1;
+    }
+
     int source = open(argv[1], O_RDONLY);
     if (source < 0) {
         fprintf(stderr, "cp: %s: errno %d\n", argv[1], errno);
