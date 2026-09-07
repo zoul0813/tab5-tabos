@@ -102,7 +102,9 @@ Each process starts with console descriptors 0, 1, and 2 and allocates file/devi
 descriptors from 3 upward. It owns an inherited working directory, errno state, and the
 metadata-selected (or legacy-default) 16 KiB stack. Its heap grows on demand to its
 metadata-selected (or legacy-default) 256 KiB limit. Process cleanup closes open
-descriptors and releases guest memory, task stack, heap, and executable memory.
+descriptors and releases guest memory, task stack, heap, and executable memory. Child
+executable paths are normalized against the inherited working directory before loading,
+including relative PATH entries, `./`, `../`, and `/` paths on the current drive.
 On Tab5, native return, exit, and child-exec work notify runtime immediately; cleanup
 stops the native task before releasing anything reachable through an application call gate.
 All native ABI calls pass through guards. Cleanup requests stop, suspends the task,
