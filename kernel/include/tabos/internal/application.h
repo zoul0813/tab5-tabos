@@ -20,8 +20,8 @@ struct tabos_app_context {
 
 void kernel_application_system_init(void);
 void kernel_application_system_update(void);
-uint64_t kernel_application_system_deadline(void);
 bool kernel_application_system_runnable(void);
+uint64_t kernel_application_system_next_deadline(void);
 void kernel_application_system_shutdown(void);
 
 bool application_registry_register(const tabos_app_descriptor_t* descriptor);

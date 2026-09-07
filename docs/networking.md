@@ -94,6 +94,17 @@ waits for the active backend operation to return, and disposes every owned socke
 This keeps a terminated process from leaving a blocked worker or response for the
 next application.
 
+On macOS and Linux, a blocking RV32 socket or TLS call suspends only the guest.
+The runtime continues servicing input, display deadlines, and window shutdown.
+Explicitly nonblocking sockets still return `EAGAIN` directly to the application.
+DNS, ICMP echo, and TLS connection setup use workers that own copies of their inputs;
+process termination discards their replies without waiting for a resolver or peer.
+At most 16 unfinished worker operations may exist across active and cancelled processes;
+further setup requests report an I/O error until capacity is released. TLS connection
+setup allows ten seconds for connection/handshake progress, excluding any uninterruptible
+system resolver delay. Established TLS reads and writes retain blocking application
+semantics while allowing the host runtime to progress.
+
 ### Waiting for readiness
 
 `<tabos/wait.h>` provides generic, opaque `tabos_wait_source_t` handles. Convert a
@@ -114,7 +125,10 @@ the operation. The return value is the number of ready items, zero for timeout,
 or `-1` with `errno` set. Process teardown cancels an active wait before closing
 its parent resources. Finite waits calculate one absolute monotonic deadline and
 recompute remaining blocking time after intermediate wakes, so an early empty wake does
-not become an early timeout.
+not become an early timeout. Zero-time polls inspect every source, including sockets.
+On host, pending guest operations publish a retry deadline up to 10 ms away, shortened
+to the original finite-wait deadline when applicable. No retry deadline remains after
+completion or cancellation.
 
 `tester` exercises socket-only and mixed socket/device waits. On an online configured
 system it also disconnects Wi-Fi, confirms `wifi0` lifecycle readiness, and starts a saved

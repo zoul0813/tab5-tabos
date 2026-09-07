@@ -164,8 +164,6 @@ struct loader_elf_application {
         size_t heap_used;
         size_t heap_limit;
         uint32_t tty_mode;
-        bool input_wait_pending;
-        uint64_t input_wait_deadline;
         char input_pending[4];
         uint8_t input_pending_offset;
         uint8_t input_pending_length;
@@ -1344,14 +1342,12 @@ static int elf_wait_sources(loader_elf_application_t* application, tabos_elf_wai
     uint32_t socket_item_indices[TABOS_SOCKET_MAX];
     uint32_t socket_count                           = 0U;
     bool requires_polling                           = false;
-    bool input_only                                 = true;
     bool update_sources[ELF_WAIT_SOURCE_TYPE_COUNT] = {false};
     for (uint32_t index = 0U; index < count; ++index) {
         elf_wait_source_t* source = elf_wait_source(application, items[index].source);
         if (source == NULL || source->type >= ELF_WAIT_SOURCE_TYPE_COUNT) {
             return -TABOS_EBADF;
         }
-        input_only                               = input_only && source->type == ELF_WAIT_SOURCE_INPUT;
         const elf_wait_source_adapter_t* adapter = &elf_wait_source_adapters[source->type];
         if (items[index].events == 0U || (items[index].events & ~adapter->valid_events) != 0U) {
             return -TABOS_EINVAL;
@@ -1379,7 +1375,6 @@ static int elf_wait_sources(loader_elf_application_t* application, tabos_elf_wai
     const bool finite_timeout = timeout_ms != TABOS_WAIT_TIMEOUT_INFINITE;
     const uint64_t deadline_ms =
         finite_timeout ? time_deadline_after(platform_time_ms(), timeout_ms) : TIME_DEADLINE_NONE;
-    const uint64_t input_deadline = application->input_wait_pending ? application->input_wait_deadline : deadline_ms;
     while (true) {
         int ready = 0;
         for (uint32_t type = 0U; type < ELF_WAIT_SOURCE_TYPE_COUNT; ++type) {
@@ -1407,29 +1402,11 @@ static int elf_wait_sources(loader_elf_application_t* application, tabos_elf_wai
         }
 
         const uint64_t now_ms = platform_time_ms();
-        if (input_only) {
-            if (ready > 0 || timeout_ms == 0U || now_ms >= input_deadline) {
-                application->input_wait_pending = false;
-                return ready;
-            }
-            if (atomic_load_explicit(&application->wait_cancel_requested, memory_order_acquire)) {
-                application->input_wait_pending = false;
-                return -TABOS_ECANCELED;
-            }
-            if (platform_riscv32_requires_runtime_slices()) {
-                application->input_wait_pending  = true;
-                application->input_wait_deadline = input_deadline;
-                return TABOS_ELF_WAIT_PENDING;
-            }
-            input_wait_ready(input_deadline == TIME_DEADLINE_NONE ? UINT32_MAX : (uint32_t) (input_deadline - now_ms));
-            continue;
-        }
         if (ready == 0 && finite_timeout && now_ms >= deadline_ms) {
             return 0;
         }
-
         uint32_t socket_timeout = 0U;
-        if (ready == 0 && timeout_ms != 0U) {
+        if (ready == 0 && timeout_ms != 0U && (!finite_timeout || now_ms < deadline_ms)) {
             if (!requires_polling) {
                 socket_timeout = finite_timeout ? (uint32_t) (deadline_ms - now_ms) : TABOS_WAIT_TIMEOUT_INFINITE;
             } else if (!finite_timeout) {
@@ -1458,7 +1435,8 @@ static int elf_wait_sources(loader_elf_application_t* application, tabos_elf_wai
             }
         }
 
-        if (ready > 0 || timeout_ms == 0U || !requires_polling) {
+        if (ready > 0 || timeout_ms == 0U || !requires_polling ||
+            (finite_timeout && platform_time_ms() >= deadline_ms)) {
             return ready;
         }
         if (atomic_load_explicit(&application->wait_cancel_requested, memory_order_acquire)) {
@@ -2583,15 +2561,14 @@ bool loader_elf_application_runtime_runnable(const tabos_app_descriptor_t* descr
     }
     const loader_elf_application_t* application = application_data;
     return application->execution != NULL && platform_riscv32_requires_runtime_slices() &&
-           (!application->input_wait_pending || input_pending() ||
-            platform_time_ms() >= application->input_wait_deadline);
+           platform_riscv32_next_deadline(application->execution) <= platform_time_ms();
 }
 
-uint64_t loader_elf_application_deadline(const tabos_app_descriptor_t* descriptor, const void* data)
+uint64_t loader_elf_application_next_deadline(const tabos_app_descriptor_t* descriptor, const void* application_data)
 {
-    if (descriptor == NULL || descriptor->update != elf_update || data == NULL) {
-        return TIME_DEADLINE_NONE;
+    if (descriptor == NULL || descriptor->update != elf_update || application_data == NULL) {
+        return PLATFORM_RUNTIME_DEADLINE_NONE;
     }
-    const loader_elf_application_t* application = data;
-    return application->input_wait_pending ? application->input_wait_deadline : TIME_DEADLINE_NONE;
+    const loader_elf_application_t* application = application_data;
+    return platform_riscv32_next_deadline(application->execution);
 }

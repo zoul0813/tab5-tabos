@@ -150,8 +150,12 @@ which invokes only event-ready or expired-deadline owners once per bounded pass 
 recomputes the nearest deadline. Key repeat, cursor blink, network retry, and finite
 application waits use explicit saturating monotonic deadlines. Late periodic updates run
 once and advance directly to the next future period. No compatibility tick remains. Host
-RV32 guests remain runnable through bounded interpreter slices, while native Tab5
-application tasks do not force runtime spinning. Debug wake diagnostics reuse the
+RV32 guests remain runnable through bounded interpreter slices. Pending host wait and
+socket/TLS gates suspend at their call site and publish a retry deadline up to 10 ms
+away, bounded by the original finite timeout. DNS/echo/TLS setup jobs own copied data
+and are capped at 16 unfinished operations; cancellation drops replies without waiting
+for a resolver/peer or retaining guest memory. Native Tab5 application tasks do not
+force runtime spinning. Debug wake diagnostics reuse the
 60-second hardware-health audit and therefore add no independent periodic deadline.
 ESP-IDF Wi-Fi/IP and host-simulated network changes now wake runtime through a platform
 callback; portable network status is copied only after that notification. Device health

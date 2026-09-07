@@ -176,3 +176,9 @@ Loader does not yet provide:
 - signing, discovery, or package metadata
 
 Host tests parse, load, and execute the same RV32 application artifact used by Tab5 through a resumable RV32IMA interpreter. Guest state persists across bounded instruction slices so host tests cover loader, ABI, output, exit status, and execution faults without replacing RV32 code with a host-native build.
+
+Host blocking waits retain the guest call site and arguments across runtime turns.
+Only completed calls publish results and advance the guest PC. Pending socket/TLS
+operations and generic waits release the SDL thread; DNS/echo/TLS setup workers retain
+copied backend data, never guest RAM or process pointers. Cancelling a process discards
+its continuation before freeing guest memory.

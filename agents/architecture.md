@@ -251,7 +251,17 @@ deadlines. Native Tab5 application completion and ELF exit/child-exec requests p
 application readiness; process launch and parent restoration do likewise. These
 notifications carry no process pointer, so coalesced late wakeups cannot target a
 destroyed or generation-reused slot. No compatibility tick remains. Active host RV32
-interpretation keeps the runtime immediately runnable for bounded instruction slices.
+interpretation keeps the runtime immediately runnable for bounded instruction slices
+only while the guest can execute. A suspended host wait/I/O gate retains its PC and
+arguments and publishes a bounded 10 ms readiness retry deadline, shortened to the
+original finite wait deadline. This deadline exists only while an operation is pending.
+Socket and established TLS operations use nonblocking backend attempts; explicit guest
+nonblocking socket mode still returns EAGAIN. DNS, echo, and TLS setup use at most 16
+unfinished detached jobs with owned request/result storage. Only the runtime thread
+publishes results, allocates process handles, or accesses guest memory. Cancellation
+abandons replies without joining an uninterruptible resolver; completed abandoned TLS
+transports are freed by their worker. Worker completion never calls into destroyed SDL
+notification state, and echo uses an OS monotonic clock independent of SDL lifetime.
 Native Tab5 execution does not use that runnable hint because it runs in its own managed
 task. Debug builds count wake bits and expired deadline owners; reporting piggybacks on
 the existing health audit rather than creating another periodic deadline.

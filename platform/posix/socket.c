@@ -22,6 +22,7 @@
 #include <limits.h>
 #if !defined(ESP_PLATFORM)
 #include <poll.h>
+#include "host_io.h"
 #endif
 #include <stdatomic.h>
 #include <string.h>
@@ -507,6 +508,49 @@ static int submit_socket_request(const socket_request_t* request, socket_respons
 {
     if (!platform_network_socket_operations_init()) {
         return -TABOS_EIO;
+    }
+    const bool can_block =
+        request->operation == SOCKET_OPERATION_ACCEPT || request->operation == SOCKET_OPERATION_CONNECT ||
+        request->operation == SOCKET_OPERATION_SEND || request->operation == SOCKET_OPERATION_RECEIVE ||
+        request->operation == SOCKET_OPERATION_SEND_TO || request->operation == SOCKET_OPERATION_RECEIVE_FROM;
+    if (host_io_active() && can_block) {
+        const int flags = fcntl(request->socket, F_GETFL, 0);
+        if (flags < 0) {
+            return socket_error();
+        }
+        if ((flags & O_NONBLOCK) == 0) {
+            if (request->operation == SOCKET_OPERATION_CONNECT && host_io_retrying()) {
+                struct pollfd item = {.fd = request->socket, .events = POLLOUT};
+                const int ready    = poll(&item, 1U, 0);
+                if (ready == 0) {
+                    host_io_retry();
+                    return -TABOS_EAGAIN;
+                }
+                int error      = 0;
+                socklen_t size = sizeof(error);
+                if (ready < 0 || getsockopt(request->socket, SOL_SOCKET, SO_ERROR, &error, &size) != 0) {
+                    return socket_error();
+                }
+                errno = error;
+                return error == 0 ? 0 : socket_error();
+            }
+            if (fcntl(request->socket, F_SETFL, flags | O_NONBLOCK) != 0) {
+                return socket_error();
+            }
+            execute_socket_request(request, response);
+            (void) fcntl(request->socket, F_SETFL, flags);
+            if (request->operation == SOCKET_OPERATION_ACCEPT && response->result >= 0) {
+                const int accepted_flags = fcntl(response->result, F_GETFL, 0);
+                if (accepted_flags < 0 || fcntl(response->result, F_SETFL, accepted_flags & ~O_NONBLOCK) != 0) {
+                    (void) close_native_socket(response->result);
+                    return -TABOS_EIO;
+                }
+            }
+            if (response->result == -TABOS_EAGAIN) {
+                host_io_retry();
+            }
+            return response->result;
+        }
     }
     execute_socket_request(request, response);
     return response->result;
