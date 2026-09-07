@@ -26,6 +26,10 @@ make -C apps/coreutils touchtest
 Use `build-ls`, `build-mkdir`, or `build-date` to compile without installing. Runnable
 binaries install to `.local/rootfs/T/bin/` without filename extensions.
 
+`cp` rejects source and destination paths that identify the same file, including
+normalized path aliases and host-storage hard links, before opening the destination
+for truncation.
+
 `reboot` immediately performs an orderly system restart. `shutdown` immediately
 unmounts storage and requests system power-off. Neither command schedules a delayed
 action.

@@ -566,6 +566,13 @@ growth and limit failure, and deterministic cleanup after success and failure.
 Test blocking stdin plus `O_NONBLOCK`/`EAGAIN`. Text fixtures use raw CP437 bytes;
 host Unicode input outside CP437 must be rejected or explicitly substituted.
 
+`component.coreutils_cp` builds the production `cp` source against SDK POSIX
+compatibility headers and the real portable/host storage path. It must reject an
+identical path, a normalized relative alias, and a host hard link without changing
+source bytes, then truncate and copy into a distinct destination. Filesystem and
+POSIX adapter tests must verify matching nonzero identity across `stat()`/`fstat()`
+and across rename.
+
 System-action tests cover invalid reboot commands, unavailable and rejected ELF gates,
 first-request-wins kernel state, and action consumption. Host integration must verify
 power-off exits and reboot performs full teardown plus in-process reinitialization. Tab5

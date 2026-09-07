@@ -54,6 +54,8 @@ static int convert_status(const tabos_stat_t* source, void* destination)
         .st_mode  = source->mode,
         .st_size  = source->size,
         .st_mtime = source->modified_time,
+        .st_dev   = source->device_id,
+        .st_ino   = source->file_id,
     };
     memcpy(destination, &converted, sizeof(converted));
     return 0;

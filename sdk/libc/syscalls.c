@@ -178,6 +178,8 @@ static void copy_stat(struct stat* destination, const tabos_elf_stat_t* source)
     destination->st_size  = (off_t) ((uint64_t) source->size_low | (uint64_t) source->size_high << 32U);
     destination->st_mtime = (time_t) ((uint64_t) (uint32_t) source->modified_time_low |
                                       (uint64_t) (uint32_t) source->modified_time_high << 32U);
+    destination->st_dev   = (dev_t) ((uint64_t) source->device_id_low | (uint64_t) source->device_id_high << 32U);
+    destination->st_ino   = (ino_t) ((uint64_t) source->file_id_low | (uint64_t) source->file_id_high << 32U);
 }
 
 int _stat(const char* path, struct stat* status)

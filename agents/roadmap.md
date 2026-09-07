@@ -352,6 +352,7 @@
 - [x] Use `T:` microSD as initial available Tab5 drive.
 - [x] Treat card absence at boot as nonfatal; live removal recovery remains future work.
 - [x] Keep ESP-IDF, host file descriptors, and platform filesystem types out of public API.
+- [x] Resolve AUD-011: expose portable file identity and reject same-file `cp` destinations before truncation.
 
 ### Portable Filesystem Core
 

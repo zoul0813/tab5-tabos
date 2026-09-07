@@ -585,6 +585,10 @@ static void elf_copy_stat(tabos_elf_stat_t* destination, const tabos_stat_t* sou
     destination->size_high          = (uint32_t) (source->size >> 32U);
     destination->modified_time_low  = (int32_t) source->modified_time;
     destination->modified_time_high = (int32_t) (source->modified_time >> 32U);
+    destination->device_id_low      = (uint32_t) source->device_id;
+    destination->device_id_high     = (uint32_t) (source->device_id >> 32U);
+    destination->file_id_low        = (uint32_t) source->file_id;
+    destination->file_id_high       = (uint32_t) (source->file_id >> 32U);
 }
 
 static int elf_fs_stat_path(const char* path, tabos_elf_stat_t* status)
@@ -1400,10 +1404,7 @@ static int elf_wait_sources(loader_elf_application_t* application, tabos_elf_wai
             }
         }
 
-        const uint64_t now_ms = platform_time_ms();
-        if (ready == 0 && finite_timeout && now_ms >= deadline_ms) {
-            return 0;
-        }
+        const uint64_t now_ms   = platform_time_ms();
         uint32_t socket_timeout = 0U;
         if (ready == 0 && timeout_ms != 0U && (!finite_timeout || now_ms < deadline_ms)) {
             if (!requires_polling) {

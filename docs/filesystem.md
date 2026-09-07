@@ -24,7 +24,7 @@ native TabOS components that do not link the loaded-application C runtime.
 The initial subset supports:
 
 - opening, closing, reading, writing, and seeking regular files
-- file and open-file metadata
+- file and open-file metadata, including `st_dev`/`st_ino` identity
 - creating, removing, and renaming files and directories
 - current-working-directory operations
 - opening and iterating directories
@@ -40,6 +40,14 @@ absolute on current drive and `path` is relative to current working directory. A
 `A:` selects that drive's root. Drive letters are case-insensitive and normalized to
 uppercase. DOS-style `A:relative` paths are rejected. Repeated separators and `.` are
 collapsed; `..` cannot traverse above drive root. Cross-drive rename returns `EXDEV`.
+
+Two successful `stat()` results with matching `st_dev` and `st_ino` identify the
+same file, allowing applications to reject destructive source/destination aliases
+before opening for truncation. Host storage preserves native device/inode identity,
+including hard links. ESP-IDF FAT does not expose inode values, so TabOS supplies a
+case-folded normalized-path identity there; FAT links are unsupported. These values
+support current-file comparisons and must not be persisted across rename, unmount, or
+reboot.
 
 Use `tabos_fs_drive_count()` and `tabos_fs_drive_info()` to enumerate available drives,
 their letters, names, removable status, capacity, and free space.

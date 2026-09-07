@@ -375,6 +375,9 @@ process exit.
 lseek, stat, fstat, mkdir, unlink, and rename. Standard streams use unbuffered
 stdin, line-buffered stdout, and unbuffered stderr. Ordinary files retain normal
 libc buffering. Files are binary-transparent and perform no newline conversion.
+File metadata carries device/file identity for same-file checks. Host identity
+preserves native hard-link aliases; FAT uses normalized path identity because its
+ESP-IDF VFS exposes no inode.
 
 [DECIDED] Blocking stdin is the default. Descriptor state supports
 `O_NONBLOCK` from the first implementation through `fcntl`; an empty

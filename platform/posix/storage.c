@@ -143,6 +143,8 @@ static void map_status(const struct stat* source, tabos_stat_t* destination)
         .mode          = map_mode(source->st_mode),
         .size          = source->st_size >= 0 ? (uint64_t) source->st_size : 0U,
         .modified_time = (int64_t) source->st_mtime,
+        .device_id     = (uint64_t) source->st_dev,
+        .file_id       = (uint64_t) source->st_ino,
     };
 }
 

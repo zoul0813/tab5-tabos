@@ -738,6 +738,32 @@ tabos_enable_sanitizers(tabos_posix_filesystem)
 
 add_test(NAME component.posix_filesystem COMMAND tabos_posix_filesystem)
 
+add_library(tabos_coreutils_cp_program OBJECT "${TABOS_ROOT}/apps/coreutils/src/cp/main.c")
+target_include_directories(tabos_coreutils_cp_program PRIVATE
+    "${TABOS_ROOT}/sdk/posix/include"
+    "${TABOS_ROOT}/sdk/include"
+)
+target_compile_definitions(tabos_coreutils_cp_program PRIVATE main=tabos_cp_main)
+tabos_enable_warnings(tabos_coreutils_cp_program)
+tabos_enable_sanitizers(tabos_coreutils_cp_program)
+
+add_executable(tabos_coreutils_cp
+    component/coreutils_cp.c
+    $<TARGET_OBJECTS:tabos_coreutils_cp_program>
+    fakes/storage_backend.c
+    "${TABOS_ROOT}/platform/posix/storage.c"
+)
+target_include_directories(tabos_coreutils_cp PRIVATE
+    "${TABOS_ROOT}/fs/include"
+    "${TABOS_ROOT}/platform/include"
+    "${TABOS_ROOT}/sdk/include"
+    "${CMAKE_CURRENT_LIST_DIR}/fakes"
+)
+target_link_libraries(tabos_coreutils_cp PRIVATE tabos_core)
+tabos_enable_warnings(tabos_coreutils_cp)
+tabos_enable_sanitizers(tabos_coreutils_cp)
+add_test(NAME component.coreutils_cp COMMAND tabos_coreutils_cp)
+
 add_test(NAME integration.host_smoke COMMAND tabos_host --smoke)
 set_tests_properties(integration.host_smoke PROPERTIES
     ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy"
