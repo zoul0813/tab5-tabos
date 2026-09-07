@@ -967,6 +967,11 @@ font scaling, cursor inversion, and full terminal redraw. Physical diagnostics m
 measure internal RAM and PSRAM separately. Keep only repeatable speedups; host tests
 cannot establish PIE performance or context-switch correctness.
 
+`unit.raster` exercises the scalar fill fallback under ASan/UBSan. Fully clipped
+rectangles on every side, extreme coordinates, and zero-sized rectangles must leave
+the framebuffer and surrounding canaries unchanged; partially clipped fills must
+still produce the expected pixels.
+
 Fullscreen graphics tests must verify terminal writes, redraws, cursor timers, and
 scrollback navigation cannot alter or present the graphics framebuffer. TTY navigation
 keys must reach the graphics application regardless of its inherited TTY mode. Closing
