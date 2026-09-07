@@ -2514,6 +2514,11 @@ void loader_elf_application_destroy(void* application)
     free(elf_application);
 }
 
+const char* loader_elf_application_path(const loader_elf_application_t* application)
+{
+    return application != NULL ? application->path : NULL;
+}
+
 const char* loader_elf_application_working_directory(const loader_elf_application_t* application)
 {
     return application != NULL ? application->working_directory : NULL;
@@ -2525,7 +2530,12 @@ bool loader_elf_application_set_working_directory(loader_elf_application_t* appl
         strlen(working_directory) >= sizeof(application->working_directory)) {
         return false;
     }
+    char resolved_path[TABOS_FS_PATH_MAX];
+    if (!filesystem_normalize_path(application->path, working_directory, resolved_path, sizeof(resolved_path))) {
+        return false;
+    }
     memcpy(application->working_directory, working_directory, strlen(working_directory) + 1U);
+    memcpy(application->path, resolved_path, strlen(resolved_path) + 1U);
     return true;
 }
 

@@ -39,7 +39,9 @@ Applications are installed as extensionless executable files under `T:/bin/`.
 The shell default command search path is `T:/bin`; users may redefine it with
 DOS-style semicolon-separated PATH entries. Absolute drive paths and relative
 paths containing `/` (including `./` and `../`) bypass PATH lookup. The shell
-does not append `.bin` to command names.
+does not append `.bin` to command names. Before a filesystem-loaded child starts,
+its executable path is normalized against the parent's inherited process-local
+working directory rather than the filesystem-wide working directory.
 
 ### Pre-release application ABI [DECIDED]
 
