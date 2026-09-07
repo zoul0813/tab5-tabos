@@ -65,6 +65,7 @@ jobs:
           install_name_tool -change "$sdl_library" '@executable_path/libSDL3.0.dylib' "$package/tabos_host"
           codesign --force --sign - "$package/libSDL3.0.dylib"
           codesign --force --sign - "$package/tabos_host"
+          chmod u+w "$package/libSDL3.0.dylib"
           chmod +x "$package/tabos_host" "$package/run.sh"
           tar -C dist -czf dist/tabos-macos-arm64.tar.gz tabos-macos-arm64
           clean_directory="$(mktemp -d)"
