@@ -220,10 +220,13 @@ void platform_camera_resume(void);
 void platform_camera_shutdown(void);
 bool platform_network_operations_init(void);
 void platform_network_operations_shutdown(void);
+void platform_network_operations_cancel(void);
 bool platform_network_socket_operations_init(void);
 void platform_network_socket_operations_shutdown(void);
+void platform_network_socket_operations_cancel(void);
 bool platform_tls_operations_init(void);
 void platform_tls_operations_shutdown(void);
+void platform_tls_operations_cancel(void);
 void platform_network_socket_interrupt(int socket);
 bool platform_network_socket_operations_suspend(void);
 void platform_network_socket_operations_resume(void);
@@ -278,6 +281,9 @@ platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* cont
 bool platform_riscv32_requires_runtime_slices(void);
 uint64_t platform_riscv32_next_deadline(const platform_riscv32_context_t* context);
 void platform_riscv32_destroy(platform_riscv32_context_t* context);
+/* Quiesce gates before freeing process-owned resources; cancellation must not block. */
+void platform_riscv32_stop(platform_riscv32_context_t* context, void (*cancel)(void*), void* user_data);
+bool platform_riscv32_current_cancelled(void);
 void* platform_riscv32_current_user_data(void);
 void platform_input_wait(void);
 platform_mutex_t* platform_mutex_create(void);

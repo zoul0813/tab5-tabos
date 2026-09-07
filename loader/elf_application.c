@@ -153,7 +153,6 @@ struct loader_elf_application {
         elf_descriptor_t descriptors[ELF_DESCRIPTOR_CAPACITY];
         elf_socket_t sockets[ELF_SOCKET_CAPACITY];
         elf_wait_source_t wait_sources[ELF_WAIT_SOURCE_CAPACITY];
-        atomic_bool wait_active;
         atomic_bool wait_cancel_requested;
         elf_tls_t tls[ELF_TLS_CAPACITY];
         char working_directory[TABOS_FS_PATH_MAX];
@@ -1411,14 +1410,12 @@ static int elf_wait(tabos_elf_wait_item_t* items, uint32_t count, uint32_t timeo
     if (application == NULL || writable == NULL || count == 0U || count > TABOS_WAIT_MAX) {
         return -TABOS_EINVAL;
     }
-    atomic_store_explicit(&application->wait_active, true, memory_order_release);
     int result;
     if (atomic_load_explicit(&application->wait_cancel_requested, memory_order_acquire)) {
         result = -TABOS_ECANCELED;
     } else {
         result = elf_wait_sources(application, writable, count, timeout_ms);
     }
-    atomic_store_explicit(&application->wait_active, false, memory_order_release);
     return atomic_load_explicit(&application->wait_cancel_requested, memory_order_acquire) ? -TABOS_ECANCELED : result;
 }
 
@@ -2316,22 +2313,13 @@ static bool elf_heap_guards_intact(const loader_elf_application_t* application)
     return true;
 }
 
-static void elf_cancel_wait(loader_elf_application_t* application)
+static void elf_cancel_execution(void* user_data)
 {
+    loader_elf_application_t* application = user_data;
     atomic_store_explicit(&application->wait_cancel_requested, true, memory_order_release);
-    if (!atomic_load_explicit(&application->wait_active, memory_order_acquire)) {
-        return;
-    }
-    for (size_t index = 0U; index < ELF_WAIT_SOURCE_CAPACITY; ++index) {
-        const elf_wait_source_t* source = &application->wait_sources[index];
-        if (!source->open || source->type != ELF_WAIT_SOURCE_SOCKET) {
-            continue;
-        }
-        elf_socket_t* socket = elf_socket(application, (int) source->parent);
-        if (socket != NULL) {
-            platform_network_socket_interrupt(socket->platform_socket);
-        }
-    }
+    platform_network_operations_cancel();
+    platform_network_socket_operations_cancel();
+    platform_tls_operations_cancel();
 }
 
 static void elf_release_resources(loader_elf_application_t* application)
@@ -2339,7 +2327,7 @@ static void elf_release_resources(loader_elf_application_t* application)
     if (application == NULL) {
         return;
     }
-    elf_cancel_wait(application);
+    platform_riscv32_stop(application->execution, elf_cancel_execution, application);
     /* Stop concurrent native execution before releasing any process-owned
      * object that an application call gate could still access. */
     platform_riscv32_destroy(application->execution);

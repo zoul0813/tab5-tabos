@@ -91,8 +91,15 @@ socket that reuses the same per-process slot.
 Process cleanup interrupts blocked socket operations before it destroys the
 application execution context. The platform then prevents new socket operations,
 waits for the active backend operation to return, and disposes every owned socket.
-This keeps a terminated process from leaving a blocked worker or response for the
-next application.
+On Tab5, socket waits/accept/connect/transfers use cancellable nonblocking worker
+attempts; generic waits and ICMP receive waits check cancellation between short polls.
+TLS uses nonblocking handshake and transfer attempts and preserves the ten-second
+operation timeout. The underlying ESP-TLS TCP-connect readiness call may still wait up
+to its configured ten seconds; an already-entered DNS lookup must finish or time out in
+lwIP. Teardown retains the task and service state while these calls finish. The calling
+gate consumes its worker reply and releases the worker mutex before task deletion, so
+no stale response reaches the next application. Handle-close operations remain allowed
+during cancellation so error-path cleanup can release newly created resources.
 
 On macOS and Linux, a blocking RV32 socket or TLS call suspends only the guest.
 The runtime continues servicing input, display deadlines, and window shutdown.

@@ -337,6 +337,7 @@ static void execute_socket_request(const socket_request_t* request, socket_respo
 }
 
 #if defined(ESP_PLATFORM)
+#include "native_socket.inc"
 static QueueHandle_t socket_requests;
 static QueueHandle_t socket_responses;
 static SemaphoreHandle_t socket_mutex;
@@ -349,7 +350,7 @@ static void socket_worker(void* argument)
         socket_request_t request;
         if (xQueueReceive(socket_requests, &request, portMAX_DELAY) == pdTRUE) {
             socket_response_t response;
-            execute_socket_request(&request, &response);
+            execute_cancellable_socket_request(&request, &response);
             (void) xQueueSend(socket_responses, &response, portMAX_DELAY);
         }
     }
@@ -443,6 +444,11 @@ static int submit_socket_request(const socket_request_t* request, socket_respons
         ESP_LOGE("tabos_socket", "worker mutex failed for operation %u", (unsigned int) request->operation);
         return -TABOS_EIO;
     }
+    atomic_store_explicit(&socket_cancel_requested, false, memory_order_release);
+    if (platform_riscv32_current_cancelled() && request->operation != SOCKET_OPERATION_CLOSE) {
+        (void) xSemaphoreGive(socket_mutex);
+        return -TABOS_ECANCELED;
+    }
     const bool sent     = xQueueSend(socket_requests, request, portMAX_DELAY) == pdTRUE;
     const bool received = sent && xQueueReceive(socket_responses, response, portMAX_DELAY) == pdTRUE;
     (void) xSemaphoreGive(socket_mutex);
@@ -454,6 +460,10 @@ static int submit_socket_request(const socket_request_t* request, socket_respons
     return response->result;
 }
 #else
+void platform_network_socket_operations_cancel(void)
+{
+}
+
 bool platform_network_socket_operations_init(void)
 {
     if (socket_cancel_pipe[0] >= 0) {

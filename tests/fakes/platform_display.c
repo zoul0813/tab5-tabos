@@ -865,3 +865,25 @@ void platform_mutex_unlock(platform_mutex_t* mutex)
 {
     (void) mutex;
 }
+
+void platform_riscv32_stop(platform_riscv32_context_t* context, void (*cancel)(void*), void* user_data)
+{
+    (void) context;
+    (void) cancel;
+    (void) user_data;
+}
+
+bool platform_riscv32_current_cancelled(void)
+{
+    return false;
+}
+
+void platform_network_operations_cancel(void)
+{
+}
+void platform_network_socket_operations_cancel(void)
+{
+}
+void platform_tls_operations_cancel(void)
+{
+}

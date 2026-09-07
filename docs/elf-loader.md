@@ -104,7 +104,15 @@ metadata-selected (or legacy-default) 16 KiB stack. Its heap grows on demand to 
 metadata-selected (or legacy-default) 256 KiB limit. Process cleanup closes open
 descriptors and releases guest memory, task stack, heap, and executable memory.
 On Tab5, native return, exit, and child-exec work notify runtime immediately; cleanup
-stops native task before releasing anything reachable through an application call gate.
+stops the native task before releasing anything reachable through an application call gate.
+All native ABI calls pass through guards. Cleanup requests stop, suspends the task,
+and waits until neither CPU reports it running. If a call gate remains active, cleanup
+cancels its blocking work and resumes it long enough to release service locks; gate exit
+parks instead of returning to guest code. Only a stopped task with no active gate may
+have its stack, process resources, and executable mapping freed. An application computing
+outside call gates can be stopped without requiring it to yield voluntarily.
+Cancellation waits for an already-entered OS resolver or other bounded driver operation
+to return; cleanup never frees live state merely because a timeout elapsed.
 
 ## Tab5 Hardware Test
 
