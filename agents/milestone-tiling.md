@@ -199,7 +199,7 @@ Binary formats:
 
 ## Test and Acceptance Checklist
 
-- [ ] Converter tests cover deterministic output, RGB565 conversion, automatic and explicit
+- [x] Converter tests cover deterministic output, RGB565 conversion, automatic and explicit
   color keys, static and animated GIF input, GIF transparency/disposal, frame timing and
   repeat counts, multiple tilesets, Tiled transforms and animations, object markers,
   identifier collisions, and every rejected feature.
@@ -211,7 +211,7 @@ Binary formats:
 - [x] Verify repeated successful load/unload and cleanup after failed loads.
 - [x] Sprite pixel tests cover clipping, pivots, scale, quarter rotations, mirrors, opacity,
   transparency, animation wrap/clamp, metasprite order, and transformed pivots.
-- [ ] Tilemap tests cover get/set, empty cells, every Tiled flip combination, negative camera,
+- [x] Tilemap tests cover get/set, empty cells, every Tiled flip combination, negative camera,
   smooth scrolling, viewport edges, layer ordering, animation time, tile flags, objects,
   and invalid layers/cells.
 - [ ] Run tests through native and logical canvases; scalar output remains byte-identical
@@ -240,6 +240,43 @@ Binary formats:
   tile layers, and 64 sprites, sustaining the Tab5 panel cadence target of 58 FPS. If frame
   construction, excluding the VSYNC wait, exceeds 12 ms, add one bounded bulk tile-layer
   private ABI operation while preserving the same public SDK API.
+
+## Converter Acceptance Evidence — 2026-09-07
+
+- `unit.asset_converter` independently verifies deterministic `.c`, `.h`, `.tsp`, and
+  `.tmap` output; exhaustive RGB565 channel conversion; static and animated GIF input;
+  composited transparency and disposal; duration clamping and overrides; and missing,
+  indefinite, and finite repeat metadata.
+- Color-key coverage verifies automatic selection, explicit keys in both RGB565 integer
+  and RGB-triplet forms, opaque-pixel collision rejection, transparency tolerance
+  boundaries, and exhaustive rejection of partial alpha values 1 through 254.
+- Tiled coverage verifies inline and external tilesets, authoritative TMJ/TSJ metadata,
+  animations, repeat counts, ordered tile and object layers, object markers and integer
+  properties, all tile-object alignments, fractional-coordinate warnings, unsupported
+  map/layer/object/property forms, malformed GIDs and animations, overlapping tilesets,
+  and identifier collisions.
+- `unit.sdk_asset_equivalence` supplies the multi-tileset fixture and all eight Tiled GID
+  transforms, then verifies normalized converter output through matching generated-C and
+  binary descriptors and pixels.
+- Focused `unit.asset_converter` and `unit.sdk_asset_equivalence` tests pass 2/2 on both
+  macOS Debug and Release after adding the successful explicit-key regression.
+
+## Tilemap Acceptance Evidence — 2026-09-07
+
+- `unit.sdk_tiles` isolates the public cell contract: get/set success, empty-cell decode
+  and no-op drawing, writable transformed cells, sprite flag lookup from decoded tile IDs,
+  column and row bounds, invalid and object-layer access, reserved-bit rejection, unchanged
+  failed-query output, and unchanged cells after failed writes.
+- The same test renders independent expected pixels for all eight Tiled horizontal,
+  vertical, and diagonal transform combinations and validates negative camera movement,
+  animation time, viewport clipping, invalid draw layers, malformed cells, logical-canvas
+  rendering, and native command submission.
+- `unit.sdk_asset_equivalence` adds authored multi-layer maps, generated object/property
+  lookup, empty cells, animated tiles, exact layer compositing, one-pixel and sub-tile
+  scrolling in both directions, negative and far-outside cameras, and viewport-edge
+  comparisons against independent full-frame pixels.
+- Focused `unit.sdk_tiles`, `unit.asset_converter`, and `unit.sdk_asset_equivalence` tests
+  pass 3/3 on macOS Debug with sanitizers and 3/3 on macOS Release.
 
 ## Loader Review Evidence — 2026-09-05
 

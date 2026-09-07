@@ -281,6 +281,16 @@ def main() -> int:
         if keyed_assets.images[0].key != 1 or keyed_assets.images[0].pixels != [0, 1]:
             return 1
 
+        for explicit_key in (0x07ff, [0, 255, 255]):
+            explicit_key_manifest = {
+                "version": 1, "name": "explicit_key",
+                "images": [{"name": "keyed", "source": "keyed.png", "color_key": explicit_key}],
+            }
+            (root / "explicit-key.json").write_text(json.dumps(explicit_key_manifest), encoding="utf-8")
+            explicit_key_assets = load_manifest(root / "explicit-key.json")
+            if explicit_key_assets.images[0].key != 0x07ff or explicit_key_assets.images[0].pixels != [0, 0x07ff]:
+                return 1
+
         sheet = Image.new("RGBA", (5, 4), (12, 34, 56, 255))
         sheet.save(root / "sheet.png")
         authored_manifest = {

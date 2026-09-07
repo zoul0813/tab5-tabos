@@ -36,7 +36,16 @@ animated drawing and screen-space HUD restoration; execution on target remains r
 Host tests cover clip behavior, sprite pivots/transparency/animation/metasprites, tile
 get/set/camera/transforms, binary loading and cleanup, deterministic conversion, GIF
 timing/repeat metadata, generated-C compilation, editable TMJ/TSJ metadata, and absence
-of duplicate images or sprites when a manifest imports a Tiled tileset.
+of duplicate images or sprites when a manifest imports a Tiled tileset. Color-key
+coverage verifies automatic selection, explicit RGB565 and RGB-triplet keys, collision
+rejection, RGB tolerance boundaries, and rejection of partial alpha before keying.
+
+Tilemap cell-contract tests isolate empty-cell drawing and verify encoded sprite IDs,
+transform extraction, application flag lookup, writable transformed cells, column/row
+bounds, invalid tile and object layers, reserved bits, unchanged query outputs, and
+unchanged cells after failed writes. Equivalence scenes add every Tiled transform,
+one-pixel positive and negative camera movement, sub-tile scrolling, exact viewport
+edges, animation time, authored layer ordering, and generated object/property lookup.
 
 `unit.application_assets` exercises the shared application Make rules from a synthetic
 application beneath a path containing spaces. It verifies that only declared runtime files

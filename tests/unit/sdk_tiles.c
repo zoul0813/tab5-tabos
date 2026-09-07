@@ -222,6 +222,72 @@ static bool invalid_descriptors(tabos_graphics_t* graphics, const tabos_sprite_s
     return true;
 }
 
+static bool tilemap_cell_contract(tabos_graphics_t* graphics, const tabos_sprite_set_t* sprites)
+{
+    tabos_tile_t cells[] = {
+        TABOS_TILE(0U),
+        TABOS_TILE_EMPTY,
+        TABOS_TILE(1U),
+        TABOS_TILE(0U),
+    };
+    tabos_tilemap_layer_t layers[] = {
+        {.name = "tiles", .type = TABOS_TILEMAP_LAYER_TILES, .cells = cells},
+        {.name = "objects", .type = TABOS_TILEMAP_LAYER_OBJECTS},
+    };
+    tabos_tilemap_t map = {
+        .width = 2U, .height = 2U, .tile_width = 2U, .tile_height = 2U, .layers = layers, .layer_count = 2U};
+    tabos_tile_t tile = 123U;
+    if (tabos_tilemap_get(&map, 0U, 1U, 0U, &tile) != 0 || tile != TABOS_TILE_EMPTY ||
+        TABOS_TILE_ID(tile) != TABOS_SPRITE_NONE || TABOS_TILE_TRANSFORMS(tile) != 0U) {
+        return false;
+    }
+
+    const tabos_tile_t transformed = TABOS_TILE(0U) | TABOS_TILE_FLIP_HORIZONTAL | TABOS_TILE_FLIP_DIAGONAL;
+    if (tabos_tilemap_set(&map, 0U, 1U, 0U, transformed) != 0 || tabos_tilemap_get(&map, 0U, 1U, 0U, &tile) != 0 ||
+        tile != transformed || TABOS_TILE_ID(tile) != 0U ||
+        TABOS_TILE_TRANSFORMS(tile) != (TABOS_TILE_FLIP_HORIZONTAL | TABOS_TILE_FLIP_DIAGONAL) ||
+        tabos_sprite_flags(sprites, TABOS_TILE_ID(tile)) != 4U) {
+        return false;
+    }
+
+    tile = 123U;
+    if (tabos_tilemap_get(&map, 0U, 2U, 0U, &tile) != -1 || errno != ERANGE || tile != 123U ||
+        tabos_tilemap_get(&map, 0U, 0U, 2U, &tile) != -1 || errno != ERANGE || tile != 123U ||
+        tabos_tilemap_get(&map, 2U, 0U, 0U, &tile) != -1 || errno != EINVAL || tile != 123U ||
+        tabos_tilemap_get(&map, 1U, 0U, 0U, &tile) != -1 || errno != EINVAL || tile != 123U ||
+        tabos_tilemap_get(&map, 0U, 0U, 0U, NULL) != -1 || errno != EINVAL) {
+        return false;
+    }
+
+    const tabos_tile_t unchanged = cells[0];
+    if (tabos_tilemap_set(&map, 0U, 2U, 0U, TABOS_TILE_EMPTY) != -1 || errno != ERANGE || cells[0] != unchanged ||
+        tabos_tilemap_set(&map, 0U, 0U, 2U, TABOS_TILE_EMPTY) != -1 || errno != ERANGE || cells[0] != unchanged ||
+        tabos_tilemap_set(&map, 2U, 0U, 0U, TABOS_TILE_EMPTY) != -1 || errno != EINVAL || cells[0] != unchanged ||
+        tabos_tilemap_set(&map, 1U, 0U, 0U, TABOS_TILE_EMPTY) != -1 || errno != EINVAL || cells[0] != unchanged ||
+        tabos_tilemap_set(&map, 0U, 0U, 0U, TABOS_TILE_RESERVED) != -1 || errno != EINVAL || cells[0] != unchanged) {
+        return false;
+    }
+
+    tabos_tile_t empty_cell           = TABOS_TILE_EMPTY;
+    tabos_tilemap_layer_t empty_layer = {.name = "empty", .type = TABOS_TILEMAP_LAYER_TILES, .cells = &empty_cell};
+    const tabos_tilemap_t empty_map   = {
+          .width = 1U, .height = 1U, .tile_width = 2U, .tile_height = 2U, .layers = &empty_layer, .layer_count = 1U};
+    const tabos_color_t background          = UINT16_C(0x1234);
+    const tabos_tilemap_draw_options_t draw = TABOS_TILEMAP_DRAW_OPTIONS_DEFAULT;
+    if (tabos_graphics_begin_camera(graphics, 0, 0) != 0 || tabos_graphics_clear(graphics, background) != 0 ||
+        tabos_tilemap_draw_layer(graphics, &empty_map, 0U, sprites, &draw) != 0 ||
+        tabos_tilemap_draw_layer(graphics, &map, 1U, sprites, &draw) != -1 || errno != EINVAL ||
+        tabos_tilemap_draw_layer(graphics, &map, 2U, sprites, &draw) != -1 || errno != EINVAL) {
+        return false;
+    }
+    for (size_t index = 0U; index < (size_t) graphics->width * graphics->height; ++index) {
+        if (graphics->pixels[index] != background) {
+            return false;
+        }
+    }
+    return tabos_graphics_end_camera(graphics) == 0;
+}
+
 static bool native_submission(const tabos_sprite_set_t* sprites)
 {
     tabos_graphics_t graphics = {0};
@@ -346,7 +412,8 @@ int main(int argc, char** argv)
         tabos_sprite_animation_sprite(&sprites, 0U, 10U) != 1U ||
         tabos_sprite_animation_sprite(&sprites, 0U, 60U) != 1U || !transformed_pivots(&graphics, red) ||
         tabos_sprite_draw(&graphics, &sprites, 0U, 4, 4) != 0 || graphics.pixels[3U * graphics.width + 4U] != red ||
-        tabos_metasprite_draw(&graphics, &sprites, 0U, 8, 8, true, false, 255U) != 0) {
+        tabos_metasprite_draw(&graphics, &sprites, 0U, 8, 8, true, false, 255U) != 0 ||
+        !tilemap_cell_contract(&graphics, &sprites)) {
         return 1;
     }
 
