@@ -108,3 +108,5 @@ NATIVE_GATE(int, camera_copy,
             (stream, lease, offset, buffer, capacity))
 NATIVE_GATE(int, camera_release, (int stream, tabos_camera_lease_t lease), (stream, lease))
 NATIVE_GATE(int, camera_wait_source, (int stream), (stream))
+NATIVE_GATE(int, tty_get_size, (int descriptor, tabos_tty_size_t* size), (descriptor, size))
+NATIVE_GATE(int, input_wait_source, (void), ())
