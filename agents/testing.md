@@ -1705,3 +1705,45 @@ Validate macOS Debug/Release and Tab5 cross-builds. The operator reported Kilo p
 Tab5 functional requirements passing on 2026-09-07 and subsequently confirmed
 `tester --input` worked on physical Tab5. Quantitative memory and power measurements
 were not reported.
+
+## Power Phase 0 validation
+
+`unit.gpio_interrupt` compiles the real Tab5 GPIO owner against a narrow fake IDF driver.
+It verifies install failure/retry, unexpected external ownership, failed second consumer,
+independent delivery, teardown isolation and boot-lifetime reuse. Existing touch/keyboard
+drain tests retain their source-order coverage; these tests do not prove electrical wake.
+
+Follow `docs/power-baseline.md` for identity capture, participant/PM-lock audit, cumulative
+wake-counter deltas, worker/IRQ/bus traces, and the instrumented measurement worksheet.
+Record physical validation separately from host tests and cross-builds. GPIO50/GPIO23
+runtime IRQ success does not establish light-sleep wake; RTC/IMU power-controller routing
+must not be labeled transparent resume without retained-state proof.
+
+Power baseline instrumentation extends `unit.core_smoke`: ordinary event dispatch must
+not report peripheral activity; the existing health deadline reports once in Debug and
+not in Release. Cross-build both configurations to verify counter compile guards; use
+physical consecutive serial snapshots for actual codec/headphone/VSYNC rates.
+
+`unit.power_manager` validates deterministic dependency and callback order, blockers,
+failure rollback, pending callbacks, generation-stale completion, wake collection,
+saturated deadlines, indefinite transition blocking, duplicate names, missing
+dependencies, cycles, and capacity overflow. `unit.host_power_model` validates synthetic
+monotonic advancement, activity injection, brightness state, one-shot platform failure,
+coalesced wake injection, and wake-cause consumption. Tab5 builds retain stubbed sleep
+entry until validated hardware sleep lands in Phase 7.
+
+Phase 2 extends manager tests with exact idle boundary, simultaneous activity/deadline race,
+held-input and fullscreen/media inhibitor behavior, fresh timeout after final release,
+configuration changes while idle, active brightness below idle brightness, and dim/restore
+failures with truthful desired/effective state. Input and pointer service tests distinguish
+physical ingress and held/contact state from software repeat, text, and cancellation. Host SDL
+must dim through texture modulation without changing framebuffer or screenshot pixels.
+
+Phase 3 audio tests require zero platform starts after service initialization, exactly one
+start on first open, no restart for additional streams, and one stop on last close or owner
+cleanup. Repeat across every supported native rate. Inject first-start failure, verify no
+handle or active hardware leaks, then prove next first-open recovers. Existing mixing,
+capture, route, fault, wait, and shared-clock assertions remain mandatory. Health-audit tests
+must prove suspended deadlines disappear, no audit occurs while paused, and resume runs one
+overdue audit while advancing directly to the next future deadline. Cross-build real Tab5
+audio code; host fakes do not prove codec shutdown, jack routing, or electrical savings.

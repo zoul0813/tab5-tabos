@@ -22,12 +22,16 @@ int main(void)
     if (!audio_service_init()) {
         return fail("audio service init failed");
     }
+    if (audio_service_power_inhibited()) {
+        return fail("idle audio service inhibits power");
+    }
     tabos_audio_info_t info;
     const char* driver = NULL;
     int error          = -1;
     if (!audio_service_info(&info, &driver, &error) || driver == NULL || error != 0 || info.capture_channels != 4U ||
         info.sample_rates != TABOS_AUDIO_RATES_ALL || info.default_sample_rate != TABOS_AUDIO_DEFAULT_SAMPLE_RATE ||
-        test_platform_audio_sample_rate() != TABOS_AUDIO_DEFAULT_SAMPLE_RATE ||
+        test_platform_audio_sample_rate() != TABOS_AUDIO_DEFAULT_SAMPLE_RATE || test_platform_audio_active() ||
+        test_platform_audio_start_calls() != 0U || test_platform_audio_stop_calls() != 0U ||
         (info.features & (TABOS_AUDIO_FEATURE_PLAYBACK | TABOS_AUDIO_FEATURE_CAPTURE)) !=
             (TABOS_AUDIO_FEATURE_PLAYBACK | TABOS_AUDIO_FEATURE_CAPTURE)) {
         return fail("audio service info mismatch");
@@ -45,21 +49,29 @@ int main(void)
         .route       = TABOS_AUDIO_ROUTE_SPEAKER,
         .sample_rate = TABOS_AUDIO_SAMPLE_RATE_11025,
     };
-    const tabos_audio_stream_t native_rate = audio_service_open(&owner_a, &native_rate_config);
+    const tabos_audio_stream_t native_rate       = audio_service_open(&owner_a, &native_rate_config);
     tabos_audio_config_t conflicting_rate_config = native_rate_config;
     conflicting_rate_config.sample_rate          = TABOS_AUDIO_SAMPLE_RATE_48000;
     tabos_audio_config_t unsupported_rate_config = native_rate_config;
     unsupported_rate_config.sample_rate          = 12345U;
-    if (native_rate <= 0 || test_platform_audio_sample_rate() != TABOS_AUDIO_SAMPLE_RATE_11025 ||
+    if (native_rate <= 0 || !audio_service_power_inhibited() || !test_platform_audio_active() ||
+        test_platform_audio_start_calls() != 1U || test_platform_audio_sample_rate() != TABOS_AUDIO_SAMPLE_RATE_11025 ||
         audio_service_open(&owner_b, &conflicting_rate_config) != -TABOS_EBUSY ||
         audio_service_open(&owner_b, &unsupported_rate_config) != -TABOS_EINVAL ||
-        audio_service_close(&owner_a, native_rate) != 0) {
+        audio_service_close(&owner_a, native_rate) != 0 || audio_service_power_inhibited() ||
+        test_platform_audio_active() || test_platform_audio_stop_calls() != 1U) {
         return fail("sample-rate selection or shared-clock arbitration failed");
     }
+    test_platform_audio_fail_start_once();
+    if (audio_service_open(&owner_a, &playback_config) != -TABOS_EIO || test_platform_audio_active() ||
+        test_platform_audio_start_calls() != 2U || test_platform_audio_stop_calls() != 1U) {
+        return fail("first-stream hardware-start failure was not contained");
+    }
     const tabos_audio_stream_t default_rate = audio_service_open(&owner_a, &playback_config);
-    if (default_rate <= 0 || test_platform_audio_sample_rate() != TABOS_AUDIO_DEFAULT_SAMPLE_RATE ||
-        audio_service_close(&owner_a, default_rate) != 0) {
-        return fail("default sample rate was not restored on next open");
+    if (default_rate <= 0 || !test_platform_audio_active() ||
+        test_platform_audio_sample_rate() != TABOS_AUDIO_DEFAULT_SAMPLE_RATE ||
+        audio_service_close(&owner_a, default_rate) != 0 || test_platform_audio_active()) {
+        return fail("default sample rate or first-open fault recovery failed");
     }
     static const uint32_t native_rates[] = {
         TABOS_AUDIO_SAMPLE_RATE_8000,  TABOS_AUDIO_SAMPLE_RATE_11025, TABOS_AUDIO_SAMPLE_RATE_12000,
@@ -68,8 +80,8 @@ int main(void)
         TABOS_AUDIO_SAMPLE_RATE_88200, TABOS_AUDIO_SAMPLE_RATE_96000,
     };
     for (size_t index = 0U; index < sizeof(native_rates) / sizeof(native_rates[0]); ++index) {
-        tabos_audio_config_t config = playback_config;
-        config.sample_rate          = native_rates[index];
+        tabos_audio_config_t config       = playback_config;
+        config.sample_rate                = native_rates[index];
         const tabos_audio_stream_t stream = audio_service_open(&owner_a, &config);
         if (stream <= 0 || test_platform_audio_sample_rate() != native_rates[index] ||
             audio_service_close(&owner_a, stream) != 0) {
@@ -83,6 +95,18 @@ int main(void)
             audio_service_write(&owner_a, playback[index], &sample, sizeof(sample)) != (int) sizeof(sample)) {
             return fail("four playback streams did not open and accept PCM");
         }
+    }
+    const unsigned int starts_with_four_streams = test_platform_audio_start_calls();
+    if (!test_platform_audio_active() || test_platform_audio_route() != TABOS_AUDIO_ROUTE_SPEAKER) {
+        return fail("audio hardware stopped with open streams");
+    }
+    const unsigned int route_calls = test_platform_audio_route_calls();
+    if (audio_service_set_route(&owner_a, playback[0], TABOS_AUDIO_ROUTE_HEADPHONE) != 0 ||
+        test_platform_audio_route() != TABOS_AUDIO_ROUTE_HEADPHONE ||
+        test_platform_audio_route_calls() != route_calls + 1U ||
+        audio_service_set_route(&owner_a, playback[0], TABOS_AUDIO_ROUTE_SPEAKER) != 0 ||
+        test_platform_audio_route() != TABOS_AUDIO_ROUTE_SPEAKER) {
+        return fail("active playback route changes failed");
     }
     int16_t mixed[2] = {0};
     test_platform_audio_render(mixed, 1U);
@@ -167,7 +191,8 @@ int main(void)
 
     audio_service_close_owner(&owner_a);
     if (audio_service_get_status(&owner_a, capture, &status) != -TABOS_EBADF ||
-        audio_service_close(&owner_a, playback[1]) != -TABOS_EBADF) {
+        audio_service_close(&owner_a, playback[1]) != -TABOS_EBADF || test_platform_audio_active() ||
+        test_platform_audio_start_calls() != starts_with_four_streams) {
         return fail("owner cleanup did not stale audio handles");
     }
     audio_service_shutdown();

@@ -7,7 +7,8 @@
 #include <string.h>
 
 enum {
-    INPUT_QUEUE_CAPACITY = 64
+    INPUT_QUEUE_CAPACITY  = 64,
+    INPUT_POWER_KEY_LIMIT = TABOS_KEY_SYM + 1U
 };
 
 static tabos_input_event_t event_queue[INPUT_QUEUE_CAPACITY];
@@ -20,6 +21,10 @@ static uint8_t held_text_modifiers;
 static tabos_timer_t repeat_timer;
 static platform_mutex_t* queue_mutex;
 static platform_signal_t* queue_signal;
+static bool power_keys[INPUT_POWER_KEY_LIMIT];
+static size_t power_held_count;
+static size_t power_unknown_held_count;
+static bool power_activity_pending;
 
 static bool modifier_key(tabos_key_t key)
 {
@@ -63,6 +68,10 @@ bool input_init(void)
     held_modifiers      = 0U;
     held_text[0]        = '\0';
     held_text_modifiers = 0U;
+    memset(power_keys, 0, sizeof(power_keys));
+    power_held_count         = 0U;
+    power_unknown_held_count = 0U;
+    power_activity_pending   = false;
     tabos_timer_cancel(&repeat_timer);
     unlock_queue();
     return true;
@@ -79,6 +88,10 @@ void input_shutdown(void)
     held_modifiers      = 0U;
     held_text[0]        = '\0';
     held_text_modifiers = 0U;
+    memset(power_keys, 0, sizeof(power_keys));
+    power_held_count         = 0U;
+    power_unknown_held_count = 0U;
+    power_activity_pending   = false;
     tabos_timer_cancel(&repeat_timer);
     unlock_queue();
     platform_mutex_destroy(queue_mutex);
@@ -98,6 +111,24 @@ bool input_submit(const tabos_input_event_t* event)
     }
     if (!lock_queue()) {
         return false;
+    }
+    if (event->type == TABOS_INPUT_KEY_DOWN || event->type == TABOS_INPUT_KEY_UP) {
+        const bool down = event->type == TABOS_INPUT_KEY_DOWN;
+        power_activity_pending = true;
+        if (event->key > TABOS_KEY_UNKNOWN && event->key <= TABOS_KEY_SYM) {
+            if (power_keys[(size_t) event->key] != down) {
+                power_keys[(size_t) event->key] = down;
+                if (down) {
+                    ++power_held_count;
+                } else {
+                    --power_held_count;
+                }
+            }
+        } else if (down) {
+            ++power_unknown_held_count;
+        } else if (power_unknown_held_count > 0U) {
+            --power_unknown_held_count;
+        }
     }
     if (event->type == TABOS_INPUT_KEY_DOWN && !modifier_key(event->key)) {
         held_key            = event->key;
@@ -128,6 +159,18 @@ bool input_submit(const tabos_input_event_t* event)
     input_wake_waiter();
     input_diagnostic_log(event);
     return true;
+}
+
+bool input_take_power_activity(bool* held)
+{
+    if (held == NULL || !lock_queue()) {
+        return false;
+    }
+    const bool activity    = power_activity_pending;
+    power_activity_pending = false;
+    *held                  = power_held_count != 0U || power_unknown_held_count != 0U;
+    unlock_queue();
+    return activity;
 }
 
 void input_update(void)

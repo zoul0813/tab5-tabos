@@ -16,6 +16,7 @@ static platform_audio_capture_fn capture_callback;
 static platform_audio_error_fn error_callback;
 static uint32_t current_sample_rate;
 static bool capture_supported;
+static bool audio_active;
 
 static void SDLCALL playback_needed(void* userdata, SDL_AudioStream* stream, int additional_amount, int total_amount)
 {
@@ -119,10 +120,8 @@ static bool sample_rate_supported(uint32_t sample_rate)
         case TABOS_AUDIO_SAMPLE_RATE_44100:
         case TABOS_AUDIO_SAMPLE_RATE_48000:
         case TABOS_AUDIO_SAMPLE_RATE_88200:
-        case TABOS_AUDIO_SAMPLE_RATE_96000:
-            return true;
-        default:
-            return false;
+        case TABOS_AUDIO_SAMPLE_RATE_96000: return true;
+        default: return false;
     }
 }
 
@@ -142,9 +141,9 @@ bool platform_audio_init(platform_audio_render_fn render, platform_audio_capture
         .detected            = true,
         .ready               = true,
     };
-    render_callback  = render;
-    capture_callback = capture;
-    error_callback   = error;
+    render_callback     = render;
+    capture_callback    = capture;
+    error_callback      = error;
     current_sample_rate = TABOS_AUDIO_DEFAULT_SAMPLE_RATE;
     capture_supported   = true;
     if (host_is_headless()) {
@@ -162,39 +161,44 @@ bool platform_audio_init(platform_audio_render_fn render, platform_audio_capture
         info->routes           &= ~((uint32_t) TABOS_AUDIO_ROUTE_MICROPHONE);
         info->capture_channels  = 0U;
     }
+    close_streams();
     return true;
 }
 
-bool platform_audio_set_sample_rate(uint32_t sample_rate)
+bool platform_audio_start(uint32_t sample_rate, uint32_t route)
 {
-    if (!sample_rate_supported(sample_rate)) {
+    if (audio_active || !sample_rate_supported(sample_rate) ||
+        (route != TABOS_AUDIO_ROUTE_SPEAKER && route != TABOS_AUDIO_ROUTE_HEADPHONE &&
+         route != TABOS_AUDIO_ROUTE_MICROPHONE)) {
         return false;
-    }
-    if (sample_rate == current_sample_rate) {
-        return true;
     }
     if (host_is_headless()) {
         current_sample_rate = sample_rate;
+        audio_active        = true;
         return true;
     }
-    const uint32_t previous_sample_rate = current_sample_rate;
-    close_streams();
     if (!open_streams(sample_rate, capture_supported)) {
-        (void) open_streams(previous_sample_rate, capture_supported);
         return false;
     }
     current_sample_rate = sample_rate;
+    audio_active        = true;
     return true;
+}
+
+void platform_audio_stop(void)
+{
+    close_streams();
+    audio_active = false;
 }
 
 void platform_audio_shutdown(void)
 {
-    close_streams();
-    render_callback      = NULL;
-    capture_callback     = NULL;
-    error_callback       = NULL;
-    current_sample_rate  = 0U;
-    capture_supported    = false;
+    platform_audio_stop();
+    render_callback     = NULL;
+    capture_callback    = NULL;
+    error_callback      = NULL;
+    current_sample_rate = 0U;
+    capture_supported   = false;
 }
 
 bool platform_audio_set_route(uint32_t route)

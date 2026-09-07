@@ -176,6 +176,17 @@ bool camera_service_info(tabos_camera_info_t* info, const char** driver, bool* r
     return true;
 }
 
+bool camera_service_power_inhibited(void)
+{
+    if (!initialized) {
+        return false;
+    }
+    platform_mutex_lock(camera_mutex);
+    const bool inhibited = open_count != 0U;
+    platform_mutex_unlock(camera_mutex);
+    return inhibited;
+}
+
 void camera_service_set_device_id(tabos_device_id_t device_id)
 {
     camera_device_id = device_id;
@@ -508,6 +519,9 @@ tabos_camera_stream_t camera_service_open(const void* owner, const tabos_camera_
     platform_mutex_lock(pipeline_mutex);
     const tabos_camera_stream_t result = open_pipeline_locked(owner, config);
     platform_mutex_unlock(pipeline_mutex);
+    if (result >= 0) {
+        platform_runtime_notify(PLATFORM_RUNTIME_EVENT_POWER);
+    }
     return result;
 }
 
@@ -516,6 +530,9 @@ int camera_service_close(const void* owner, tabos_camera_stream_t handle)
     platform_mutex_lock(pipeline_mutex);
     const int result = close_pipeline_locked(owner, handle);
     platform_mutex_unlock(pipeline_mutex);
+    if (result == 0) {
+        platform_runtime_notify(PLATFORM_RUNTIME_EVENT_POWER);
+    }
     return result;
 }
 
@@ -524,6 +541,7 @@ void camera_service_close_owner(const void* owner)
     platform_mutex_lock(pipeline_mutex);
     close_owner_pipeline_locked(owner);
     platform_mutex_unlock(pipeline_mutex);
+    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_POWER);
 }
 
 void camera_service_remove_device(void)

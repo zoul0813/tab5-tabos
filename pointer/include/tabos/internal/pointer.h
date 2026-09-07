@@ -18,6 +18,8 @@ int pointer_service_poll(const void* owner, tabos_pointer_stream_t stream, uint3
                          uint32_t* returned_events);
 void pointer_service_close_owner(const void* owner);
 void pointer_service_submit(const tabos_pointer_event_t* event);
+void pointer_service_record_movement(void);
+bool pointer_service_take_power_activity(bool* contact_active);
 void pointer_service_remove_device(void);
 
 #endif

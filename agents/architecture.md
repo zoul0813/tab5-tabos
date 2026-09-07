@@ -1517,3 +1517,46 @@ attributes and incomplete escape state before parent acquisition.
 Kilo is an independent RV32 application, with a 2 MiB heap and 32 KiB stack metadata
 request, byte-oriented rows, bounded edits, and an application-local backup/rename save
 transaction. No POSIX emulation or hardware dependency was added to the application.
+
+## GPIO service ownership and power baseline
+
+Tab5 GPIO interrupt registration is owned by `platform/esp32p4/gpio_interrupt.c`.
+Serialized platform initialization installs one non-IRAM service for the boot; keyboard
+and touch own only their pin handlers. A consumer must never uninstall the shared service.
+Touch constructors retain GPIO configuration but receive no component callback; TabOS
+checks direct attachment and removes it before controller teardown. Concurrent registration
+and new consumers require an explicit lifecycle audit.
+
+Power Phase 0 inventory and wake-source restrictions live in `docs/power-baseline.md`.
+Portable Phase 1 and 2 power management is internal to kernel. Runtime dispatcher owns state
+transitions and combines its absolute deadline with existing service deadlines. Fixed-capacity
+participants are ordered once by stable dependency names; asynchronous completions carry a
+transition generation so stale replies cannot advance current state. Invalid graphs disable
+suspend while normal operation remains available. Platform boundary supplies brightness,
+preparation/abort, sleep entry, wake-cause collection, and restoration. No public suspend API,
+PM enablement, or Tab5 wake arming exists yet. Missing tested reversible service lifecycle
+remains a blocker, including initialized drivers with no application handles.
+
+Keyboard and pointer services retain normalized physical activity plus held/contact state
+under their existing service mutexes. Runtime samples both after platform ingress and before
+foreground execution, then owns resulting power transition. Fullscreen ownership and open
+audio/camera streams are sampled as dim/suspend inhibitors; lifecycle changes notify runtime.
+Final inhibitor release starts a fresh idle interval. Power status stores desired and last
+known effective brightness separately, including validity and failure. Host SDL brightness is
+texture presentation modulation; framebuffer and captured pixels remain unchanged.
+
+Debug peripheral activity uses a narrow `platform_runtime_log_activity()` diagnostic
+hook beside the existing health-audit wake report. Tab5 counts codec pairs/frames/errors,
+headphone attempts/errors, VSYNC and PPA completions with boot-lifetime lock-free unsigned
+atomics; no new periodic task/deadline exists. Release compiles out updates; host does
+not manufacture physical peripheral measurements. These counts are not PM policy or
+synchronization state.
+
+Audio hardware has an initialized-but-idle platform lifecycle. Service admission starts
+transport at requested shared sample rate and initial route before exposing first handle.
+Last-stream close stops transport after worker exit. Tab5 closes both codec devices, disables
+speaker routing, and runs jack polling only for active speaker routing; host SDL likewise owns
+audio streams only while TabOS streams exist. Backend-start failure updates device health and
+remains retryable after no stream was admitted. Maintenance audit supports suppressed deadlines
+and one overdue resume pass. Pinned ESP-IDF v5.4.4 exposes no public retained-buffer MIPI-DPI
+pause; controller display-off is not treated as scanout quiescence.

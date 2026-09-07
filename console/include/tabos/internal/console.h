@@ -16,5 +16,6 @@ void console_update(void);
 uint64_t console_next_deadline(void);
 void console_redraw(void);
 void console_set_graphics_active(bool active);
+bool console_graphics_active(void);
 
 #endif
