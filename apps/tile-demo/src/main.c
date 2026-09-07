@@ -55,6 +55,22 @@ static void move_robot(const tabos_tilemap_t* map, const tabos_sprite_set_t* spr
     }
 }
 
+static bool sprite_overlaps_object(const tabos_sprite_set_t* sprites, uint32_t sprite_id, int32_t sprite_x,
+                                   int32_t sprite_y, const tabos_tilemap_object_t* object)
+{
+    if (sprite_id >= sprites->sprite_count || object->width == 0U || object->height == 0U) {
+        return false;
+    }
+    const tabos_sprite_t* sprite = &sprites->sprites[sprite_id];
+    const int64_t left           = (int64_t) sprite_x - sprite->pivot_x;
+    const int64_t top            = (int64_t) sprite_y - sprite->pivot_y;
+    const int64_t right          = left + sprite->width;
+    const int64_t bottom         = top + sprite->height;
+    const int64_t object_right   = (int64_t) object->x + object->width;
+    const int64_t object_bottom  = (int64_t) object->y + object->height;
+    return left < object_right && right > object->x && top < object_bottom && bottom > object->y;
+}
+
 int main(void)
 {
     uint32_t tty_mode = 0U;
@@ -79,9 +95,13 @@ int main(void)
         tabos_tilemap_object(&map, TDEMO_LAYER_WORLD_MARKERS, TDEMO_OBJECT_WORLD_SPAWN);
     const tabos_tilemap_object_t* grove =
         tabos_tilemap_object(&map, TDEMO_LAYER_WORLD_MARKERS, TDEMO_OBJECT_WORLD_GROVE);
-    int32_t grove_trees = 0;
-    const bool markers_valid =
-        spawn != NULL && grove != NULL && tabos_tilemap_object_property(grove, "trees", &grove_trees) == 0;
+    const tabos_tilemap_object_t* gem = tabos_tilemap_object(&map, TDEMO_LAYER_WORLD_MARKERS, TDEMO_OBJECT_WORLD_GEM);
+    const uint32_t gem_sprite         = gem == NULL ? TABOS_SPRITE_NONE : TABOS_TILE_ID(gem->tile);
+    int32_t grove_trees               = 0;
+    const bool markers_valid          = spawn != NULL && grove != NULL && gem != NULL &&
+                               gem->shape == TABOS_TILEMAP_OBJECT_TILE && TABOS_TILE_TRANSFORMS(gem->tile) == 0U &&
+                               gem_sprite < sprites.sprite_count &&
+                               tabos_tilemap_object_property(grove, "trees", &grove_trees) == 0;
     if (markers_valid && (grove_trees < 1 || grove_trees > 4)) {
         errno = EINVAL;
     }
@@ -104,6 +124,7 @@ int main(void)
     bool camera_right = false;
     bool camera_up    = false;
     bool camera_down  = false;
+    bool gem_revealed = false;
     int32_t camera_x  = 0;
     int32_t camera_y  = 0;
     uint64_t started  = tabos_monotonic_ms();
@@ -186,7 +207,11 @@ int main(void)
             robot_horizontal_press ? 0 : ((int32_t) move_right - (int32_t) move_left) * DEMO_MOVE_STEP;
         const int32_t robot_dy = robot_vertical_press ? 0 : ((int32_t) move_down - (int32_t) move_up) * DEMO_MOVE_STEP;
         move_robot(&map, &sprites, &robot_x, &robot_y, robot_dx, robot_dy);
-        const uint64_t elapsed            = tabos_monotonic_ms() - started;
+        const uint64_t elapsed      = tabos_monotonic_ms() - started;
+        const uint32_t robot_sprite = tabos_sprite_animation_sprite(&sprites, TDEMO_ANIMATION_ROBOT_WALK, elapsed);
+        if (!gem_revealed && sprite_overlaps_object(&sprites, robot_sprite, robot_x, robot_y, gem)) {
+            gem_revealed = true;
+        }
         tabos_tilemap_draw_options_t draw = TABOS_TILEMAP_DRAW_OPTIONS_DEFAULT;
         draw.animation_ms                 = elapsed;
         (void) tabos_graphics_clear(&graphics, TABOS_RGB565(8, 18, 30));
@@ -199,6 +224,11 @@ int main(void)
             const int32_t tree_y = grove->y + 15 + tree / 2 * 16;
             (void) tabos_metasprite_draw(&graphics, &sprites, TDEMO_METASPRITE_TREE_SHADOW, tree_x, tree_y, false,
                                          false, 255U);
+        }
+        if (gem_revealed) {
+            const tabos_sprite_t* sprite = &sprites.sprites[gem_sprite];
+            (void) tabos_sprite_draw(&graphics, &sprites, gem_sprite, gem->x + sprite->pivot_x,
+                                     gem->y + sprite->pivot_y);
         }
         const tabos_tilemap_layer_t* markers = &map.layers[TDEMO_LAYER_WORLD_MARKERS];
         for (uint32_t index = 0U; index < markers->object_count; ++index) {

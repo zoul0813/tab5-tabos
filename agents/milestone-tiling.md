@@ -230,7 +230,7 @@ Binary formats:
 
 - [x] Verify `tdemo` rendering, layer order, animation, editable cells, and object markers on physical Tab5.
 - [x] Verify seam-free scrolling and exact viewport clipping, including negative camera positions.
-- [ ] Verify RGB565 color-key transparency and all Tiled transforms on physical Tab5.
+- [x] Verify RGB565 color-key transparency and all Tiled transforms on physical Tab5.
 - [x] Verify repeated load/unload and repeated application launch/exit without resource loss.
 - [x] Verify terminal and input restoration on exit.
 
@@ -239,7 +239,11 @@ Tab5. Rendering and interaction matched the host simulator, including animated/l
 content, object-driven content, and editable-cell behavior. Short directional taps moved,
 camera scrolling remained correct through negative coordinates and beyond the visible map,
 and shell typing worked after exit. No resource loss appeared across the three application
-load/unload cycles. The corrected transparency and Tiled-transform checks remain open.
+load/unload cycles.
+
+Final physical visual evidence — 2026-09-07: the corrected RGBA assets rendered without
+magenta fringe, all eight reeds transform variants displayed, and moving the robot into
+the gem marker revealed its tile-object sprite inside the yellow outline.
 
 ### Performance Acceptance
 
@@ -688,6 +692,11 @@ Validated working-tree changes based on `7e43d93`:
 - The demo's checked-in RGBA master and nearest-neighbor 64x64 runtime sheet use binary
   transparency. Their opaque shadow colors remain visible without blending against or keying a
   magenta backdrop, and the runtime sheet can be reproduced directly from the aligned master.
+- A visible row of eight asymmetric reeds in the upper water area authors every Tiled GID
+  transform in canonical identity/H/V/HV/D/DH/DV/DHV order for host and physical review.
+- The gem tile object begins as a yellow marker. Animated robot bounds overlapping its authored
+  rectangle persistently reveal the sprite referenced by the object's encoded tile, exercising
+  application-owned object collision and rendering without automatic object-layer drawing.
 - Regenerating assets produced the expected rounding diagnostics and left `include/tdemo.h`
   unchanged. All standard RV32 applications cross-built successfully. Focused tile, converter,
   application-asset, and generated-C/binary-equivalence tests pass on macOS Debug and Release.

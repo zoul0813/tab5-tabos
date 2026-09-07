@@ -75,11 +75,16 @@ and flag constants instead of numeric asset IDs. It looks up the named spawn and
 markers, uses the grove's `trees` property to place metasprites, and iterates the object
 layer to process every marker. The RGBA sprite sheet uses only fully transparent and fully
 opaque pixels; shadows use opaque RGB shades instead of partial alpha or chroma-key fringe.
-Hold WASD to move the animated robot four pixels per frame
-while solid and water tile flags block movement. Hold the arrow keys to scroll the shared
-camera at the same rate. A short directional tap always applies one four-pixel step, even
-when its key-down and key-up events are consumed during the same rendered frame. Press E
-to edit one foreground cell, and press Q or Escape to exit.
+The named gem starts as a yellow object marker. When the animated robot's sprite bounds
+overlap that marker, `tdemo` reads the encoded tile from the object descriptor and reveals
+the gem sprite while retaining the marker outline. Hold WASD to move the animated robot
+four pixels per frame while solid and water tile flags block movement. Hold the arrow keys
+to scroll the shared camera at the same rate. A short directional tap always applies one
+four-pixel step, even when its key-down and key-up events are consumed during the same
+rendered frame. Press E to edit one foreground cell, and press Q or Escape to exit. The
+eight reeds across the upper water area showcase every Tiled GID transform in this order:
+identity, horizontal, vertical, horizontal plus vertical, diagonal, diagonal plus
+horizontal, diagonal plus vertical, and diagonal plus horizontal plus vertical.
 
 Core utilities are grouped under `apps/coreutils/`, but each utility remains a separate
 program. Build one with `make -C apps/coreutils ls` or `make -C apps/coreutils mkdir`.
