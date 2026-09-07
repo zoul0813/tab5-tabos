@@ -79,27 +79,23 @@ jobs:
           archive: false
 
   linux:
-    name: Linux / ${{ matrix.configuration }}
+    name: Linux
     runs-on: ubuntu-26.04
     needs: host-applications
-    strategy:
-      fail-fast: false
-      matrix:
-        configuration: [debug, release]
     steps:
       - name: Install SDL3
         run: sudo apt-get update && sudo apt-get install -y libsdl3-dev
       - uses: actions/checkout@v7
-      - name: Build and test
-        run: ./tools/tabos linux ${{ matrix.configuration }} test
+      - name: Build and test debug
+        run: ./tools/tabos linux debug test
+      - name: Build and test release
+        run: ./tools/tabos linux release test
       - name: Download host application rootfs
-        if: matrix.configuration == 'release'
         uses: actions/download-artifact@v8
         with:
           name: host-rootfs.tar.gz
           path: dist
       - name: Package Linux host
-        if: matrix.configuration == 'release'
         shell: bash
         run: |
           package="dist/tabos-linux-x64"
@@ -117,7 +113,6 @@ jobs:
           tar -C "$clean_directory" -xzf dist/tabos-linux-x64.tar.gz
           "$clean_directory/tabos-linux-x64/run.sh" --startup-smoke
       - name: Upload Linux host
-        if: matrix.configuration == 'release'
         uses: actions/upload-artifact@v7
         with:
           path: dist/tabos-linux-x64.tar.gz
