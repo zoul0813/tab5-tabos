@@ -63,7 +63,7 @@ TABOS_RUNTIME_SOURCES := $(SDK_ROOT)/crt/crt0.c $(SDK_ROOT)/crt/metadata.S $(SDK
                          $(SDK_ROOT)/lib/device.c \
                          $(SDK_ROOT)/lib/posix_filesystem.c
 
-.PHONY: all build clean install stage-assets install-assets size metadata
+.PHONY: all build clean install stage-assets install-assets size metadata tabos-list-outputs tabos-list-runtime-assets
 
 all: install
 
@@ -104,3 +104,11 @@ size: $(OUTPUT)
 
 metadata: $(OUTPUT)
 	$(READELF) -n "$(OUTPUT)"
+
+tabos-list-outputs:
+	@printf '%s\n' "$(abspath $(OUTPUT))"
+
+tabos-list-runtime-assets:
+	@for asset in $(TABOS_RUNTIME_ASSETS); do \
+		printf '%s/%s\n' "$(abspath $(BUILD_DIR)/data)" "$${asset##*/}"; \
+	done

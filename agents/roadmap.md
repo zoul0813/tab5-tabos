@@ -111,6 +111,8 @@
 - [x] Add validated versioned `.tsp` and `.tmap` loaders.
 - [x] Add deterministic PNG/GIF/Tiled converter and generated C output.
 - [x] Add explicit runtime-asset installation and MSC copying under `T:/data/<app>`.
+- [x] Validate the full 34-application RV32 build/install/MSC matrix, including optional DOOM and
+  exact `tdemo` runtime assets; make clean and distribution immune to stale renamed outputs.
 - [x] Add original binary-backed `tdemo` and host tests.
 - [x] Review binary loaders, reject overlapping sections and invalid descriptors, and add 764 malformed-file, allocation-failure, and cleanup cases; macOS Debug/Release validation and standard RV32 app cross-build pass. See `milestone-tiling.md` for evidence.
 - [x] Validate Debug/Release builds on macOS and Tab5.

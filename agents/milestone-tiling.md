@@ -223,8 +223,8 @@ Binary formats:
 
 - [x] Validate macOS Debug and Release builds (rerun for the loader validation changes; see evidence below).
 - [x] Validate Tab5 Debug and Release builds (recorded in roadmap; not rerun during this checklist conversion).
-- [ ] Validate Linux Debug and Release builds.
-- [ ] Verify all applications build and declared runtime assets install correctly across the target/configuration matrix.
+- [ ] Validate Linux Debug and Release builds. Deferred by user on 2026-09-07.
+- [x] Verify all applications build and declared runtime assets install correctly across the target/configuration matrix.
 
 ### Physical Tab5 Acceptance
 
@@ -593,6 +593,24 @@ Validated working-tree changes based on `7e43d93`:
   an empty declaration, and the regression test begins with an intentionally stale asset.
 - Tile demo build inputs and generated outputs now use relative Make paths, matching the shared
   application build contract and preserving builds when the repository path contains spaces.
+
+## Application Build Matrix Evidence — 2026-09-07
+
+- Standalone applications have one RV32 build target shared by macOS and Tab5 firmware and
+  independent of firmware Debug/Release configuration. A clean build/install produced all 34
+  declared executables, including optional pinned DOOM.
+- Every installed `T:/bin` executable compares byte for byte with its declared build output.
+  Only `tdemo` declares runtime assets; staging and rootfs contain exactly `tdemo.tsp` and
+  `world.tmap`, both byte-identical to converter output, with no PNG, GIF, Tiled, or manifest files.
+- A simulated MSC transfer copied exactly the same 34 declared binaries and two declared assets,
+  with no missing, unexpected, or differing files. A second default transfer copied 33 standard
+  binaries and excluded an already-built DOOM output as required.
+- Matrix review found obsolete `coreutils/netctl` and `coreutils/ping` build directories surviving
+  the old per-project clean. The broad MSC filesystem scan could select these stale binaries.
+  Top-level clean now removes the complete app build tree, and MSC copying queries current
+  Makefiles for exact executable and staged-asset paths instead of scanning build directories.
+- `unit.application_assets` now verifies the declared-output query contract and passes in macOS
+  Debug and Release. Linux validation remains deferred as requested.
 
 ## Portable SDK Evidence — 2026-09-06
 

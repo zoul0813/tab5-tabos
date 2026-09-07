@@ -52,6 +52,18 @@ include {ROOT / "sdk/make/application.mk"}
         if result.returncode != 0 or filenames(staged) != {"game.tsp", "level.tmap"}:
             return 1
 
+        result = run_make(application, "--no-print-directory", "-s", "tabos-list-outputs")
+        expected_output = str((application / "build/apps/fixture/fixture").resolve())
+        if result.returncode != 0 or result.stdout.strip() != expected_output:
+            return 1
+        result = run_make(application, "--no-print-directory", "-s", "tabos-list-runtime-assets")
+        expected_assets = {
+            str((staged / "game.tsp").resolve()),
+            str((staged / "level.tmap").resolve()),
+        }
+        if result.returncode != 0 or set(result.stdout.splitlines()) != expected_assets:
+            return 1
+
         (staged / "obsolete.tsp").write_bytes(b"stale")
         result = run_make(application, "stage-assets", "TABOS_RUNTIME_ASSETS=")
         if result.returncode != 0 or filenames(staged):

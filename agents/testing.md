@@ -53,7 +53,17 @@ edges, animation time, authored layer ordering, and generated object/property lo
 application beneath a path containing spaces. It verifies that only declared runtime files
 enter staging and normal installation, an empty declaration clears stale staging, missing
 declared outputs fail the build, and installation preserves unrelated application-created data.
-The MSC workflow consumes these same refreshed per-application staging directories.
+It also verifies the executable and staged-asset path queries consumed by MSC copying. The MSC
+workflow uses those current Makefile declarations rather than scanning build directories, so
+renamed or removed application outputs cannot leak into distribution media. Top-level application
+clean removes the complete build tree.
+
+A clean full application matrix builds and installs 34 RV32 executables, including optional pinned
+DOOM. Build and rootfs binaries compare byte for byte. `tdemo` is the only application declaring
+runtime assets; build staging, rootfs installation, and simulated MSC transfer contain exactly its
+`.tsp` and `.tmap` outputs and no authoring sources. Standalone RV32 applications are shared by
+macOS and Tab5 and have no firmware Debug/Release variant. The optional matrix copies all 34
+executables; the default matrix copies 33 and excludes an already-built DOOM binary.
 
 Transformed-pivot tests use independent expected rectangles for all sixteen combinations
 of quarter-turn rotation and horizontal/vertical mirroring. They also cover scaling, an

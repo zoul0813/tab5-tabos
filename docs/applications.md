@@ -43,7 +43,9 @@ Intermediate build files, PNG/GIF and Tiled sources, and manifests are excluded.
 Each application build refreshes its staging directory even when its declared asset list is
 empty, preventing obsolete staged files from reaching MSC media. Installation overwrites
 declared asset names while preserving unrelated application-created files in the same data
-directory.
+directory. MSC copying queries each current application Makefile for its declared executable
+and runtime-asset outputs; stale build directories from renamed or removed applications are
+never copied. `./apps/build.sh clean` removes the complete application build tree.
 Grouped utility outputs are flattened; for example, `build/apps/coreutils/ls/ls` is
 copied to `bin/ls`.
 
