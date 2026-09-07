@@ -69,7 +69,9 @@ Individual application commands such as `make -C apps/shell` remain available.
 
 Published macOS and Linux host archives include the maintained application set under
 `rootfs/`, including the required `T:/bin/shell`. The archive launcher resolves that
-directory from its own installed location, independent of the source checkout.
+directory from its own installed location, independent of the source checkout. The
+Tab5 release archive includes the same `T:` contents under `sdcard/`; copy that
+directory's contents to the root of the TF/microSD card.
 
 Core utilities are grouped under `apps/coreutils/`, but each utility remains a separate
 program. Build one with `make -C apps/coreutils ls` or `make -C apps/coreutils mkdir`.

@@ -24,7 +24,7 @@ jobs:
       - name: Stage host application rootfs
         uses: actions/upload-artifact@v7
         with:
-          name: tabos-host-rootfs
+          name: host-rootfs.tar.gz
           path: host-rootfs.tar.gz
           archive: false
           retention-days: 1
@@ -47,7 +47,7 @@ jobs:
         if: matrix.configuration == 'release'
         uses: actions/download-artifact@v8
         with:
-          name: tabos-host-rootfs
+          name: host-rootfs.tar.gz
           path: dist
       - name: Package macOS host
         if: matrix.configuration == 'release'
@@ -95,7 +95,7 @@ jobs:
         if: matrix.configuration == 'release'
         uses: actions/download-artifact@v8
         with:
-          name: tabos-host-rootfs
+          name: host-rootfs.tar.gz
           path: dist
       - name: Package Linux host
         if: matrix.configuration == 'release'
@@ -140,6 +140,7 @@ jobs:
     name: Tab5 compile / ${{ matrix.configuration }}
     runs-on: ubuntu-24.04
     container: espressif/idf:v5.4.4
+    needs: host-applications
     strategy:
       fail-fast: false
       matrix:
@@ -151,20 +152,35 @@ jobs:
         run: |
           . /opt/esp/idf/export.sh
           ./tools/tabos tab5 ${{ matrix.configuration }} build
+      - name: Download application rootfs
+        if: matrix.configuration == 'release'
+        uses: actions/download-artifact@v8
+        with:
+          name: host-rootfs.tar.gz
+          path: dist
       - name: Package Tab5 firmware
         if: matrix.configuration == 'release'
         shell: bash
         run: |
           build_directory="build/tab5-release"
+          package_directory="$(mktemp -d)"
+          rootfs_directory="$(mktemp -d)"
+          firmware_archive="$(mktemp)"
           mkdir -p dist
           python -c 'import json, sys; data = json.load(open(sys.argv[1], encoding="utf-8")); print(*data["flash_files"].values(), sep="\n")' \
             "$build_directory/flasher_args.json" > dist/flash-files.txt
           test -s dist/flash-files.txt
-          tar -C "$build_directory" -czf "$PWD/dist/tabos-tab5-release.tar.gz" \
+          tar -C "$build_directory" -cf "$firmware_archive" \
             -T "$PWD/dist/flash-files.txt" \
             flash_args \
             flash_project_args \
             flasher_args.json
+          tar -C "$package_directory" -xf "$firmware_archive"
+          tar -C "$rootfs_directory" -xzf dist/host-rootfs.tar.gz
+          test -x "$rootfs_directory/rootfs/T/bin/shell"
+          mkdir -p "$package_directory/sdcard"
+          cp -a "$rootfs_directory/rootfs/T/." "$package_directory/sdcard/"
+          tar -C "$package_directory" -czf "$PWD/dist/tabos-tab5-release.tar.gz" .
       - name: Upload Tab5 firmware
         if: matrix.configuration == 'release'
         uses: actions/upload-artifact@v7
