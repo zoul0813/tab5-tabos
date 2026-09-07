@@ -4,7 +4,7 @@ PROGRAMS := netctl ping nettest ntpdate httpsget fetch irc
 
 ifeq ($(strip $(PROGRAM)),)
 
-.PHONY: all build install clean $(PROGRAMS)
+.PHONY: all build install clean tabos-list-outputs tabos-list-runtime-assets $(PROGRAMS)
 
 all: $(PROGRAMS)
 build: $(PROGRAMS:%=build-%)
@@ -19,6 +19,11 @@ $(PROGRAMS:%=build-%): build-%:
 clean:
 	@for program in $(PROGRAMS); do \
 		$(MAKE) --no-print-directory PROGRAM=$$program -f Makefile clean; \
+	done
+
+tabos-list-outputs tabos-list-runtime-assets:
+	@for program in $(PROGRAMS); do \
+		$(MAKE) --no-print-directory -s PROGRAM=$$program -f Makefile $@; \
 	done
 
 else

@@ -480,6 +480,7 @@ but is not a substitute for this execution path.
 - [ ] Freeze and version the first supported application ABI only when TabOS is ready
   to support independently distributed third-party binaries.
 - [x] Rebuild all bundled applications with ABI changes during pre-release development.
+- [x] Track application headers, Makefiles, generated prerequisites, and effective resource/ABI settings.
 - [x] Publish public application headers independent from ESP-IDF and FreeRTOS.
 - [x] Provide compiler, linker, strip, and packaging workflow for external applications.
 - [ ] Optionally provide host-native application build mode for sanitizer-heavy source tests;

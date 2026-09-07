@@ -582,6 +582,12 @@ powered halt fallback, and microSD integrity after repeated orderly actions.
 
 ELF loader tests use real RV32 fixture and cover format metadata, segment bounds, executable entry, supported static `SHT_RELA` processing, unsupported relocation rejection, image-size limit, memory copy, unload, and malformed inputs under host sanitizers. Host executes same RV32 bytes through resumable interpreter and must cover multiple instruction slices, API-table calls, argument vectors, console output, return status, illegal instructions, and invalid guest memory access. Tab5 hardware validation covers dual PSRAM aliases, load-bias relocation, final cache synchronization, globals/BSS/newlib state, native API-table calls, arguments, console output, return status, and cleanup. Expected success text begins with `Hello TabOS!`.
 
+Application build tracking uses an isolated synthetic SDK/application and a real host C
+compiler. It must prove that unchanged builds remain cached while SDK headers, application
+headers, generated prerequisites, the application Makefile, and heap, stack, capability,
+ABI, and contact-limit settings each relink the executable. Maintained RV32 applications must also build through
+the real cross toolchain after shared-rule changes.
+
 Filesystem-backed application coverage must keep the global filesystem working directory
 distinct from the child's inherited directory and verify relative PATH entries, `./`,
 `../`, and current-drive `/` executable paths load the file selected by the child.

@@ -84,9 +84,10 @@ Portable `input/input.c` owns queue and HID text translation. Optional event log
 Each independently loaded application under `apps/` is a standalone project with its
 own build definition, `src/`, `include/`, `README.md`, and `LICENSE`. Application
 Makefiles use shared TabOS SDK rules from `sdk/make/application.mk`; runnable binaries
-are built separately from firmware. `apps/build.sh` invokes maintained default standalone
-application builds and installs outputs into local simulated `T:/bin`; optional projects
-require explicit flags such as `--with-doom`. Built-in firmware diagnostics remain grouped under
+are built separately from firmware. The shared rules track included headers, application
+Makefiles, generated prerequisites, and effective build settings. `apps/build.sh` invokes
+maintained default standalone application builds and installs declared outputs into local
+simulated `T:/bin`; optional projects require explicit flags such as `--with-doom`. Built-in firmware diagnostics remain grouped under
 `apps/diag/` because they are kernel test fixtures rather than distributable programs.
 
 ## Dependency Direction

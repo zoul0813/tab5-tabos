@@ -100,6 +100,13 @@ extensionless executable and installs it under `.local/rootfs/T/bin/`. Run
 `./apps/build.sh` to build default applications. Optional applications such as DOOM
 require their documented opt-in flag.
 
+The shared rules generate compiler dependency data for SDK and application headers,
+track the including application Makefile and generated `TABOS_BUILD_PREREQUISITES`, and
+persist the effective compile/link configuration. Header-only edits and changes to heap,
+stack, capability, ABI, or pointer-contact settings rebuild the executable. Applications
+may declare `TABOS_RUNTIME_ASSETS`; build/install stages and MSC distribution copy those
+files through the declared output inventory.
+
 TabOS has not released or frozen its application ABI. SDK and transport changes may be
 incompatible during development, and all bundled applications must be rebuilt with the
 matching system build.
