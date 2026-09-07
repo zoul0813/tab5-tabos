@@ -1,12 +1,19 @@
 # TabOS Testing and Multi-Target Development Strategy
 
-> Status: agreed development and testing direction as of 2026-08-10.
+> Status: agreed development and testing direction as of 2026-09-07.
 >
 > Purpose: define how TabOS should be structured, built, and tested across the real M5Stack Tab5 hardware target and native macOS/Linux development targets.
 >
 > This document is written primarily for Codex and contributors. It should be read together with `architecture.md` and `TABOS_CONTEXT.md`.
 
 ## Sprite, Tile, and Asset Validation
+
+The post-merge baseline at `6589874` passes all 60 macOS Debug tests with sanitizers,
+all 60 macOS Release tests, every standard RV32 application build including `tdemo`, and
+the Tab5 Debug firmware build. This validates integration with the event-driven runtime,
+ISR, pointer, and camera work merged from `main`. Linux Debug/Release, complete
+native/logical pixel parity, physical Tab5 behavior, and the performance fixture remain
+separate acceptance work.
 
 Converter tests verify developer-facing header output carries its generated-file warning,
 contains generated constants, and omits generated-C declarations and SDK includes. The

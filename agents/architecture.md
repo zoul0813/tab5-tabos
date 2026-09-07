@@ -1,6 +1,6 @@
 # TabOS Architecture
 
-> Status: agreed project architecture as of 2026-08-10.
+> Status: agreed project architecture as of 2026-09-07.
 >
 > This document defines the intended structure of TabOS and the architectural boundaries that implementation work should preserve. It is written primarily for Codex and contributors working in the repository.
 
@@ -40,6 +40,16 @@ existing clip repeat semantics. This adds no binary-format or private-ABI change
 Descriptors may be generated C data or validated process-owned binary data with identical
 IDs and rendering semantics. Applications own gameplay and choose layer draw order.
 
+`[DECIDED]` Tile and object coordinates use the runtime's top-left, positive-X-right,
+positive-Y-down coordinate system. Conversion normalizes Tiled tile-object alignment and
+rounds fractional object geometry to logical pixels with explicit diagnostics. Object
+layers expose descriptors and lookup data only; they never create or render entities.
+
+`[DECIDED]` Binary sprite sets and maps load completely into process-owned memory before
+becoming visible to the caller. Validation or allocation failure leaves an existing
+destination unchanged. Successful unload clears the destination. Assets and source pixels
+must remain alive until queued graphics work is drained by present or graphics close.
+
 Per-operation clip rectangles extend existing blits. Scalar and logical-canvas paths
 implement exact clipping. SDL/PPA adapters may decline clipped work so portable fallback
 remains pixel-identical. Private RV32 marshaling carries all clip fields.
@@ -49,6 +59,8 @@ or Tiled JSON. Runtime formats contain little-endian offsets/counts, never point
 TMJ/TSJ is authoritative for imported tileset images, atlas regions, tile metadata, and
 tile animations. A manifest orchestrates outputs and adds only metadata not represented
 by imported Tiled sources; it must not re-import the same tileset image or sprite regions.
+Generated C, public constants, `.tsp`, and `.tmap` outputs derive from the same normalized
+model and must remain deterministic and semantically equivalent.
 
 ## 1. Overview
 

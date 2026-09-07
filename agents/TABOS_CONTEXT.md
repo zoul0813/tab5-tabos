@@ -1,6 +1,6 @@
 # TabOS Codex Context
 
-> Status: project context distilled from TabOS planning discussions through 2026-08-10.
+> Status: project context distilled from TabOS planning discussions through 2026-09-07.
 > Purpose: give Codex a stable architectural baseline. Treat items marked **Decision** as the current direction, **Proposed** as a likely design that still needs validation, and **Open** as unresolved.
 
 ## Sprite and Tile SDK
@@ -8,6 +8,12 @@
 - `[DECIDED]` `tabos_tilemap_object()` resolves a generated stable Tiled object ID
   within a generated object-layer index. Games retain direct array iteration when they
   need every marker; object layers never render automatically.
+
+- `[DECIDED]` Runtime map and object coordinates use a common top-left origin with
+  positive X right and positive Y down. Conversion normalizes Tiled tile-object
+  alignment into that coordinate system. Fractional authored object geometry rounds to
+  the nearest logical pixel, with halves away from zero, and emits one warning for each
+  adjusted field.
 
 - `[DECIDED]` `TABOS_TILEMAP_DRAW_OPTIONS_DEFAULT` draws against the full graphics
   canvas at animation time zero. Games copy it and override only needed fields; an
@@ -64,6 +70,10 @@
   physics, or collision solver.
 - `[DECIDED]` Versioned `.tsp` and `.tmap` assets load fully into process-owned memory.
   Authoring accepts PNG, animated GIF, and finite orthogonal Tiled JSON.
+- `[DECIDED]` Generated C and binary assets come from one normalized model and preserve
+  identical IDs, descriptors, flags, animations, layers, objects, properties, and
+  rendering semantics. Binary loaders validate the complete file before replacing a
+  destination and leave it unchanged on failure.
 - `[DECIDED]` Runtime assets live under `T:/data/<app-name>/`; builds copy only explicit
   generated outputs.
 - `[DECIDED]` Imported TMJ/TSJ files own tileset images, regions, tile metadata, and tile

@@ -1,6 +1,7 @@
 # Sprite and Tile Graphics Milestone
 
-> Status: core implementation landed on `feature/tiling`; detailed review and acceptance remain open.
+> Status: implementation, public API, asset pipeline, and documentation review are complete;
+> remaining automated, platform, physical, and performance acceptance stays open.
 > Keep this checklist synchronized with the milestone summary in [roadmap.md](roadmap.md).
 
 ## Tracking Rules
@@ -193,7 +194,7 @@ Binary formats:
   metasprite, scrolling multilayer map, editable cell, collision flags, and object markers.
   Load binary assets from `T:/data/tdemo/`.
 - [x] Review: Update graphics/API, SDK/application-build, asset-authoring, and demo documentation.
-- [ ] Review: Record decisions and milestone work in `agents/TABOS_CONTEXT.md`,
+- [x] Review: Record decisions and milestone work in `agents/TABOS_CONTEXT.md`,
   `agents/architecture.md`, `agents/testing.md`, and `agents/roadmap.md`.
 
 ## Test and Acceptance Checklist

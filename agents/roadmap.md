@@ -22,6 +22,14 @@
 
 ### Sprite and Tile Graphics
 
+- [x] Synchronize finalized sprite/tile API, converter, coordinate, ownership, and
+  validation decisions across context, architecture, testing, roadmap, and milestone
+  documents after merging `main` into `feature/tiling`.
+
+- [x] Resolve the `main` integration against the event-driven runtime, ISR, pointer, and
+  camera work. Combined private ELF API version is 21; macOS Debug and Release each pass
+  60/60 tests, every standard RV32 application builds, and Tab5 Debug firmware builds.
+
 - [x] Verify normal tile games render fully in logical RGB565 memory and submit one final accelerated
   canvas blit per presentation; cover exact 426/427-pixel integer-scale boundary behavior.
 
