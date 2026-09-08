@@ -11,6 +11,12 @@ enum {
 enum {
     TABOS_TTY_GET_MODE = 0x5401,
     TABOS_TTY_SET_MODE = 0x5402,
+    TABOS_TTY_GET_SIZE = 0x5403,
 };
+
+typedef struct {
+        uint32_t rows;
+        uint32_t columns;
+} tabos_tty_size_t;
 
 #endif

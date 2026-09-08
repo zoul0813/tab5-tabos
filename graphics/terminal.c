@@ -38,7 +38,7 @@ static uint64_t live_viewport_top(const terminal_t* terminal)
 {
     const uint64_t visible_rows = terminal->rows;
     const uint64_t first_visible =
-        terminal->current_line + 1U > visible_rows ? terminal->current_line + 1U - visible_rows : 0U;
+        terminal->last_line + 1U > visible_rows ? terminal->last_line + 1U - visible_rows : 0U;
     return first_visible > terminal->first_line ? first_visible : terminal->first_line;
 }
 
@@ -94,7 +94,10 @@ static void append_line(terminal_t* terminal, bool hard_break)
     if (terminal->current_line - terminal->first_line + 1U > terminal->line_capacity) {
         ++terminal->first_line;
     }
-    clear_line(terminal, terminal->current_line);
+    if (terminal->current_line > terminal->last_line) {
+        terminal->last_line = terminal->current_line;
+        clear_line(terminal, terminal->current_line);
+    }
     terminal->column = 0U;
     follow_live_output(terminal);
 }
@@ -134,7 +137,13 @@ static void backspace(terminal_t* terminal)
         if (terminal->current_line == terminal->first_line) {
             return;
         }
+        if (terminal->current_line == live_viewport_top(terminal) && terminal->current_line < terminal->last_line) {
+            return;
+        }
         clear_line(terminal, terminal->current_line);
+        if (terminal->last_line == terminal->current_line) {
+            --terminal->last_line;
+        }
         --terminal->current_line;
         const size_t previous_length = terminal->line_lengths[line_slot(terminal, terminal->current_line)];
         terminal->column             = previous_length > terminal->columns ? terminal->columns : previous_length;
@@ -183,6 +192,10 @@ static void ansi_sgr(terminal_t* terminal, unsigned int value)
         terminal->background = ansi_color(value - 40U);
     } else if (value >= 100U && value <= 107U) {
         terminal->background = ansi_color(value - 100U + 8U);
+    } else if (value == 39U) {
+        terminal->foreground = 0xffff;
+    } else if (value == 49U) {
+        terminal->background = 0x0000;
     } else if (value == 7U) {
         terminal->reverse = true;
     } else if (value == 27U) {
@@ -190,28 +203,47 @@ static void ansi_sgr(terminal_t* terminal, unsigned int value)
     }
 }
 
+static void restore_cursor(terminal_t* terminal)
+{
+    const uint64_t top    = live_viewport_top(terminal);
+    const uint64_t bottom = top + terminal->rows - 1U;
+    terminal->column = terminal->saved_column < terminal->columns ? terminal->saved_column : terminal->columns - 1U;
+    terminal->current_line = terminal->saved_line < top ? top : terminal->saved_line;
+    if (terminal->current_line > bottom) {
+        terminal->current_line = bottom;
+    }
+}
+
 static void ansi_command(terminal_t* terminal, char command)
 {
-    const unsigned int value = terminal->ansi_have_value ? terminal->ansi_value : 0U;
+    const unsigned int value = terminal->ansi_values[0];
+    const size_t amount      = value == 0U ? 1U : value;
+    const uint64_t top       = live_viewport_top(terminal);
+    const uint64_t bottom    = top + terminal->rows - 1U;
+    if (terminal->ansi_private) {
+        if (terminal->ansi_count == 1U && value == 25U && (command == 'h' || command == 'l')) {
+            terminal->cursor_visible = command == 'h';
+        }
+        return;
+    }
     if (command == 'H' || command == 'f') {
-        terminal->current_line = terminal->first_line + (value > 0U ? value - 1U : 0U);
-        terminal->column       = 0U;
+        size_t row    = amount - 1U;
+        size_t column = terminal->ansi_count > 1U && terminal->ansi_values[1] > 0U ? terminal->ansi_values[1] - 1U : 0U;
+        terminal->current_line = top + (row < terminal->rows ? row : terminal->rows - 1U);
+        terminal->column       = column < terminal->columns ? column : terminal->columns - 1U;
     } else if (command == 'A') {
-        terminal->current_line -= value < terminal->current_line ? value : terminal->current_line;
+        const uint64_t available  = terminal->current_line - top;
+        terminal->current_line   -= amount < available ? amount : available;
     } else if (command == 'B') {
-        terminal->current_line += value;
+        const uint64_t available  = bottom - terminal->current_line;
+        terminal->current_line   += amount < available ? amount : available;
     } else if (command == 'C') {
-        terminal->column += value;
-        if (terminal->column >= terminal->columns) {
-            terminal->column = terminal->columns - 1U;
-        }
+        const size_t available  = terminal->columns - 1U - terminal->column;
+        terminal->column       += amount < available ? amount : available;
     } else if (command == 'D') {
-        terminal->column -= value < terminal->column ? value : terminal->column;
+        terminal->column -= amount < terminal->column ? amount : terminal->column;
     } else if (command == 'G') {
-        terminal->column = value > 0U ? value - 1U : 0U;
-        if (terminal->column >= terminal->columns) {
-            terminal->column = terminal->columns - 1U;
-        }
+        terminal->column = amount < terminal->columns ? amount - 1U : terminal->columns - 1U;
     } else if (command == 'J' && value == 2U) {
         terminal_clear(terminal);
     } else if (command == 'K') {
@@ -224,13 +256,17 @@ static void ansi_command(terminal_t* terminal, char command)
         terminal->line_lengths[line_slot(terminal, terminal->current_line)] = start;
         terminal->full_redraw                                               = true;
     } else if (command == 'm') {
-        ansi_sgr(terminal, value);
+        for (size_t index = 0U; index < terminal->ansi_count; ++index) {
+            ansi_sgr(terminal, terminal->ansi_values[index]);
+        }
     } else if (command == 's') {
         terminal->saved_column = terminal->column;
         terminal->saved_line   = terminal->current_line;
     } else if (command == 'u') {
-        terminal->column       = terminal->saved_column;
-        terminal->current_line = terminal->saved_line;
+        restore_cursor(terminal);
+    }
+    while (terminal->last_line < terminal->current_line) {
+        clear_line(terminal, ++terminal->last_line);
     }
 }
 
@@ -245,9 +281,9 @@ static void clear_framebuffer(terminal_t* terminal)
 
 static void draw_cell(terminal_t* terminal, size_t column, size_t row, const terminal_cell_t* cell, bool cursor)
 {
-    const char character                       = cell->character == '\0' ? ' ' : cell->character;
-    platform_pixel_t foreground                = cell->character == '\0' ? terminal->foreground : cell->foreground;
-    platform_pixel_t background                = cell->character == '\0' ? terminal->background : cell->background;
+    const char character        = cell->character == '\0' ? ' ' : cell->character;
+    platform_pixel_t foreground = cell->character == '\0' ? terminal->foreground : cell->foreground;
+    platform_pixel_t background = cell->character == '\0' ? terminal->background : cell->background;
     if (cell->reverse) {
         const platform_pixel_t swapped = foreground;
         foreground                     = background;
@@ -279,7 +315,7 @@ static void render(terminal_t* terminal)
         clear_framebuffer(terminal);
         for (size_t row = 0U; row < terminal->rows; ++row) {
             const uint64_t line = terminal->viewport_top + row;
-            if (line < terminal->first_line || line > terminal->current_line) {
+            if (line < terminal->first_line || line > terminal->last_line) {
                 continue;
             }
             const terminal_cell_t* cells = const_line_cells(terminal, line);
@@ -293,7 +329,7 @@ static void render(terminal_t* terminal)
     } else {
         for (size_t row = 0U; row < terminal->rows; ++row) {
             const uint64_t line          = terminal->viewport_top + row;
-            const terminal_cell_t* cells = line <= terminal->current_line ? const_line_cells(terminal, line) : NULL;
+            const terminal_cell_t* cells = line <= terminal->last_line ? const_line_cells(terminal, line) : NULL;
             for (size_t column = 0U; column < terminal->columns; ++column) {
                 const size_t dirty_index = (row * terminal->columns) + column;
                 if (!terminal->dirty_cells[dirty_index]) {
@@ -398,7 +434,7 @@ bool terminal_resize(terminal_t* terminal, platform_framebuffer_t* framebuffer, 
     const uint64_t distance_from_end =
         old_live_top >= terminal->viewport_top ? old_live_top - terminal->viewport_top : 0U;
 
-    for (uint64_t line = terminal->first_line; line <= terminal->current_line; ++line) {
+    for (uint64_t line = terminal->first_line; line <= terminal->last_line; ++line) {
         const size_t slot            = line_slot(terminal, line);
         const terminal_cell_t* cells = const_line_cells(terminal, line);
         for (size_t column = 0U; column < terminal->line_lengths[slot]; ++column) {
@@ -438,6 +474,7 @@ void terminal_clear(terminal_t* terminal)
     terminal->row                  = 0U;
     terminal->first_line           = 0U;
     terminal->current_line         = 0U;
+    terminal->last_line            = 0U;
     terminal->viewport_top         = 0U;
     terminal->cursor_phase_visible = true;
     terminal->full_redraw          = true;
@@ -482,17 +519,18 @@ void terminal_write(terminal_t* terminal, const char* text)
     while (*text != '\0') {
         if (terminal->ansi_state == 1U) {
             if (*text == '[') {
-                terminal->ansi_state      = 2U;
-                terminal->ansi_value      = 0U;
-                terminal->ansi_have_value = false;
+                terminal->ansi_state = 2U;
+                memset(terminal->ansi_values, 0, sizeof(terminal->ansi_values));
+                terminal->ansi_count   = 1U;
+                terminal->ansi_private = false;
+                terminal->ansi_invalid = false;
             } else if (*text == '7') {
                 terminal->saved_column = terminal->column;
                 terminal->saved_line   = terminal->current_line;
                 terminal->ansi_state   = 0U;
             } else if (*text == '8') {
-                terminal->column       = terminal->saved_column;
-                terminal->current_line = terminal->saved_line;
-                terminal->ansi_state   = 0U;
+                restore_cursor(terminal);
+                terminal->ansi_state = 0U;
             } else {
                 terminal->ansi_state = 0U;
             }
@@ -501,16 +539,39 @@ void terminal_write(terminal_t* terminal, const char* text)
         }
         if (terminal->ansi_state == 2U) {
             if (*text >= '0' && *text <= '9') {
-                terminal->ansi_value      = terminal->ansi_value * 10U + (unsigned int) (*text - '0');
-                terminal->ansi_have_value = true;
+                unsigned int* value      = &terminal->ansi_values[terminal->ansi_count - 1U];
+                const unsigned int digit = (unsigned int) (*text - '0');
+                if (*value > (UINT16_MAX - digit) / 10U) {
+                    terminal->ansi_invalid = true;
+                } else {
+                    *value = *value * 10U + digit;
+                }
                 ++text;
                 continue;
             }
             if (*text == ';') {
+                if (terminal->ansi_count == 8U) {
+                    terminal->ansi_invalid = true;
+                } else {
+                    ++terminal->ansi_count;
+                }
                 ++text;
                 continue;
             }
-            ansi_command(terminal, *text);
+            if (*text == '?' && terminal->ansi_count == 1U && terminal->ansi_values[0] == 0U &&
+                !terminal->ansi_private) {
+                terminal->ansi_private = true;
+                ++text;
+                continue;
+            }
+            if ((unsigned char) *text < 0x40U || (unsigned char) *text > 0x7eU) {
+                terminal->ansi_invalid = true;
+                ++text;
+                continue;
+            }
+            if (!terminal->ansi_invalid) {
+                ansi_command(terminal, *text);
+            }
             terminal->ansi_state = 0U;
             ++text;
             continue;
@@ -639,5 +700,5 @@ bool terminal_is_at_end(const terminal_t* terminal)
 size_t terminal_history_line_count(const terminal_t* terminal)
 {
     return terminal == NULL || terminal->cells == NULL ? 0U :
-                                                         (size_t) (terminal->current_line - terminal->first_line + 1U);
+                                                         (size_t) (terminal->last_line - terminal->first_line + 1U);
 }

@@ -1,6 +1,7 @@
 #include <tabos/internal/runtime.h>
 #include <tabos/internal/input.h>
 #include <tabos/internal/device_registry.h>
+#include <tabos/internal/hardware_devices.h>
 
 #include <tabos/application.h>
 #include <tabos/device.h>
@@ -94,6 +95,9 @@ int main(void)
         return 1;
     }
 
+    if (test_platform_activity_reports() != 0U) {
+        return 1;
+    }
     test_platform_keyboard_set_status(false, EIO);
     test_platform_advance_time_ms(60000U);
     kernel_runtime_update(PLATFORM_RUNTIME_EVENT_DEADLINE);
@@ -101,11 +105,28 @@ int main(void)
         device.last_error != EIO) {
         return 1;
     }
+#if TABOS_TEST_RUNTIME_DIAGNOSTICS
+    if (test_platform_activity_reports() != 1U) {
+        return 1;
+    }
+#else
+    if (test_platform_activity_reports() != 0U) {
+        return 1;
+    }
+#endif
     test_platform_keyboard_set_status(true, 0);
+    hardware_devices_suspend_audit();
+    if (hardware_devices_next_deadline() != PLATFORM_RUNTIME_DEADLINE_NONE) {
+        return 1;
+    }
     test_platform_advance_time_ms(60000U);
     kernel_runtime_update(PLATFORM_RUNTIME_EVENT_DEADLINE);
+    if (!device_registry_find(TABOS_DEVICE_NAME_KEYBOARD, &device) || device.state != TABOS_DEVICE_FAULT) {
+        return 1;
+    }
+    hardware_devices_resume_audit();
     if (!device_registry_find(TABOS_DEVICE_NAME_KEYBOARD, &device) || device.state != TABOS_DEVICE_READY ||
-        device.last_error != 0) {
+        device.last_error != 0 || hardware_devices_next_deadline() != test_platform_time_ms() + 60000U) {
         return 1;
     }
 

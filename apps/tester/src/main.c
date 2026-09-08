@@ -14,6 +14,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/ioctl.h>
+#include <tabos/tty.h>
 
 enum {
     PROCESS_LEAK_DESCRIPTOR_COUNT   = 8,
@@ -92,6 +94,12 @@ static int run_process_fixture(int argc, char** argv)
     if (argc != 2) {
         return -1;
     }
+    if (strcmp(argv[1], "--input-source") == 0) {
+        if (ioctl(0, TABOS_TTY_SET_MODE, (uint32_t) 0U) != 0) {
+            return 1;
+        }
+        return tabos_input_wait_source();
+    }
     if (strcmp(argv[1], "--process-leaf") == 0) {
         return 23;
     }
@@ -119,6 +127,12 @@ static int run_process_fixture(int argc, char** argv)
 
 int main(int argc, char** argv)
 {
+    if (argc == 2 && strcmp(argv[1], "--input") == 0) {
+        tester_context_t context = {.argc = argc, .argv = argv};
+        tester_test_input(&context);
+        printf("Input assertions: %u; failures: %u\n", context.assertions, context.failures);
+        return context.failures == 0U ? 0 : 1;
+    }
     if (argc == 2 && strcmp(argv[1], "--camera-leak") == 0) {
         return tester_camera_leak_fixture();
     }

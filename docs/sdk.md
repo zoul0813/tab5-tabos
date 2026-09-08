@@ -110,3 +110,11 @@ files through the declared output inventory.
 TabOS has not released or frozen its application ABI. SDK and transport changes may be
 incompatible during development, and all bundled applications must be rebuilt with the
 matching system build.
+
+## Terminal editor services
+
+`<tabos/tty.h>` adds `TABOS_TTY_GET_SIZE`, returning a copied `tabos_tty_size_t`
+through `ioctl` on foreground console descriptors. `<tabos/wait.h>` adds
+`tabos_input_wait_source()` for non-consuming keyboard readiness. See
+[console controls](console.md) and [keyboard waits](input.md). These extend private
+pre-release transport; rebuild bundled applications and firmware together.

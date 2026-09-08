@@ -29,6 +29,7 @@ typedef struct {
         uint32_t returned_events;
 } tabos_wait_item_t;
 
+tabos_wait_source_t tabos_input_wait_source(void);
 tabos_wait_source_t tabos_socket_wait_source(tabos_socket_t socket);
 tabos_wait_source_t tabos_device_subscription_wait_source(tabos_device_subscription_t subscription);
 tabos_wait_source_t tabos_audio_wait_source(tabos_audio_stream_t stream);

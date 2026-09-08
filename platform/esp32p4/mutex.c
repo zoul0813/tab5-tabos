@@ -45,3 +45,45 @@ void platform_mutex_unlock(platform_mutex_t* mutex)
         (void) xSemaphoreGive(mutex->native);
     }
 }
+
+struct platform_signal {
+        SemaphoreHandle_t native;
+};
+platform_signal_t* platform_signal_create(void)
+{
+    platform_signal_t* signal = calloc(1U, sizeof(*signal));
+    if (signal != NULL) {
+        signal->native = xSemaphoreCreateBinary();
+        if (signal->native == NULL) {
+            free(signal);
+            return NULL;
+        }
+    }
+    return signal;
+}
+void platform_signal_destroy(platform_signal_t* signal)
+{
+    if (signal != NULL) {
+        vSemaphoreDelete(signal->native);
+        free(signal);
+    }
+}
+void platform_signal_notify(platform_signal_t* signal)
+{
+    if (signal != NULL) {
+        (void) xSemaphoreGive(signal->native);
+    }
+}
+void platform_signal_wait(platform_signal_t* signal, uint32_t timeout_ms)
+{
+    if (signal != NULL) {
+        TickType_t ticks = portMAX_DELAY;
+        if (timeout_ms != UINT32_MAX) {
+            ticks = pdMS_TO_TICKS(timeout_ms);
+            if (ticks == 0U && timeout_ms != 0U) {
+                ticks = 1U;
+            }
+        }
+        (void) xSemaphoreTake(signal->native, ticks);
+    }
+}

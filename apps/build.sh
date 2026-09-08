@@ -120,6 +120,24 @@ if [ -n "$msc_mount" ]; then
         done
     fi
 
+    # Copy notices from selected source projects, including `build --msc` which
+    # does not run application install recipes or populate the local rootfs.
+    for application_dir in "$script_dir"/*; do
+        if [ ! -f "$application_dir/Makefile" ]; then
+            continue
+        fi
+        application_name=${application_dir##*/}
+        if [ "$application_name" = doom ] && [ "$with_doom" = false ]; then
+            continue
+        fi
+        for notice in LICENSE COPYING UPSTREAM.md; do
+            if [ -f "$application_dir/$notice" ]; then
+                mkdir -p "$msc_mount/share/licenses/$application_name"
+                cp "$application_dir/$notice" "$msc_mount/share/licenses/$application_name/"
+            fi
+        done
+    done
+
     sync
     if ! command -v diskutil >/dev/null 2>&1; then
         printf 'apps/build.sh: diskutil unavailable; leaving MSC mounted at %s\n' "$msc_mount" >&2

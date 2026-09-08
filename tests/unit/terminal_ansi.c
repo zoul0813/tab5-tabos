@@ -58,6 +58,36 @@ int main(void)
     terminal_write(&terminal, "[HZ");
     check(cell(&terminal, 0U, 0U)->character == 'Z', "split escape sequence");
 
+    terminal_write(&terminal, "\033[2;5H\033[31;44mX\033[39;49mY");
+    check(cell(&terminal, 4U, 1U)->character == 'X', "two parameter cursor");
+    check(cell(&terminal, 4U, 1U)->background == 0x001f, "multiple SGR");
+    check(cell(&terminal, 5U, 1U)->foreground == 0xffff && cell(&terminal, 5U, 1U)->background == 0, "default colors");
+    terminal_write(&terminal, "\033[?");
+    terminal_write(&terminal, "2");
+    terminal_write(&terminal, "5l");
+    check(!terminal.cursor_visible, "split private cursor hide");
+    terminal_write(&terminal, "\033[?25h");
+    check(terminal.cursor_visible, "cursor show");
+    const size_t old_column = terminal.column;
+    terminal_write(&terminal, "\033[999999999999999999999999C\033[1;2;3;4;5;6;7;8;9m");
+    check(terminal.column == old_column, "overflow consumed without text or movement");
+    for (size_t index = 0; index < 400U; ++index) {
+        terminal_write(&terminal, "scroll\n");
+    }
+    const uint64_t top = terminal.viewport_top;
+    terminal_write(&terminal, "\033[1;2HZ");
+    check(terminal.viewport_top == top && terminal.current_line == top, "address live screen after ring overflow");
+    check(terminal.cells[(top % terminal.line_capacity) * terminal.columns + 1U].character == 'Z',
+          "ring positioned cell");
+    terminal_write(&terminal, "\033[4;19HB");
+    check(terminal.viewport_top == top, "last row painter leaves final column unused without scroll");
+    terminal_write(&terminal, "C");
+    check(terminal.viewport_top == top + 1U, "existing immediate wrap contract at bottom right");
+    terminal_clear(&terminal);
+    terminal_write(&terminal, "a\nb\n\b");
+    check(terminal.last_line == terminal.current_line && terminal.current_line == 1U, "backspace trims live tail");
+    terminal_write(&terminal, "\033[;5fD");
+    check(terminal.current_line == 0U && terminal.column == 5U, "omitted row defaults to one");
     terminal_shutdown(&terminal);
     return 0;
 }

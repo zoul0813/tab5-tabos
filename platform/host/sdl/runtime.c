@@ -1,4 +1,5 @@
 #include "internal.h"
+#include "power_test.h"
 
 #include <tabos/platform/platform.h>
 
@@ -164,6 +165,7 @@ void platform_perform_system_action(platform_system_action_t action)
 
 bool platform_init(bool headless)
 {
+    host_power_test_reset();
     is_headless                        = headless;
     quit_requested                     = false;
     host_battery_charging_enabled      = true;
@@ -400,5 +402,12 @@ void platform_log(const char* message)
 
 uint64_t platform_time_ms(void)
 {
-    return SDL_GetTicks();
+    const uint64_t now = SDL_GetTicks();
+    const uint64_t offset = host_power_time_offset();
+    return UINT64_MAX - now < offset ? UINT64_MAX : now + offset;
+}
+
+void platform_runtime_log_activity(void)
+{
+    /* Host activity is not evidence of physical Tab5 peripheral work. */
 }

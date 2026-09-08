@@ -831,3 +831,54 @@ When modifying TabOS:
 ## 19. Current Architectural Summary
 
 The intended system is a **small native-computing environment layered on ESP-IDF/FreeRTOS**. FreeRTOS handles low-level scheduling and hardware-runtime concerns; TabOS supplies the user-visible OS abstraction. Applications are independently compiled native RISC-V programs targeting a stable TabOS API. The shell and filesystem are first-class. Graphics, input, networking, and other hardware are mediated by TabOS services. The GUI is optional and non-privileged. Most higher-level OS code should also run in a native macOS host environment, while actual hardware-specific behavior remains in the ESP32-P4 backend.
+
+## Kilo terminal service implementation (2026-09-07)
+
+Kilo uses public copied `TABOS_TTY_GET_SIZE` geometry and a foreground process-owned
+`tabos_input_wait_source()` adapter. Keyboard-only waits use retained coalesced wake
+signals, with absolute deadlines and host RV32 suspension; other generic service
+waits retain their existing behavior. Source handles use existing generation and
+teardown rules. Terminal CSI parsing is bounded to eight parameters; cursor addressing
+uses the live screen rather than the oldest retained scrollback line. Immediate
+wrapping is preserved, so Kilo reserves the final column. Console release resets
+attributes and incomplete escape state before parent acquisition.
+
+Kilo is an independent RV32 application, with a 2 MiB heap and 32 KiB stack metadata
+request, byte-oriented rows, bounded edits, and an application-local backup/rename save
+transaction. No POSIX emulation or hardware dependency was added to the application.
+
+## GPIO service ownership and power baseline
+
+Tab5 GPIO interrupt registration is owned by `platform/esp32p4/gpio_interrupt.c`.
+Serialized platform initialization installs one non-IRAM service for the boot; keyboard
+and touch own only their pin handlers. A consumer must never uninstall the shared service.
+Touch constructors retain GPIO configuration but receive no component callback; TabOS
+checks direct attachment and removes it before controller teardown. Concurrent registration
+and new consumers require an explicit lifecycle audit.
+
+Power Phase 0 inventory and wake-source restrictions live in `docs/power-baseline.md`.
+Phases 1 and 2 add internal portable power states, policy/diagnostics, dependency-ordered
+participants, generation-safe asynchronous completion, runtime event/deadline integration,
+and deterministic host simulation. Normalized physical keyboard and pointer ingress resets
+inactivity before foreground delivery; software repeat and service work do not. Held input,
+fullscreen graphics, and open audio/camera streams inhibit dimming and suspend. Default idle
+dimming applies after 60 seconds at most 20% and restores active brightness before input
+delivery. SDL modulates presentation without changing framebuffer pixels. No public suspend
+API, PM enablement, or Tab5 wake arming exists yet. Missing tested reversible service
+lifecycle remains a blocker, including initialized drivers with no application handles.
+
+Power Phase 3 makes audio transport demand-driven. Platform initialization discovers audio
+devices but leaves codecs closed and creates no transfer or headphone-monitor task. First
+stream start configures selected rate and route before admission; last close joins worker
+shutdown, disables speaker routing, closes codecs, and stops jack polling. Speaker routing
+samples jack state before enabling output, then keeps existing 50 ms active monitoring.
+Failed starts fault audio state but a later first-open retries cleanly. Health audit now has
+deadline-suppressing suspend/resume hooks with one overdue audit on resume. Retained-buffer
+MIPI-DPI scanout pause remains unavailable in pinned ESP-IDF and therefore still blocks sleep.
+
+Debug peripheral activity uses a narrow `platform_runtime_log_activity()` diagnostic
+hook beside the existing health-audit wake report. Tab5 counts codec pairs/frames/errors,
+headphone attempts/errors, VSYNC and PPA completions with boot-lifetime lock-free unsigned
+atomics; no new periodic task/deadline exists. Release compiles out updates; host does
+not manufacture physical peripheral measurements. These counts are not PM policy or
+synchronization state.

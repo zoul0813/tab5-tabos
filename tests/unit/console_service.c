@@ -35,6 +35,11 @@ int main(void)
         !tabos_console_is_foreground(&foreground) || tabos_console_is_foreground(&background)) {
         return 1;
     }
+    tabos_tty_size_t size;
+    if (!console_get_size(&foreground, &size) || size.rows != 24U || size.columns != 80U ||
+        console_get_size(&background, &size) || console_get_size(&foreground, NULL)) {
+        return 1;
+    }
     if (!terminal.cursor_visible || display_framebuffer()->pixels[0] != 0xffff) {
         return 1;
     }
@@ -87,7 +92,8 @@ int main(void)
     }
     memcpy(graphics_snapshot, framebuffer->pixels, framebuffer_bytes);
     console_set_graphics_active(true);
-    if (!tabos_console_write(&foreground, "graphics-hidden") || tabos_console_page_up(&foreground) ||
+    if (!console_graphics_active() || !tabos_console_write(&foreground, "graphics-hidden") ||
+        tabos_console_page_up(&foreground) ||
         memcmp(graphics_snapshot, framebuffer->pixels, framebuffer_bytes) != 0 || !input_submit(&submitted) ||
         !tabos_console_poll(&foreground, &received) || console_next_deadline() != UINT64_MAX) {
         return 1;
@@ -98,11 +104,15 @@ int main(void)
         return 1;
     }
     console_set_graphics_active(false);
-    if (console_next_deadline() != test_platform_time_ms() + TABOS_CURSOR_BLINK_INTERVAL_MS) {
+    if (console_graphics_active() ||
+        console_next_deadline() != test_platform_time_ms() + TABOS_CURSOR_BLINK_INTERVAL_MS) {
         return 1;
     }
     free(graphics_snapshot);
 
+    if (!tabos_console_write(&foreground, "\033[31;44;7m\033[?25l\033[")) {
+        return 1;
+    }
     tabos_console_release(&foreground);
     if (console_next_deadline() != UINT64_MAX || tabos_console_is_foreground(&foreground) ||
         tabos_console_write(&foreground, "stale") || !tabos_console_acquire(&background) ||
@@ -111,6 +121,10 @@ int main(void)
         return 1;
     }
 
+    if (!terminal.cursor_visible || terminal.foreground != 0xffff || terminal.background != 0U || terminal.reverse ||
+        terminal.ansi_state != 0U) {
+        return 1;
+    }
     const size_t generated_lines = terminal.line_capacity + 10U;
     char* history                = malloc((generated_lines * 2U) + 1U);
     if (history == NULL) {

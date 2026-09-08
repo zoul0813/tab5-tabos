@@ -17,6 +17,12 @@ automatically disables the main speaker amplifier while leaving headphone playba
 Removing them restores the speaker only when the active playback route requests the speaker;
 an explicitly selected headphone route keeps the speaker disabled.
 
+Audio transport is demand-driven. With no streams open, TabOS closes codec transport,
+stops its audio worker, disables speaker routing, and performs no headphone polling. First
+open starts hardware at requested sample rate before returning. Speaker route samples jack
+state before enabling amplifier, then polls every 50 ms while speaker routing remains active.
+Last close stops hardware again. Hardware-start failure returns `EIO`; later first open retries.
+
 ## Stream API
 
 Open a stream with `tabos_audio_open()` and a `tabos_audio_config_t` direction, channel

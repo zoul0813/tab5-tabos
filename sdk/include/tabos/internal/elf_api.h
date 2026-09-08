@@ -3,6 +3,7 @@
 
 #include <tabos/graphics.h>
 #include <tabos/input.h>
+#include <tabos/tty.h>
 #include <tabos/device.h>
 #include <tabos/audio.h>
 #include <tabos/pointer.h>
@@ -201,6 +202,8 @@ typedef struct {
         int (*camera_copy)(int stream, tabos_camera_lease_t lease, uint32_t offset, void* buffer, uint32_t capacity);
         int (*camera_release)(int stream, tabos_camera_lease_t lease);
         int (*camera_wait_source)(int stream);
+        int (*tty_get_size)(int descriptor, tabos_tty_size_t* size);
+        int (*input_wait_source)(void);
 } tabos_elf_api_t;
 
 typedef int (*tabos_elf_entry_fn)(const tabos_elf_api_t* api, int argc, const char* const* argv);

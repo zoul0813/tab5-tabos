@@ -196,12 +196,13 @@ multitouch contact matching, rapid retouch, stationary-report suppression, arriv
 bounded rescheduling, I2C fault cancellation, and shutdown cancellation. Physical
 validation remains required independently on GT911, ST7123, and ST7121 hardware.
 
-ST7121 boot currently emits
-`gpio_install_isr_service(...): GPIO isr service already installed` after keyboard
-initialization installs the shared ESP-IDF GPIO ISR service first. Touch remains
-functional because GPIO23 attaches to the existing service, but ownership should be
-centralized or made explicitly idempotent so later peripheral initialization does not
-attempt a duplicate global service install or emit an error-level boot message.
+Power Phase 0 now centralizes the boot-lifetime GPIO service in
+`platform/esp32p4/gpio_interrupt.c`. Keyboard and touch attach individual handlers;
+touch bypasses the component callback installer that produced a duplicate global-install
+error and ignored attachment failures. Host ownership/failure regression and Tab5 Debug
+cross-build pass. Final Debug boot has no duplicate-install error; operator confirms
+keyboard/touch with `hello` and `touchtest` on ST7121. Other revisions and exhaustive
+fault/gesture checks remain separate; see [Phase 0 evidence](validation/power-phase0-2026-09-07.md).
 
 ### Phase 4: Deadline-driven portable services
 

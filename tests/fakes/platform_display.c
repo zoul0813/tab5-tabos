@@ -70,6 +70,8 @@ struct platform_mutex {
 
 static platform_pixel_t pixels[TABOS_DISPLAY_WIDTH * TABOS_DISPLAY_HEIGHT];
 static uint64_t monotonic_ms;
+static uint8_t fake_brightness = 100U;
+static bool fail_brightness_once;
 static char last_log[256];
 static platform_network_status_t fake_network;
 static platform_network_event_fn fake_network_event;
@@ -88,6 +90,12 @@ static platform_audio_error_fn fake_audio_error;
 static platform_audio_render_fn fake_audio_render;
 static platform_audio_capture_fn fake_audio_capture;
 static uint32_t fake_audio_sample_rate;
+static bool fake_audio_active;
+static bool fake_audio_fail_start;
+static unsigned int fake_audio_start_calls;
+static unsigned int fake_audio_stop_calls;
+static uint32_t fake_audio_route;
+static unsigned int fake_audio_route_calls;
 static platform_runtime_events_t fake_runtime_events;
 static uint64_t fake_runtime_wait_deadline;
 
@@ -207,6 +215,43 @@ uint64_t platform_time_ms(void)
     return monotonic_ms;
 }
 
+bool platform_power_set_brightness(uint8_t percent)
+{
+    if (percent > 100U || fail_brightness_once) {
+        fail_brightness_once = false;
+        return false;
+    }
+    fake_brightness = percent;
+    return true;
+}
+uint8_t test_platform_brightness(void)
+{
+    return fake_brightness;
+}
+void test_platform_fail_brightness_once(void)
+{
+    fail_brightness_once = true;
+}
+bool platform_power_prepare_sleep(void)
+{
+    return true;
+}
+void platform_power_abort_sleep(void)
+{
+}
+bool platform_power_enter_light_sleep(void)
+{
+    return true;
+}
+platform_power_wake_cause_t platform_power_collect_wake_causes(void)
+{
+    return PLATFORM_POWER_WAKE_KEYBOARD;
+}
+bool platform_power_restore(void)
+{
+    return true;
+}
+
 bool platform_wall_clock_get(int64_t* seconds)
 {
     if (seconds == NULL) {
@@ -293,6 +338,12 @@ bool platform_audio_init(platform_audio_render_fn render, platform_audio_capture
                      .ready               = true,
     };
     fake_audio_sample_rate = TABOS_AUDIO_DEFAULT_SAMPLE_RATE;
+    fake_audio_active      = false;
+    fake_audio_fail_start  = false;
+    fake_audio_start_calls = 0U;
+    fake_audio_stop_calls  = 0U;
+    fake_audio_route       = 0U;
+    fake_audio_route_calls = 0U;
     return true;
 }
 
@@ -301,16 +352,31 @@ void platform_audio_shutdown(void)
     fake_audio_render  = NULL;
     fake_audio_capture = NULL;
     fake_audio_error   = NULL;
+    fake_audio_active  = false;
 }
 
 bool platform_audio_set_route(uint32_t route)
 {
-    return route == TABOS_AUDIO_ROUTE_SPEAKER || route == TABOS_AUDIO_ROUTE_HEADPHONE ||
-           route == TABOS_AUDIO_ROUTE_MICROPHONE;
+    if (route != TABOS_AUDIO_ROUTE_SPEAKER && route != TABOS_AUDIO_ROUTE_HEADPHONE &&
+        route != TABOS_AUDIO_ROUTE_MICROPHONE) {
+        return false;
+    }
+    fake_audio_route = route;
+    ++fake_audio_route_calls;
+    return true;
 }
 
-bool platform_audio_set_sample_rate(uint32_t sample_rate)
+bool platform_audio_start(uint32_t sample_rate, uint32_t route)
 {
+    ++fake_audio_start_calls;
+    if (fake_audio_fail_start) {
+        fake_audio_fail_start = false;
+        return false;
+    }
+    if (route != TABOS_AUDIO_ROUTE_SPEAKER && route != TABOS_AUDIO_ROUTE_HEADPHONE &&
+        route != TABOS_AUDIO_ROUTE_MICROPHONE) {
+        return false;
+    }
     switch (sample_rate) {
         case TABOS_AUDIO_SAMPLE_RATE_8000:
         case TABOS_AUDIO_SAMPLE_RATE_11025:
@@ -322,14 +388,56 @@ bool platform_audio_set_sample_rate(uint32_t sample_rate)
         case TABOS_AUDIO_SAMPLE_RATE_44100:
         case TABOS_AUDIO_SAMPLE_RATE_48000:
         case TABOS_AUDIO_SAMPLE_RATE_88200:
-        case TABOS_AUDIO_SAMPLE_RATE_96000: fake_audio_sample_rate = sample_rate; return true;
+        case TABOS_AUDIO_SAMPLE_RATE_96000:
+            fake_audio_sample_rate = sample_rate;
+            fake_audio_active      = true;
+            fake_audio_route       = route;
+            return true;
         default: return false;
     }
+}
+
+void platform_audio_stop(void)
+{
+    if (fake_audio_active) {
+        ++fake_audio_stop_calls;
+    }
+    fake_audio_active = false;
 }
 
 uint32_t test_platform_audio_sample_rate(void)
 {
     return fake_audio_sample_rate;
+}
+
+bool test_platform_audio_active(void)
+{
+    return fake_audio_active;
+}
+
+unsigned int test_platform_audio_start_calls(void)
+{
+    return fake_audio_start_calls;
+}
+
+unsigned int test_platform_audio_stop_calls(void)
+{
+    return fake_audio_stop_calls;
+}
+
+void test_platform_audio_fail_start_once(void)
+{
+    fake_audio_fail_start = true;
+}
+
+uint32_t test_platform_audio_route(void)
+{
+    return fake_audio_route;
+}
+
+unsigned int test_platform_audio_route_calls(void)
+{
+    return fake_audio_route_calls;
 }
 
 void test_platform_audio_render(int16_t* stereo, size_t frames)
@@ -866,6 +974,31 @@ void platform_mutex_unlock(platform_mutex_t* mutex)
     (void) mutex;
 }
 
+struct platform_signal {
+        bool pending;
+};
+platform_signal_t* platform_signal_create(void)
+{
+    return calloc(1U, sizeof(platform_signal_t));
+}
+void platform_signal_destroy(platform_signal_t* signal)
+{
+    free(signal);
+}
+void platform_signal_notify(platform_signal_t* signal)
+{
+    if (signal != NULL) {
+        signal->pending = true;
+    }
+}
+void platform_signal_wait(platform_signal_t* signal, uint32_t timeout_ms)
+{
+    (void) timeout_ms;
+    if (signal != NULL) {
+        signal->pending = false;
+    }
+}
+
 void platform_riscv32_stop(platform_riscv32_context_t* context, void (*cancel)(void*), void* user_data)
 {
     (void) context;
@@ -886,4 +1019,16 @@ void platform_network_socket_operations_cancel(void)
 }
 void platform_tls_operations_cancel(void)
 {
+}
+
+static unsigned int activity_reports;
+
+void platform_runtime_log_activity(void)
+{
+    ++activity_reports;
+}
+
+unsigned int test_platform_activity_reports(void)
+{
+    return activity_reports;
 }
