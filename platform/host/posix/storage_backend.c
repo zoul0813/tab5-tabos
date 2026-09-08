@@ -7,12 +7,19 @@
 
 #include <errno.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>
 
 /* Host mirrors the currently supported Tab5 volume as the default drive. */
 static const char drive_letters[] = {'T', 'A'};
+
+static const char* storage_backend_rootfs(void)
+{
+    const char* rootfs = getenv("TABOS_HOST_ROOTFS");
+    return rootfs != NULL && rootfs[0] != '\0' ? rootfs : TABOS_HOST_ROOTFS;
+}
 
 size_t storage_backend_drive_count(void)
 {
@@ -24,10 +31,11 @@ bool storage_backend_mount(size_t index, char* letter, char* root, size_t root_s
     if (index >= sizeof(drive_letters) || letter == NULL || root == NULL || removable == NULL || name == NULL) {
         return false;
     }
-    if (mkdir(TABOS_HOST_ROOTFS, 0755) != 0 && errno != EEXIST) {
+    const char* rootfs = storage_backend_rootfs();
+    if (mkdir(rootfs, 0755) != 0 && errno != EEXIST) {
         return false;
     }
-    const int length = snprintf(root, root_size, "%s/%c", TABOS_HOST_ROOTFS, drive_letters[index]);
+    const int length = snprintf(root, root_size, "%s/%c", rootfs, drive_letters[index]);
     if (length <= 0 || (size_t) length >= root_size) {
         return false;
     }
@@ -51,7 +59,7 @@ bool storage_backend_info(char letter, uint64_t* total_bytes, uint64_t* free_byt
         return false;
     }
     char root[TABOS_FS_PATH_MAX];
-    const int length = snprintf(root, sizeof(root), "%s/%c", TABOS_HOST_ROOTFS, letter);
+    const int length = snprintf(root, sizeof(root), "%s/%c", storage_backend_rootfs(), letter);
     if (length <= 0 || (size_t) length >= sizeof(root)) {
         return false;
     }

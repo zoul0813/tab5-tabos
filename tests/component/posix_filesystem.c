@@ -22,8 +22,10 @@ int main(void)
         return 1;
     }
     struct stat status;
-    if (fstat(descriptor, &status) != 0 || !S_ISREG(status.st_mode) || status.st_size != sizeof(message) ||
-        close(descriptor) != 0) {
+    struct stat path_status;
+    if (fstat(descriptor, &status) != 0 || stat("/portable/./example.txt", &path_status) != 0 ||
+        !S_ISREG(status.st_mode) || status.st_size != sizeof(message) || status.st_ino == 0U ||
+        status.st_dev != path_status.st_dev || status.st_ino != path_status.st_ino || close(descriptor) != 0) {
         return 1;
     }
     DIR* directory       = opendir("/portable");

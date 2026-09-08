@@ -15,9 +15,12 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include <time.h>
+#include "host_io.h"
 #endif
 
 #include <errno.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -29,6 +32,18 @@ enum {
     ICMP6_ECHO_REPLY = 129,
     ECHO_BUFFER_BYTES = ICMP_HEADER_BYTES + 1024,
 };
+
+#if defined(ESP_PLATFORM)
+static atomic_bool network_cancel_requested;
+void platform_network_operations_cancel(void)
+{
+    atomic_store_explicit(&network_cancel_requested, true, memory_order_release);
+}
+#else
+void platform_network_operations_cancel(void)
+{
+}
+#endif
 
 typedef struct {
     uint8_t type;
@@ -64,6 +79,18 @@ static void close_socket(int descriptor)
     (void) lwip_close(descriptor);
 #else
     (void) close(descriptor);
+#endif
+}
+
+static uint64_t network_monotonic_ms(void)
+{
+#if defined(ESP_PLATFORM)
+    return platform_time_ms();
+#else
+    /* Detached echo work may finish after SDL runtime shutdown. */
+    struct timespec now;
+    (void) clock_gettime(CLOCK_MONOTONIC, &now);
+    return (uint64_t) now.tv_sec * 1000U + (uint64_t) now.tv_nsec / 1000000U;
 #endif
 }
 
@@ -171,7 +198,7 @@ static platform_network_operation_result_t network_echo_direct(const platform_ne
         header->checksum = htons(checksum(packet, packet_size));
 #endif
     }
-    const uint64_t started = platform_time_ms();
+    const uint64_t started = network_monotonic_ms();
     if (sendto(descriptor, packet, packet_size, 0, (const struct sockaddr*) &target, target_size) < 0) {
         char message[96];
         (void) snprintf(message, sizeof(message), "ICMP send failed for %s: errno %d", address->text, errno);
@@ -180,12 +207,23 @@ static platform_network_operation_result_t network_echo_direct(const platform_ne
         return PLATFORM_NETWORK_OPERATION_IO;
     }
     for (;;) {
-        const uint64_t elapsed = platform_time_ms() - started;
+#if defined(ESP_PLATFORM)
+        if (atomic_load_explicit(&network_cancel_requested, memory_order_acquire)) {
+            close_socket(descriptor);
+            return PLATFORM_NETWORK_OPERATION_IO;
+        }
+#endif
+        const uint64_t elapsed = network_monotonic_ms() - started;
         if (elapsed >= timeout_ms) {
             close_socket(descriptor);
             return PLATFORM_NETWORK_OPERATION_TIMEOUT;
         }
-        const uint32_t remaining_ms = timeout_ms - (uint32_t) elapsed;
+        uint32_t remaining_ms = timeout_ms - (uint32_t) elapsed;
+#if defined(ESP_PLATFORM)
+        if (remaining_ms > 10U) {
+            remaining_ms = 10U;
+        }
+#endif
         const struct timeval timeout = {
             .tv_sec = (long) (remaining_ms / 1000U),
             .tv_usec = (int) ((remaining_ms % 1000U) * 1000U),
@@ -199,6 +237,11 @@ static platform_network_operation_result_t network_echo_direct(const platform_ne
         const ssize_t received = recvfrom(descriptor, packet, sizeof(packet), 0, (struct sockaddr*) &source, &source_size);
         if (received < 0) {
             const int failure = errno;
+#if defined(ESP_PLATFORM)
+            if (failure == EAGAIN || failure == EWOULDBLOCK || failure == ETIMEDOUT) {
+                continue;
+            }
+#endif
             char message[96];
             (void) snprintf(message, sizeof(message), "ICMP receive ended for %s: errno %d", address->text, failure);
             platform_log(message);
@@ -228,7 +271,7 @@ static platform_network_operation_result_t network_echo_direct(const platform_ne
         close_socket(descriptor);
         result->sequence = sequence;
         result->bytes = (uint32_t) received - (uint32_t) offset - ICMP_HEADER_BYTES;
-        const uint64_t final_elapsed = platform_time_ms() - started;
+        const uint64_t final_elapsed = network_monotonic_ms() - started;
         result->round_trip_ms = final_elapsed > UINT32_MAX ? UINT32_MAX : (uint32_t) final_elapsed;
         return PLATFORM_NETWORK_OPERATION_OK;
     }
@@ -284,7 +327,9 @@ static void network_worker(void* argument)
             vTaskDelete(NULL);
             return;
         }
-        if (request.operation == NETWORK_WORKER_RESOLVE) {
+        if (atomic_load_explicit(&network_cancel_requested, memory_order_acquire)) {
+            response.operation = PLATFORM_NETWORK_OPERATION_IO;
+        } else if (request.operation == NETWORK_WORKER_RESOLVE) {
             response.operation = network_resolve_direct(request.hostname, request.family, &response.address);
         } else {
             response.operation = network_echo_direct(&request.address, request.sequence, request.payload_bytes,
@@ -327,6 +372,11 @@ static platform_network_operation_result_t submit_request(const network_worker_r
 {
     if (worker_task == NULL || request == NULL || response == NULL ||
         xSemaphoreTake(worker_mutex, portMAX_DELAY) != pdTRUE) {
+        return PLATFORM_NETWORK_OPERATION_IO;
+    }
+    atomic_store_explicit(&network_cancel_requested, false, memory_order_release);
+    if (platform_riscv32_current_cancelled()) {
+        (void) xSemaphoreGive(worker_mutex);
         return PLATFORM_NETWORK_OPERATION_IO;
     }
     const bool completed = xQueueSend(worker_requests, request, portMAX_DELAY) == pdTRUE &&
@@ -392,6 +442,29 @@ platform_network_operation_result_t platform_network_echo(const platform_network
 
 #else
 
+typedef struct {
+        bool resolve;
+        char hostname[254];
+        uint32_t family;
+        platform_network_address_t address;
+        uint16_t sequence;
+        uint16_t payload_bytes;
+        uint32_t timeout_ms;
+        platform_network_echo_result_t echo;
+        platform_network_operation_result_t result;
+} host_network_request_t;
+
+static void host_network_work(void* data)
+{
+    host_network_request_t* request = data;
+    if (request->resolve) {
+        request->result = network_resolve_direct(request->hostname, request->family, &request->address);
+    } else {
+        request->result = network_echo_direct(&request->address, request->sequence, request->payload_bytes,
+                                              request->timeout_ms, &request->echo);
+    }
+}
+
 bool platform_network_operations_init(void)
 {
     return true;
@@ -404,7 +477,18 @@ void platform_network_operations_shutdown(void)
 platform_network_operation_result_t platform_network_resolve(const char* hostname, uint32_t family,
                                                              platform_network_address_t* address)
 {
-    return network_resolve_direct(hostname, family, address);
+    if (hostname == NULL || address == NULL || strnlen(hostname, 254U) == 254U) {
+        return PLATFORM_NETWORK_OPERATION_INVALID;
+    }
+    host_network_request_t request = {.resolve = true, .family = family};
+    (void) snprintf(request.hostname, sizeof(request.hostname), "%s", hostname);
+    if (host_io_call(&request, sizeof(request), host_network_work, NULL) != 1) {
+        return PLATFORM_NETWORK_OPERATION_IO;
+    }
+    if (request.result == PLATFORM_NETWORK_OPERATION_OK) {
+        *address = request.address;
+    }
+    return request.result;
 }
 
 platform_network_operation_result_t platform_network_echo(const platform_network_address_t* address,
@@ -412,7 +496,18 @@ platform_network_operation_result_t platform_network_echo(const platform_network
                                                           uint32_t timeout_ms,
                                                           platform_network_echo_result_t* result)
 {
-    return network_echo_direct(address, sequence, payload_bytes, timeout_ms, result);
+    if (address == NULL || result == NULL) {
+        return PLATFORM_NETWORK_OPERATION_INVALID;
+    }
+    host_network_request_t request = {
+        .address = *address, .sequence = sequence, .payload_bytes = payload_bytes, .timeout_ms = timeout_ms};
+    if (host_io_call(&request, sizeof(request), host_network_work, NULL) != 1) {
+        return PLATFORM_NETWORK_OPERATION_IO;
+    }
+    if (request.result == PLATFORM_NETWORK_OPERATION_OK) {
+        *result = request.echo;
+    }
+    return request.result;
 }
 
 #endif

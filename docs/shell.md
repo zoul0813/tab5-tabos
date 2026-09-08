@@ -34,6 +34,10 @@ Initial commands are:
 - `<program>`: search the shell PATH, defaulting to `T:/bin/<program>`
 - `<path>`: execute explicit application path
 
+Resolved executable paths use the shell process's current working directory. Relative
+PATH entries, `./`, `../`, and `/` paths on the current drive therefore continue to work
+after `cd` without changing the filesystem-wide working directory.
+
 Shell splits application commands into at most 16 arguments. Spaces delimit arguments;
 single quotes, double quotes, and backslash escaping preserve spaces or quote characters:
 

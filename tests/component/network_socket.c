@@ -6,10 +6,12 @@
 #include <arpa/inet.h>
 #include <limits.h>
 #include <pthread.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdatomic.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -166,6 +168,59 @@ static void test_descriptorless_wait(void)
            "descriptorless internal wait provides bounded polling delay");
 }
 
+static void closed_peer_send_child(void)
+{
+    (void) signal(SIGPIPE, SIG_DFL);
+    const uint16_t port                       = reserve_port(AF_INET, SOCK_STREAM);
+    const platform_network_address_t loopback = portable_address(AF_INET);
+    const int server                          = platform_network_socket_open(loopback.family, TABOS_SOCKET_TCP);
+    if (port == 0U || server < 0 || platform_network_socket_bind(server, &loopback, port) != 0 ||
+        platform_network_socket_listen(server, 1U) != 0) {
+        _exit(1);
+    }
+    const int client = socket(AF_INET, SOCK_STREAM, 0);
+    struct sockaddr_storage target;
+    socklen_t target_size;
+    native_address(AF_INET, port, &target, &target_size);
+    if (client < 0 || connect(client, (const struct sockaddr*) &target, target_size) != 0) {
+        _exit(1);
+    }
+    const int accepted                 = platform_network_socket_accept(server, NULL, NULL);
+    const struct linger abortive_close = {.l_onoff = 1, .l_linger = 0};
+    if (accepted < 0 || setsockopt(client, SOL_SOCKET, SO_LINGER, &abortive_close, sizeof(abortive_close)) != 0 ||
+        close(client) != 0) {
+        _exit(1);
+    }
+    char byte;
+    if (platform_network_socket_receive(accepted, &byte, sizeof(byte)) > 0) {
+        _exit(1);
+    }
+    int send_failures = 0;
+    for (unsigned int attempt = 0U; attempt < 8U; ++attempt) {
+        if (platform_network_socket_send(accepted, "x", 1U) < 0) {
+            ++send_failures;
+        }
+    }
+    (void) platform_network_socket_close(accepted);
+    (void) platform_network_socket_close(server);
+    platform_network_socket_operations_shutdown();
+    _exit(send_failures >= 2 ? 0 : 1);
+}
+
+static void test_closed_peer_send(void)
+{
+    const pid_t child = fork();
+    expect(child >= 0, "start closed-peer send subprocess");
+    if (child == 0) {
+        closed_peer_send_child();
+    }
+    if (child > 0) {
+        int status = 0;
+        expect(waitpid(child, &status, 0) == child && WIFEXITED(status) && WEXITSTATUS(status) == 0,
+               "closed-peer sends return errors without SIGPIPE termination");
+    }
+}
+
 static void test_tcp(int family)
 {
     const uint16_t port = reserve_port(family, SOCK_STREAM);
@@ -255,6 +310,7 @@ static void test_udp(int family)
 
 int main(void)
 {
+    test_closed_peer_send();
     test_descriptorless_wait();
     test_tcp(AF_INET);
     test_udp(AF_INET);

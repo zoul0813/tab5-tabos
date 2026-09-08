@@ -5,6 +5,10 @@
 
 ## Sprite and Tile SDK
 
+The integrated sprite/tile, audit, Kilo, and power tree uses private ELF API version
+22. Rebuild applications from either earlier version-21 branch; those branch layouts
+were different. Public pre-release ABI policy remains unchanged.
+
 - `[DECIDED]` `tabos_tilemap_object()` resolves a generated stable Tiled object ID
   within a generated object-layer index. Games retain direct array iteration when they
   need every marker; object layers never render automatically.
@@ -227,8 +231,12 @@ which invokes only event-ready or expired-deadline owners once per bounded pass 
 recomputes the nearest deadline. Key repeat, cursor blink, network retry, and finite
 application waits use explicit saturating monotonic deadlines. Late periodic updates run
 once and advance directly to the next future period. No compatibility tick remains. Host
-RV32 guests remain runnable through bounded interpreter slices, while native Tab5
-application tasks do not force runtime spinning. Debug wake diagnostics reuse the
+RV32 guests remain runnable through bounded interpreter slices. Pending host wait and
+socket/TLS gates suspend at their call site and publish a retry deadline up to 10 ms
+away, bounded by the original finite timeout. DNS/echo/TLS setup jobs own copied data
+and are capped at 16 unfinished operations; cancellation drops replies without waiting
+for a resolver/peer or retaining guest memory. Native Tab5 application tasks do not
+force runtime spinning. Debug wake diagnostics reuse the
 60-second hardware-health audit and therefore add no independent periodic deadline.
 ESP-IDF Wi-Fi/IP and host-simulated network changes now wake runtime through a platform
 callback; portable network status is copied only after that notification. Device health
@@ -239,7 +247,13 @@ Native Tab5 application return, ELF exit request, ELF child-exec request, proces
 and parent restoration notify runtime through a pointer-free coalesced readiness bit.
 Process state remains authoritative and late wakeups cannot target reused process slots.
 ELF teardown cancels waits and stops native execution before releasing process-owned
-resources. Host RV32 guests continue through explicit bounded interpreter slices.
+resources. Native task lifetime now lives in `platform/esp32p4/application_task.c`.
+All 97 private ABI gates track active depth. Stop waits for cross-core suspension,
+resumes active gates to drain cancelled work and release locks, then deletes only a
+stopped task outside every gate. Native workers return their replies before the calling
+gate exits; DNS and bounded driver calls may delay safe shutdown. Teardown discards queued graphics commands without reading borrowed guest
+buffers or presenting a final application frame; explicit graphics close still flushes
+live buffers. Host RV32 guests continue through explicit bounded interpreter slices.
 
 Portable application foundation defines descriptor and cooperative lifecycle API in
 `<tabos/application.h>`. Fixed-capacity process table exposes PID, parent, and state
@@ -442,6 +456,9 @@ process exit.
 lseek, stat, fstat, mkdir, unlink, and rename. Standard streams use unbuffered
 stdin, line-buffered stdout, and unbuffered stderr. Ordinary files retain normal
 libc buffering. Files are binary-transparent and perform no newline conversion.
+File metadata carries device/file identity for same-file checks. Host identity
+preserves native hard-link aliases; FAT uses normalized path identity because its
+ESP-IDF VFS exposes no inode.
 
 [DECIDED] Blocking stdin is the default. Descriptor state supports
 `O_NONBLOCK` from the first implementation through `fcntl`; an empty
@@ -895,3 +912,54 @@ When modifying TabOS:
 ## 19. Current Architectural Summary
 
 The intended system is a **small native-computing environment layered on ESP-IDF/FreeRTOS**. FreeRTOS handles low-level scheduling and hardware-runtime concerns; TabOS supplies the user-visible OS abstraction. Applications are independently compiled native RISC-V programs targeting a stable TabOS API. The shell and filesystem are first-class. Graphics, input, networking, and other hardware are mediated by TabOS services. The GUI is optional and non-privileged. Most higher-level OS code should also run in a native macOS host environment, while actual hardware-specific behavior remains in the ESP32-P4 backend.
+
+## Kilo terminal service implementation (2026-09-07)
+
+Kilo uses public copied `TABOS_TTY_GET_SIZE` geometry and a foreground process-owned
+`tabos_input_wait_source()` adapter. Keyboard-only waits use retained coalesced wake
+signals, with absolute deadlines and host RV32 suspension; other generic service
+waits retain their existing behavior. Source handles use existing generation and
+teardown rules. Terminal CSI parsing is bounded to eight parameters; cursor addressing
+uses the live screen rather than the oldest retained scrollback line. Immediate
+wrapping is preserved, so Kilo reserves the final column. Console release resets
+attributes and incomplete escape state before parent acquisition.
+
+Kilo is an independent RV32 application, with a 2 MiB heap and 32 KiB stack metadata
+request, byte-oriented rows, bounded edits, and an application-local backup/rename save
+transaction. No POSIX emulation or hardware dependency was added to the application.
+
+## GPIO service ownership and power baseline
+
+Tab5 GPIO interrupt registration is owned by `platform/esp32p4/gpio_interrupt.c`.
+Serialized platform initialization installs one non-IRAM service for the boot; keyboard
+and touch own only their pin handlers. A consumer must never uninstall the shared service.
+Touch constructors retain GPIO configuration but receive no component callback; TabOS
+checks direct attachment and removes it before controller teardown. Concurrent registration
+and new consumers require an explicit lifecycle audit.
+
+Power Phase 0 inventory and wake-source restrictions live in `docs/power-baseline.md`.
+Phases 1 and 2 add internal portable power states, policy/diagnostics, dependency-ordered
+participants, generation-safe asynchronous completion, runtime event/deadline integration,
+and deterministic host simulation. Normalized physical keyboard and pointer ingress resets
+inactivity before foreground delivery; software repeat and service work do not. Held input,
+fullscreen graphics, and open audio/camera streams inhibit dimming and suspend. Default idle
+dimming applies after 60 seconds at most 20% and restores active brightness before input
+delivery. SDL modulates presentation without changing framebuffer pixels. No public suspend
+API, PM enablement, or Tab5 wake arming exists yet. Missing tested reversible service
+lifecycle remains a blocker, including initialized drivers with no application handles.
+
+Power Phase 3 makes audio transport demand-driven. Platform initialization discovers audio
+devices but leaves codecs closed and creates no transfer or headphone-monitor task. First
+stream start configures selected rate and route before admission; last close joins worker
+shutdown, disables speaker routing, closes codecs, and stops jack polling. Speaker routing
+samples jack state before enabling output, then keeps existing 50 ms active monitoring.
+Failed starts fault audio state but a later first-open retries cleanly. Health audit now has
+deadline-suppressing suspend/resume hooks with one overdue audit on resume. Retained-buffer
+MIPI-DPI scanout pause remains unavailable in pinned ESP-IDF and therefore still blocks sleep.
+
+Debug peripheral activity uses a narrow `platform_runtime_log_activity()` diagnostic
+hook beside the existing health-audit wake report. Tab5 counts codec pairs/frames/errors,
+headphone attempts/errors, VSYNC and PPA completions with boot-lifetime lock-free unsigned
+atomics; no new periodic task/deadline exists. Release compiles out updates; host does
+not manufacture physical peripheral measurements. These counts are not PM policy or
+synchronization state.

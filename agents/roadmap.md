@@ -22,6 +22,11 @@
 
 ### Sprite and Tile Graphics
 
+- [x] Merge main `7d6bcea` into `feature/tiling`, preserving both commit histories,
+  sprite/tile functionality, audit fixes, Kilo, and power integration. Use private
+  ELF API version 22 for the combined graphics/stat/terminal layout and regenerate
+  the embedded RV32 fixture. Rebuild default applications, including `tdemo`.
+
 - [x] Synchronize finalized sprite/tile API, converter, coordinate, ownership, and
   validation decisions across context, architecture, testing, roadmap, and milestone
   documents after merging `main` into `feature/tiling`.
@@ -118,6 +123,17 @@
 - [x] Validate Debug/Release builds on macOS and Tab5.
 - [ ] Validate Debug/Release builds on Linux.
 - [ ] Validate rendering, repeated load/unload, terminal restoration, and performance on physical Tab5.
+
+
+### Kilo Terminal Editor
+
+- [x] Implement terminal geometry, bounded ANSI controls, and keyboard readiness waits.
+- [x] Port attributed upstream Kilo with bounded editing and recoverable byte-preserving saves.
+- [x] Validate macOS sanitizers, actual RV32 sessions, and macOS/Tab5 Debug/Release builds.
+- Linux host testing excluded for this implementation by explicit user direction.
+- [x] Physical Tab5 Kilo functional acceptance: operator reports requirements pass (2026-09-07).
+- [x] Physical Tab5 `tester --input` passes (operator confirmed, 2026-09-07).
+
 ### Persistent Shell History
 
 - [x] Implement shell-local 32-entry recall, editable drafts, and `history` listing.
@@ -156,9 +172,44 @@
 ### Low-Power Integration Milestone
 
 - [x] Accept interrupt/event-runtime handoff as power-policy foundation.
-- [ ] Slice 1: implement portable power manager, dependency-ordered service registration,
-  platform sleep contract, and deterministic host controls.
-- [ ] Slice 2: implement activity-driven idle dimming and measure each power reduction.
+- [x] Power Phase 0 source inventory, conservative blocker classification, SDK/wake-route
+  audit, measurement worksheet, and shared GPIO service ownership; macOS Debug 53/53
+  tests and Tab5 Debug cross-build pass. Evidence: `validation/power-phase0-2026-09-07.md`.
+- [x] Power Phase 0 continuation: capture P4 v1.3/ST7121 boot identity and 60-second
+  runtime baseline (101 wakes, 100 cursor expirations, one health audit) on installed
+  `dd9031b-dirty`; complete SDK-source restrictions and conservative wake classification.
+- [x] Power Phase 0 diagnostic firmware: Debug/Release cross-builds, 53/53 macOS Debug
+  tests, forced matching-app rebuild/install, healthy shell boot without duplicate GPIO
+  service error, and measured audio/headphone/VSYNC/PPA activity at idle.
+- [x] Power Phase 0 board continuation: operator confirms `hello`/`touchtest`; trace
+  published keyboard/touch connectors, RTC/IMU conditioning and PMS150G connections.
+  Record differing IMU supply circuits in `docs/power-routing.md`.
+- [x] Power Phase 0 setup: operator confirms battery plus USB-C, keyboard and SD,
+  no headphones, and USB-A host connection for MSC.
+- [x] Close Power Phase 0: user accepts PCB revision `unknown` and defers exact
+  matching plus circuit-specific RTC/IMU/power-button wake. All ten items complete
+  with documented limits; later sleep tests and instrumented power evidence remain open.
+- [x] Phase 1: implement portable asynchronous power manager, dependency-ordered
+  participant registration, runtime deadline/event integration, platform sleep contract,
+  and deterministic host controls. macOS Debug tests and Tab5 Debug cross-build pass;
+  hardware sleep remains disabled.
+- [x] Slice 2: implement activity-driven idle dimming, held-input/fullscreen/media
+  inhibition, truthful brightness state, and SDL presentation modulation.
+- [x] Physically validate Tab5 dim/restore behavior, touch/keyboard restoration,
+  fullscreen inhibition, and held-contact inhibition.
+- [x] Power Phase 3 audio slice: make host and Tab5 audio hardware demand-driven,
+  stop headphone polling outside speaker-routed streams, preserve rate/routing/error
+  behavior across restarts, and add suspend-aware health-audit lifecycle.
+- [x] Physically validate Phase 3 speaker tone, codec start, bounded active audio/jack
+  counters, last-close idle-timer restart, and subsequent dimming.
+- [ ] Power Phase 3 display slice: add retained-buffer MIPI-DPI scanout quiescence when
+  pinned ESP-IDF exposes or TabOS supplies a safe reversible driver operation.
+- [ ] Physically measure unused-audio shutdown and headphone-monitor removal separately.
+- [x] Capture coarse measurement setup: generic inline USB-C meter at 5.12 V, no battery,
+  charging off, keyboard/SD attached, USB-A connected to unpowered host, Wi-Fi connected,
+  readings after two seconds stable; 0.07–0.09 A active and 0.04 A dimmed.
+- [x] Record measurement boundary: available equipment cannot intercept battery-only
+  power, so power validation uses USB-C input measurements only.
 
 ### Hardware Services Phase 6 Validation
 
@@ -234,6 +285,8 @@
 
 ### Process Ownership and Failure Containment
 
+- [x] Resolve AUD-003: discard borrowed-buffer graphics commands on teardown; validate
+  RV32 return, exit, fault, forced stop, and explicit present/close under host sanitizers.
 - [x] Audit process, ELF mapping, execution task, descriptor, heap, graphics,
   console, and nested-parent ownership.
 - [x] Make filesystem ELF resource teardown idempotent across partial startup,
@@ -284,6 +337,7 @@
 - [x] Cache or package SDL3 efficiently enough to avoid unnecessary Linux container startup.
 - [x] Publish downloadable macOS, Linux, and Tab5 artifacts.
 - [x] Include executable `run.sh` launchers in macOS and Linux artifacts.
+- [x] Package maintained applications and a checkout-independent writable rootfs with host artifacts.
 - [x] Let macOS launcher remove quarantine attribute before starting unsigned host binary.
 - [x] Package correctly capitalized Tab5 firmware image and flash metadata.
 
@@ -439,6 +493,7 @@
 - [x] Use `T:` microSD as initial available Tab5 drive.
 - [x] Treat card absence at boot as nonfatal; live removal recovery remains future work.
 - [x] Keep ESP-IDF, host file descriptors, and platform filesystem types out of public API.
+- [x] Resolve AUD-011: expose portable file identity and reject same-file `cp` destinations before truncation.
 
 ### Portable Filesystem Core
 
@@ -495,6 +550,13 @@
 - [x] Execute `hello_elf` completely in host tests and verify output and exit status.
 - [x] Bound guest instruction execution so runaway applications cannot hang host tests.
 - [x] Retain guest CPU and memory state across bounded runtime-update slices.
+- [x] Resolve AUD-006 with guarded native gates, cross-core stopped verification,
+  cancellable service work, and lock-safe task/resource teardown.
+- [ ] Physically validate AUD-006 on both Tab5 cores during DNS/TLS/socket waits
+  and service contention; host scheduler and backend-loop regressions cover the repair.
+- [x] Resolve AUD-005: suspend host generic/socket/TLS waits, retain finite deadlines,
+  bound copied DNS/echo/TLS setup workers, and cancel without retaining guest memory.
+  Add RV32 SDL/input/shutdown, forced teardown, socket, and local TLS regressions.
 - [x] Report illegal instructions and invalid guest memory accesses without crashing host.
 - [ ] Add optional instruction/register tracing for application debugging.
 - [ ] Evaluate GDB remote debugging after basic interpreter execution is stable.
@@ -568,6 +630,7 @@ but is not a substitute for this execution path.
 - [ ] Freeze and version the first supported application ABI only when TabOS is ready
   to support independently distributed third-party binaries.
 - [x] Rebuild all bundled applications with ABI changes during pre-release development.
+- [x] Track application headers, Makefiles, generated prerequisites, and effective resource/ABI settings.
 - [x] Publish public application headers independent from ESP-IDF and FreeRTOS.
 - [x] Provide compiler, linker, strip, and packaging workflow for external applications.
 - [ ] Optionally provide host-native application build mode for sanitizer-heavy source tests;
@@ -618,6 +681,7 @@ but is not a substitute for this execution path.
 - [x] Add direct native-orientation scanout for fullscreen Tab5 graphics applications.
 - [x] Add VSYNC-paced native double buffering for tear-free Tab5 graphics.
 - [x] Add deterministic pixel-level clipping and framebuffer regression tests.
+- [x] Resolve AUD-008: reject empty raster-fill intersections before pointer and span arithmetic.
 - [x] Add a portable graphics benchmark application.
 - [x] Add application-owned integer-scaled logical canvases with automatic presentation.
 - [ ] Validate PPA orientation, transforms, and fallback on physical Tab5 variants.
@@ -741,9 +805,9 @@ but is not a substitute for this execution path.
 
 ## Maintenance and Technical Debt
 
-- [ ] Centralize or make idempotent Tab5 GPIO ISR-service installation. Keyboard may
-  install the shared ESP-IDF service before ST7121 touch initialization, currently
-  producing a benign `GPIO isr service already installed` error-level boot message.
+- [x] Centralize Tab5 GPIO ISR-service ownership; touch attaches directly with checked
+  errors instead of invoking component global installation. Failure/retry and shared
+  consumer lifetime regression passes; physical boot verification remains above.
 - [ ] Replace or reduce the 50 ms PI4IO headphone-detect poll; shared-I2C read failures
   currently produce intermittent error logs during touch activity.
 - [x] Migrate existing generic `tab_*` and internal-only `tabos_*` symbols to decided

@@ -33,9 +33,23 @@ enum {
     PLATFORM_RUNTIME_EVENT_DEVICE      = 1U << 6U,
     PLATFORM_RUNTIME_EVENT_DEADLINE    = 1U << 7U,
     PLATFORM_RUNTIME_EVENT_SHUTDOWN    = 1U << 8U,
+    PLATFORM_RUNTIME_EVENT_POWER       = 1U << 9U,
 };
 
 #define PLATFORM_RUNTIME_DEADLINE_NONE UINT64_MAX
+
+typedef uint32_t platform_power_wake_cause_t;
+
+enum {
+    PLATFORM_POWER_WAKE_NONE         = 0U,
+    PLATFORM_POWER_WAKE_KEYBOARD     = 1U << 0U,
+    PLATFORM_POWER_WAKE_POINTER      = 1U << 1U,
+    PLATFORM_POWER_WAKE_TIMER        = 1U << 2U,
+    PLATFORM_POWER_WAKE_POWER_BUTTON = 1U << 3U,
+    PLATFORM_POWER_WAKE_RTC          = 1U << 4U,
+    PLATFORM_POWER_WAKE_MOTION       = 1U << 5U,
+    PLATFORM_POWER_WAKE_OTHER        = 1U << 30U,
+};
 
 typedef void (*platform_audio_render_fn)(int16_t* stereo, size_t frames);
 typedef void (*platform_audio_capture_fn)(const int16_t* samples, size_t frames, uint32_t channels);
@@ -186,7 +200,15 @@ const char* platform_name(void);
 const char* platform_display_name(void);
 bool platform_get_diagnostics(platform_diagnostics_t* diagnostics);
 void platform_log(const char* message);
+/* Debug diagnostics only; called by existing health audit, creates no timer. */
+void platform_runtime_log_activity(void);
 uint64_t platform_time_ms(void);
+bool platform_power_set_brightness(uint8_t percent);
+bool platform_power_prepare_sleep(void);
+void platform_power_abort_sleep(void);
+bool platform_power_enter_light_sleep(void);
+platform_power_wake_cause_t platform_power_collect_wake_causes(void);
+bool platform_power_restore(void);
 bool platform_wall_clock_get(int64_t* seconds);
 bool platform_wall_clock_set(int64_t seconds);
 bool platform_wall_clock_status(int* error);
@@ -204,8 +226,9 @@ bool platform_battery_health(int* error);
 bool platform_audio_init(platform_audio_render_fn render, platform_audio_capture_fn capture,
                          platform_audio_error_fn error, platform_audio_info_t* info);
 void platform_audio_shutdown(void);
+bool platform_audio_start(uint32_t sample_rate, uint32_t route);
+void platform_audio_stop(void);
 bool platform_audio_set_route(uint32_t route);
-bool platform_audio_set_sample_rate(uint32_t sample_rate);
 bool platform_pointer_init(const char** driver, int* error);
 void platform_pointer_update(void);
 void platform_pointer_shutdown(void);
@@ -220,10 +243,13 @@ void platform_camera_resume(void);
 void platform_camera_shutdown(void);
 bool platform_network_operations_init(void);
 void platform_network_operations_shutdown(void);
+void platform_network_operations_cancel(void);
 bool platform_network_socket_operations_init(void);
 void platform_network_socket_operations_shutdown(void);
+void platform_network_socket_operations_cancel(void);
 bool platform_tls_operations_init(void);
 void platform_tls_operations_shutdown(void);
+void platform_tls_operations_cancel(void);
 void platform_network_socket_interrupt(int socket);
 bool platform_network_socket_operations_suspend(void);
 void platform_network_socket_operations_resume(void);
@@ -276,9 +302,18 @@ platform_riscv32_context_t* platform_riscv32_create(const void* entry, const voi
 platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* context, unsigned int instruction_budget,
                                                 int* returned_status);
 bool platform_riscv32_requires_runtime_slices(void);
+uint64_t platform_riscv32_next_deadline(const platform_riscv32_context_t* context);
 void platform_riscv32_destroy(platform_riscv32_context_t* context);
+/* Quiesce gates before freeing process-owned resources; cancellation must not block. */
+void platform_riscv32_stop(platform_riscv32_context_t* context, void (*cancel)(void*), void* user_data);
+bool platform_riscv32_current_cancelled(void);
 void* platform_riscv32_current_user_data(void);
 void platform_input_wait(void);
+typedef struct platform_signal platform_signal_t;
+platform_signal_t* platform_signal_create(void);
+void platform_signal_destroy(platform_signal_t* signal);
+void platform_signal_notify(platform_signal_t* signal);
+void platform_signal_wait(platform_signal_t* signal, uint32_t timeout_ms);
 platform_mutex_t* platform_mutex_create(void);
 void platform_mutex_destroy(platform_mutex_t* mutex);
 void platform_mutex_lock(platform_mutex_t* mutex);

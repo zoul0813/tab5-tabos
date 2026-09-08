@@ -24,6 +24,8 @@ typedef struct {
         uint32_t st_mode;
         uint64_t st_size;
         int64_t st_mtime;
+        uint64_t st_dev;
+        uint64_t st_ino;
 } tabos_posix_stat_t;
 
 int tabos_posix_open(const char* path, int flags, ...);

@@ -10,7 +10,9 @@ ESP-IDF, FreeRTOS, or SDL.
 The SDK uses newlib. Standard `main(argc, argv)`, stdio, `malloc`, `calloc`, `realloc`,
 `free`, and process exit are supported. File APIs include `open`, `close`, `read`, `write`,
 `lseek`, `stat`, `fstat`, `mkdir`, `rmdir`, `unlink`, `rename`, `chdir`, `getcwd`, directory
-iteration, and nonblocking flags. TabOS does not claim full POSIX compatibility.
+iteration, and nonblocking flags. `stat`/`fstat` expose `st_dev` and `st_ino` for
+same-file checks; applications must not treat them as persistent identifiers. TabOS
+does not claim full POSIX compatibility.
 
 ## Time and System Information
 
@@ -107,6 +109,25 @@ Applications declare generated runtime files with `TABOS_RUNTIME_ASSETS`. Build 
 stage only those files under `build/apps/<app>/data/` and install them under
 `.local/rootfs/T/data/<app>/`; source images and manifests are not installed.
 
+The shared rules generate compiler dependency data for SDK and application headers,
+track the including application Makefile and generated `TABOS_BUILD_PREREQUISITES`, and
+persist the effective compile/link configuration. Header-only edits and changes to heap,
+stack, capability, ABI, or pointer-contact settings rebuild the executable. Applications
+may declare `TABOS_RUNTIME_ASSETS`; build/install stages and MSC distribution copy those
+files through the declared output inventory.
+
 TabOS has not released or frozen its application ABI. SDK and transport changes may be
 incompatible during development, and all bundled applications must be rebuilt with the
 matching system build.
+
+The combined sprite/tile and current main transport uses private ELF API version 22.
+Rebuild applications when moving from either branch's version 21 binaries; their
+graphics and filesystem layouts differ from this combined transport.
+
+## Terminal editor services
+
+`<tabos/tty.h>` adds `TABOS_TTY_GET_SIZE`, returning a copied `tabos_tty_size_t`
+through `ioctl` on foreground console descriptors. `<tabos/wait.h>` adds
+`tabos_input_wait_source()` for non-consuming keyboard readiness. See
+[console controls](console.md) and [keyboard waits](input.md). These extend private
+pre-release transport; rebuild bundled applications and firmware together.

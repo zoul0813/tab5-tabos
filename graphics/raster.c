@@ -35,19 +35,27 @@ void raster_copy_span(platform_pixel_t* destination, const platform_pixel_t* sou
 void raster_fill(platform_framebuffer_t* framebuffer, int32_t x, int32_t y, uint32_t width, uint32_t height,
                  tabos_color_t color)
 {
-    if (framebuffer == NULL || framebuffer->pixels == NULL) {
+    if (framebuffer == NULL || framebuffer->pixels == NULL || width == 0U || height == 0U) {
         return;
     }
-    const int64_t right         = (int64_t) x + width;
-    const int64_t bottom        = (int64_t) y + height;
-    const int32_t left          = x < 0 ? 0 : x;
-    const int32_t top           = y < 0 ? 0 : y;
-    const int32_t clipped_right = right > (int64_t) framebuffer->width ? (int32_t) framebuffer->width : (int32_t) right;
-    const int32_t clipped_bottom =
-        bottom > (int64_t) framebuffer->height ? (int32_t) framebuffer->height : (int32_t) bottom;
-    for (int32_t row = top; row < clipped_bottom; ++row) {
-        raster_fill_span(framebuffer->pixels + (size_t) row * framebuffer->stride_pixels + (size_t) left,
-                         (size_t) (clipped_right - left), color);
+    const int64_t right  = (int64_t) x + width;
+    const int64_t bottom = (int64_t) y + height;
+    if (right <= 0 || bottom <= 0) {
+        return;
+    }
+
+    const uint64_t left           = x < 0 ? 0U : (uint64_t) x;
+    const uint64_t top            = y < 0 ? 0U : (uint64_t) y;
+    const uint64_t clipped_right  = (uint64_t) right > framebuffer->width ? framebuffer->width : (uint64_t) right;
+    const uint64_t clipped_bottom = (uint64_t) bottom > framebuffer->height ? framebuffer->height : (uint64_t) bottom;
+    if (clipped_right <= left || clipped_bottom <= top) {
+        return;
+    }
+
+    const size_t clipped_left = (size_t) left;
+    const size_t span_count   = (size_t) (clipped_right - left);
+    for (size_t row = (size_t) top; row < (size_t) clipped_bottom; ++row) {
+        raster_fill_span(framebuffer->pixels + row * framebuffer->stride_pixels + clipped_left, span_count, color);
     }
 }
 

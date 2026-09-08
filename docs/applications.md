@@ -23,6 +23,13 @@ this builds without installing:
 ./apps/build.sh build
 ```
 
+Application builds track included SDK and application headers, each application's
+Makefile, generated prerequisites, and effective compiler/linker resource settings.
+Changing heap, stack, ABI, capability, or pointer-contact values therefore rebuilds the
+ELF automatically; an unchanged invocation remains incremental. `./apps/build.sh clean`
+removes the shared application build tree so renamed or removed applications cannot
+leave stale outputs behind.
+
 Explicitly fetch, build, and install pinned optional DOOM application with:
 
 ```sh
@@ -59,6 +66,11 @@ it with other applications, use:
 When `build/apps/doom/doom` exists, `--msc --with-doom` copies that extensionless
 executable to `T:/bin/doom`. Build and installation never copy or download WAD data.
 
+Kilo is included in ordinary application builds as `T:/bin/kilo`. It edits one named
+file and provides search, C/C++ highlighting, and recoverable staged saves. See
+[Kilo](kilo.md). Installed license materials under `T:/share/licenses/` are also copied
+by `--msc`; separate binary distributions must preserve their notices.
+
 Individual application commands such as `make -C apps/shell` remain available.
 
 `tdemo` demonstrates sprite/tile APIs and declares generated `.tsp` and `.tmap`
@@ -85,6 +97,12 @@ rendered frame. Press E to edit one foreground cell, and press Q or Escape to ex
 eight reeds across the upper water area showcase every Tiled GID transform in this order:
 identity, horizontal, vertical, horizontal plus vertical, diagonal, diagonal plus
 horizontal, diagonal plus vertical, and diagonal plus horizontal plus vertical.
+
+Published macOS and Linux host archives include the maintained application set under
+`rootfs/`, including the required `T:/bin/shell`. The archive launcher resolves that
+directory from its own installed location, independent of the source checkout. The
+Tab5 release archive includes the same `T:` contents under `sdcard/`; copy that
+directory's contents to the root of the TF/microSD card.
 
 Core utilities are grouped under `apps/coreutils/`, but each utility remains a separate
 program. Build one with `make -C apps/coreutils ls` or `make -C apps/coreutils mkdir`.

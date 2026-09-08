@@ -22,6 +22,7 @@
 #include <limits.h>
 #if !defined(ESP_PLATFORM)
 #include <poll.h>
+#include "host_io.h"
 #endif
 #include <stdatomic.h>
 #include <string.h>
@@ -141,6 +142,26 @@ static int close_native_socket(int descriptor)
 #endif
 }
 
+static bool suppress_socket_sigpipe(int descriptor)
+{
+#if !defined(ESP_PLATFORM) && defined(SO_NOSIGPIPE)
+    const int enabled = 1;
+    return setsockopt(descriptor, SOL_SOCKET, SO_NOSIGPIPE, &enabled, sizeof(enabled)) == 0;
+#else
+    (void) descriptor;
+    return true;
+#endif
+}
+
+static int socket_send_flags(void)
+{
+#if !defined(ESP_PLATFORM) && defined(MSG_NOSIGNAL)
+    return MSG_NOSIGNAL;
+#else
+    return 0;
+#endif
+}
+
 static bool native_endpoint(const platform_network_address_t* address, uint16_t port, struct sockaddr_storage* storage,
                             socklen_t* size)
 {
@@ -245,7 +266,16 @@ static void execute_socket_request(const socket_request_t* request, socket_respo
             return;
         }
         const int descriptor = socket(family, type, 0);
-        response->result     = descriptor >= 0 ? descriptor : socket_error();
+        if (descriptor < 0) {
+            response->result = socket_error();
+            return;
+        }
+        if (!suppress_socket_sigpipe(descriptor)) {
+            response->result = socket_error();
+            (void) close_native_socket(descriptor);
+            return;
+        }
+        response->result = descriptor;
         return;
     }
     if (request->operation == SOCKET_OPERATION_CLOSE) {
@@ -274,7 +304,7 @@ static void execute_socket_request(const socket_request_t* request, socket_respo
         return;
     }
     if (request->operation == SOCKET_OPERATION_SEND) {
-        const ssize_t sent = send(request->socket, request->data, request->size, 0);
+        const ssize_t sent = send(request->socket, request->data, request->size, socket_send_flags());
         response->result   = sent >= 0 ? (int) sent : socket_error();
         return;
     }
@@ -289,6 +319,11 @@ static void execute_socket_request(const socket_request_t* request, socket_respo
         const int accepted = accept(request->socket, (struct sockaddr*) &endpoint, &endpoint_size);
         if (accepted < 0) {
             response->result = socket_error();
+            return;
+        }
+        if (!suppress_socket_sigpipe(accepted)) {
+            response->result = socket_error();
+            (void) close_native_socket(accepted);
             return;
         }
         if (!portable_endpoint(&endpoint, &response->address, &response->port)) {
@@ -329,13 +364,14 @@ static void execute_socket_request(const socket_request_t* request, socket_respo
         response->result =
             connect(request->socket, (const struct sockaddr*) &endpoint, endpoint_size) == 0 ? 0 : socket_error();
     } else {
-        const ssize_t sent =
-            sendto(request->socket, request->data, request->size, 0, (const struct sockaddr*) &endpoint, endpoint_size);
-        response->result = sent >= 0 ? (int) sent : socket_error();
+        const ssize_t sent = sendto(request->socket, request->data, request->size, socket_send_flags(),
+                                    (const struct sockaddr*) &endpoint, endpoint_size);
+        response->result   = sent >= 0 ? (int) sent : socket_error();
     }
 }
 
 #if defined(ESP_PLATFORM)
+#include "native_socket.inc"
 static QueueHandle_t socket_requests;
 static QueueHandle_t socket_responses;
 static SemaphoreHandle_t socket_mutex;
@@ -348,7 +384,7 @@ static void socket_worker(void* argument)
         socket_request_t request;
         if (xQueueReceive(socket_requests, &request, portMAX_DELAY) == pdTRUE) {
             socket_response_t response;
-            execute_socket_request(&request, &response);
+            execute_cancellable_socket_request(&request, &response);
             (void) xQueueSend(socket_responses, &response, portMAX_DELAY);
         }
     }
@@ -442,6 +478,11 @@ static int submit_socket_request(const socket_request_t* request, socket_respons
         ESP_LOGE("tabos_socket", "worker mutex failed for operation %u", (unsigned int) request->operation);
         return -TABOS_EIO;
     }
+    atomic_store_explicit(&socket_cancel_requested, false, memory_order_release);
+    if (platform_riscv32_current_cancelled() && request->operation != SOCKET_OPERATION_CLOSE) {
+        (void) xSemaphoreGive(socket_mutex);
+        return -TABOS_ECANCELED;
+    }
     const bool sent     = xQueueSend(socket_requests, request, portMAX_DELAY) == pdTRUE;
     const bool received = sent && xQueueReceive(socket_responses, response, portMAX_DELAY) == pdTRUE;
     (void) xSemaphoreGive(socket_mutex);
@@ -453,6 +494,10 @@ static int submit_socket_request(const socket_request_t* request, socket_respons
     return response->result;
 }
 #else
+void platform_network_socket_operations_cancel(void)
+{
+}
+
 bool platform_network_socket_operations_init(void)
 {
     if (socket_cancel_pipe[0] >= 0) {
@@ -507,6 +552,49 @@ static int submit_socket_request(const socket_request_t* request, socket_respons
 {
     if (!platform_network_socket_operations_init()) {
         return -TABOS_EIO;
+    }
+    const bool can_block =
+        request->operation == SOCKET_OPERATION_ACCEPT || request->operation == SOCKET_OPERATION_CONNECT ||
+        request->operation == SOCKET_OPERATION_SEND || request->operation == SOCKET_OPERATION_RECEIVE ||
+        request->operation == SOCKET_OPERATION_SEND_TO || request->operation == SOCKET_OPERATION_RECEIVE_FROM;
+    if (host_io_active() && can_block) {
+        const int flags = fcntl(request->socket, F_GETFL, 0);
+        if (flags < 0) {
+            return socket_error();
+        }
+        if ((flags & O_NONBLOCK) == 0) {
+            if (request->operation == SOCKET_OPERATION_CONNECT && host_io_retrying()) {
+                struct pollfd item = {.fd = request->socket, .events = POLLOUT};
+                const int ready    = poll(&item, 1U, 0);
+                if (ready == 0) {
+                    host_io_retry();
+                    return -TABOS_EAGAIN;
+                }
+                int error      = 0;
+                socklen_t size = sizeof(error);
+                if (ready < 0 || getsockopt(request->socket, SOL_SOCKET, SO_ERROR, &error, &size) != 0) {
+                    return socket_error();
+                }
+                errno = error;
+                return error == 0 ? 0 : socket_error();
+            }
+            if (fcntl(request->socket, F_SETFL, flags | O_NONBLOCK) != 0) {
+                return socket_error();
+            }
+            execute_socket_request(request, response);
+            (void) fcntl(request->socket, F_SETFL, flags);
+            if (request->operation == SOCKET_OPERATION_ACCEPT && response->result >= 0) {
+                const int accepted_flags = fcntl(response->result, F_GETFL, 0);
+                if (accepted_flags < 0 || fcntl(response->result, F_SETFL, accepted_flags & ~O_NONBLOCK) != 0) {
+                    (void) close_native_socket(response->result);
+                    return -TABOS_EIO;
+                }
+            }
+            if (response->result == -TABOS_EAGAIN) {
+                host_io_retry();
+            }
+            return response->result;
+        }
     }
     execute_socket_request(request, response);
     return response->result;

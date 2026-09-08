@@ -13,6 +13,26 @@
 
 #include <errno.h>
 
+bool platform_power_prepare_sleep(void)
+{
+    return false;
+}
+void platform_power_abort_sleep(void)
+{
+}
+bool platform_power_enter_light_sleep(void)
+{
+    return false;
+}
+platform_power_wake_cause_t platform_power_collect_wake_causes(void)
+{
+    return PLATFORM_POWER_WAKE_NONE;
+}
+bool platform_power_restore(void)
+{
+    return true;
+}
+
 enum {
     INA226_ADDRESS             = 0x41,
     INA226_CONFIGURATION       = 0x00,

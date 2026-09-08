@@ -6,6 +6,10 @@
 
 ## Sprite and Tile Layer
 
+The merge with main's audit, Kilo, and power work uses private ELF API version 22.
+It combines the 76-byte RV32 clipped-blit structure with main's filesystem identity
+and terminal services; binaries from either earlier version-21 branch must be rebuilt.
+
 `[DECIDED]` Sprite pivots are local geometric origins, including edge and outside-rectangle
 origins. Mirroring occurs in source space before quarter-turn rotation, matching the blit
 renderer. Scaling uses integer division with truncation toward zero; unrepresentable
@@ -97,7 +101,9 @@ Applications are installed as extensionless executable files under `T:/bin/`.
 The shell default command search path is `T:/bin`; users may redefine it with
 DOS-style semicolon-separated PATH entries. Absolute drive paths and relative
 paths containing `/` (including `./` and `../`) bypass PATH lookup. The shell
-does not append `.bin` to command names.
+does not append `.bin` to command names. Before a filesystem-loaded child starts,
+its executable path is normalized against the parent's inherited process-local
+working directory rather than the filesystem-wide working directory.
 
 ### Pre-release application ABI [DECIDED]
 
@@ -166,6 +172,26 @@ between cores corrupted RGB565 preview data without reporting a driver error. A 
 dequeue deadline provides slow stall diagnostics, not normal polling. H.264 capacity is
 checked before dequeue, and lease release wakes a capacity-blocked worker. Stop and
 shutdown join capture work before frame pools, DMA mappings, or mutexes are destroyed.
+
+### Native application quiescence [DECIDED]
+
+Every native private ABI gate is guarded by `platform/esp32p4/application_task.c`;
+`application_gates.inc` covers all table fields, with an ABI-size assertion preventing
+silent omissions when fields are added. Task-local storage retains the execution
+context; portable gates still obtain only their application user data. Teardown sets
+stop, suspends the task, and checks `eTaskGetState()` until it is not running on either
+core. It may delete only when gate depth is zero. An active gate is resumed after
+nonblocking cancellation is issued and parks after releasing all service locks.
+Computing guest code outside gates does not need to cooperate. A completion flag alone
+is never treated as a stopped acknowledgement. The pinned IDF deletion helper already
+suspends/checks task execution, but cannot establish that service locks were released.
+
+Native socket and echo workers use bounded cancellation polls; TLS uses WANT retries.
+Callers retain their worker mutex and consume the reply before leaving the guarded
+call, preventing stale-response reuse. Close operations remain valid during cancellation
+for rollback. A DNS lookup already inside lwIP and the bounded ESP-TLS connect-select
+call may delay quiescence; do not delete either task or borrowed state to enforce a
+teardown timeout. Host stop abandons copied jobs using its existing continuation rules.
 
 ### Generic wait sources [DECIDED]
 
@@ -309,7 +335,17 @@ deadlines. Native Tab5 application completion and ELF exit/child-exec requests p
 application readiness; process launch and parent restoration do likewise. These
 notifications carry no process pointer, so coalesced late wakeups cannot target a
 destroyed or generation-reused slot. No compatibility tick remains. Active host RV32
-interpretation keeps the runtime immediately runnable for bounded instruction slices.
+interpretation keeps the runtime immediately runnable for bounded instruction slices
+only while the guest can execute. A suspended host wait/I/O gate retains its PC and
+arguments and publishes a bounded 10 ms readiness retry deadline, shortened to the
+original finite wait deadline. This deadline exists only while an operation is pending.
+Socket and established TLS operations use nonblocking backend attempts; explicit guest
+nonblocking socket mode still returns EAGAIN. DNS, echo, and TLS setup use at most 16
+unfinished detached jobs with owned request/result storage. Only the runtime thread
+publishes results, allocates process handles, or accesses guest memory. Cancellation
+abandons replies without joining an uninterruptible resolver; completed abandoned TLS
+transports are freed by their worker. Worker completion never calls into destroyed SDL
+notification state, and echo uses an OS monotonic clock independent of SDL lifetime.
 Native Tab5 execution does not use that runnable hint because it runs in its own managed
 task. Debug builds count wake bits and expired deadline owners; reporting piggybacks on
 the existing health audit rather than creating another periodic deadline.
@@ -378,6 +414,9 @@ protocol to remain blocked until process manager restores it with child status.
 Process teardown cancels blocking application waits and stops the native execution
 context before releasing any process-owned service, descriptor, heap, or executable
 mapping. This prevents cleanup from racing a final application API call.
+Queued graphics commands borrow application buffers. Teardown discards that queue after
+stopping execution; it must not drain blits after guest RAM or the native stack is freed.
+Explicit graphics close still fences pending work while application memory is live.
 
 ELF ABI version 3 entry and nested execution carry bounded `argc`/`argv`. Child loader
 state owns copied arguments for full process lifetime. Tokenization, quoting, and escaping
@@ -685,6 +724,11 @@ subset. SDK compatibility headers map familiar names such as `open`, `read`, and
 `stat` to a TabOS-owned prefixed ABI; TabOS does not expose host or ESP-IDF libc
 objects as its ABI. The portable core owns path normalization, descriptors, errors,
 and dispatch. Drive table enumerates backend-owned letters; host exposes controlled `A:` and `T:` directories, while Tab5 currently exposes BSP-mounted microSD FAT as `T:`. Missing drives return `ENODEV`; cross-drive rename returns `EXDEV`. Internal-flash `A:` implementation, permissions, links, and removal recovery remain pending.
+Portable metadata includes device/file identity for same-file comparisons. Host
+backends retain native device/inode identity and therefore recognize hard links.
+ESP-IDF FAT reports no inode, so portable core supplies case-folded normalized-path
+identity and updates open-file fallback identity across rename. Identity values are
+comparison data for current files, not persistent storage IDs.
 Tab5 FAT uses heap-backed long-filename buffers with a 255-character maximum so
 the backend honors the public filesystem name limit instead of silently imposing
 8.3 names.
@@ -1521,3 +1565,61 @@ ESP32-C6 transport details
 ```
 
 Maintaining that separation is the central architectural constraint of the project.
+
+## Kilo terminal service implementation (2026-09-07)
+
+Kilo uses public copied `TABOS_TTY_GET_SIZE` geometry and a foreground process-owned
+`tabos_input_wait_source()` adapter. Keyboard-only waits use retained coalesced wake
+signals, with absolute deadlines and host RV32 suspension; other generic service
+waits retain their existing behavior. Source handles use existing generation and
+teardown rules. Terminal CSI parsing is bounded to eight parameters; cursor addressing
+uses the live screen rather than the oldest retained scrollback line. Immediate
+wrapping is preserved, so Kilo reserves the final column. Console release resets
+attributes and incomplete escape state before parent acquisition.
+
+Kilo is an independent RV32 application, with a 2 MiB heap and 32 KiB stack metadata
+request, byte-oriented rows, bounded edits, and an application-local backup/rename save
+transaction. No POSIX emulation or hardware dependency was added to the application.
+
+## GPIO service ownership and power baseline
+
+Tab5 GPIO interrupt registration is owned by `platform/esp32p4/gpio_interrupt.c`.
+Serialized platform initialization installs one non-IRAM service for the boot; keyboard
+and touch own only their pin handlers. A consumer must never uninstall the shared service.
+Touch constructors retain GPIO configuration but receive no component callback; TabOS
+checks direct attachment and removes it before controller teardown. Concurrent registration
+and new consumers require an explicit lifecycle audit.
+
+Power Phase 0 inventory and wake-source restrictions live in `docs/power-baseline.md`.
+Portable Phase 1 and 2 power management is internal to kernel. Runtime dispatcher owns state
+transitions and combines its absolute deadline with existing service deadlines. Fixed-capacity
+participants are ordered once by stable dependency names; asynchronous completions carry a
+transition generation so stale replies cannot advance current state. Invalid graphs disable
+suspend while normal operation remains available. Platform boundary supplies brightness,
+preparation/abort, sleep entry, wake-cause collection, and restoration. No public suspend API,
+PM enablement, or Tab5 wake arming exists yet. Missing tested reversible service lifecycle
+remains a blocker, including initialized drivers with no application handles.
+
+Keyboard and pointer services retain normalized physical activity plus held/contact state
+under their existing service mutexes. Runtime samples both after platform ingress and before
+foreground execution, then owns resulting power transition. Fullscreen ownership and open
+audio/camera streams are sampled as dim/suspend inhibitors; lifecycle changes notify runtime.
+Final inhibitor release starts a fresh idle interval. Power status stores desired and last
+known effective brightness separately, including validity and failure. Host SDL brightness is
+texture presentation modulation; framebuffer and captured pixels remain unchanged.
+
+Debug peripheral activity uses a narrow `platform_runtime_log_activity()` diagnostic
+hook beside the existing health-audit wake report. Tab5 counts codec pairs/frames/errors,
+headphone attempts/errors, VSYNC and PPA completions with boot-lifetime lock-free unsigned
+atomics; no new periodic task/deadline exists. Release compiles out updates; host does
+not manufacture physical peripheral measurements. These counts are not PM policy or
+synchronization state.
+
+Audio hardware has an initialized-but-idle platform lifecycle. Service admission starts
+transport at requested shared sample rate and initial route before exposing first handle.
+Last-stream close stops transport after worker exit. Tab5 closes both codec devices, disables
+speaker routing, and runs jack polling only for active speaker routing; host SDL likewise owns
+audio streams only while TabOS streams exist. Backend-start failure updates device health and
+remains retryable after no stream was admitted. Maintenance audit supports suppressed deadlines
+and one overdue resume pass. Pinned ESP-IDF v5.4.4 exposes no public retained-buffer MIPI-DPI
+pause; controller display-off is not treated as scanout quiescence.

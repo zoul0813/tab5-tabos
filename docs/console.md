@@ -86,3 +86,22 @@ Tab5 example:
 ./tools/tabos tab5 debug build
 ./tools/tabos tab5 debug flash
 ```
+
+## Terminal geometry and cursor controls
+
+Applications call `ioctl(fd, TABOS_TTY_GET_SIZE, &size)` with `tabos_tty_size_t`
+from `<tabos/tty.h>`. The copied `uint32_t rows` and `columns` reflect the active
+font, cell dimensions, and terminal scale. Only foreground console descriptors
+0, 1, and 2 are accepted. Ordinary file descriptors return `ENOTTY`.
+
+CSI supports bounded row/column `H` and `f`, omitted/default parameters, multiple
+SGR values, default colors 39/49, and private cursor visibility `?25h`/`?25l`.
+Sequences may span writes. Overflow, excessive parameters (more than eight), and
+unsupported sequences are consumed without exposing parameter bytes as text.
+Cursor addressing is clamped to the live screen, independently of retained
+scrollback. Moving the cursor does not discard rows below it.
+
+Wrapping remains immediate, including at the bottom-right cell. Full-screen painters
+should reserve the final column and explicitly position each row without a final
+newline, as Kilo does. Console release resets incomplete escapes and color/reverse
+attributes; the next foreground session gets a visible cursor.

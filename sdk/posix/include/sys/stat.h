@@ -9,6 +9,8 @@ struct stat {
         uint32_t st_mode;
         uint64_t st_size;
         int64_t st_mtime;
+        uint64_t st_dev;
+        uint64_t st_ino;
 };
 
 #define S_IFREG       TABOS_S_IFREG

@@ -178,6 +178,8 @@ static void copy_stat(struct stat* destination, const tabos_elf_stat_t* source)
     destination->st_size  = (off_t) ((uint64_t) source->size_low | (uint64_t) source->size_high << 32U);
     destination->st_mtime = (time_t) ((uint64_t) (uint32_t) source->modified_time_low |
                                       (uint64_t) (uint32_t) source->modified_time_high << 32U);
+    destination->st_dev   = (dev_t) ((uint64_t) source->device_id_low | (uint64_t) source->device_id_high << 32U);
+    destination->st_ino   = (ino_t) ((uint64_t) source->file_id_low | (uint64_t) source->file_id_high << 32U);
 }
 
 int _stat(const char* path, struct stat* status)
@@ -331,6 +333,17 @@ int fcntl(int descriptor, int command, ...)
 
 int ioctl(int descriptor, unsigned long request, ...)
 {
+    if (request == TABOS_TTY_GET_SIZE) {
+        va_list arguments;
+        va_start(arguments, request);
+        tabos_tty_size_t* size = va_arg(arguments, tabos_tty_size_t*);
+        va_end(arguments);
+        if (size == NULL || tabos_runtime_api == NULL || tabos_runtime_api->tty_get_size == NULL) {
+            errno = EINVAL;
+            return -1;
+        }
+        return fail_result(tabos_runtime_api->tty_get_size(descriptor, size));
+    }
     if (request == TABOS_TTY_GET_MODE) {
         va_list arguments;
         va_start(arguments, request);

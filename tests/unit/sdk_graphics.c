@@ -1,8 +1,8 @@
 #include <tabos/graphics.h>
 #include <tabos/internal/elf_api.h>
 
-#include <stddef.h>
 #include <errno.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -28,6 +28,7 @@ static int32_t expected_y;
 static uint32_t expected_output_width;
 static uint32_t expected_output_height;
 static uint32_t overlay_flags;
+static unsigned int blit_count;
 static bool capture_native;
 static tabos_graphics_blit_options_t submitted;
 static unsigned int submitted_count;
@@ -46,7 +47,10 @@ static int graphics_fill_rect(int32_t x, int32_t y, uint32_t width, uint32_t hei
 
 static int graphics_blit(int32_t x, int32_t y, uint32_t width, uint32_t height, const uint16_t* pixels)
 {
-    (void) pixels;
+    if (width == 0U || height == 0U || pixels == NULL) {
+        return -EINVAL;
+    }
+    ++blit_count;
     return graphics_fill_rect(x, y, width, height, 0U);
 }
 
@@ -112,6 +116,7 @@ static const tabos_elf_api_t api = {
     .graphics_present      = graphics_present,
     .graphics_close        = graphics_close,
     .graphics_capabilities = graphics_capabilities,
+    .graphics_blit         = graphics_blit,
     .graphics_blit_ex      = graphics_blit_ex,
     .graphics_set_overlays = graphics_set_overlays,
 };
@@ -389,7 +394,11 @@ int main(void)
 
     graphics = (tabos_graphics_t) {0};
     if (tabos_graphics_open(&graphics) != 0 || graphics.width != 1280U || graphics.height != 720U ||
-        graphics.scale != 1U || graphics.pixels != NULL || tabos_graphics_close(&graphics) != 0 || close_count != 3U) {
+        graphics.scale != 1U || graphics.pixels != NULL ||
+        tabos_graphics_blit(&graphics, 0, 0, 0U, 1U, sprite) != -1 || errno != EINVAL || blit_count != 0U ||
+        tabos_graphics_blit(&graphics, 0, 0, 1U, 0U, sprite) != -1 || errno != EINVAL || blit_count != 0U ||
+        tabos_graphics_blit(&graphics, 0, 0, 1U, 1U, sprite) != 0 || blit_count != 1U ||
+        tabos_graphics_close(&graphics) != 0 || close_count != 3U) {
         return 1;
     }
     check_camera();

@@ -7,11 +7,15 @@
 
 #include <tabos/input.h>
 
+bool input_pending(void);
+void input_wait_ready(uint32_t timeout_ms);
+void input_wake_waiter(void);
 bool input_init(void);
 void input_shutdown(void);
 void input_update(void);
 uint64_t input_next_deadline(void);
 bool input_submit(const tabos_input_event_t* event);
+bool input_take_power_activity(bool* held);
 void input_diagnostic_log(const tabos_input_event_t* event);
 size_t input_text_from_hid(uint8_t usage, uint8_t modifiers, char* text, size_t text_size);
 

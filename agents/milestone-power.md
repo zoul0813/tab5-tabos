@@ -1,5 +1,9 @@
 # TabOS Low-Power Integration Milestone
 
+> The final accepted implementation plan is in [agents/power.md](power.md).
+> Use it for the agreed implementation phases and decisions; the original milestone
+> documentation below is preserved for context.
+
 ## Goal
 
 Add measurable low-power behavior without breaking TabOS process continuity,

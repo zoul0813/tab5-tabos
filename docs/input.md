@@ -117,3 +117,21 @@ through GPIO50; built-in touch is interrupt-driven through GPIO23 and documented
 `docs/pointer.md`.
 
 USB keyboards connected to Tab5 are not supported yet. A future ESP-IDF USB-host HID backend can submit events to the same portable queue and coexist with the I²C keyboard without changing applications.
+
+## Keyboard readiness waits
+
+`tabos_input_wait_source()` is declared in `<tabos/wait.h>`. It returns a stable,
+process-owned generation-tagged source for the foreground keyboard queue. Request
+`TABOS_WAIT_READABLE` through `tabos_wait()`. Readiness observes queued events without
+consuming them; drain with `tabos_input_poll()`. Raw and stdin reads share the queue,
+so an application must choose one consumption path. Readiness may include events
+subsequently filtered by TTY policy.
+
+Keyboard-only waits use a retained, coalescing wake signal on native Tab5 and suspend
+the actual RV32 guest on host. Empty infinite waits create no periodic application
+work. Finite waits use absolute monotonic deadlines. Teardown cancels the wait before
+execution and resources are destroyed. Sources from another process or a destroyed
+child return `EBADF`; writable readiness is invalid. Repeated source lookup does not
+consume additional source slots. This change does not replace legacy polling behavior
+for mixed or unrelated generic service waits, or the existing `tabos_input_wait()`
+convenience wrapper.

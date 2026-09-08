@@ -19,11 +19,18 @@ int main(void)
     if (!input_init()) {
         return 1;
     }
+    bool power_held = true;
+    if (input_take_power_activity(&power_held) || power_held) {
+        return 1;
+    }
     const tabos_input_event_t key = {
         .type = TABOS_INPUT_KEY_DOWN,
         .key  = TABOS_KEY_A,
     };
     if (!input_submit(&key)) {
+        return 1;
+    }
+    if (!input_take_power_activity(&power_held) || !power_held || input_take_power_activity(&power_held)) {
         return 1;
     }
     tabos_input_event_t received;
@@ -61,6 +68,9 @@ int main(void)
     if (!input_submit(&held) || !tabos_input_poll(&received)) {
         return 1;
     }
+    if (!input_take_power_activity(&power_held) || !power_held) {
+        return 1;
+    }
     const uint64_t first_repeat_ms = test_platform_time_ms() + TABOS_KEY_REPEAT_DELAY_MS;
     if (input_next_deadline() != first_repeat_ms) {
         return 1;
@@ -70,6 +80,9 @@ int main(void)
         .text = "w",
     };
     if (!input_submit(&held_text) || !tabos_input_poll(&received)) {
+        return 1;
+    }
+    if (input_take_power_activity(&power_held) || !power_held) {
         return 1;
     }
     test_platform_advance_time_ms(TABOS_KEY_REPEAT_DELAY_MS - 1U);
@@ -83,6 +96,9 @@ int main(void)
         !received.repeat || !tabos_input_poll(&received) || received.type != TABOS_INPUT_TEXT ||
         strcmp(received.text, "w") != 0 || !received.repeat || tabos_input_poll(&received) ||
         input_next_deadline() != first_repeat_ms + TABOS_KEY_REPEAT_INTERVAL_MS) {
+        return 1;
+    }
+    if (input_take_power_activity(&power_held) || !power_held) {
         return 1;
     }
 
@@ -99,6 +115,9 @@ int main(void)
         .key  = TABOS_KEY_W,
     };
     if (!input_submit(&released) || input_next_deadline() != UINT64_MAX || !tabos_input_poll(&received)) {
+        return 1;
+    }
+    if (!input_take_power_activity(&power_held) || power_held) {
         return 1;
     }
     test_platform_advance_time_ms(TABOS_KEY_REPEAT_INTERVAL_MS);

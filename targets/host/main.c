@@ -19,9 +19,10 @@ static bool is_smoke_test(int argc, char** argv)
 
 int main(int argc, char** argv)
 {
-    const bool headless = is_smoke_test(argc, argv);
-    int result          = 0;
-    bool restart        = false;
+    const bool startup_smoke = argc == 2 && strcmp(argv[1], "--startup-smoke") == 0;
+    const bool headless      = startup_smoke || is_smoke_test(argc, argv);
+    int result               = 0;
+    bool restart             = false;
     do {
         restart = false;
         if (!kernel_runtime_init()) {
@@ -32,7 +33,8 @@ int main(int argc, char** argv)
             kernel_runtime_shutdown();
             return 1;
         }
-        if (!kernel_runtime_start(!headless)) {
+        const bool launch_startup_application = !headless || startup_smoke;
+        if (!kernel_runtime_start(launch_startup_application)) {
             fprintf(stderr, "%s runtime startup failed\n", TABOS_SYSTEM_NAME);
             kernel_runtime_shutdown();
             platform_shutdown();

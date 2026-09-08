@@ -102,9 +102,19 @@ Each process starts with console descriptors 0, 1, and 2 and allocates file/devi
 descriptors from 3 upward. It owns an inherited working directory, errno state, and the
 metadata-selected (or legacy-default) 16 KiB stack. Its heap grows on demand to its
 metadata-selected (or legacy-default) 256 KiB limit. Process cleanup closes open
-descriptors and releases guest memory, task stack, heap, and executable memory.
+descriptors and releases guest memory, task stack, heap, and executable memory. Child
+executable paths are normalized against the inherited working directory before loading,
+including relative PATH entries, `./`, `../`, and `/` paths on the current drive.
 On Tab5, native return, exit, and child-exec work notify runtime immediately; cleanup
-stops native task before releasing anything reachable through an application call gate.
+stops the native task before releasing anything reachable through an application call gate.
+All native ABI calls pass through guards. Cleanup requests stop, suspends the task,
+and waits until neither CPU reports it running. If a call gate remains active, cleanup
+cancels its blocking work and resumes it long enough to release service locks; gate exit
+parks instead of returning to guest code. Only a stopped task with no active gate may
+have its stack, process resources, and executable mapping freed. An application computing
+outside call gates can be stopped without requiring it to yield voluntarily.
+Cancellation waits for an already-entered OS resolver or other bounded driver operation
+to return; cleanup never frees live state merely because a timeout elapsed.
 
 ## Tab5 Hardware Test
 
@@ -176,3 +186,9 @@ Loader does not yet provide:
 - signing, discovery, or package metadata
 
 Host tests parse, load, and execute the same RV32 application artifact used by Tab5 through a resumable RV32IMA interpreter. Guest state persists across bounded instruction slices so host tests cover loader, ABI, output, exit status, and execution faults without replacing RV32 code with a host-native build.
+
+Host blocking waits retain the guest call site and arguments across runtime turns.
+Only completed calls publish results and advance the guest PC. Pending socket/TLS
+operations and generic waits release the SDL thread; DNS/echo/TLS setup workers retain
+copied backend data, never guest RAM or process pointers. Cancelling a process discards
+its continuation before freeing guest memory.

@@ -110,3 +110,17 @@ int tabos_wait(tabos_wait_item_t* items, uint32_t count, uint32_t timeout_ms)
     }
     return result;
 }
+
+tabos_wait_source_t tabos_input_wait_source(void)
+{
+    if (tabos_runtime_api == NULL || tabos_runtime_api->input_wait_source == NULL) {
+        errno = ENOSYS;
+        return TABOS_WAIT_SOURCE_INVALID;
+    }
+    const int result = tabos_runtime_api->input_wait_source();
+    if (result < 0) {
+        errno = -result;
+        return TABOS_WAIT_SOURCE_INVALID;
+    }
+    return result;
+}

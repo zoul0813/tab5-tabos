@@ -295,7 +295,7 @@ int tabos_graphics_rect(tabos_graphics_t* graphics, int32_t x, int32_t y, uint32
 int tabos_graphics_blit(tabos_graphics_t* graphics, int32_t x, int32_t y, uint32_t width, uint32_t height,
                         const tabos_color_t* pixels)
 {
-    if (!valid(graphics) || pixels == NULL) {
+    if (!valid(graphics) || pixels == NULL || width == 0U || height == 0U) {
         errno = EINVAL;
         return -1;
     }

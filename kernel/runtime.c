@@ -12,6 +12,7 @@
 #include <tabos/internal/input.h>
 #include <tabos/internal/network.h>
 #include <tabos/internal/pointer.h>
+#include <tabos/internal/power.h>
 #include <tabos/internal/camera.h>
 #include <tabos/internal/terminal.h>
 #include <tabos/internal/time.h>
@@ -44,6 +45,8 @@ static char storage_detail[512];
 static char clock_detail[80];
 static char network_detail[160];
 static atomic_int requested_system_action;
+static power_manager_t power_manager;
+static bool power_initialized;
 
 #ifndef NDEBUG
 typedef struct {
@@ -102,6 +105,7 @@ static void log_wake_counts(void)
                     wake_counts.input_deadline, wake_counts.console_deadline, wake_counts.network_deadline,
                     wake_counts.health_deadline, wake_counts.application_slice);
     platform_log(message);
+    platform_runtime_log_activity();
 }
 #endif
 
@@ -408,7 +412,27 @@ bool kernel_runtime_start(bool launch_startup_application)
         filesystem_shutdown();
         return false;
     }
-    runtime_started = true;
+    const power_policy_t power_policy = {.idle_ms           = 60000U,
+                                         .suspend_ms        = 600000U,
+                                         .active_brightness = 75U,
+                                         .idle_brightness   = 20U,
+                                         .automatic_suspend = false};
+    if (!power_manager_init(&power_manager, power_policy, platform_time_ms())) {
+        kernel_application_system_shutdown();
+        console_shutdown();
+        terminal_shutdown(&terminal);
+        hardware_devices_shutdown();
+        camera_service_shutdown();
+        pointer_service_shutdown();
+        display_shutdown();
+        audio_service_shutdown();
+        network_service_shutdown();
+        filesystem_shutdown();
+        return false;
+    }
+    (void) power_manager_finalize(&power_manager);
+    power_initialized = true;
+    runtime_started   = true;
 #ifndef NDEBUG
     wake_counts = (runtime_wake_counts_t) {0};
 #endif
@@ -422,6 +446,8 @@ bool kernel_runtime_start(bool launch_startup_application)
     const tabos_app_result_t startup_result = startup_app != NULL ? tabos_app_launch(startup_app) : TABOS_APP_RESULT_OK;
 #endif
     if (startup_result != TABOS_APP_RESULT_OK) {
+        power_manager_shutdown(&power_manager);
+        power_initialized = false;
         kernel_application_system_shutdown();
         console_shutdown();
         terminal_shutdown(&terminal);
@@ -452,14 +478,45 @@ void kernel_runtime_update(platform_runtime_events_t events)
     bool device_ready        = (events & PLATFORM_RUNTIME_EVENT_DEVICE) != 0U;
     const bool deadline_wake = (events & PLATFORM_RUNTIME_EVENT_DEADLINE) != 0U;
 
+    const uint64_t now = platform_time_ms();
+    if (power_initialized) {
+        const power_state_t state = power_manager_status(&power_manager)->state;
+        if (state == POWER_STATE_SUSPENDING || state == POWER_STATE_SUSPENDED || state == POWER_STATE_RESUMING) {
+            power_manager_update(&power_manager, events, now);
+            const power_state_t updated = power_manager_status(&power_manager)->state;
+            if (updated == POWER_STATE_SUSPENDING || updated == POWER_STATE_SUSPENDED ||
+                updated == POWER_STATE_RESUMING) {
+                return;
+            }
+        }
+    }
     if ((events & PLATFORM_RUNTIME_EVENT_INPUT) != 0U) {
         platform_keyboard_update();
     }
     if ((events & PLATFORM_RUNTIME_EVENT_POINTER) != 0U) {
         platform_pointer_update();
     }
-
-    const uint64_t now = platform_time_ms();
+    if (power_initialized) {
+        bool key_held       = false;
+        bool contact_active = false;
+        const bool input_activity   = input_take_power_activity(&key_held);
+        const bool pointer_activity = pointer_service_take_power_activity(&contact_active);
+        const bool activity         = input_activity || pointer_activity;
+        uint32_t inhibitors  = key_held ? POWER_INHIBITOR_KEYBOARD : 0U;
+        inhibitors          |= contact_active ? POWER_INHIBITOR_POINTER : 0U;
+        inhibitors          |= console_graphics_active() ? POWER_INHIBITOR_FULLSCREEN : 0U;
+        inhibitors |= audio_service_power_inhibited() || camera_service_power_inhibited() ? POWER_INHIBITOR_MEDIA : 0U;
+        power_manager_set_dim_inhibitors(&power_manager, inhibitors, now);
+        if (activity) {
+            power_manager_request_activity(&power_manager, now);
+        }
+        power_manager_update(&power_manager, events, now);
+        const power_status_t* power_status = power_manager_status(&power_manager);
+        if (power_status->state == POWER_STATE_SUSPENDING || power_status->state == POWER_STATE_SUSPENDED ||
+            power_status->state == POWER_STATE_RESUMING) {
+            return;
+        }
+    }
     if (deadline_wake && deadline_ready(input_next_deadline(), now)) {
         input_update();
         application_ready = true;
@@ -519,11 +576,18 @@ uint64_t kernel_runtime_next_deadline(void)
     deadline          = earliest_deadline(deadline, console_next_deadline());
     deadline          = earliest_deadline(deadline, network_service_next_deadline());
     deadline          = earliest_deadline(deadline, hardware_devices_next_deadline());
+    deadline          = earliest_deadline(deadline, kernel_application_system_next_deadline());
+    if (power_initialized) {
+        deadline = earliest_deadline(deadline, power_manager_next_deadline(&power_manager));
+    }
     return deadline;
 }
 
 void kernel_runtime_shutdown(void)
 {
+    if (power_initialized) {
+        power_manager_begin_shutdown(&power_manager, platform_time_ms());
+    }
     if (runtime_started) {
         kernel_application_system_shutdown();
         console_shutdown();
@@ -539,6 +603,10 @@ void kernel_runtime_shutdown(void)
     audio_service_shutdown();
     network_service_shutdown();
     filesystem_shutdown();
+    if (power_initialized) {
+        power_manager_shutdown(&power_manager);
+        power_initialized = false;
+    }
     runtime_initialized = false;
     input_shutdown();
     device_registry_shutdown();

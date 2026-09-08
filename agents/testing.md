@@ -8,6 +8,17 @@
 
 ## Sprite, Tile, and Asset Validation
 
+The 2026-09-08 merge with main `7d6bcea` validates all 74 macOS Debug and all 74
+macOS Release tests, including focused reruns after integration repairs. Debug's
+loopback-dependent tests were rerun outside the sandbox. The combined tests retain
+both tiling and audit coverage: clipped-blit guest fixtures include all 76 wire bytes,
+raster fixtures clear their complete heap-backed framebuffer, and build tracking
+includes sprite/tile runtime sources. Core smoke selects diagnostic expectations from
+the linked runtime's configuration, independently of test assertion enablement.
+Tab5 Debug and Release firmware builds, the default RV32 application build/install
+matrix, and actual RV32 shell-history and Kilo/tester-input sessions also pass.
+Linux validation is excluded from this sync by explicit user direction.
+
 The post-merge baseline at `6589874` passes all 60 macOS Debug tests with sanitizers,
 all 60 macOS Release tests, every standard RV32 application build including `tdemo`, and
 the Tab5 Debug firmware build. This validates integration with the event-driven runtime,
@@ -205,6 +216,8 @@ This should make normal development substantially faster.
 - Generated firmware lives in `build/tab5-debug/` or `build/tab5-release/` and uses `TabOS.bin` capitalization.
 - Info-level serial logging is required in debug and release so detected hardware remains visible during boot.
 - Current host suite has unit, integration, architecture-boundary, and invalid-target tests. Display transforms must remain host-unit-tested.
+- Host test targets keep C assertions enabled in optimized configurations because assertions contain validation and, in some older tests, required setup calls.
+- Timing-sensitive component tests rely on their CTest timeout and observable runtime state instead of sub-second wall-clock assertions that can fail under CI scheduler load.
 
 ### Event and deadline runtime validation
 
@@ -288,6 +301,22 @@ child execution wake a blocked runtime promptly. Late coalesced application read
 must be harmless after process teardown or process-slot reuse. Cleanup must stop native
 execution before releasing process-owned resources.
 
+`unit.native_task` compiles the production native task/gate implementation against a
+pthread scheduler model. It repeats return-before-self-suspend, forced computation,
+forced service-lock cancellation, delayed cross-core stop acknowledgement, idempotent
+stop, creation failure, and never-started cleanup. It also verifies argument/return
+forwarding through integer, pointer, 64-bit, and void gates. The fake IDF deletion helper
+includes the pinned helper's existing suspension handshake; the old task implementation
+still fails because deletion occurs while the service mutex remains owned.
+`component.native_socket_cancel` runs the actual native cancellation loop over real host
+sockets, checking blocked accept/receive/infinite wait, flag restoration, cancellation
+reset, and cleanup-close behavior. `unit.native_tls_cancel` compiles the native TLS loops
+with deterministic ESP-TLS WANT/completion responses, checking cancelled setup/read/write,
+repeated reuse, resource reclamation, and operation timeout. These run under host
+ASan/UBSan; scheduler/ESP-TLS models do not replace physical dual-core validation.
+Physical validation must force stop during socket/TLS/DNS calls and service contention
+on both cores, and verify repeated return/exit/parent restoration without leaked locks.
+
 Host RV32 tests must force multiple instruction-slice yields before child completion and
 verify retained PC, registers, memory, and parent state. Tab5 tests must keep native child
 active while independently proving keyboard polling, timer/cursor updates, display work,
@@ -305,6 +334,18 @@ persistent files and directories and return nonzero when any assertion fails.
 Process module must remain self-contained: tester parent launches tester child, child
 launches tester grandchild, known statuses unwind in reverse, and parent repeats chain to
 prove cleanup and reload. Run tester from shell so this also exercises persistent PID 0.
+
+`component.elf_wait` executes real RV32 fixtures through the loader and headless SDL
+runtime. It checks finite/infinite pointer waits, SDL pointer delivery and shutdown,
+blocking UDP receive, socket-only/mixed zero and infinite waits, DNS continuation,
+repeated forced socket/DNS teardown, and parent restoration. `unit.host_io` holds 16
+cancelled workers behind a barrier, checks bounded exhaustion and copied inputs, then
+checks disposal and normal delivery. `component.host_network_io` exercises suspended
+TCP accept/connect/receive, explicit EAGAIN, DNS, verified TLS connection setup and
+TLS read/write against an ephemeral local CA/server. These tests use host sanitizers;
+loopback tests need permission to bind local ports. Closed-peer socket coverage runs in a
+subprocess with the default SIGPIPE action and requires repeated sends to return errors
+without terminating the process.
 
 Generic-wait validation covers zero and finite application waits, cancellable infinite
 backend waits, monotonic timeout, readiness clearing, source ordering, mixed socket/device
@@ -644,6 +685,13 @@ growth and limit failure, and deterministic cleanup after success and failure.
 Test blocking stdin plus `O_NONBLOCK`/`EAGAIN`. Text fixtures use raw CP437 bytes;
 host Unicode input outside CP437 must be rejected or explicitly substituted.
 
+`component.coreutils_cp` builds the production `cp` source against SDK POSIX
+compatibility headers and the real portable/host storage path. It must reject an
+identical path, a normalized relative alias, and a host hard link without changing
+source bytes, then truncate and copy into a distinct destination. Filesystem and
+POSIX adapter tests must verify matching nonzero identity across `stat()`/`fstat()`
+and across rename.
+
 System-action tests cover invalid reboot commands, unavailable and rejected ELF gates,
 first-request-wins kernel state, and action consumption. Host integration must verify
 power-off exits and reboot performs full teardown plus in-process reinitialization. Tab5
@@ -651,6 +699,16 @@ hardware validation must separately verify reset, battery-powered shutdown, exte
 powered halt fallback, and microSD integrity after repeated orderly actions.
 
 ELF loader tests use real RV32 fixture and cover format metadata, segment bounds, executable entry, supported static `SHT_RELA` processing, unsupported relocation rejection, image-size limit, memory copy, unload, and malformed inputs under host sanitizers. Host executes same RV32 bytes through resumable interpreter and must cover multiple instruction slices, API-table calls, argument vectors, console output, return status, illegal instructions, and invalid guest memory access. Tab5 hardware validation covers dual PSRAM aliases, load-bias relocation, final cache synchronization, globals/BSS/newlib state, native API-table calls, arguments, console output, return status, and cleanup. Expected success text begins with `Hello TabOS!`.
+
+Application build tracking uses an isolated synthetic SDK/application and a real host C
+compiler. It must prove that unchanged builds remain cached while SDK headers, application
+headers, generated prerequisites, the application Makefile, and heap, stack, capability,
+ABI, and contact-limit settings each relink the executable. Maintained RV32 applications must also build through
+the real cross toolchain after shared-rule changes.
+
+Filesystem-backed application coverage must keep the global filesystem working directory
+distinct from the child's inherited directory and verify relative PATH entries, `./`,
+`../`, and current-drive `/` executable paths load the file selected by the child.
 
 Manual console validation must include prompt-boundary Backspace, held Backspace, held printable keys, Enter, and Tab followed by visible text. Host backend synthesizes missing Enter/Tab/repeat text while retaining SDL text input for normal layout and IME behavior; matching SDL text events are suppressed to prevent duplicates.
 
@@ -822,6 +880,8 @@ The build system should:
 - make SDL3 a host-only dependency
 - keep ESP-IDF dependencies out of host builds
 - keep host dependencies out of Tab5 firmware
+- cross-build the maintained application rootfs used by published host packages
+- extract each host package into a clean directory and verify startup finds its bundled shell
 
 ---
 
@@ -1050,10 +1110,20 @@ font scaling, cursor inversion, and full terminal redraw. Physical diagnostics m
 measure internal RAM and PSRAM separately. Keep only repeatable speedups; host tests
 cannot establish PIE performance or context-switch correctness.
 
+`unit.raster` exercises the scalar fill fallback under ASan/UBSan. Fully clipped
+rectangles on every side, extreme coordinates, and zero-sized rectangles must leave
+the framebuffer and surrounding canaries unchanged; partially clipped fills must
+still produce the expected pixels.
+
 Fullscreen graphics tests must verify terminal writes, redraws, cursor timers, and
 scrollback navigation cannot alter or present the graphics framebuffer. TTY navigation
 keys must reach the graphics application regardless of its inherited TTY mode. Closing
 or faulting the application must redraw and present the retained terminal exactly once.
+`component.elf_graphics_cleanup` runs a real RV32 child with a queued stack-backed
+rotated blit through return, exit request, illegal-instruction fault, and forced
+termination, then repeats the cases to exercise cleanup and parent restoration. A live
+present/close control proves explicit flushing still works. The regression must pass
+under ASan/UBSan; teardown discards pending drawing without accessing freed guest RAM.
 
 Scaled-canvas tests must cover zero-initialized native opening, dimensions supplied before
 the single open call, rejection when only one dimension is supplied, fullscreen and 4:3
@@ -1744,3 +1814,62 @@ A developer working on the shell, filesystem, graphics model, UI, utilities, or 
 The real Tab5 remains the final source of truth for hardware behavior.
 
 The purpose of the macOS/Linux SDL3 builds is to make the shared TabOS implementation fast to develop, easy to debug, and continuously testable without compromising the architecture of the actual device.
+
+## Kilo validation (2026-09-07)
+
+`component.kilo` tests bounded editing, duplicate input suppression, search, CP437,
+allocation failures, line endings, short I/O, save/close/install/rollback/cleanup errors,
+and real-terminal rendering after ring overflow. `tabos_kilo_rv32` is an optional
+actual-application harness using temporary drive roots. Pass shell, Kilo, and optionally
+tester artifacts; ordinary CTest remains independent of application builds.
+`tester --input` checks copied geometry, keyboard sources, finite deadlines, foreign
+and stale handles, and retained parent TTY mode. Console and runtime-event regressions
+cover lifecycle reset and retained/coalesced wake signals.
+
+For this implementation session the user explicitly excludes Linux host tests.
+Validate macOS Debug/Release and Tab5 cross-builds. The operator reported Kilo physical
+Tab5 functional requirements passing on 2026-09-07 and subsequently confirmed
+`tester --input` worked on physical Tab5. Quantitative memory and power measurements
+were not reported.
+
+## Power Phase 0 validation
+
+`unit.gpio_interrupt` compiles the real Tab5 GPIO owner against a narrow fake IDF driver.
+It verifies install failure/retry, unexpected external ownership, failed second consumer,
+independent delivery, teardown isolation and boot-lifetime reuse. Existing touch/keyboard
+drain tests retain their source-order coverage; these tests do not prove electrical wake.
+
+Follow `docs/power-baseline.md` for identity capture, participant/PM-lock audit, cumulative
+wake-counter deltas, worker/IRQ/bus traces, and the instrumented measurement worksheet.
+Record physical validation separately from host tests and cross-builds. GPIO50/GPIO23
+runtime IRQ success does not establish light-sleep wake; RTC/IMU power-controller routing
+must not be labeled transparent resume without retained-state proof.
+
+Power baseline instrumentation extends `unit.core_smoke`: ordinary event dispatch must
+not report peripheral activity; the existing health deadline reports once in Debug and
+not in Release. Cross-build both configurations to verify counter compile guards; use
+physical consecutive serial snapshots for actual codec/headphone/VSYNC rates.
+
+`unit.power_manager` validates deterministic dependency and callback order, blockers,
+failure rollback, pending callbacks, generation-stale completion, wake collection,
+saturated deadlines, indefinite transition blocking, duplicate names, missing
+dependencies, cycles, and capacity overflow. `unit.host_power_model` validates synthetic
+monotonic advancement, activity injection, brightness state, one-shot platform failure,
+coalesced wake injection, and wake-cause consumption. Tab5 builds retain stubbed sleep
+entry until validated hardware sleep lands in Phase 7.
+
+Phase 2 extends manager tests with exact idle boundary, simultaneous activity/deadline race,
+held-input and fullscreen/media inhibitor behavior, fresh timeout after final release,
+configuration changes while idle, active brightness below idle brightness, and dim/restore
+failures with truthful desired/effective state. Input and pointer service tests distinguish
+physical ingress and held/contact state from software repeat, text, and cancellation. Host SDL
+must dim through texture modulation without changing framebuffer or screenshot pixels.
+
+Phase 3 audio tests require zero platform starts after service initialization, exactly one
+start on first open, no restart for additional streams, and one stop on last close or owner
+cleanup. Repeat across every supported native rate. Inject first-start failure, verify no
+handle or active hardware leaks, then prove next first-open recovers. Existing mixing,
+capture, route, fault, wait, and shared-clock assertions remain mandatory. Health-audit tests
+must prove suspended deadlines disappear, no audit occurs while paused, and resume runs one
+overdue audit while advancing directly to the next future deadline. Cross-build real Tab5
+audio code; host fakes do not prove codec shutdown, jack routing, or electrical savings.

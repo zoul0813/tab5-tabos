@@ -1,3 +1,4 @@
+#include "gpio_interrupt.h"
 #include "internal.h"
 #include "keyboard_interrupt.h"
 
@@ -303,11 +304,7 @@ static bool keyboard_interrupt_init(void)
     if (gpio_config(&interrupt_config) != ESP_OK) {
         return false;
     }
-    const esp_err_t install_result = gpio_install_isr_service(0);
-    if (install_result != ESP_OK && install_result != ESP_ERR_INVALID_STATE) {
-        return false;
-    }
-    if (gpio_isr_handler_add(KEYBOARD_INTERRUPT_PIN, keyboard_interrupt, NULL) != ESP_OK) {
+    if (tab5_gpio_interrupt_add(KEYBOARD_INTERRUPT_PIN, keyboard_interrupt, NULL) != ESP_OK) {
         return false;
     }
     keyboard_isr_installed = true;

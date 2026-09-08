@@ -11,9 +11,13 @@
 #else
 #include <limits.h>
 #include <openssl/ssl.h>
+#include <poll.h>
+#include <time.h>
+#include "host_io.h"
 #endif
 
 #include <stdio.h>
+#include <stdatomic.h>
 #include <string.h>
 
 enum {
@@ -26,7 +30,6 @@ enum {
 typedef esp_tls_t* native_tls_t;
 #else
 typedef SSL* native_tls_t;
-static SSL_CTX* tls_context;
 #endif
 
 typedef struct {
@@ -71,6 +74,13 @@ static native_tls_t connection_get(int connection)
 }
 
 #if defined(ESP_PLATFORM)
+static atomic_bool tls_cancel_requested;
+
+void platform_tls_operations_cancel(void)
+{
+    atomic_store_explicit(&tls_cancel_requested, true, memory_order_release);
+}
+
 typedef enum {
     TLS_OPERATION_CONNECT,
     TLS_OPERATION_CLOSE,
@@ -98,25 +108,7 @@ static QueueHandle_t tls_responses;
 static SemaphoreHandle_t tls_mutex;
 static TaskHandle_t tls_task;
 
-static int tls_connect_direct(const char* hostname, uint16_t port)
-{
-    const esp_tls_cfg_t configuration = {
-        .crt_bundle_attach = esp_crt_bundle_attach,
-        .timeout_ms = 10000,
-    };
-    esp_tls_t* native = esp_tls_init();
-    if (native == NULL || esp_tls_conn_new_sync(hostname, (int) strlen(hostname), (int) port, &configuration, native) != 1) {
-        if (native != NULL) {
-            (void) esp_tls_conn_destroy(native);
-        }
-        return tls_error();
-    }
-    const int result = connection_allocate(native);
-    if (result < 0) {
-        (void) esp_tls_conn_destroy(native);
-    }
-    return result;
-}
+#include "native_tls.inc"
 
 static void tls_worker(void* argument)
 {
@@ -149,16 +141,8 @@ static void tls_worker(void* argument)
             } else if (request.operation == TLS_OPERATION_CLOSE) {
                 connections[request.connection - 1].native = NULL;
                 response.result = esp_tls_conn_destroy(native) == 0 ? 0 : tls_error();
-            } else if (request.operation == TLS_OPERATION_SEND) {
-                response.result = (int) esp_tls_conn_write(native, request.data, request.size);
-                if (response.result <= 0) {
-                    response.result = tls_error();
-                }
             } else {
-                response.result = (int) esp_tls_conn_read(native, response.data, request.size);
-                if (response.result < 0) {
-                    response.result = tls_error();
-                }
+                response.result = tls_transfer_direct(native, &request, &response);
             }
         }
         (void) xQueueSend(tls_responses, &response, portMAX_DELAY);
@@ -191,6 +175,11 @@ static int submit_request(const tls_request_t* request, tls_response_t* response
 {
     if (!platform_tls_operations_init() || xSemaphoreTake(tls_mutex, portMAX_DELAY) != pdTRUE) {
         return -TABOS_EIO;
+    }
+    atomic_store_explicit(&tls_cancel_requested, false, memory_order_release);
+    if (platform_riscv32_current_cancelled() && request->operation != TLS_OPERATION_CLOSE) {
+        (void) xSemaphoreGive(tls_mutex);
+        return -TABOS_ECANCELED;
     }
     const bool completed = xQueueSend(tls_requests, request, portMAX_DELAY) == pdTRUE &&
                            xQueueReceive(tls_responses, response, portMAX_DELAY) == pdTRUE;
@@ -259,6 +248,10 @@ int platform_tls_receive(int connection, void* data, uint32_t capacity)
 
 #else
 
+void platform_tls_operations_cancel(void)
+{
+}
+
 bool platform_tls_operations_init(void)
 {
     return true;
@@ -275,38 +268,91 @@ void platform_tls_operations_shutdown(void)
     }
 }
 
-int platform_tls_connect(const char* hostname, uint16_t port)
+typedef struct {
+        char hostname[TLS_HOSTNAME_MAX + 1];
+        uint16_t port;
+        BIO* transport;
+        SSL* native;
+} host_tls_connect_t;
+
+static uint64_t tls_monotonic_ms(void)
 {
-    if (hostname == NULL || hostname[0] == '\0' || port == 0U) {
-        return -TABOS_EINVAL;
+    struct timespec now;
+    (void) clock_gettime(CLOCK_MONOTONIC, &now);
+    return (uint64_t) now.tv_sec * 1000U + (uint64_t) now.tv_nsec / 1000000U;
+}
+
+static void host_tls_connect_work(void* data)
+{
+    host_tls_connect_t* request = data;
+    SSL_CTX* context            = SSL_CTX_new(TLS_client_method());
+    if (context == NULL) {
+        return;
     }
-    if (tls_context == NULL) {
-        if (OPENSSL_init_ssl(0U, NULL) != 1) {
-            return tls_error();
-        }
-        tls_context = SSL_CTX_new(TLS_client_method());
-        if (tls_context == NULL || SSL_CTX_set_default_verify_paths(tls_context) != 1) {
-            return tls_error();
-        }
-        SSL_CTX_set_verify(tls_context, SSL_VERIFY_PEER, NULL);
+    if (SSL_CTX_set_default_verify_paths(context) != 1) {
+        SSL_CTX_free(context);
+        return;
     }
-    BIO* transport = BIO_new_ssl_connect(tls_context);
+    SSL_CTX_set_verify(context, SSL_VERIFY_PEER, NULL);
+    BIO* transport = BIO_new_ssl_connect(context);
+    SSL_CTX_free(context);
     if (transport == NULL) {
-        return tls_error();
+        return;
     }
     char endpoint[320];
-    (void) snprintf(endpoint, sizeof(endpoint), "%s:%u", hostname, (unsigned int) port);
+    (void) snprintf(endpoint, sizeof(endpoint), "%s:%u", request->hostname, (unsigned int) request->port);
     BIO_set_conn_hostname(transport, endpoint);
+    BIO_set_nbio(transport, 1);
     SSL* native = NULL;
     BIO_get_ssl(transport, &native);
-    if (native == NULL || SSL_set_tlsext_host_name(native, hostname) != 1 || SSL_set1_host(native, hostname) != 1 ||
-        BIO_do_connect(transport) <= 0 || SSL_get_verify_result(native) != X509_V_OK) {
+    if (native == NULL || SSL_set_tlsext_host_name(native, request->hostname) != 1 ||
+        SSL_set1_host(native, request->hostname) != 1) {
         BIO_free_all(transport);
+        return;
+    }
+    const uint64_t deadline = tls_monotonic_ms() + 10000U;
+    for (;;) {
+        if (BIO_do_connect(transport) > 0) {
+            if (SSL_get_verify_result(native) == X509_V_OK) {
+                request->transport = transport;
+                request->native    = native;
+                return;
+            }
+            break;
+        }
+        if (!BIO_should_retry(transport) || tls_monotonic_ms() >= deadline) {
+            break;
+        }
+        struct pollfd item = {.fd     = (int) BIO_get_fd(transport, NULL),
+                              .events = BIO_should_read(transport) ? POLLIN : POLLOUT};
+        (void) poll(&item, 1U, 100);
+    }
+    BIO_free_all(transport);
+}
+
+static void host_tls_connect_dispose(void* data, bool delivered)
+{
+    host_tls_connect_t* request = data;
+    if (!delivered && request->transport != NULL) {
+        BIO_free_all(request->transport);
+    }
+}
+
+int platform_tls_connect(const char* hostname, uint16_t port)
+{
+    if (hostname == NULL || hostname[0] == '\0' || port == 0U ||
+        strnlen(hostname, TLS_HOSTNAME_MAX + 1U) > TLS_HOSTNAME_MAX) {
+        return -TABOS_EINVAL;
+    }
+    host_tls_connect_t request = {.port = port};
+    (void) snprintf(request.hostname, sizeof(request.hostname), "%s", hostname);
+    if (host_io_call(&request, sizeof(request), host_tls_connect_work, host_tls_connect_dispose) != 1 ||
+        request.transport == NULL) {
         return tls_error();
     }
-    const int result = connection_allocate(native, transport);
+    const int result = connection_allocate(request.native, request.transport);
     if (result < 0) {
-        BIO_free_all(transport);
+        BIO_free_all(request.transport);
     }
     return result;
 }
@@ -323,13 +369,42 @@ int platform_tls_close(int connection)
     return 0;
 }
 
+static int host_tls_transfer(native_tls_t native, void* data, uint32_t size, bool send)
+{
+    for (;;) {
+        int result;
+        if (send) {
+            result = SSL_write(native, data, (int) size);
+        } else {
+            result = SSL_read(native, data, (int) size);
+        }
+        if (result > 0) {
+            return result;
+        }
+        const int error = SSL_get_error(native, result);
+        if (!send && error == SSL_ERROR_ZERO_RETURN) {
+            return 0;
+        }
+        if (error != SSL_ERROR_WANT_READ && error != SSL_ERROR_WANT_WRITE) {
+            return tls_error();
+        }
+        if (host_io_active()) {
+            host_io_retry();
+            return -TABOS_EAGAIN;
+        }
+        struct pollfd item = {.fd = SSL_get_fd(native), .events = error == SSL_ERROR_WANT_READ ? POLLIN : POLLOUT};
+        if (poll(&item, 1U, -1) < 0) {
+            return tls_error();
+        }
+    }
+}
+
 int platform_tls_send(int connection, const void* data, uint32_t size)
 {
     native_tls_t native = connection_get(connection);
     if (native == NULL) { return -TABOS_EBADF; }
     if (data == NULL || size == 0U || size > INT_MAX) { return -TABOS_EINVAL; }
-    const int result = SSL_write(native, data, (int) size);
-    return result > 0 ? result : tls_error();
+    return host_tls_transfer(native, (void*) data, size, true);
 }
 
 int platform_tls_receive(int connection, void* data, uint32_t capacity)
@@ -337,8 +412,7 @@ int platform_tls_receive(int connection, void* data, uint32_t capacity)
     native_tls_t native = connection_get(connection);
     if (native == NULL) { return -TABOS_EBADF; }
     if (data == NULL || capacity == 0U || capacity > INT_MAX) { return -TABOS_EINVAL; }
-    const int result = SSL_read(native, data, (int) capacity);
-    return result >= 0 ? result : tls_error();
+    return host_tls_transfer(native, data, capacity, false);
 }
 
 #endif
