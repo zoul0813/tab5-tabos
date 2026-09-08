@@ -221,6 +221,15 @@ This should make normal development substantially faster.
 
 ### Event and deadline runtime validation
 
+Host power-model tests must use the same Linux static-archive rescan group as runtime
+event tests: platform power activity calls portable input/pointer services, which call
+back into platform synchronization. A trailing core archive alone does not resolve
+that cycle with GNU ld.
+
+Core smoke checks runtime activity diagnostics using the linked runtime's build
+configuration, not `NDEBUG` in the test translation unit. Tests undefine `NDEBUG` to
+retain assertions in Release, while the production runtime still omits Debug logging.
+
 Runtime wake tests use both deterministic platform fakes and the real headless SDL
 backend. Coverage must prove duplicate-bit coalescing, simultaneous event preservation,
 task notification, simulated ISR notification, indefinite blocking, no return before an
