@@ -6,6 +6,8 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
 endif()
 
 add_executable(tabos_core_smoke unit/core_smoke.c ${TABOS_TEST_PLATFORM_FAKES})
+# Tests keep assertions enabled, but the linked runtime retains its build mode.
+target_compile_definitions(tabos_core_smoke PRIVATE TABOS_TEST_RUNTIME_DIAGNOSTICS=$<CONFIG:Debug>)
 target_include_directories(tabos_core_smoke PRIVATE
     "${TABOS_ROOT}/graphics/include"
     "${TABOS_ROOT}/input/include"
@@ -413,7 +415,15 @@ target_include_directories(tabos_host_power_model PRIVATE
     "${TABOS_ROOT}/platform/include"
     "${TABOS_ROOT}/sdk/include"
 )
-target_link_libraries(tabos_host_power_model PRIVATE tabos_core tabos_platform_host SDL3::SDL3)
+if(TABOS_TARGET STREQUAL "linux")
+    # Power activity reaches portable input/pointer services, which call back
+    # into platform synchronization. Rescan both archives as for runtime events.
+    target_link_libraries(tabos_host_power_model PRIVATE
+        "-Wl,--start-group" tabos_core tabos_platform_host "-Wl,--end-group" SDL3::SDL3
+    )
+else()
+    target_link_libraries(tabos_host_power_model PRIVATE tabos_core tabos_platform_host SDL3::SDL3)
+endif()
 tabos_enable_warnings(tabos_host_power_model)
 tabos_enable_sanitizers(tabos_host_power_model)
 add_test(NAME unit.host_power_model COMMAND tabos_host_power_model)

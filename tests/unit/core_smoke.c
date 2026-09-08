@@ -105,7 +105,7 @@ int main(void)
         device.last_error != EIO) {
         return 1;
     }
-#ifndef NDEBUG
+#if TABOS_TEST_RUNTIME_DIAGNOSTICS
     if (test_platform_activity_reports() != 1U) {
         return 1;
     }
