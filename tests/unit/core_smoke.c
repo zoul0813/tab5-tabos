@@ -291,11 +291,34 @@ int main(void)
         return 1;
     }
     const tabos_input_event_t wake_key = {.type = TABOS_INPUT_KEY_DOWN, .key = TABOS_KEY_A};
+    if (!test_platform_panel_enabled()) {
+        return 1;
+    }
+    test_platform_advance_time_ms(119999U);
+    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_DEADLINE);
+    if (!test_platform_panel_enabled()) {
+        return 1;
+    }
+    test_platform_advance_time_ms(1U);
+    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_DEADLINE);
+    if (test_platform_panel_enabled() || test_platform_brightness() != 0U) {
+        return 1;
+    }
+    /* Final stage ignores pointer activity even on host/other touch controllers. */
+    touch.type = TABOS_POINTER_DOWN;
+    pointer_service_submit(&touch);
+    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_POINTER);
+    touch.type = TABOS_POINTER_UP;
+    pointer_service_submit(&touch);
+    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_POINTER);
+    if (test_platform_panel_enabled() || test_platform_brightness() != 0U) {
+        return 1;
+    }
     if (!input_submit(&wake_key)) {
         return 1;
     }
     kernel_runtime_update(PLATFORM_RUNTIME_EVENT_INPUT);
-    if (test_platform_brightness() != 75U) {
+    if (test_platform_brightness() != 75U || !test_platform_panel_enabled()) {
         return 1;
     }
     kernel_runtime_shutdown();
@@ -312,14 +335,14 @@ int main(void)
     if (!application_registry_register(&app) || tabos_app_launch(app.name) != TABOS_APP_RESULT_OK) {
         return 1;
     }
-    test_platform_advance_time_ms(180000U);
+    test_platform_advance_time_ms(300000U);
     kernel_runtime_update(PLATFORM_RUNTIME_EVENT_DEADLINE);
-    if (test_platform_brightness() != 0U) {
+    if (test_platform_brightness() != 0U || test_platform_panel_enabled()) {
         return 1;
     }
     panic_requested = true;
     kernel_runtime_update(PLATFORM_RUNTIME_EVENT_APPLICATION);
-    if (!tabos_process_system_panicked() || test_platform_brightness() != 75U) {
+    if (!tabos_process_system_panicked() || test_platform_brightness() != 75U || !test_platform_panel_enabled()) {
         return 1;
     }
     test_platform_advance_time_ms(180000U);

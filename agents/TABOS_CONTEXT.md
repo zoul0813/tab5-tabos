@@ -876,13 +876,22 @@ Failed starts fault audio state but a later first-open retries cleanly. Health a
 deadline-suppressing suspend/resume hooks with one overdue audit on resume. Retained-buffer
 MIPI-DPI scanout pause remains unavailable in pinned ESP-IDF and therefore still blocks sleep.
 
-Display-only screen-off now follows dimming at 180 seconds total inactivity. The CPU,
-applications, networking, and maintenance continue running. Tab5 sets backlight to zero
-and sends panel display-off without resetting touch, removing shared supplies, or freeing
-framebuffers. DMA/VSYNC continues. Touch/keyboard activity restores display output;
+Display-only policy dims at 60 seconds, disables backlight at 180 seconds, then disables
+panel output at 300 seconds total inactivity. The CPU, applications, networking, and
+maintenance continue running. Separate brightness/panel controls preserve shared supplies
+and framebuffers. Backlight turns off before panel disable; panel enables before brightness
+restoration. DMA/VSYNC continues. Touch/keyboard restore through the backlight-only stage;
+after panel-off is requested, only keyboard activity restores (pointer activity is ignored
+for restoration and idle inhibition).
 existing dim inhibitors also inhibit screen-off. Panic restores brightness and prevents
 idle blanking. SDL uses zero texture brightness. Physical off/restore and incremental
 current measurements remain pending; this does not enable system sleep.
+
+Operator tested previous panel-off implementation: 0.08–0.09 A active, 0.04 A dimmed,
+0.01 A off; keyboard restoration passes without blue flash. Touch restoration failed,
+but touchtest works after keyboard restoration. Backlight-only comparison is authorized
+and now restores on a screen tap according to the operator. Current reads mostly
+0.02 A, ranging 0.01–0.03 A; do not label panel-off touch failure unavoidable.
 
 Debug peripheral activity uses a narrow `platform_runtime_log_activity()` diagnostic
 hook beside the existing health-audit wake report. Tab5 counts codec pairs/frames/errors,

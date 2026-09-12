@@ -1774,3 +1774,17 @@ off/present/restore. Hardware validation must confirm zero backlight/no image at
 seconds, retained touch responsiveness, restoration and repeated cycles on ILI9881C,
 ST7123, and ST7121 separately. Measure screen-off savings separately from dimming;
 continued DMA/VSYNC is expected until retained-buffer scanout quiescence is implemented.
+
+For the backlight-only trial, repeat measurements on the same supply/setup and test a
+quick tap from 180-second screen-off before pressing any key. If touch fails, restore
+with keyboard and run `touchtest` to distinguish temporary suppression from driver loss.
+Record new current separately from the previous ST7121 panel-off result (0.01 A).
+
+Three-stage coverage additionally checks exact 300-second panel disable, no early or
+redundant panel commands, ordered backlight/panel transitions, panel failure recovery,
+disabled/invalid final-stage policy, and saturated deadlines. Runtime tests prove pointer
+activity cannot restore the final stage, keyboard and panic restore it, and CPU health
+audits continue. On hardware, first test touch restoration between 180 and 300 seconds;
+then begin a fresh uninterrupted 300-second idle interval, confirm touch does not restore,
+and use keyboard to restore. Repeat cycles and check touchtest after keyboard restoration.
+Record all three stage currents separately; the combined policy is not physically validated yet.

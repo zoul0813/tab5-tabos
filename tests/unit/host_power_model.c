@@ -27,10 +27,18 @@ int main(void)
     assert(platform_display_present(&framebuffer));
     assert(platform_power_set_brightness(0U));
     assert(host_power_test_brightness() == 0U);
+    assert(host_power_test_panel_enabled());
+    host_power_test_fail(HOST_POWER_FAIL_PANEL);
+    assert(!platform_power_set_panel_enabled(false));
+    assert(host_power_test_panel_enabled());
+    assert(platform_power_set_panel_enabled(false));
+    assert(!host_power_test_panel_enabled());
     assert(framebuffer.pixels[0] == 0x1234U);
     framebuffer.pixels[0] = 0x5678U;
     assert(platform_display_present(&framebuffer));
     assert(host_power_test_brightness() == 0U);
+    assert(platform_power_set_panel_enabled(true));
+    assert(host_power_test_panel_enabled());
     assert(platform_power_set_brightness(42U));
     assert(framebuffer.pixels[0] == 0x5678U);
     assert(host_power_test_brightness() == 42U);

@@ -106,6 +106,17 @@
   and power measurements remain pending.
 - [ ] Physically validate screen-off/restoration on each panel revision and measure
   incremental savings; controller display-off still leaves DMA/VSYNC running.
+- [x] Record ST7121 panel-off readings: 0.08–0.09 A active, 0.04 A dimmed, 0.01 A off;
+  keyboard restores without blue flash, touch restoration fails but touchtest works afterward.
+- [x] Validate basic backlight-only trial on current ST7121 board: panel output stays
+  enabled at 180 seconds; operator confirms tapping restores the screen.
+- [x] Record backlight-only current: mostly 0.02 A, observed range 0.01–0.03 A at
+  180 seconds. Touch restoration passes; no sampled mean established. Repeated cycles
+  and other panel revisions remain pending.
+- [x] Combine 60-second dim, 180-second backlight-off and 300-second panel-off using
+  independent panel/brightness controls; ignore pointer restoration at the final stage.
+- [ ] Validate combined three-stage policy on hardware, including repeated keyboard
+  restoration after 300 seconds and touch restoration between 180 and 300 seconds.
 - [ ] Physically measure unused-audio shutdown and headphone-monitor removal separately.
 - [x] Capture coarse measurement setup: generic inline USB-C meter at 5.12 V, no battery,
   charging off, keyboard/SD attached, USB-A connected to unpowered host, Wi-Fi connected,

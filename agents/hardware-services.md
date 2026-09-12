@@ -348,10 +348,17 @@ sleep entry, time accounting, and measurement rather than repeating that convers
 - [ ] Define active, idle, suspending, suspended, resuming, and shutting-down states.
 - [ ] Add idle display dimming and reduced driver polling before attempting suspend.
 
-  Display-only implementation now includes 60-second dimming and 180-second screen-off,
-  with CPU/services and touch input retained. Audio transport is demand-driven. Dimming
+  Display-only implementation includes 60-second dimming, 180-second backlight-off with
+  touch/keyboard restoration, and 300-second panel-off with keyboard-only restoration.
+  CPU/services remain running. Audio transport is demand-driven. Dimming
   and audio functional checks have physical evidence; screen-off/restoration and separate
   optimization measurements remain pending. DMA/VSYNC quiescence remains open.
+
+  Subsequent ST7121 screen-off check records 0.08–0.09 A active, 0.04 A dimmed, and
+  0.01 A panel-off. Keyboard restores without blue flash; touch cannot restore until
+  keyboard re-enables the screen, after which touchtest works. Backlight-only trial
+  restores on a screen tap, with mostly 0.02 A current (0.01–0.03 A observed range).
+  Repeated cycles and other panel revisions remain unvalidated.
 - [ ] Add wake-source registration for RTC alarm, power button, keyboard, and BMI270 motion.
 - [ ] Define suspend blockers for active filesystem writes, media streams, network operations,
   and unreleased camera frames.

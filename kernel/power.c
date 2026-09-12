@@ -29,7 +29,8 @@ static void failure(power_manager_t* manager, power_failure_code_t code, const c
 static bool policy_ok(power_policy_t policy)
 {
     return policy.active_brightness <= 100U && policy.idle_brightness <= 100U &&
-           (policy.screen_off_ms == 0U || policy.screen_off_ms >= policy.idle_ms);
+           (policy.screen_off_ms == 0U || policy.screen_off_ms >= policy.idle_ms) &&
+           (policy.panel_off_ms == 0U || (policy.screen_off_ms != 0U && policy.panel_off_ms >= policy.screen_off_ms));
 }
 
 static uint8_t idle_brightness(power_policy_t policy)
@@ -70,10 +71,40 @@ static bool set_brightness(power_manager_t* manager, uint8_t brightness)
     return true;
 }
 
+static bool set_panel(power_manager_t* manager, bool enabled)
+{
+    if (manager->status.panel_valid && manager->status.panel_enabled == enabled) {
+        return true;
+    }
+    if (!platform_power_set_panel_enabled(enabled)) {
+        manager->status.panel_valid = false;
+        failure(manager, POWER_FAILURE_PANEL, NULL);
+        return false;
+    }
+    manager->status.panel_enabled = enabled;
+    manager->status.panel_valid   = true;
+    return true;
+}
+
+static void set_display(power_manager_t* manager, uint8_t brightness, bool panel_enabled)
+{
+    manager->status.desired_brightness = brightness;
+    if (!panel_enabled) {
+        /* Never disable the panel while its backlight is still on. */
+        if (set_brightness(manager, 0U)) {
+            (void) set_panel(manager, false);
+        }
+    } else if (set_panel(manager, true)) {
+        /* Restore panel output before illuminating the retained frame. */
+        (void) set_brightness(manager, brightness);
+    }
+}
+
 static void restore_display(power_manager_t* manager)
 {
     manager->status.screen_off_requested = false;
-    (void) set_brightness(manager, manager->status.policy.active_brightness);
+    manager->status.panel_off_requested  = false;
+    set_display(manager, manager->status.policy.active_brightness, true);
 }
 
 static void apply_idle_display(power_manager_t* manager, uint64_t now_ms)
@@ -81,7 +112,10 @@ static void apply_idle_display(power_manager_t* manager, uint64_t now_ms)
     const power_policy_t policy = manager->status.policy;
     manager->status.screen_off_requested =
         policy.screen_off_ms != 0U && now_ms >= add(manager->status.last_activity_ms, policy.screen_off_ms);
-    (void) set_brightness(manager, manager->status.screen_off_requested ? 0U : idle_brightness(policy));
+    manager->status.panel_off_requested =
+        policy.panel_off_ms != 0U && now_ms >= add(manager->status.last_activity_ms, policy.panel_off_ms);
+    set_display(manager, manager->status.screen_off_requested ? 0U : idle_brightness(policy),
+                !manager->status.panel_off_requested);
 }
 
 bool power_manager_init(power_manager_t* manager, power_policy_t policy, uint64_t now_ms)
@@ -100,7 +134,7 @@ bool power_manager_init(power_manager_t* manager, power_policy_t policy, uint64_
                                         .last_activity_ms  = now_ms,
                                         .state_changed_ms  = now_ms,
                                         .suspend_available = true};
-    (void) set_brightness(manager, policy.active_brightness);
+    restore_display(manager);
     return true;
 }
 
@@ -497,9 +531,7 @@ void power_manager_update(power_manager_t* manager, platform_runtime_events_t ev
             manager->status.reason           = POWER_REASON_INACTIVITY;
             manager->status.state_changed_ms = now_ms;
             apply_idle_display(manager, now_ms);
-        } else if (manager->status.state == POWER_STATE_IDLE && !manager->status.screen_off_requested &&
-                   manager->status.policy.screen_off_ms != 0U &&
-                   now_ms >= add(manager->status.last_activity_ms, manager->status.policy.screen_off_ms)) {
+        } else if (manager->status.state == POWER_STATE_IDLE) {
             apply_idle_display(manager, now_ms);
         }
         if (manager->status.state == POWER_STATE_IDLE && manager->status.policy.automatic_suspend &&
@@ -539,6 +571,12 @@ uint64_t power_manager_next_deadline(const power_manager_t* manager)
         uint64_t deadline = PLATFORM_RUNTIME_DEADLINE_NONE;
         if (!manager->status.screen_off_requested && manager->status.policy.screen_off_ms != 0U) {
             deadline = add(manager->status.last_activity_ms, manager->status.policy.screen_off_ms);
+        }
+        if (!manager->status.panel_off_requested && manager->status.policy.panel_off_ms != 0U) {
+            const uint64_t panel_deadline = add(manager->status.last_activity_ms, manager->status.policy.panel_off_ms);
+            if (panel_deadline < deadline) {
+                deadline = panel_deadline;
+            }
         }
         if (manager->status.policy.automatic_suspend) {
             const uint64_t suspend_deadline = add(manager->status.last_activity_ms, manager->status.policy.suspend_ms);

@@ -902,35 +902,30 @@ bool platform_power_set_brightness(uint8_t percent)
     if (!display_created || percent > 100U) {
         return false;
     }
-    /* Do not reset the panel, remove shared rails, or enter controller sleep:
-     * the touch controller must remain responsive while only the screen is off.
-     * Scanout continues, so ordinary presentation and VSYNC waits remain valid.
-     */
-    esp_err_t result;
-    if (percent == 0U) {
-        result = bsp_display_brightness_set(0);
-        if (result != ESP_OK) {
-            ESP_LOGE(TAG, "Could not disable backlight: %s", esp_err_to_name(result));
-            return false;
-        }
-        backlight_initialized = true;
-        backlight_enabled     = false;
-    }
-    result = esp_lcd_panel_disp_on_off(display_handles.panel, percent != 0U);
-    if (result != ESP_OK) {
-        ESP_LOGE(TAG, "Could not %s display: %s", percent != 0U ? "enable" : "blank", esp_err_to_name(result));
-        return false;
-    }
-    if (percent == 0U) {
-        return true;
-    }
-    result = bsp_display_brightness_set(percent);
+    /* Backlight-only stage preserves touch; panel enable is controlled separately. */
+    const esp_err_t result = bsp_display_brightness_set(percent);
     if (result != ESP_OK) {
         ESP_LOGE(TAG, "Could not set backlight brightness: %s", esp_err_to_name(result));
         return false;
     }
     backlight_initialized = true;
     backlight_enabled     = percent > 0U;
+    return true;
+}
+
+bool platform_power_set_panel_enabled(bool enabled)
+{
+    if (!display_created) {
+        return false;
+    }
+    /* Touch did not restore the tested ST7121 while disabled; keyboard did.
+     * Keep shared rails, framebuffer allocations, and DMA/VSYNC running.
+     */
+    const esp_err_t result = esp_lcd_panel_disp_on_off(display_handles.panel, enabled);
+    if (result != ESP_OK) {
+        ESP_LOGE(TAG, "Could not %s display: %s", enabled ? "enable" : "disable", esp_err_to_name(result));
+        return false;
+    }
     return true;
 }
 

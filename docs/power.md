@@ -66,34 +66,53 @@ GPIO interrupt ownership, pinned-SDK restrictions, unverified wake paths, and th
 repeatable measurement worksheet. Functional sleep/wake and instrumented power
 measurements remain separate validation gates.
 
-Display policy turns the screen off after
-180 seconds of total inactivity (120 seconds after dimming). Backlight is off and no
-image is visible, while the CPU, applications, networking, and timers continue running.
-Touch and keyboard activity restore the screen and previous active brightness during
-runtime input dispatch. Touch circuitry remains operational while the screen is off.
+Display policy uses three deadlines from the same last physical activity:
+
+- 60 seconds: dim to at most 20%.
+- 180 seconds: backlight off, panel enabled; touch or keyboard restores active brightness.
+- 300 seconds: backlight off and panel disabled; keyboard restores the display.
+  Pointer activity no longer restores it or resets inactivity at this final stage.
+
+The CPU, applications, networking, and timers continue running at every stage.
 Dimming and screen-off are display power savings, separate from system sleep; actual
 system sleep will also require the screen to be off. Fullscreen graphics, open audio/camera
 streams, and held keys/contacts inhibit both dimming and screen-off. Releasing the final
-inhibitor restarts both inactivity deadlines. Kernel panic restores the display and inhibits
+inhibitor restarts all inactivity deadlines. Kernel panic restores the display and inhibits
 idle blanking so failure output stays visible.
 
-Tab5 screen-off sets backlight brightness to zero and sends the controller display-off
-command. It retains panel/touch power rails, framebuffer allocations, and continuous
-DMA/VSYNC scanout. This is not scanout quiescence or controller sleep. On restoration,
-the controller is enabled before the backlight. SDL presents black using zero texture
+Tab5 independently controls backlight brightness and panel display enablement.
+It retains panel/touch power rails, framebuffer allocations,
+and continuous DMA/VSYNC scanout. This is not scanout quiescence or controller sleep.
+Panel disable follows successful backlight shutdown; restoration enables the panel before
+raising backlight brightness. SDL presents black using zero texture
 brightness; framebuffer and screenshot pixels remain intact. Background rendering does
 not turn the screen back on.
 
-Failed display operations invalidate effective-brightness status and retain the last
+Failed display operations invalidate the corresponding brightness or panel status and retain the last
 successful value for diagnostics. There is no periodic off retry; later activity or a
 policy change can retry restoration. Physical screen-off/touch restoration and incremental
 current savings still require validation on each supported display revision.
+
+The previous panel-display-off implementation was tested on the current ST7121 board:
+the operator reported 0.08–0.09 A active, 0.04 A after dimming, and 0.01 A after screen-off.
+Keyboard restored the screen without a blue flash. Touch did not restore from screen-off,
+but `touchtest` worked after keyboard restoration. This suggests the panel command may
+suppress touch reporting; the cause is not yet proven. The backlight-only trial isolates
+that command. Repeat the same readings and touch/keyboard checks before comparing savings;
+the previous 0.01 A reading does not describe this trial. Meter/setup limitations still apply.
+
+For the backlight-only trial at 180 seconds, the operator reports a predominantly
+0.02 A reading, fluctuating between 0.01 A and 0.03 A. This is a typical displayed
+value and observed range, not a sampled mean. The operator confirms that tapping the
+screen restores it from backlight-only off. The typical reading is 0.01 A above the earlier panel-off
+reading, but meter resolution and uncontrolled variation limit the comparison.
 
 TabOS now contains an internal portable power-state manager and deterministic host
 simulation used for development tests. After 60 seconds without physical keyboard or
 pointer activity, display dims from default 75% active brightness to 20%. If active setting
 is below 20%, dimming never raises it. Physical key presses/releases, active pointer events,
-held keys, and active contacts restore or hold active brightness. Software key repeat,
+held keys, and active contacts restore or hold active brightness, except pointer activity
+after the final panel-off stage. Software key repeat,
 cursor blink, background output, and service completions do not reset idle time.
 
 Fullscreen graphics and open audio or camera streams inhibit dimming, screen-off, and suspend. Brightness

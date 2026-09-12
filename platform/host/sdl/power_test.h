@@ -4,6 +4,7 @@
 typedef enum {
     HOST_POWER_FAIL_NONE,
     HOST_POWER_FAIL_BRIGHTNESS,
+    HOST_POWER_FAIL_PANEL,
     HOST_POWER_FAIL_PREPARE,
     HOST_POWER_FAIL_SLEEP,
     HOST_POWER_FAIL_RESTORE
@@ -15,4 +16,5 @@ void host_power_test_wake(platform_power_wake_cause_t causes);
 void host_power_test_fail(host_power_failure_t failure);
 uint64_t host_power_time_offset(void);
 uint8_t host_power_test_brightness(void);
+bool host_power_test_panel_enabled(void);
 #endif

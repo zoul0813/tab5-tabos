@@ -1561,12 +1561,18 @@ remains retryable after no stream was admitted. Maintenance audit supports suppr
 and one overdue resume pass. Pinned ESP-IDF v5.4.4 exposes no public retained-buffer MIPI-DPI
 pause; controller display-off is not treated as scanout quiescence.
 
-[DECIDED] Display-only idle policy dims at 60 seconds and blanks at 180 seconds of
+[DECIDED] Display-only idle policy dims at 60 seconds, disables backlight at 180 seconds,
+and disables panel output at 300 seconds of
 total inactivity while CPU, applications, networking, and deadlines continue normally.
 Screen-off is a requested display condition within idle, not a system-suspend state.
-The brightness contract maps zero to backlight-off plus panel display-off; nonzero
-enables panel output before restoring backlight. Retain shared touch supplies and
-scanout buffers. Touch/keyboard restore output through normal runtime activity handling;
+Brightness and panel enablement are independent platform operations. Backlight must reach
+zero before panel disable; panel must enable before brightness restoration. Previous panel display-off suppressed touch
+restoration on the tested ST7121 board; operator confirms backlight-only off restores
+on a screen tap, with predominantly 0.02 A current (observed range 0.01–0.03 A).
+Retain shared touch supplies and
+scanout buffers. Touch/keyboard restore output through normal runtime activity handling
+until panel-off is requested; after that, pointer activity neither restores nor inhibits
+blanking, while keyboard still restores. All deadlines share last physical activity;
 held input, fullscreen/media ownership, and panic inhibit idle blanking. No off retry
-deadline is added after failure; invalidate effective brightness and retry on activity
+deadline is added after failure; invalidate corresponding effective status and retry on activity
 or policy updates. DMA/VSYNC quiescence remains a separate driver lifecycle requirement.
