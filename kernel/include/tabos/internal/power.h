@@ -14,7 +14,8 @@ enum {
     POWER_INHIBITOR_KEYBOARD   = 1U << 0U,
     POWER_INHIBITOR_POINTER    = 1U << 1U,
     POWER_INHIBITOR_FULLSCREEN = 1U << 2U,
-    POWER_INHIBITOR_MEDIA      = 1U << 3U
+    POWER_INHIBITOR_MEDIA      = 1U << 3U,
+    POWER_INHIBITOR_PANIC      = 1U << 4U
 };
 
 typedef enum {
@@ -48,7 +49,8 @@ typedef enum {
     POWER_FAILURE_PLATFORM_PREPARE,
     POWER_FAILURE_PLATFORM_SLEEP,
     POWER_FAILURE_PLATFORM_RESTORE,
-    POWER_FAILURE_BRIGHTNESS
+    POWER_FAILURE_BRIGHTNESS,
+    POWER_FAILURE_PANEL
 } power_failure_code_t;
 typedef enum {
     POWER_CALLBACK_SUCCESS,
@@ -78,6 +80,8 @@ typedef struct {
 } power_participant_registration_t;
 typedef struct {
         uint64_t idle_ms;
+        uint64_t screen_off_ms; /* Total inactivity; zero disables screen-off. */
+        uint64_t panel_off_ms;  /* Total inactivity; zero leaves panel enabled. */
         uint64_t suspend_ms;
         uint8_t active_brightness;
         uint8_t idle_brightness;
@@ -107,6 +111,10 @@ typedef struct {
         uint8_t desired_brightness;
         uint8_t effective_brightness;
         bool brightness_valid;
+        bool screen_off_requested;
+        bool panel_off_requested;
+        bool panel_enabled;
+        bool panel_valid;
         bool suspend_available;
 } power_status_t;
 typedef struct {

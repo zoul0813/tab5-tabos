@@ -155,6 +155,9 @@ struct platform_mutex {
 static uint64_t monotonic_ms;
 static uint8_t fake_brightness = 100U;
 static bool fail_brightness_once;
+static bool fake_panel_enabled = true;
+static bool fail_panel_once;
+static unsigned int panel_calls;
 static char last_log[256];
 static platform_network_status_t fake_network;
 static platform_network_event_fn fake_network_event;
@@ -334,7 +337,7 @@ uint64_t platform_time_ms(void)
 
 bool platform_power_set_brightness(uint8_t percent)
 {
-    if (percent > 100U || fail_brightness_once) {
+    if (percent > 100U || fail_brightness_once || (percent != 0U && !fake_panel_enabled)) {
         fail_brightness_once = false;
         return false;
     }
@@ -348,6 +351,31 @@ uint8_t test_platform_brightness(void)
 void test_platform_fail_brightness_once(void)
 {
     fail_brightness_once = true;
+}
+bool platform_power_set_panel_enabled(bool enabled)
+{
+    ++panel_calls;
+    if (fail_panel_once) {
+        fail_panel_once = false;
+        return false;
+    }
+    if (!enabled && fake_brightness != 0U) {
+        return false;
+    }
+    fake_panel_enabled = enabled;
+    return true;
+}
+bool test_platform_panel_enabled(void)
+{
+    return fake_panel_enabled;
+}
+unsigned int test_platform_panel_calls(void)
+{
+    return panel_calls;
+}
+void test_platform_fail_panel_once(void)
+{
+    fail_panel_once = true;
 }
 bool platform_power_prepare_sleep(void)
 {

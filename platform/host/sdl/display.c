@@ -17,19 +17,28 @@ static platform_pixel_t* framebuffer_pixels;
 static platform_pixel_t* presented_pixels;
 static Uint64 graphics_present_deadline_ns;
 static bool renderer_vsync;
+static uint8_t display_brightness = 100U;
+static bool panel_enabled         = true;
 
 bool host_display_set_brightness(uint8_t percent)
 {
     if (percent > 100U) {
         return false;
     }
+    display_brightness = percent;
     if (host_is_headless() || texture == NULL || renderer == NULL) {
         return true;
     }
-    const Uint8 modulation = (Uint8) (((unsigned int) percent * 255U + 50U) / 100U);
+    const Uint8 modulation = panel_enabled ? (Uint8) (((unsigned int) percent * 255U + 50U) / 100U) : 0U;
     return SDL_SetTextureColorMod(texture, modulation, modulation, modulation) &&
            SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE) && SDL_RenderClear(renderer) &&
            SDL_RenderTexture(renderer, texture, NULL, NULL) && SDL_RenderPresent(renderer);
+}
+
+bool host_display_set_panel_enabled(bool enabled)
+{
+    panel_enabled = enabled;
+    return host_display_set_brightness(display_brightness);
 }
 
 bool host_capture_screenshot(void)
@@ -277,6 +286,8 @@ bool platform_display_present(const platform_framebuffer_t* framebuffer)
 
 void platform_display_shutdown(void)
 {
+    display_brightness = 100U;
+    panel_enabled      = true;
     if (texture != NULL) {
         SDL_DestroyTexture(texture);
         texture = NULL;

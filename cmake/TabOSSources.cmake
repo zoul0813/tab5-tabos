@@ -5,6 +5,7 @@ endif()
 set(TABOS_CORE_SOURCES
     "${TABOS_ROOT}/kernel/runtime.c"
     "${TABOS_ROOT}/kernel/power.c"
+    "${TABOS_ROOT}/kernel/power_config.c"
     "${TABOS_ROOT}/process/process.c"
     "${TABOS_ROOT}/kernel/application_registry.c"
     "${TABOS_ROOT}/kernel/device_registry.c"

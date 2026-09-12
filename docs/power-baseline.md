@@ -211,6 +211,45 @@ Release power separately once the behavior is established.
 
 ## Reproducible measurement worksheet
 
+### Startup current observation
+
+During the screen-off investigation, the operator reports approximately 0.12 A
+immediately after a Tab5 power reset, gradually falling to 0.08–0.10 A during normal
+operation. Retain this as a startup-current observation for later supply sizing and
+startup-budget evaluation, separate from steady-state dim/off measurements.
+
+Reset-to-settled duration, transient peak/inrush, sampling bandwidth, and repeated-run
+variability were not recorded. The exact firmware and supply/charging setup were not
+reconfirmed for this observation. The displayed 0.12 A is not a measured maximum or
+an established minimum supply-current rating. Future startup characterization should
+capture current versus time, peak current and supply-voltage droop with the firmware,
+peripherals, power source, and charging state recorded. Backlight-only trial readings
+are recorded separately below.
+
+### Combined three-stage policy validation
+
+The current policy combines dimming at 60 seconds, backlight-only off at 180 seconds,
+and panel disable at 300 seconds, all measured from last physical activity. Earlier
+measurements below characterize the mechanisms separately, not a completed combined run.
+Hardware validation remains pending: record each stage current, test touch restoration
+between 180 and 300 seconds, then allow a fresh uninterrupted 300-second idle interval
+and verify keyboard-only restoration. Repeat cycles and run `touchtest` after restoration.
+CPU/services remain running; these stages are not system sleep or DMA/VSYNC quiescence.
+
+### Backlight-only screen-off observation
+
+At 180 seconds inactivity, the operator reports mostly 0.02 A, fluctuating from
+0.01 A to 0.03 A. The panel output remains enabled in this trial; only the backlight
+is off. Treat 0.02 A as the predominant displayed value, not a measured mean. Previous
+panel-off firmware read 0.01 A, with touch restoration failing and keyboard restoration
+working. The operator confirms a screen tap restores the backlight-only trial. Sampling
+duration and detailed supply/setup reconfirmation were not provided with these readings;
+do not infer precise savings. The comparison establishes working touch restoration on
+the current board at the reported coarse current range; repeated cycles and other panel
+revisions remain separate validation.
+
+### Per-run worksheet
+
 Copy this worksheet for every run. Never fill an unmeasured value with zero.
 
 | Identity / setup | Record |

@@ -13,6 +13,7 @@
 #include <tabos/internal/network.h>
 #include <tabos/internal/pointer.h>
 #include <tabos/internal/power.h>
+#include <tabos/internal/power_config.h>
 #include <tabos/internal/camera.h>
 #include <tabos/internal/terminal.h>
 #include <tabos/internal/time.h>
@@ -412,11 +413,15 @@ bool kernel_runtime_start(bool launch_startup_application)
         filesystem_shutdown();
         return false;
     }
-    const power_policy_t power_policy = {.idle_ms           = 60000U,
-                                         .suspend_ms        = 600000U,
-                                         .active_brightness = 75U,
-                                         .idle_brightness   = 20U,
-                                         .automatic_suspend = false};
+    power_policy_t power_policy                     = power_config_defaults();
+    const power_config_result_t power_config_result = power_config_load(&power_policy);
+    if (power_config_result != POWER_CONFIG_OK && power_config_result != POWER_CONFIG_NOT_FOUND &&
+        power_config_result != POWER_CONFIG_UNAVAILABLE) {
+        char message[128];
+        (void) snprintf(message, sizeof(message), "Power: %s: %s; using defaults", POWER_CONFIG_PATH,
+                        power_config_result_name(power_config_result));
+        platform_log(message);
+    }
     if (!power_manager_init(&power_manager, power_policy, platform_time_ms())) {
         kernel_application_system_shutdown();
         console_shutdown();
@@ -497,14 +502,16 @@ void kernel_runtime_update(platform_runtime_events_t events)
         platform_pointer_update();
     }
     if (power_initialized) {
-        bool key_held       = false;
-        bool contact_active = false;
-        const bool input_activity   = input_take_power_activity(&key_held);
-        const bool pointer_activity = pointer_service_take_power_activity(&contact_active);
-        const bool activity         = input_activity || pointer_activity;
-        uint32_t inhibitors  = key_held ? POWER_INHIBITOR_KEYBOARD : 0U;
-        inhibitors          |= contact_active ? POWER_INHIBITOR_POINTER : 0U;
-        inhibitors          |= console_graphics_active() ? POWER_INHIBITOR_FULLSCREEN : 0U;
+        bool key_held                = false;
+        bool contact_active          = false;
+        const bool input_activity    = input_take_power_activity(&key_held);
+        const bool pointer_activity  = pointer_service_take_power_activity(&contact_active);
+        const bool pointer_restores  = !power_manager_status(&power_manager)->panel_off_requested;
+        const bool activity          = input_activity || (pointer_activity && pointer_restores);
+        uint32_t inhibitors          = key_held ? POWER_INHIBITOR_KEYBOARD : 0U;
+        inhibitors                  |= contact_active && pointer_restores ? POWER_INHIBITOR_POINTER : 0U;
+        inhibitors                  |= console_graphics_active() ? POWER_INHIBITOR_FULLSCREEN : 0U;
+        inhibitors                  |= tabos_process_system_panicked() ? POWER_INHIBITOR_PANIC : 0U;
         inhibitors |= audio_service_power_inhibited() || camera_service_power_inhibited() ? POWER_INHIBITOR_MEDIA : 0U;
         power_manager_set_dim_inhibitors(&power_manager, inhibitors, now);
         if (activity) {
@@ -556,6 +563,10 @@ void kernel_runtime_update(platform_runtime_events_t events)
 #ifndef NDEBUG
         ++wake_counts.application_slice;
 #endif
+    }
+    if (power_initialized && tabos_process_system_panicked()) {
+        power_manager_set_dim_inhibitors(
+            &power_manager, power_manager_status(&power_manager)->dim_inhibitors | POWER_INHIBITOR_PANIC, now);
     }
 #ifndef NDEBUG
     if (health_deadline_ready) {

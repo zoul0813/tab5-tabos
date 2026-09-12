@@ -211,7 +211,15 @@ void platform_log(const char* message);
 /* Debug diagnostics only; called by existing health audit, creates no timer. */
 void platform_runtime_log_activity(void);
 uint64_t platform_time_ms(void);
+/* Zero disables the backlight (host: black presentation), retaining pixels and touch input.
+ * Panel enable is independent. This does not suspend the CPU or promise DMA quiescence.
+ * Failure may leave partial hardware state; callers must invalidate cached brightness.
+ */
 bool platform_power_set_brightness(uint8_t percent);
+/* Controller display-on/off; retain buffers and shared supplies, without entering sleep.
+ * Caller disables the backlight before disabling the panel and restores the panel first.
+ */
+bool platform_power_set_panel_enabled(bool enabled);
 bool platform_power_prepare_sleep(void);
 void platform_power_abort_sleep(void);
 bool platform_power_enter_light_sleep(void);

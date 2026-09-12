@@ -5,6 +5,7 @@ static atomic_uint_fast64_t offset_ms;
 static atomic_uint wakes;
 static atomic_int failure;
 static atomic_uchar brightness;
+static atomic_bool panel_enabled;
 static bool take(host_power_failure_t value)
 {
     int expected = (int) value;
@@ -16,6 +17,7 @@ void host_power_test_reset(void)
     atomic_store(&wakes, 0U);
     atomic_store(&failure, HOST_POWER_FAIL_NONE);
     atomic_store(&brightness, 100U);
+    atomic_store(&panel_enabled, true);
 }
 void host_power_test_advance_time(uint64_t milliseconds)
 {
@@ -58,6 +60,18 @@ bool platform_power_set_brightness(uint8_t percent)
 bool platform_power_prepare_sleep(void)
 {
     return !take(HOST_POWER_FAIL_PREPARE);
+}
+bool platform_power_set_panel_enabled(bool enabled)
+{
+    if (take(HOST_POWER_FAIL_PANEL) || !host_display_set_panel_enabled(enabled)) {
+        return false;
+    }
+    atomic_store(&panel_enabled, enabled);
+    return true;
+}
+bool host_power_test_panel_enabled(void)
+{
+    return atomic_load(&panel_enabled);
 }
 void platform_power_abort_sleep(void)
 {

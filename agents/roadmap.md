@@ -83,6 +83,11 @@
 
 ### Low-Power Integration Milestone
 
+- [x] Add boot-time `T:/etc/power.conf` INI settings for three idle durations and normal/dim
+  brightness, bounded validation, safe defaults, template, and restart tests. macOS
+  Debug/Release full suites pass (71 tests each); Tab5 Debug/Release cross-builds pass.
+- [ ] Physically verify custom power.conf values load from microSD after reboot.
+
 - [x] Accept interrupt/event-runtime handoff as power-policy foundation.
 - [x] Power Phase 0 source inventory, conservative blocker classification, SDK/wake-route
   audit, measurement worksheet, and shared GPIO service ownership; macOS Debug 53/53
@@ -116,6 +121,24 @@
   counters, last-close idle-timer restart, and subsequent dimming.
 - [ ] Power Phase 3 display slice: add retained-buffer MIPI-DPI scanout quiescence when
   pinned ESP-IDF exposes or TabOS supplies a safe reversible driver operation.
+- [x] Add 180-second display-only screen-off after 60-second dimming, touch/keyboard
+  restoration, retained CPU/service progress, failure recovery, and visible panic output.
+  macOS Debug/Release suites pass (69 tests each), with final targeted regression checks;
+  Tab5 Debug/Release builds pass. Operator reports firmware flashed; physical validation
+  and power measurements remain pending.
+- [ ] Physically validate screen-off/restoration on each panel revision and measure
+  incremental savings; controller display-off still leaves DMA/VSYNC running.
+- [x] Record ST7121 panel-off readings: 0.08–0.09 A active, 0.04 A dimmed, 0.01 A off;
+  keyboard restores without blue flash, touch restoration fails but touchtest works afterward.
+- [x] Validate basic backlight-only trial on current ST7121 board: panel output stays
+  enabled at 180 seconds; operator confirms tapping restores the screen.
+- [x] Record backlight-only current: mostly 0.02 A, observed range 0.01–0.03 A at
+  180 seconds. Touch restoration passes; no sampled mean established. Repeated cycles
+  and other panel revisions remain pending.
+- [x] Combine 60-second dim, 180-second backlight-off and 300-second panel-off using
+  independent panel/brightness controls; ignore pointer restoration at the final stage.
+- [ ] Validate combined three-stage policy on hardware, including repeated keyboard
+  restoration after 300 seconds and touch restoration between 180 and 300 seconds.
 - [ ] Physically measure unused-audio shutdown and headphone-monitor removal separately.
 - [x] Capture coarse measurement setup: generic inline USB-C meter at 5.12 V, no battery,
   charging off, keyboard/SD attached, USB-A connected to unpowered host, Wi-Fi connected,

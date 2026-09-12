@@ -1571,3 +1571,28 @@ integration. Metadata requests 4 MiB heap/64 KiB stack, with a 3 MiB Lua allocat
 ceiling and 48-level C-call/pattern limits. Physical high-water and latency measurements
 remain pending. The shared Make rules accept tracked trailing `TABOS_LDLIBS`; Lua uses
 `-lm`. These application-specific budgets/profile choices do not alter general SDK limits.
+
+[DECIDED] Display-only idle policy dims at 60 seconds, disables backlight at 180 seconds,
+and disables panel output at 300 seconds of
+total inactivity while CPU, applications, networking, and deadlines continue normally.
+Screen-off is a requested display condition within idle, not a system-suspend state.
+Brightness and panel enablement are independent platform operations. Backlight must reach
+zero before panel disable; panel must enable before brightness restoration. Previous panel display-off suppressed touch
+restoration on the tested ST7121 board; operator confirms backlight-only off restores
+on a screen tap, with predominantly 0.02 A current (observed range 0.01–0.03 A).
+Retain shared touch supplies and
+scanout buffers. Touch/keyboard restore output through normal runtime activity handling
+until panel-off is requested; after that, pointer activity neither restores nor inhibits
+blanking, while keyboard still restores. All deadlines share last physical activity;
+held input, fullscreen/media ownership, and panic inhibit idle blanking. No off retry
+deadline is added after failure; invalidate corresponding effective status and retry on activity
+or policy updates. DMA/VSYNC quiescence remains a separate driver lifecycle requirement.
+
+[DECIDED] Runtime loads optional version-1 INI `T:/etc/power.conf` once after filesystem
+initialization and before power-manager initialization. Portable `kernel/power_config.c`
+owns bounded parsing/loading through TabOS filesystem APIs; defaults remain 60/180/300
+seconds and 75/20 percent. All configurable timeouts are absolute inactivity durations.
+Missing fields use defaults; invalid complete policy or I/O failure leaves defaults intact.
+No hot reload, periodic storage access, automatic writes, public ABI, or sleep enablement
+is added. Normal brightness must remain nonzero; dim brightness is capped at normal by
+existing policy. The checked-in `etc/power.conf` is a user-copyable template.

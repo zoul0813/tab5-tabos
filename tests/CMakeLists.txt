@@ -12,6 +12,7 @@ target_include_directories(tabos_core_smoke PRIVATE
     "${TABOS_ROOT}/console/include"
     "${TABOS_ROOT}/graphics/include"
     "${TABOS_ROOT}/input/include"
+    "${TABOS_ROOT}/pointer/include"
     "${TABOS_ROOT}/kernel/include"
     "${TABOS_ROOT}/platform/include"
     "${TABOS_GENERATED_INCLUDE_DIR}"
@@ -410,6 +411,35 @@ target_link_libraries(tabos_power_manager PRIVATE tabos_core)
 tabos_enable_warnings(tabos_power_manager)
 tabos_enable_sanitizers(tabos_power_manager)
 add_test(NAME unit.power_manager COMMAND tabos_power_manager)
+
+add_executable(tabos_power_config unit/power_config.c "${TABOS_ROOT}/kernel/power_config.c")
+target_include_directories(tabos_power_config PRIVATE
+    "${TABOS_ROOT}/kernel/include"
+    "${TABOS_ROOT}/platform/include"
+    "${TABOS_ROOT}/sdk/include"
+)
+tabos_enable_warnings(tabos_power_config)
+tabos_enable_sanitizers(tabos_power_config)
+add_test(NAME unit.power_config COMMAND tabos_power_config)
+
+add_executable(tabos_power_config_runtime
+    component/power_config.c
+    fakes/platform_display.c
+    "${TABOS_ROOT}/platform/host/posix/storage_backend.c"
+    "${TABOS_ROOT}/platform/posix/storage.c"
+)
+target_include_directories(tabos_power_config_runtime PRIVATE
+    "${TABOS_ROOT}/input/include"
+    "${TABOS_ROOT}/kernel/include"
+    "${TABOS_ROOT}/platform/include"
+    "${TABOS_ROOT}/sdk/include"
+    "${TABOS_GENERATED_INCLUDE_DIR}"
+    "${CMAKE_CURRENT_LIST_DIR}/fakes"
+)
+target_link_libraries(tabos_power_config_runtime PRIVATE tabos_core)
+tabos_enable_warnings(tabos_power_config_runtime)
+tabos_enable_sanitizers(tabos_power_config_runtime)
+add_test(NAME component.power_config COMMAND tabos_power_config_runtime)
 
 add_executable(tabos_host_runtime_event unit/host_runtime_event.c)
 target_include_directories(tabos_host_runtime_event PRIVATE

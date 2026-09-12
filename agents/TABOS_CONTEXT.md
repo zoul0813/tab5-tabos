@@ -876,6 +876,23 @@ Failed starts fault audio state but a later first-open retries cleanly. Health a
 deadline-suppressing suspend/resume hooks with one overdue audit on resume. Retained-buffer
 MIPI-DPI scanout pause remains unavailable in pinned ESP-IDF and therefore still blocks sleep.
 
+Display-only policy dims at 60 seconds, disables backlight at 180 seconds, then disables
+panel output at 300 seconds total inactivity. The CPU, applications, networking, and
+maintenance continue running. Separate brightness/panel controls preserve shared supplies
+and framebuffers. Backlight turns off before panel disable; panel enables before brightness
+restoration. DMA/VSYNC continues. Touch/keyboard restore through the backlight-only stage;
+after panel-off is requested, only keyboard activity restores (pointer activity is ignored
+for restoration and idle inhibition).
+Existing dim inhibitors also inhibit screen-off. Panic restores brightness and prevents
+idle blanking. SDL uses zero texture brightness. Physical off/restore and incremental
+current measurements remain pending; this does not enable system sleep.
+
+Operator tested previous panel-off implementation: 0.08–0.09 A active, 0.04 A dimmed,
+0.01 A off; keyboard restoration passes without blue flash. Touch restoration failed,
+but touchtest works after keyboard restoration. Backlight-only comparison is authorized
+and now restores on a screen tap according to the operator. Current reads mostly
+0.02 A, ranging 0.01–0.03 A; do not label panel-off touch failure unavoidable.
+
 Debug peripheral activity uses a narrow `platform_runtime_log_activity()` diagnostic
 hook beside the existing health-audit wake report. Tab5 counts codec pairs/frames/errors,
 headphone attempts/errors, VSYNC and PPA completions with boot-lifetime lock-free unsigned
@@ -893,3 +910,10 @@ integration. Metadata requests 4 MiB heap/64 KiB stack, with a 3 MiB Lua allocat
 ceiling and 48-level C-call/pattern limits. Physical high-water and latency measurements
 remain pending. The shared Make rules accept tracked trailing `TABOS_LDLIBS`; Lua uses
 `-lm`. These application-specific budgets/profile choices do not alter general SDK limits.
+
+Runtime optionally loads `T:/etc/power.conf` at boot using portable bounded INI parsing.
+Version 1 `[display]` configures dim/backlight-off/panel-off total seconds plus normal/dim
+brightness. Defaults remain 60/180/300 seconds and 75/20 percent. File is read-only to
+the service; reboot applies user edits. Invalid files fall back atomically with a log
+warning; absent storage/file remains nonfatal. Template and user instructions live in
+`etc/power.conf` and `docs/power.md`; no configuration polling or system sleep is added.

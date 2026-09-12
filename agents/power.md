@@ -2,16 +2,19 @@
 
 ## Agreed behavior
 
-Deliver portable power manager and idle dimming first; coordinated light sleep follows after service safety and rollback tests pass.
+Deliver portable power manager, idle dimming, and idle screen-off first; coordinated light sleep follows after service safety and rollback tests pass.
 
 | Policy | Decision |
 |---|---|
 | Idle dimming | Enabled by default after validation; 60 seconds inactivity, 20% brightness |
+| Idle screen-off | 180 seconds total inactivity: backlight off, panel enabled; 300 seconds: panel disabled too; CPU and services continue running |
+| Display activity restoration | Touch/keyboard restore from dimmed or backlight-only off before input delivery. After 300-second panel-off, keyboard restores; pointer activity deliberately does not restore or reset inactivity |
+| Display policy versus sleep | Dimming and screen-off are display power savings, not system sleep. Actual system sleep also requires screen off |
 | Brightness restoration | Restore previous active brightness before delivering activity |
 | Automatic suspend | Disabled by default; 10 minutes inactivity when enabled |
 | Configuration | Runtime changes immediate; explicit `powerctl save` persists settings |
-| Fullscreen graphics | Blocks dimming and every suspend request |
-| Media | Open audio/camera streams block suspend; initially also inhibit dimming |
+| Fullscreen graphics | Blocks dimming, screen-off, and every suspend request |
+| Media | Open audio/camera streams block suspend; initially also inhibit dimming and screen-off |
 | Wi-Fi | May disconnect before suspend and reconnect afterward; IP continuity not promised |
 | Application deadlines | Continue aging but do not wake suspended system; complete after another wake |
 | Wake sources | Investigate keyboard, touch, power button, RTC alarm, and BMI270 motion |
@@ -21,6 +24,12 @@ Deliver portable power manager and idle dimming first; coordinated light sleep f
 | Deep sleep | Deferred; no process-persistence or reboot-style hibernation implementation |
 
 “Suspend” means transparent light sleep: preserve RAM, process stack, foreground ownership, handles, and boot-local device identities.
+
+All display timeouts run from the same last-activity timestamp: dim at 60 seconds,
+backlight off at 180 seconds, then panel off at 300 seconds. Screen-off must not park
+applications, pause application deadlines, or disconnect networking. Preserve display
+contents in RAM for restoration. Retain any shared supply needed for touch operation;
+touch restoration while the CPU runs is separate from proving touch wake from light sleep.
 
 ## Phase 0 — Establish evidence and platform limits
 
@@ -98,12 +107,23 @@ Meter precision and two-second stability interval limit accuracy. Light sleep re
 
 ## Phase 3 — Remove avoidable idle service work
 
+Display timings and normal/dim brightness now have optional boot-time configuration in
+`T:/etc/power.conf` (`version=1`, `[display]`). Defaults remain 60/180/300 seconds and
+75/20 percent. See `docs/power.md` for supported keys and validation. File loading adds
+no periodic work or sleep behavior; edits apply on reboot, and invalid files retain
+safe defaults without rewriting user data.
+
+- [x] Extend display policy with 180-second idle screen-off, separate from system suspend, using the existing runtime deadline mechanism.
+- [x] Restore screen and previous active brightness on touch/keyboard activity during runtime input dispatch through the backlight-only stage; preserve framebuffer contents.
+- [x] Add 300-second panel-off stage with keyboard restoration and deliberate pointer-restoration suppression; separate panel and brightness control with ordered failure handling.
+- [x] Add automated validation for exact 180-second boundary, activity/off races, touch down/move/up restoration, repeated dim/off/restore cycles, and display failure recovery with CPU and services still running.
+- [ ] Physically validate combined 60-second dim, 180-second backlight-off, 300-second panel-off, stage-specific restoration, repeated cycles, and current savings on supported panel revisions.
 - [x] Make audio hardware processing demand-driven: stop codec transfers when no audio streams exist; restart before admitting first stream.
 - [x] Preserve sample-rate arbitration, routing, capture/playback behavior, and error reporting across worker restarts.
 - [x] Run headphone monitoring only while speaker routing needs detection. Sample jack state before enabling speaker.
 - [x] Retain existing active-playback detection latency unless measurements support a change; no headphone polling while audio hardware suspended.
 - [x] Keep 60-second health audit during normal operation initially; suppress it during suspend and perform one overdue audit after resume.
-- [ ] Quiesce display scanout/VSYNC during system suspend; preserve display data and allocations.
+- [ ] Add reversible display scanout/VSYNC quiescence for screen-off and system suspend; preserve display data and allocations. Validate display-only cycles before integrating CPU sleep.
 - [ ] Measure each optimization separately. Do not claim whole-system idle savings from runtime wake counters alone.
 
 Phase 3 audio implementation leaves codec devices discovered but closed at idle. First
@@ -132,6 +152,44 @@ pause operation. `esp_lcd_panel_disp_on_off()` sends the controller display comm
 does not stop DPI DMA/VSYNC, while panel deletion frees framebuffers. Do not use either as
 fake quiescence. This item remains blocked pending a safe retained-buffer driver lifecycle.
 Physical isolated current/activity measurement remains required.
+
+Idle display policy now combines the tested mechanisms: backlight-only off at 180 seconds,
+then panel disable at 300 seconds. Pointer activity is ignored for restoration after the
+final stage; keyboard restores. Disable backlight before panel; enable panel before
+restoring brightness. Failures invalidate the corresponding effective status, with no
+periodic retry loop. Panic restores the display and inhibits blanking. CPU/services and
+scanout remain running; combined-policy hardware validation remains pending.
+
+Combined three-stage software validation: macOS Debug and Release full suites pass
+(69 tests each); Tab5 Debug and Release cross-builds pass. Tests cover exact final-stage
+timing, keyboard-only activity restoration after panel-off, panic visibility, retained
+service progress, ordered hardware operations, and panel/brightness failure recovery.
+
+Original screen-off software validation: macOS Debug and Release suites pass (69 tests each),
+with targeted checks repeated after final panic/runtime-test changes. Tab5 Debug and
+Release cross-builds pass. Operator subsequently reports flashing the firmware to Tab5;
+the physical results below apply to that original panel-off implementation.
+
+Subsequent operator validation of `7819dab` on ST7121 records 0.08–0.09 A active,
+0.04 A dimmed, and 0.01 A panel-off. Keyboard restores the screen without a blue flash;
+touch does not restore from panel-off, but `touchtest` works after keyboard restoration.
+This is a failed touch-restoration check, not proof that touch wake is unavailable.
+The user authorized a backlight-only trial: omit panel display-off/on from brightness
+changes and compare touch restoration plus current. Trial current is recorded below;
+do not carry the prior 0.01 A result forward as trial savings.
+
+Backlight-only trial: Tab5 Debug cross-build passes (`7819dab-dirty`). Not flashed by
+the agent; operator confirms tapping the screen restores it. Portable policy and host code are unchanged.
+
+Operator also reports approximately 0.12 A after power reset, gradually settling to
+0.08–0.10 A during normal operation. Startup duration and transient peak are unmeasured;
+retain this separately for later startup-current characterization, not as a supply
+rating. Details and remaining measurement fields are in
+[startup current observation](../docs/power-baseline.md#startup-current-observation).
+Backlight-only current at 180 seconds: operator reports predominantly 0.02 A, varying
+between 0.01 A and 0.03 A. This is an observed display range, not a sampled mean;
+operator confirms touch restoration passes. Keep these readings separate from the prior
+0.01 A panel-off result and the startup-current observation.
 
 **Tests:** repeated first-open/last-close, idle audio silence, route correctness, fault recovery, and no new worker spin loops.
 

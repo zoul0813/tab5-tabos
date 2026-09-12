@@ -1895,3 +1895,37 @@ and forced-teardown scenarios also own pointer streams. Pass `touch.lua` after
 the optional Snake and Starfall paths to exercise the complete graphical demo
 with framebuffer checks and shell restoration. Physical Tab5 validation remains
 open; see `docs/validation/lua-pointer-2026-09-12.md`.
+
+Screen-off coverage extends `unit.power_manager` with exact 180-second total-inactivity
+timing, late dispatch, simultaneous activity, all display inhibitors, immediate policy
+changes, disabled screen-off, failure status/recovery, repeated cycles, and separate
+automatic-suspend deadlines. `unit.core_smoke` checks real runtime default policy,
+health-service progress while off, touch down/move/up and keyboard restoration, and
+panic visibility while off. `unit.host_power_model` preserves framebuffer pixels across
+off/present/restore. Hardware validation must confirm zero backlight/no image at 180
+seconds, retained touch responsiveness, restoration and repeated cycles on ILI9881C,
+ST7123, and ST7121 separately. Measure screen-off savings separately from dimming;
+continued DMA/VSYNC is expected until retained-buffer scanout quiescence is implemented.
+
+For the backlight-only trial, repeat measurements on the same supply/setup and test a
+quick tap from 180-second screen-off before pressing any key. If touch fails, restore
+with keyboard and run `touchtest` to distinguish temporary suppression from driver loss.
+Record new current separately from the previous ST7121 panel-off result (0.01 A).
+
+Three-stage coverage additionally checks exact 300-second panel disable, no early or
+redundant panel commands, ordered backlight/panel transitions, panel failure recovery,
+disabled/invalid final-stage policy, and saturated deadlines. Runtime tests prove pointer
+activity cannot restore the final stage, keyboard and panic restore it, and CPU health
+audits continue. On hardware, first test touch restoration between 180 and 300 seconds;
+then begin a fresh uninterrupted 300-second idle interval, confirm touch does not restore,
+and use keyboard to restore. Repeat cycles and check touchtest after keyboard restoration.
+Record all three stage currents separately; the combined policy is not physically validated yet.
+
+Power-file configuration tests cover INI defaults/overrides, LF/CRLF and comments,
+unknown fields, duplicate keys, version scope, numeric overflow, embedded NULs, file
+bounds, timing order, brightness limits, and atomic rejection. Loader fakes exercise
+short reads, read/close failures and absent storage. `component.power_config` uses real
+portable/host filesystem loading and the real runtime with fake time/display: persisted
+settings apply after restart, exact custom deadlines and restoration use custom brightness,
+edits do not hot-reload, invalid saved files survive default fallback, and dimming cannot
+raise brightness. Physical microSD reboot loading remains a separate validation check.
