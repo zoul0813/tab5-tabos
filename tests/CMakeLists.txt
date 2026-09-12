@@ -837,6 +837,12 @@ tabos_enable_warnings(tabos_coreutils_cp)
 tabos_enable_sanitizers(tabos_coreutils_cp)
 add_test(NAME component.coreutils_cp COMMAND tabos_coreutils_cp)
 
+add_executable(tabos_coreutils_wc unit/coreutils_wc.c)
+target_include_directories(tabos_coreutils_wc PRIVATE "${TABOS_ROOT}")
+tabos_enable_warnings(tabos_coreutils_wc)
+tabos_enable_sanitizers(tabos_coreutils_wc)
+add_test(NAME unit.coreutils_wc COMMAND tabos_coreutils_wc)
+
 add_test(NAME integration.host_smoke COMMAND tabos_host --smoke)
 set_tests_properties(integration.host_smoke PROPERTIES
     ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy"

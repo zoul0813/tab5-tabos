@@ -588,6 +588,10 @@ source bytes, then truncate and copy into a distinct destination. Filesystem and
 POSIX adapter tests must verify matching nonzero identity across `stat()`/`fstat()`
 and across rename.
 
+`unit.coreutils_wc` compiles the production `wc` source with deterministic stream
+fixtures. It must return failure for an absent input, an injected mid-stream read
+error, and an injected close error, while retaining success for a clean stream.
+
 System-action tests cover invalid reboot commands, unavailable and rejected ELF gates,
 first-request-wins kernel state, and action consumption. Host integration must verify
 power-off exits and reboot performs full teardown plus in-process reinitialization. Tab5

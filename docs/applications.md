@@ -76,7 +76,9 @@ directory's contents to the root of the TF/microSD card.
 Core utilities are grouped under `apps/coreutils/`, but each utility remains a separate
 program. Build one with `make -C apps/coreutils ls` or `make -C apps/coreutils mkdir`.
 Sources live in `apps/coreutils/src/<name>/main.c`; each output installs directly under
-`T:/bin/`.
+`T:/bin/`. Core utilities return a nonzero status when an input cannot be opened or
+an operation fails; `wc` also reports stream read and close failures instead of treating
+them as successful end-of-file.
 
 `devices` lists registry entries using public copied metadata: unpadded decimal boot-local ID,
 logical name, class, state, symbolic features, driver name, and nonzero last error. It does not
