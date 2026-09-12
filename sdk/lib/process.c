@@ -7,6 +7,26 @@
 
 extern const tabos_elf_api_t* tabos_runtime_api;
 
+int tabos_program_query(const char* path, tabos_program_info_t* info)
+{
+    if (path == NULL || info == NULL || path[0] == '\0') {
+        errno = EINVAL;
+        return -1;
+    }
+    if (tabos_runtime_api == NULL || tabos_runtime_api->program_query == NULL) {
+        errno = ENOSYS;
+        return -1;
+    }
+    tabos_program_info_t copied = {0};
+    const int result            = tabos_runtime_api->program_query(path, &copied);
+    if (result < 0) {
+        errno = -result;
+        return -1;
+    }
+    *info = copied;
+    return 0;
+}
+
 tabos_wait_source_t tabos_process_wait_source(int pid)
 {
     if (tabos_runtime_api == NULL || tabos_runtime_api->process_wait_source == NULL) {

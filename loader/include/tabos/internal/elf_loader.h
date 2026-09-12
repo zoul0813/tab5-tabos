@@ -24,7 +24,7 @@ typedef enum {
 } loader_elf_result_t;
 
 enum {
-    LOADER_ELF_METADATA_VERSION         = 1U,
+    LOADER_ELF_METADATA_VERSION         = 2U,
     LOADER_ELF_METADATA_DESCRIPTOR_SIZE = 32U,
     LOADER_ELF_DEFAULT_HEAP_BYTES       = 256U * 1024U,
     LOADER_ELF_DEFAULT_STACK_BYTES      = 16U * 1024U,
@@ -44,6 +44,7 @@ typedef struct {
         size_t requested_heap_bytes;
         size_t requested_stack_bytes;
         uint32_t capabilities;
+        uint32_t launch_flags;
         bool metadata_present;
 } loader_elf_info_t;
 
@@ -57,6 +58,7 @@ typedef struct {
 loader_elf_result_t loader_elf_inspect(const uint8_t* data, size_t size, loader_elf_info_t* info);
 loader_elf_result_t loader_elf_load(const uint8_t* data, size_t size, loader_elf_image_t* image);
 loader_elf_result_t loader_elf_load_file(const char* path, loader_elf_image_t* image);
+loader_elf_result_t loader_elf_inspect_file(const char* path, loader_elf_info_t* info);
 void loader_elf_unload(loader_elf_image_t* image);
 const char* loader_elf_result_name(loader_elf_result_t result);
 

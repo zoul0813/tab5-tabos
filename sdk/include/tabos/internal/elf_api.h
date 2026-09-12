@@ -3,6 +3,7 @@
 
 #include <tabos/internal/ipc_transport.h>
 #include <tabos/internal/surface_transport.h>
+#include <tabos/process.h>
 
 #include <tabos/graphics.h>
 #include <tabos/input.h>
@@ -213,6 +214,7 @@ typedef struct {
         int (*ipc)(uint32_t operation, ipc_transport_packet_t* packet);
         int (*process_wait_source)(int pid);
         int (*surface)(uint32_t operation, surface_transport_packet_t* packet, void* pixels);
+        int (*program_query)(const char* path, tabos_program_info_t* info);
 } tabos_elf_api_t;
 
 typedef int (*tabos_elf_entry_fn)(const tabos_elf_api_t* api, int argc, const char* const* argv);

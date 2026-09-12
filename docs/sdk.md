@@ -7,6 +7,14 @@ ESP-IDF, FreeRTOS, or SDL.
 
 ## Supported Runtime
 
+GUI clients set `TABOS_APP_GUI=1` before including `sdk/make/application.mk`.
+This emits metadata version 2 with the GUI launch flag; default is unmarked.
+`tabos_program_query(path, &info)` in `<tabos/process.h>` inspects an executable
+without starting it and reports `TABOS_PROGRAM_GUI`, requested heap/stack bytes
+and image bytes. It returns 0 or -1/errno, preserving output on failure.
+Legacy metadata version 1 and absent metadata mean console/fullscreen. Unknown
+versions, flags or malformed notes fail validation. Markers grant no privileges.
+
 The SDK uses newlib. Standard `main(argc, argv)`, stdio, `malloc`, `calloc`, `realloc`,
 `free`, and process exit are supported. File APIs include `open`, `close`, `read`, `write`,
 `lseek`, `stat`, `fstat`, `mkdir`, `rmdir`, `unlink`, `rename`, `chdir`, `getcwd`, directory

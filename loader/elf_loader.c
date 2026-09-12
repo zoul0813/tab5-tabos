@@ -109,6 +109,7 @@ static loader_elf_result_t inspect_metadata(const uint8_t* data, size_t size, lo
     info->requested_stack_bytes   = LOADER_ELF_DEFAULT_STACK_BYTES;
     info->capabilities            = TABOS_APP_CAPABILITY_CONSOLE;
     info->metadata_present        = false;
+    info->launch_flags            = 0U;
 
     for (uint16_t section_index = 0U; section_index < section_count; ++section_index) {
         const uint8_t* section = data + section_offset + ((size_t) section_index * section_entry_size);
@@ -144,10 +145,12 @@ static loader_elf_result_t inspect_metadata(const uint8_t* data, size_t size, lo
                     return LOADER_ELF_UNSUPPORTED_FORMAT;
                 }
                 const uint8_t* descriptor = name + name_padded;
-                if (read_u32(descriptor) != LOADER_ELF_METADATA_VERSION ||
+                const uint32_t version    = read_u32(descriptor);
+                const uint32_t flags      = read_u32(descriptor + 24U);
+                if ((version != 1U && version != LOADER_ELF_METADATA_VERSION) ||
                     read_u32(descriptor + 4U) != LOADER_ELF_METADATA_DESCRIPTOR_SIZE ||
-                    read_u32(descriptor + 8U) != TABOS_APPLICATION_ABI_VERSION || read_u32(descriptor + 24U) != 0U ||
-                    read_u32(descriptor + 28U) != 0U) {
+                    read_u32(descriptor + 8U) != TABOS_APPLICATION_ABI_VERSION || (version == 1U && flags != 0U) ||
+                    (flags & ~1U) != 0U || read_u32(descriptor + 28U) != 0U) {
                     return LOADER_ELF_UNSUPPORTED_FORMAT;
                 }
                 const uint32_t heap_bytes     = read_u32(descriptor + 12U);
@@ -165,6 +168,7 @@ static loader_elf_result_t inspect_metadata(const uint8_t* data, size_t size, lo
                 info->requested_stack_bytes   = stack_bytes;
                 info->capabilities            = capabilities;
                 info->metadata_present        = true;
+                info->launch_flags            = flags;
                 found                         = true;
             }
             cursor += ELF_NOTE_HEADER_SIZE + payload_size;
@@ -404,6 +408,7 @@ loader_elf_result_t loader_elf_inspect(const uint8_t* data, size_t size, loader_
         .requested_stack_bytes   = info->requested_stack_bytes,
         .capabilities            = info->capabilities,
         .metadata_present        = info->metadata_present,
+        .launch_flags            = info->launch_flags,
     };
     return LOADER_ELF_OK;
 }
@@ -460,12 +465,16 @@ loader_elf_result_t loader_elf_load(const uint8_t* data, size_t size, loader_elf
     return LOADER_ELF_OK;
 }
 
-loader_elf_result_t loader_elf_load_file(const char* path, loader_elf_image_t* image)
+static loader_elf_result_t inspect_or_load_file(const char* path, loader_elf_image_t* image, loader_elf_info_t* info)
 {
-    if (path == NULL || path[0] == '\0' || image == NULL) {
+    if (path == NULL || path[0] == '\0' || (image == NULL && info == NULL)) {
         return LOADER_ELF_INVALID_ARGUMENT;
     }
-    *image = (loader_elf_image_t) {0};
+    if (image != NULL) {
+        *image = (loader_elf_image_t) {0};
+    } else {
+        *info = (loader_elf_info_t) {0};
+    }
 
     const tabos_fd_t file = tabos_fs_open(path, TABOS_O_RDONLY, 0U);
     if (file < 0) {
@@ -505,9 +514,20 @@ loader_elf_result_t loader_elf_load_file(const char* path, loader_elf_image_t* i
         return LOADER_ELF_FILE_READ_FAILED;
     }
 
-    const loader_elf_result_t result = loader_elf_load(data, size, image);
+    const loader_elf_result_t result =
+        image != NULL ? loader_elf_load(data, size, image) : loader_elf_inspect(data, size, info);
     free(data);
     return result;
+}
+
+loader_elf_result_t loader_elf_load_file(const char* path, loader_elf_image_t* image)
+{
+    return inspect_or_load_file(path, image, NULL);
+}
+
+loader_elf_result_t loader_elf_inspect_file(const char* path, loader_elf_info_t* info)
+{
+    return inspect_or_load_file(path, NULL, info);
 }
 
 void loader_elf_unload(loader_elf_image_t* image)

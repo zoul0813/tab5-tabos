@@ -1366,6 +1366,32 @@ static int elf_surface(uint32_t operation, surface_transport_packet_t* packet, v
     return surface_service_request(application->context->process_id, operation, writable, pixels, bytes);
 }
 
+static int elf_program_query(const char* path, tabos_program_info_t* info)
+{
+    loader_elf_application_t* application = platform_riscv32_current_user_data();
+    tabos_program_info_t* writable = (tabos_program_info_t*) platform_executable_data_pointer(info, sizeof(*info));
+    char resolved[TABOS_FS_PATH_MAX];
+    if (writable == NULL || !elf_resolve_path(application, path, resolved)) {
+        return -TABOS_EINVAL;
+    }
+    loader_elf_info_t inspected;
+    const loader_elf_result_t result = loader_elf_inspect_file(resolved, &inspected);
+    if (result != LOADER_ELF_OK) {
+        if (result == LOADER_ELF_FILE_OPEN_FAILED) {
+            return -TABOS_ENOENT;
+        }
+        if (result == LOADER_ELF_NO_FILE_MEMORY) {
+            return -TABOS_ENOMEM;
+        }
+        return -TABOS_EINVAL;
+    }
+    *writable = (tabos_program_info_t) {.flags       = inspected.launch_flags,
+                                        .heap_bytes  = (uint32_t) inspected.requested_heap_bytes,
+                                        .stack_bytes = (uint32_t) inspected.requested_stack_bytes,
+                                        .image_bytes = (uint32_t) inspected.image_size};
+    return 0;
+}
+
 static int elf_wait_poll_device_subscription(loader_elf_application_t* application, uintptr_t parent,
                                              uint32_t requested_events, uint32_t* returned_events)
 {
@@ -2447,6 +2473,7 @@ static bool elf_entry(tabos_app_context_t* context)
         .ipc                             = elf_ipc,
         .process_wait_source             = elf_process_wait_source,
         .surface                         = elf_surface,
+        .program_query                   = elf_program_query,
     };
     application->execution = platform_riscv32_create(
         application->image.entry, application->image.memory, application->image.memory_size,

@@ -13,6 +13,12 @@
 
 void tester_test_concurrent_process(tester_context_t* context)
 {
+    tabos_program_info_t program;
+    tester_expect(context,
+                  tabos_program_query("T:/bin/tester", &program) == 0 && program.flags == 0U &&
+                      program.heap_bytes > 0U && program.image_bytes > 0U,
+                  "query unmarked executable without launching it");
+    tester_expect(context, tabos_program_query("T:/no-such-program", &program) == -1, "query missing executable fails");
     tester_expect(context, tabos_session_open() > 0, "foreground tester opens inherited GUI session");
     const tabos_ipc_channel_t listener = tabos_ipc_listen();
     tester_expect(context, listener > 0, "session listener opens");

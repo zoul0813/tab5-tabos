@@ -119,7 +119,22 @@ int main(void)
     if (loader_elf_inspect(metadata_elf, sizeof(metadata_elf), &metadata_info) != LOADER_ELF_UNSUPPORTED_FORMAT) {
         return 1;
     }
-    build_metadata_elf(metadata_elf, 52U, 1U, 2U, 32U, 512U * 1024U, 64U * 1024U, TABOS_APP_CAPABILITY_CONSOLE, 0U,
+    build_metadata_elf(metadata_elf, 52U, 1U, 2U, 32U, 512U * 1024U, 64U * 1024U, TABOS_APP_CAPABILITY_CONSOLE, 1U,
+                       false);
+    if (loader_elf_inspect(metadata_elf, sizeof(metadata_elf), &metadata_info) != LOADER_ELF_OK ||
+        metadata_info.launch_flags != 1U) {
+        return 1;
+    }
+    write_u32(metadata_elf + 128U, 2U);
+    if (loader_elf_inspect(metadata_elf, sizeof(metadata_elf), &metadata_info) != LOADER_ELF_UNSUPPORTED_FORMAT) {
+        return 1;
+    }
+    write_u32(metadata_elf + 128U, 1U);
+    write_u32(metadata_elf + 132U, 1U);
+    if (loader_elf_inspect(metadata_elf, sizeof(metadata_elf), &metadata_info) != LOADER_ELF_UNSUPPORTED_FORMAT) {
+        return 1;
+    }
+    build_metadata_elf(metadata_elf, 52U, 1U, 3U, 32U, 512U * 1024U, 64U * 1024U, TABOS_APP_CAPABILITY_CONSOLE, 0U,
                        false);
     if (loader_elf_inspect(metadata_elf, sizeof(metadata_elf), &metadata_info) != LOADER_ELF_UNSUPPORTED_FORMAT) {
         return 1;

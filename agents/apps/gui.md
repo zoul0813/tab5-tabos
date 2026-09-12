@@ -30,7 +30,7 @@ Exit gate: ownership/lifecycle contracts are recorded and measured memory feasib
 - [x] GUI-004: Specify public copied IPC operations, endpoint discovery/grant handoff, queue/message limits, stale-handle behavior, generic waits, and disconnect semantics. Reserve bounded lifecycle/control delivery so data/input saturation cannot prevent pause, close, or recovery.
 - [ ] GUI-005: Specify surface create/upload/commit/read-grant/release semantics, bounded staging, atomic visibility, damage bounds, read/commit synchronization, and abort/failure cleanup. Choose buffering from measurements rather than assuming two full buffers per client.
 - [ ] GUI-006: Measure representative maximized RGB565 client memory on Tab5, including client canvas/heap, staging, retained surface, compositor, scanout, executable, and OS allocations. Measure prototype upload/composition time and existing Starfall/DOOM requirements; record peak/headroom and choose initial configurable resource limits. Do not promise a reserved game budget.
-- [ ] GUI-007: Specify the minimal SDK-generated ELF GUI marker and pre-execution query through public services. Define absent-marker compatibility and malformed-marker errors using existing ELF metadata/validation conventions; marker grants no privileges.
+- [x] GUI-007: Specify the minimal SDK-generated ELF GUI marker and pre-execution query through public services. Define absent-marker compatibility and malformed-marker errors using existing ELF metadata/validation conventions; marker grants no privileges.
 - [x] GUI-008: Record concurrent execution as the successor to initial foreground-only architecture/context decisions and scope old tests to synchronous execution. Keep PID 0 liveness, platform boundaries, current pre-release ABI policy, and shell recovery intact.
 
 ## Phase 1 — Concurrent Processes and Session Ownership
@@ -108,6 +108,13 @@ Exit gate: complete first-release experience, automated evidence, hardware resul
 - [ ] GUI-607: Synchronize architecture/context/testing documents and roadmap after each implemented stage. Record commands, actual outcomes, platform coverage, measured limits, and remaining hardware gaps here or in linked validation records before marking delivery complete.
 
 ## Deferred Work
+
+Marker/query evidence: metadata version 2 uses offset 24 bit 0 for GUI; version 1
+and absent metadata remain unmarked. Seven macOS Debug loader/SDK/boundary tests
+pass, covering malformed metadata and query output preservation on failure.
+Real RV32 tester queries itself and a missing executable before concurrency rounds.
+macOS Debug and Tab5 Debug builds pass; Tab5 retains 5,648 partition bytes.
+Desktop launch routing remains GUI-403 work.
 
 - Desktop auto-start, independent terminal windows, clipboard, drag-and-drop, full app manifests, transparency, and third-party GUI framework integration.
 - GUI checkpoint/unload, switching away from a running fullscreen game, and arbitrary native crash recovery.

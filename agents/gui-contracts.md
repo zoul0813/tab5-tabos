@@ -103,8 +103,13 @@ Prototype implemented; physical resource gate remains open:
 
 ## ELF launch marker
 
-- Extend the existing TABOS SHT_NOTE metadata with a versioned GUI launch flag;
-  SDK emits it from an explicit application Makefile setting, default off.
+- TABOS SHT_NOTE metadata version 2 uses descriptor offset 24 for launch flags,
+  with bit 0 indicating GUI. Offset 28 remains reserved zero. The descriptor stays
+  32 bytes. SDK emits this from `TABOS_APP_GUI=1`, default 0. Version 1 requires
+  both old reserved words zero and remains supported as unmarked.
+- `tabos_program_query(path, info)` returns flags and requested heap/stack/image
+  sizes through public native/RV32 gates without allocating an execution image.
+  Failure returns -1/errno and leaves caller output unchanged.
 - The public pre-execution query uses the normal bounded ELF inspection path.
   Missing legacy metadata means console/fullscreen. Unknown versions, duplicate
   records, reserved-bit misuse and malformed sizes fail explicitly.

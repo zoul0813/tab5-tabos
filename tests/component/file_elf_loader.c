@@ -52,6 +52,10 @@ int main(void)
         return 1;
     }
 
+    loader_elf_info_t inspected;
+    const bool query_valid = loader_elf_inspect_file(path, &inspected) == LOADER_ELF_OK &&
+                             inspected.launch_flags == 0U && inspected.image_size == 259U &&
+                             loader_elf_inspect_file("A:/missing.bin", &inspected) == LOADER_ELF_FILE_OPEN_FAILED;
     loader_elf_image_t image;
     const loader_elf_result_t result = loader_elf_load_file(path, &image);
     const bool valid                 = result == LOADER_ELF_OK && image.memory != NULL && image.entry == image.memory &&
@@ -97,5 +101,5 @@ int main(void)
     (void) tabos_fs_unlink(path);
     (void) tabos_fs_rmdir("A:/bin");
     filesystem_shutdown();
-    return valid && missing_rejected && tty_mode_valid && inherited_paths ? 0 : 1;
+    return query_valid && valid && missing_rejected && tty_mode_valid && inherited_paths ? 0 : 1;
 }

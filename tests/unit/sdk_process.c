@@ -13,6 +13,13 @@ static unsigned int waits;
 static int next_pid = 17;
 static bool reaped;
 
+static int query_call(const char* path, tabos_program_info_t* info)
+{
+    info->flags      = TABOS_PROGRAM_GUI;
+    info->heap_bytes = 4096U;
+    return strcmp(path, "client") == 0 ? 0 : -TABOS_ENOENT;
+}
+
 static void yield_call(void)
 {
     ++yields;
@@ -44,11 +51,18 @@ static int wait_call(int pid, int* status)
 
 int main(void)
 {
-    const char* const argv[] = {"client", NULL};
+    const char* const argv[]  = {"client", NULL};
+    tabos_program_info_t info = {0};
+    assert(tabos_program_query("client", &info) == -1 && errno == ENOSYS);
     assert(tabos_spawn("T:/bin/client", 1, argv) == -TABOS_EINVAL);
     assert(tabos_waitpid(17, NULL) == -TABOS_EINVAL);
     tabos_elf_api_t api = {.spawn = spawn_call, .waitpid = wait_call, .yield = yield_call};
     tabos_runtime_api   = &api;
+    api.program_query   = query_call;
+    assert(tabos_program_query(NULL, &info) == -1 && errno == EINVAL);
+    assert(tabos_program_query("client", &info) == 0 && info.flags == TABOS_PROGRAM_GUI && info.heap_bytes == 4096U);
+    info.flags = 99U;
+    assert(tabos_program_query("missing", &info) == -1 && errno == TABOS_ENOENT && info.flags == 99U);
     assert(tabos_spawn(NULL, 1, argv) == -TABOS_EINVAL);
     assert(tabos_spawn("", 1, argv) == -TABOS_EINVAL);
     assert(tabos_spawn("T:/bin/client", -1, argv) == -TABOS_EINVAL);

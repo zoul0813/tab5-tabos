@@ -125,7 +125,8 @@ static _Thread_local uint32_t host_rv32_active_ram_size;
     X(SESSION_OPEN, 408U)                    \
     X(IPC, 412U)                             \
     X(PROCESS_WAIT_SOURCE, 416U)             \
-    X(SURFACE, 420U)
+    X(SURFACE, 420U)                         \
+    X(PROGRAM_QUERY, 424U)
 
 enum {
 #define HOST_RV32_GATE_INDEX(name, api_offset) HOST_RV32_GATE_INDEX_##name,
@@ -521,6 +522,18 @@ static platform_riscv32_result_t step_inner(platform_riscv32_context_t* context,
             }
             current_user_data       = context->user_data;
             context->state.regs[10] = (uint32_t) context->api.surface(operation, packet, pixels);
+            current_user_data       = NULL;
+            context->state.pc       = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_PROGRAM_QUERY) {
+            const char* path           = guest_string(context->memory, context->state.regs[10]);
+            tabos_program_info_t* info = guest_buffer(context->memory, context->state.regs[11], sizeof(*info));
+            if (path == NULL || info == NULL || context->api.program_query == NULL) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data       = context->user_data;
+            context->state.regs[10] = (uint32_t) context->api.program_query(path, info);
             current_user_data       = NULL;
             context->state.pc       = context->state.regs[1];
             continue;

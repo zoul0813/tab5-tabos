@@ -5,6 +5,19 @@
 
 #define TABOS_PROCESS_ARG_MAX 16
 
+enum {
+    TABOS_PROGRAM_GUI = 1U
+};
+typedef struct {
+        uint32_t flags;
+        uint32_t heap_bytes;
+        uint32_t stack_bytes;
+        uint32_t image_bytes;
+} tabos_program_info_t;
+
+/* Inspect executable metadata without starting or allocating an execution image. */
+int tabos_program_query(const char* path, tabos_program_info_t* info);
+
 int tabos_exec(const char* path, int argc, const char* const argv[]);
 /* Concurrent child, copied arguments, actual positive PID or negative error.
  * Child receives no foreground console, keyboard or fullscreen display grant. */
