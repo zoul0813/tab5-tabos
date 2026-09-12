@@ -625,6 +625,7 @@ but is not a substitute for this execution path.
 - [x] Add bounded parsing and loading for version 1 `T:/etc/wifi.conf`.
 - [x] Add atomic configuration updates while preserving unknown future settings.
 - [x] Add the internal Wi-Fi connection service with three-attempt autoconnect.
+- [x] Serialize portable Wi-Fi state and retry deadlines across runtime and native application tasks.
 - [x] Expose Wi-Fi status, saved connect, and disconnect through the application API and `netctl`.
 - [x] Decide on bounded BSD-like sockets with TabOS-owned types and wait sets.
 - [x] Implement host socket backend.

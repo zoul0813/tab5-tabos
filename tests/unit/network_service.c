@@ -3,10 +3,26 @@
 
 #include "platform_test.h"
 
+#include <pthread.h>
+#include <sched.h>
 #include <stdio.h>
+#include <stdatomic.h>
 #include <string.h>
 
 static int failures;
+
+enum {
+    CONCURRENT_OPERATION_COUNT   = 2000,
+    CONCURRENT_OBSERVATION_COUNT = 8000,
+};
+
+static const char concurrent_ssid_a[] = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+static const char concurrent_ssid_b[] = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
+
+typedef struct {
+        atomic_bool start;
+        atomic_bool failed;
+} concurrency_context_t;
 
 static void expect(bool condition, const char* message)
 {
@@ -14,6 +30,96 @@ static void expect(bool condition, const char* message)
         fprintf(stderr, "FAIL: %s\n", message);
         ++failures;
     }
+}
+
+static void wait_for_concurrency_start(concurrency_context_t* context)
+{
+    while (!atomic_load_explicit(&context->start, memory_order_acquire)) {
+        sched_yield();
+    }
+}
+
+static void* connect_concurrently(void* argument)
+{
+    concurrency_context_t* context = argument;
+    wait_for_concurrency_start(context);
+    for (unsigned int index = 0U; index < CONCURRENT_OPERATION_COUNT; ++index) {
+        const char* ssid = index % 2U == 0U ? concurrent_ssid_a : concurrent_ssid_b;
+        if (!network_service_connect(ssid, "concurrent-password", false)) {
+            atomic_store_explicit(&context->failed, true, memory_order_release);
+        }
+    }
+    return NULL;
+}
+
+static void* disconnect_concurrently(void* argument)
+{
+    concurrency_context_t* context = argument;
+    wait_for_concurrency_start(context);
+    for (unsigned int index = 0U; index < CONCURRENT_OPERATION_COUNT; ++index) {
+        if (!network_service_disconnect()) {
+            atomic_store_explicit(&context->failed, true, memory_order_release);
+        }
+    }
+    return NULL;
+}
+
+static void* update_concurrently(void* argument)
+{
+    concurrency_context_t* context = argument;
+    wait_for_concurrency_start(context);
+    for (unsigned int index = 0U; index < CONCURRENT_OBSERVATION_COUNT; ++index) {
+        network_service_update();
+    }
+    return NULL;
+}
+
+static void* observe_concurrently(void* argument)
+{
+    concurrency_context_t* context = argument;
+    wait_for_concurrency_start(context);
+    for (unsigned int index = 0U; index < CONCURRENT_OBSERVATION_COUNT; ++index) {
+        network_status_t status;
+        if (!network_service_status(&status) || memchr(status.hostname, '\0', sizeof(status.hostname)) == NULL ||
+            memchr(status.ssid, '\0', sizeof(status.ssid)) == NULL ||
+            memchr(status.ipv4, '\0', sizeof(status.ipv4)) == NULL ||
+            memchr(status.last_failure, '\0', sizeof(status.last_failure)) == NULL || status.attempts > 1U ||
+            (status.ssid[0] != '\0' && strcmp(status.ssid, "test-network") != 0 &&
+             strcmp(status.ssid, concurrent_ssid_a) != 0 && strcmp(status.ssid, concurrent_ssid_b) != 0) ||
+            network_service_next_deadline() != UINT64_MAX) {
+            atomic_store_explicit(&context->failed, true, memory_order_release);
+        }
+    }
+    return NULL;
+}
+
+static void test_concurrent_access(void)
+{
+    concurrency_context_t context = {0};
+    pthread_t workers[4];
+    void* (*worker_functions[])(void*) = {
+        connect_concurrently,
+        disconnect_concurrently,
+        update_concurrently,
+        observe_concurrently,
+    };
+    size_t created = 0U;
+    while (created < sizeof(workers) / sizeof(workers[0]) &&
+           pthread_create(&workers[created], NULL, worker_functions[created], &context) == 0) {
+        ++created;
+    }
+    expect(created == sizeof(workers) / sizeof(workers[0]), "concurrent network workers start");
+
+    atomic_store_explicit(&context.start, true, memory_order_release);
+    bool joined = true;
+    for (size_t index = 0U; index < created; ++index) {
+        if (pthread_join(workers[index], NULL) != 0) {
+            joined = false;
+        }
+    }
+    expect(joined, "concurrent network workers finish");
+    expect(!atomic_load_explicit(&context.failed, memory_order_acquire),
+           "concurrent status, connect, disconnect, update, and deadline access stays consistent");
 }
 
 int main(void)
@@ -108,6 +214,8 @@ int main(void)
     test_platform_advance_time_ms(5000U);
     network_service_update();
     expect(test_platform_network_connect_calls() == 6U, "cancelled retry does not start later");
+
+    test_concurrent_access();
 
     network_service_shutdown();
     filesystem_shutdown();
