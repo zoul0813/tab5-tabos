@@ -218,6 +218,7 @@ int main(int argc, char** argv)
             "if arg[1]=='error' then retained=s; error('GRAPHICS_ERROR') end; "
             "if arg[1]=='exit' then os.exit(7) end; "
             "if arg[1]=='return' then return end; "
+            "local sound=assert(t.audio.open()); assert(sound:write(string.rep(string.char(0,0),100))); "
             "local down=false; while true do local e=s:poll(); "
             "if e and e.key=='left' then "
             "if e.type=='key_down' then down=true else assert(down); print('GRAPHICS_INPUT_OK') end end; "
@@ -228,6 +229,15 @@ int main(int argc, char** argv)
         snprintf(snake_path, sizeof(snake_path), "%s/snake.lua", storage_root);
         copy(argv[3], snake_path);
     }
+    fixture("audio.lua", "local t=require('tabos'); local a=t.audio; local s=assert(a.open()); "
+                         "assert(a.info().default_sample_rate==44100); assert(s:set_volume(100)); "
+                         "local pcm=string.rep(string.pack('<i2',1000),1000); "
+                         "assert(s:write(pcm)==#pcm); assert(s:status().buffer_capacity>=#pcm); "
+                         "if arg[1]=='error' then retained=s; error('AUDIO_ERROR') end; "
+                         "if arg[1]=='exit' then os.exit(7) end; "
+                         "if arg[1]=='wait' then while true do t.sleep_ms(1) end end; "
+                         "assert(s:flush()); assert(s:close()); assert(s:close()); "
+                         "assert(not pcall(s.write,s,pcm)); print('AUDIO_OK')");
     fixture("exit.lua", "local f=assert(io.open('exit-cleanup','w')); f:write('closed'); os.exit(7)");
     check(setenv("SDL_VIDEODRIVER", "dummy", 1) == 0 && setenv("SDL_AUDIODRIVER", "dummy", 1) == 0, "headless");
     boot();
@@ -247,6 +257,18 @@ int main(int argc, char** argv)
     check(bytes != NULL && fread(payload, 1U, sizeof(payload), bytes) == 4U && memcmp(payload, "a\0\377z", 4U) == 0 &&
               fclose(bytes) == 0,
           "binary file bytes on host drive");
+    command("./lua audio.lua");
+    parent();
+    check(output_line("AUDIO_OK"), "real RV32 audio open/write/status/flush/close");
+    command("./lua audio.lua error");
+    parent_status(1);
+    command("./lua audio.lua exit");
+    parent_status(7);
+    command("./lua audio.lua wait");
+    key(TABOS_KEY_C, TABOS_MODIFIER_CONTROL);
+    parent_status(1);
+    command("./lua audio.lua");
+    parent();
     command("./lua graphics.lua");
     platform_framebuffer_t* framebuffer = display_framebuffer();
     for (size_t i = 0U; i < 100U && framebuffer->pixels[20U * framebuffer->stride_pixels + 20U] != 63488U; ++i) {
@@ -280,10 +302,12 @@ int main(int argc, char** argv)
     parent_status(1);
     if (argc == 4) {
         command("./lua snake.lua");
-        for (size_t i = 0U; i < 50U && console_next_deadline() != UINT64_MAX; ++i) {
+        for (size_t i = 0U; i < 200U && framebuffer->pixels[0] != 0x0883U; ++i) {
             pump();
         }
         check(tabos_process_count() == 2U && console_next_deadline() == UINT64_MAX, "Lua Snake runs");
+        key(TABOS_KEY_M, 0U);
+        key(TABOS_KEY_M, 0U);
         key(TABOS_KEY_UP, 0U);
         key(TABOS_KEY_SPACE, 0U);
         key(TABOS_KEY_ENTER, 0U);
@@ -415,6 +439,7 @@ int main(int argc, char** argv)
     command("./lua graphics.lua return");
     parent();
     stop();
+    remove_fixture("audio.lua");
     remove_fixture("graphics.lua");
     if (argc == 4) {
         remove_fixture("snake.lua");

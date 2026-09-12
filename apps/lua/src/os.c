@@ -40,8 +40,10 @@ static int exit_process(lua_State* L)
     rt->closing = true;
     lua_rawgeti(L, LUA_REGISTRYINDEX, LUA_RIDX_MAINTHREAD);
     lua_State* main_thread = lua_tothread(L, -1);
+    (void) lua_tabos_audio_close(rt);
     (void) lua_tabos_graphics_close(rt);
     lua_close(main_thread);
+    (void) lua_tabos_audio_close(rt);
     (void) lua_tabos_graphics_close(rt);
     (void) lua_tabos_console_close(rt);
     free(rt);

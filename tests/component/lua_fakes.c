@@ -187,7 +187,113 @@ static int fake_graphics_clear(uint32_t value)
     assert(graphics_opened);
     return 0;
 }
+static struct {
+        bool open;
+        uint32_t rate, channels, buffered;
+        unsigned char pcm[32768];
+} audio_streams[8];
+static int audio_failure;
+void test_lua_audio_failure(int error)
+{
+    audio_failure = error;
+}
+size_t test_lua_audio_open_count(void)
+{
+    size_t count = 0U;
+    for (size_t i = 0U; i < 8U; ++i) {
+        count += audio_streams[i].open;
+    }
+    return count;
+}
+static int fake_audio_info(tabos_audio_info_t* value)
+{
+    *value = (tabos_audio_info_t) {.features            = TABOS_AUDIO_FEATURE_PLAYBACK,
+                                   .routes              = TABOS_AUDIO_ROUTE_SPEAKER | TABOS_AUDIO_ROUTE_HEADPHONE,
+                                   .sample_rates        = TABOS_AUDIO_RATES_ALL,
+                                   .default_sample_rate = 44100U};
+    return -audio_failure;
+}
+static int fake_audio_open(const tabos_audio_config_t* config)
+{
+    if (audio_failure != 0) {
+        return -audio_failure;
+    }
+    assert(config->direction == TABOS_AUDIO_PLAYBACK);
+    for (size_t i = 0U; i < 8U; ++i) {
+        if (audio_streams[i].open && audio_streams[i].rate != config->sample_rate) {
+            return -EBUSY;
+        }
+    }
+    for (size_t i = 0U; i < 8U; ++i) {
+        if (!audio_streams[i].open) {
+            audio_streams[i].open     = true;
+            audio_streams[i].buffered = 0U;
+            audio_streams[i].rate     = config->sample_rate;
+            audio_streams[i].channels = config->channels;
+            return (int) i;
+        }
+    }
+    return -EMFILE;
+}
+static int fake_audio_close(int stream)
+{
+    assert(stream >= 0 && stream < 8 && audio_streams[stream].open);
+    if (audio_failure != 0) {
+        return -audio_failure;
+    }
+    audio_streams[stream].open = false;
+    return 0;
+}
+static int fake_audio_flush(int stream)
+{
+    assert(stream >= 0 && stream < 8 && audio_streams[stream].open);
+    if (audio_failure != 0) {
+        return -audio_failure;
+    }
+    audio_streams[stream].buffered = 0U;
+    return 0;
+}
+static int fake_audio_write(int stream, const void* pcm, uint32_t bytes)
+{
+    assert(stream >= 0 && stream < 8 && audio_streams[stream].open);
+    assert(bytes <= TABOS_AUDIO_IO_MAX && bytes % (2U * audio_streams[stream].channels) == 0U);
+    if (audio_failure != 0) {
+        return -audio_failure;
+    }
+    uint32_t available = 32768U - audio_streams[stream].buffered;
+    if (available == 0U) {
+        return -EAGAIN;
+    }
+    uint32_t count = bytes < available ? bytes : available;
+    memcpy(audio_streams[stream].pcm + audio_streams[stream].buffered, pcm, count);
+    audio_streams[stream].buffered += count;
+    return (int) count;
+}
+static int fake_audio_status(int stream, tabos_audio_status_t* value)
+{
+    assert(stream >= 0 && stream < 8 && audio_streams[stream].open);
+    *value = (tabos_audio_status_t) {.buffered_bytes = audio_streams[stream].buffered, .buffer_capacity = 32768U};
+    return -audio_failure;
+}
+static int fake_audio_volume(int stream, uint32_t volume)
+{
+    assert(stream >= 0 && stream < 8 && audio_streams[stream].open && volume <= 1000U);
+    return -audio_failure;
+}
+void test_lua_audio_bytes(const void* bytes, size_t count)
+{
+    assert(audio_streams[0].buffered == count);
+    assert(memcmp(audio_streams[0].pcm, bytes, count) == 0);
+}
 static const tabos_elf_api_t graphics_api = {
+    .audio_info       = fake_audio_info,
+    .audio_open       = fake_audio_open,
+    .audio_close      = fake_audio_close,
+    .audio_flush      = fake_audio_flush,
+    .audio_write      = fake_audio_write,
+    .audio_status     = fake_audio_status,
+    .audio_set_volume = fake_audio_volume,
+
     .graphics_open    = fake_graphics_open,
     .graphics_close   = fake_graphics_close,
     .graphics_present = fake_graphics_present,

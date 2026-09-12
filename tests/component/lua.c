@@ -16,6 +16,9 @@ uint32_t test_lua_mode(void);
 void test_lua_key(tabos_key_t key, bool down);
 void test_lua_graphics_failure(int error);
 void test_lua_mode_failure(unsigned long request);
+void test_lua_audio_failure(int error);
+size_t test_lua_audio_open_count(void);
+void test_lua_audio_bytes(const void* bytes, size_t count);
 unsigned int test_lua_graphics_presents(void);
 static int initialize(lua_State* L)
 {
@@ -300,6 +303,58 @@ int main(void)
         lua_gc(L, LUA_GCCOLLECT);
         assert(!rt->graphics.open && test_lua_mode() == 0U);
     }
+    execute(L, "a=t.audio; assert(a.info().default_sample_rate==44100); "
+               "assert(a.MAX_WRITE_BYTES==16384); assert(not pcall(a.open,12345)); "
+               "assert(not pcall(a.open,'44100')); assert(not pcall(a.open,0/0)); "
+               "assert(not pcall(a.open,44100,3)); assert(not pcall(a.open,44100,1,'microphone')); "
+               "sound=assert(a.open()); assert(sound:set_volume(500)); "
+               "assert(not pcall(sound.set_volume,sound,1001)); "
+               "assert(not pcall(sound.write,sound,'')); assert(not pcall(sound.write,sound,'x')); "
+               "assert(not pcall(sound.write,sound,string.rep('x',16386))); "
+               "assert(not pcall(sound.write,sound,'abcd',1)); "
+               "assert(not pcall(sound.write,sound,'abcd',4)); "
+               "assert(sound:write(string.char(0,128,255,127))==4)");
+    const unsigned char audio_bytes[] = {0U, 128U, 255U, 127U};
+    test_lua_audio_bytes(audio_bytes, sizeof(audio_bytes));
+    execute(L, "assert(sound:flush()); local pcm=string.rep('x',16384); "
+               "assert(sound:write(pcm)==16384); assert(sound:write(pcm,2)==16382); "
+               "assert(sound:write('abcd')==2); local n,e,c=sound:write('ab'); "
+               "assert(n==nil and type(e)=='string' and c==a.EAGAIN); "
+               "assert(sound:status().buffered_bytes==32768); assert(sound:flush()); "
+               "assert(sound:status().buffered_bytes==0); assert(not a.open(48000)); "
+               "assert(sound:close()); assert(sound:close()); assert(not pcall(sound.status,sound)); "
+               "old=sound; sound=assert(a.open(48000,2,'headphone')); assert(old:close()); "
+               "old=nil; collectgarbage(); assert(sound:write('abcd')==4); "
+               "assert(not pcall(sound.write,sound,'ab')); assert(sound:close()); "
+               "do local s <close> = assert(a.open()) end; "
+               "assert(not pcall(function() local s <close> = assert(a.open()); error('expected') end)); "
+               "do local s=assert(a.open()) end; collectgarbage()");
+    assert(test_lua_audio_open_count() == 0U);
+    test_lua_audio_failure(EIO);
+    execute(L, "assert(not a.open()); assert(not a.info())");
+    test_lua_audio_failure(0);
+    execute(L, "sound=assert(a.open())");
+    test_lua_audio_failure(EIO);
+    execute(L, "assert(not sound:write('ab')); assert(not sound:flush()); "
+               "assert(not sound:status()); assert(not sound:set_volume(500)); assert(not sound:close())");
+    test_lua_audio_failure(0);
+    execute(L, "assert(sound:close()); streams={}; for i=1,8 do streams[i]=assert(a.open()) end; "
+               "assert(not a.open()); for i=1,8 do assert(streams[i]:close()) end");
+    for (size_t offset = 0U; offset < 16U; ++offset) {
+        assert(luaL_loadstring(L, "local s <close> = assert(a.open()); "
+                                  "assert(s:write(string.rep('x',128))); s:status()") == LUA_OK);
+        rt->fail_after = rt->allocations + offset;
+        (void) lua_pcall(L, 0, 0, 0);
+        rt->fail_after = 0U;
+        lua_settop(L, 0);
+        assert(lua_tabos_audio_close(rt) == 0);
+        lua_gc(L, LUA_GCCOLLECT);
+        assert(test_lua_audio_open_count() == 0U);
+    }
+    execute(L, "sound=assert(a.open())");
+    test_lua_interrupt();
+    execute(L, "local ok,e=pcall(sound.write,sound,'ab'); assert(not ok and e:find('interrupted')); "
+               "assert(sound:close())");
     test_lua_interrupt();
     assert(luaL_loadstring(L, "while true do end") == LUA_OK);
     assert(lua_pcall(L, 0, 0, 0) != LUA_OK);

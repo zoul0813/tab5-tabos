@@ -79,5 +79,6 @@ int lua_tabos_open_module(lua_State* L)
     };
     luaL_newlib(L, functions);
     lua_tabos_graphics_module(L);
+    lua_tabos_audio_module(L);
     return 1;
 }

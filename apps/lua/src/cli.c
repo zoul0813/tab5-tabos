@@ -11,6 +11,7 @@ typedef struct {
 } options_t;
 static void report(lua_State* L)
 {
+    (void) lua_tabos_audio_close(lua_tabos_runtime(L));
     (void) lua_tabos_graphics_close(lua_tabos_runtime(L));
     const char* message = lua_tostring(L, -1);
     fprintf(stderr, "lua: %s\n", message == NULL ? "error object is not a string" : message);
@@ -66,6 +67,9 @@ static int parse(options_t* o)
 static int repl_step(lua_State* L)
 {
     lua_tabos_runtime_t* rt = lua_tabos_runtime(L);
+    if (lua_tabos_audio_close(rt) != 0) {
+        return luaL_error(L, "audio close failed");
+    }
     if (lua_tabos_graphics_close(rt) != 0) {
         return luaL_error(L, "graphics close failed");
     }
@@ -268,8 +272,12 @@ int lua_tabos_main(int argc, char** argv)
 cleanup:
     if (L != NULL) {
         rt->closing = true;
+        (void) lua_tabos_audio_close(rt);
         (void) lua_tabos_graphics_close(rt);
         lua_close(L);
+        if (lua_tabos_audio_close(rt) != 0) {
+            status = 1;
+        }
         if (lua_tabos_graphics_close(rt) != 0) {
             status = 1;
         }

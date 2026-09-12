@@ -158,7 +158,7 @@ flat asset staging mechanism; it does not recursively copy module trees.
   nil/message/error-code. Uses the SDK's cooperative yield-based sleep; it does not
   request low-power sleep. Wrong types, fractions, infinities and negatives are errors.
 
-Graphics and keyboard game input are available as described below. Audio, pointer,
+Graphics, keyboard game input, and PCM playback are available as described below. Pointer,
 child execution, native C modules, networking, camera bindings, LuaJIT and LuaRocks
 remain unavailable.
 
@@ -174,9 +174,13 @@ and score digits, with no external assets:
 lua T:/data/lua/snake.lua
 ```
 
-Arrows or WASD steer, Space pauses, Enter restarts, and Q quits. A white border means
+Arrows or WASD steer, Space pauses, Enter restarts, M toggles sound, and Q quits. A white border means
 paused; a red border means game over. Score appears at the top and prints on normal
-exit. Ctrl-C/Ctrl-D interrupt a graphics script and restore the terminal.
+exit. Start, eat, lose, and win use the same quiet triangle-wave melodies as native
+Snake (`apps/snake/src/sound.c` at commit `809b65f`). PCM is generated once in Lua
+and cached; new effects flush and reuse the playback stream. Pause stops queued
+audio, mute closes the stream, and unavailable audio never stops gameplay.
+Ctrl-C/Ctrl-D interrupt a graphics script and restore the terminal.
 
 A minimal script:
 
@@ -280,9 +284,75 @@ and another press. Files remain usable while graphics is open.
   REPL exit. Ctrl-U has its normal clear-line meaning only in console mode; games
   receive it as a key event. Escape is available to games with no automatic action.
 
-No text rendering, image decoder, transformed blit, touch, sprite, tilemap, or audio
-binding is included in this initial slice. Text can be drawn from Lua-defined pixel
+No text rendering, image decoder, transformed blit, touch, sprite, or tilemap
+binding is included in this initial graphics slice. Text can be drawn from Lua-defined pixel
 patterns, as Snake demonstrates. Those capabilities can be added independently.
+
+## PCM audio playback
+
+`tabos.audio.open(sample_rate, channels, route)` returns a playback stream userdata
+or `nil, message, errno`. Arguments may be omitted or nil: defaults are 44100 Hz,
+mono, and `"speaker"`. Rates are 8000, 11025, 12000, 16000, 22050, 24000, 32000,
+44100, 48000, 88200, or 96000 Hz; channels are 1 or 2; route is `"speaker"` or
+`"headphone"`. Actual availability comes from the audio service. Concurrent streams
+share one sample rate; a conflicting rate returns `EBUSY`. Up to eight Lua streams
+may be open, subject to the system-wide eight-stream limit. Each service stream has
+a 32 KiB ring buffer. No resampling or sample callback is hidden in the binding.
+
+| API | Behavior |
+| --- | --- |
+| `tabos.audio.info()` | Copied table with SDK `features`, `routes`, `sample_rates` bitmasks, `default_sample_rate`, and `capture_channels`. This binding exposes playback only. |
+| `stream:write(bytes, offset)` | Nonblocking write of signed-16-bit little-endian PCM. Returns accepted byte count or nil/message/errno. Optional zero-based byte offset defaults to 0. |
+| `stream:flush()` | Immediately discards queued playback without closing. Useful for replacing a sound effect. |
+| `stream:set_volume(value)` | Sets stream gain in 0..1000. |
+| `stream:status()` | Copied table with `buffered_bytes`, `buffer_capacity`, `underruns`, and `overruns`. |
+| `stream:close()` | Stops/discards queued playback and closes. Repeated close succeeds. |
+
+PCM strings must contain 1..16384 bytes (`tabos.audio.MAX_WRITE_BYTES`) and complete
+frames: 2 bytes for mono, 4 interleaved left/right bytes for stereo. Offset must be
+inside the string and frame-aligned. Partial writes are normal; advance the offset
+by the returned count. A full buffer returns `nil, message, tabos.audio.EAGAIN`.
+Games can defer remaining data to another frame or drop an optional effect. No
+method waits for ring space. Other errors should be handled or stop playback.
+
+```lua
+local tabos = require("tabos")
+local sound <close> = assert(tabos.audio.open())
+local pcm = string.rep(string.pack("<i2", 0), 4410) -- 100 ms mono silence
+local offset = 0
+while offset < #pcm do
+    local count, message, code = sound:write(pcm, offset)
+    if count then
+        offset = offset + count
+    elseif code == tabos.audio.EAGAIN then
+        assert(tabos.sleep_ms(5)) -- explicit caller-selected retry policy
+    else
+        error(message)
+    end
+end
+while assert(sound:status()).buffered_bytes > 0 do
+    assert(tabos.sleep_ms(5))
+end
+```
+
+The SDK copies accepted bytes before `write` returns; source strings may then be
+released. Backend/device buffering means an empty ring is not an exact audible
+completion fence. `close` does not wait for queued sound to finish. Stream methods
+other than write/status return true or nil/message/errno. Invalid types, fractional
+numbers, out-of-range values, malformed PCM and use of closed streams raise errors.
+
+Use `<close>` for prompt cleanup on scope exit and errors. GC is a fallback;
+uncaught script errors, script termination, `os.exit`, and process teardown also
+close streams. The REPL closes remaining streams before its next prompt. Caught
+errors retain resources still in scope. Generation checks protect later streams
+from stale userdata/finalizers. Failed closes remain available for retry.
+
+Writes check cooperative cancellation before submitting any bytes. Hardware
+open/close operations use the SDK's synchronous device lifecycle; Lua cannot cancel
+in the middle of a driver call. Explicit retry loops using `sleep_ms` retain its
+20 ms cancellation checks. Capture, audio wait-source bindings, runtime route
+changes, file decoding, and streaming callbacks are not exposed in this slice.
+See [Audio Service](audio.md) for backend routing and shared-clock details.
 
 ## Resource limits and validation
 
@@ -319,6 +389,7 @@ validation is excluded for this implementation at the user's request.
 
 See the [CLI validation record](validation/lua-cli-2026-09-12.md) and
 [graphics validation record](validation/lua-graphics-2026-09-12.md) for build and test evidence.
+Audio validation is recorded in [Lua audio validation](validation/lua-audio-2026-09-12.md).
 
 Physical Tab5 acceptance is still pending. Before marking the CLI milestone accepted:
 

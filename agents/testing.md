@@ -1801,3 +1801,22 @@ packed pixels, short raw key taps, return/error/os.exit/Ctrl-C/Ctrl-D cleanup an
 terminal restoration. Supply `apps/lua/examples/snake.lua` as the optional third
 path to exercise the actual shipped Lua game. Physical graphics/input and timing
 acceptance remains separate; Linux stays excluded by user direction.
+
+
+## Lua audio validation (2026-09-12)
+
+`component.lua` links real SDK audio wrappers against deterministic eight-stream
+fake transport. Coverage includes PCM/channel/offset/rate validation, copied bytes,
+partial writes, full-ring EAGAIN, flush, volume/status, shared-rate conflict, failed
+open/write/close, stale finalizers, slot reuse, stream exhaustion, OOM, cancellation,
+and `<close>` cleanup. Runtime cleanup retains failed closes for retry.
+
+`component.lua_snake_audio` uses Python 3 to run the actual Snake sound prelude in
+the native Lua profile and compare all four PCM strings with independent native
+integer-synthesis expectations from `apps/snake/src/sound.c` at `809b65f`. It checks
+replacement, stop, and mute. No game-loop timing is used for PCM equivalence.
+
+`tabos_lua_rv32` exercises real audio open/write/status/flush/close, error and
+os.exit cleanup, interruption, repeat launch, and forced teardown alongside live
+graphics. The optional Snake path includes its audio startup and M toggle.
+Physical audible output and latency acceptance remain separate.

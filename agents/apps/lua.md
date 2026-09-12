@@ -1,6 +1,6 @@
 # Lua Implementation Plan
 
-Status: CLI implementation and automated validation completed 2026-09-12; physical Tab5 acceptance pending. Basic graphics and keyboard game bindings implemented at user direction before final CLI acceptance; pointer/audio/process bindings remain follow-up work. Linux builds/tests excluded by user direction for this implementation.
+Status: CLI implementation and automated validation completed 2026-09-12; physical Tab5 acceptance pending. Basic graphics and keyboard game bindings implemented at user direction before final CLI acceptance; PCM playback bindings also implemented at user direction; pointer/process bindings remain follow-up work. Linux builds/tests excluded by user direction for this implementation.
 
 Current implementation uses the proposed 5.5.1 baseline and resource budgets, with
 48-level C-call/pattern limits. Kilo's keyboard wait source is reused without a new
@@ -14,7 +14,7 @@ This expands the Lua candidate in [Application Port Candidates](../milestone-app
 ## Remaining Work
 
 Track outstanding work here; completed CLI work remains in [Validation and Delivery](#validation-and-delivery).
-User direction on 2026-09-12 authorizes basic graphics and keyboard input now, without waiting for the tile engine or final CLI acceptance. Remaining acceptance checks stay open.
+User direction on 2026-09-12 authorizes basic graphics and keyboard input now, without waiting for the tile engine or final CLI acceptance. User additionally authorizes PCM playback and native Snake sound port. Remaining acceptance checks stay open.
 Linux builds/tests remain excluded by user direction. Each binding slice needs its
 own implementation, documentation/example, automated coverage, and physical validation.
 
@@ -57,11 +57,15 @@ Evidence: [graphics validation](../../docs/validation/lua-graphics-2026-09-12.md
 
 ### Audio Bindings
 
-- [ ] Implement bounded signed-16-bit PCM playback with explicit backpressure and close, without per-sample Lua callbacks or hidden resampling.
-- [ ] Define buffer ownership/lifetime and cancellation; implement idempotent cleanup on close, Lua errors, finalization, and process teardown.
-- [ ] Document the Lua audio API and ship a small playback example.
-- [ ] Add deterministic host coverage for buffer validation, backpressure, cancellation, failures, and cleanup; exercise bindings through the real RV32 runtime.
+- [x] Implement bounded signed-16-bit PCM playback with explicit backpressure and close, without per-sample Lua callbacks or hidden resampling.
+- [x] Define buffer ownership/lifetime and cancellation; implement idempotent cleanup on close, Lua errors, finalization, and process teardown.
+- [x] Document `tabos.audio` playback; port native Snake start/eat/lose/win PCM, stream reuse, pause-stop, and mute into single-file Lua Snake.
+- [x] Add deterministic host coverage for buffer validation, backpressure, cancellation, failures, and cleanup; exercise bindings through the real RV32 runtime.
 - [ ] Validate playback, backpressure, cancellation, and resource cleanup on physical Tab5; record results.
+
+Audio evidence: [validation](../../docs/validation/lua-audio-2026-09-12.md).
+The nonblocking playback API provides `open`, `info`, `write`, `flush`, `set_volume`,
+`status`, and `close`; capture and audio waits remain outside this initial slice.
 
 ### Foreground Child Execution
 
@@ -85,7 +89,7 @@ Provide an independently built `T:/bin/lua` application that runs source scripts
 Deliver two distinct milestones:
 
 1. **CLI Lua:** language runtime, files, pure-Lua modules, usable REPL, bounded memory, errors/interruption, and a small system-information/time module.
-2. **TabOS scripting bindings:** graphics, input, audio, and foreground child execution, added in separate validated slices. User direction permits the basic graphics/keyboard slice before final CLI acceptance.
+2. **TabOS scripting bindings:** graphics, input, audio, and foreground child execution, added in separate validated slices. User direction permits basic graphics/keyboard and PCM playback before final CLI acceptance.
 
 The CLI milestone does not depend on Kilo being implemented. Reuse any generic keyboard-wait work completed for Kilo, but do not require its terminal-size or ANSI improvements just to execute scripts.
 
@@ -241,7 +245,7 @@ This module should require no new public TabOS ABI beyond any separately impleme
 
 ## Follow-On: Graphics, Input, Audio, and Process Bindings
 
-The original sequence gated these on CLI acceptance. User direction on 2026-09-12 authorizes basic graphics and keyboard game input now, independently of the tile engine. Each slice still needs API documentation, a small example, deterministic host coverage, and physical validation where relevant. Audio, pointer, and process slices remain follow-up work.
+The original sequence gated these on CLI acceptance. User direction on 2026-09-12 authorizes basic graphics and keyboard game input now, independently of the tile engine. Each slice still needs API documentation, a small example, deterministic host coverage, and physical validation where relevant. User subsequently authorizes PCM playback and native Snake sound port. Pointer and process slices remain follow-up work.
 
 | Slice | Initial design |
 | --- | --- |

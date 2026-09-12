@@ -30,7 +30,10 @@
 - [ ] Complete remaining physical Tab5 CLI acceptance and measurements.
 - [x] Add Lua logical-canvas primitives, packed RGB565 blits, lifecycle and shared-broker keyboard game input; ship a single-file Snake example.
 - User authorized this basic graphics/input slice before final CLI acceptance and without the tile engine on 2026-09-12.
-- [ ] Complete physical Lua Snake/graphics/input acceptance and frame/memory measurements; pointer/audio/process bindings remain follow-up work.
+- [ ] Complete physical Lua Snake/graphics/input acceptance and frame/memory measurements; pointer/process bindings remain follow-up work.
+
+- [x] Add nonblocking Lua PCM playback, partial-write/backpressure reporting, bounded stream ownership and cleanup; port native Snake melodies exactly with mute and stream reuse.
+- [ ] Physically validate Lua audio output, cancellation, resource cleanup, and gameplay latency on Tab5.
 
 ### Kilo Terminal Editor
 

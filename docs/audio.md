@@ -79,3 +79,6 @@ two-second 440 Hz square wave. `level` prints microphone peaks for two
 seconds. `loopback` sends microphone capture to the chosen output at half volume for five
 seconds. `route` verifies route selection, and `buffers` deliberately leaves streams idle
 before reporting underrun and overrun counters.
+
+Lua games can use playback through `tabos.audio`; see the [Lua playback API](lua.md#pcm-audio-playback)
+and the single-file `T:/data/lua/snake.lua` example.

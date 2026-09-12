@@ -937,7 +937,8 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${TABOS_ROOT}/ap
 file(READ "${TABOS_ROOT}/apps/lua/sources.mk" lua_manifest)
 string(REGEX MATCHALL "[a-zA-Z0-9_/]+[.]c" lua_sources "${lua_manifest}")
 list(TRANSFORM lua_sources PREPEND "${TABOS_ROOT}/apps/lua/")
-add_library(tabos_lua_profile STATIC ${lua_sources} "${TABOS_ROOT}/sdk/lib/graphics.c")
+add_library(tabos_lua_profile STATIC ${lua_sources} "${TABOS_ROOT}/sdk/lib/graphics.c"
+    "${TABOS_ROOT}/sdk/lib/audio.c")
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     foreach(lua_source IN LISTS lua_sources)
         if(lua_source MATCHES "/apps/lua/src/")
@@ -985,3 +986,9 @@ add_test(NAME component.lua_cli COMMAND "${CMAKE_COMMAND}"
     "-DLUA_TEST_DIR=${CMAKE_CURRENT_BINARY_DIR}/lua-cli"
     -P "${CMAKE_CURRENT_LIST_DIR}/check_lua_cli.cmake")
 set_tests_properties(component.lua_cli PROPERTIES TIMEOUT 30)
+
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+add_test(NAME component.lua_snake_audio
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_LIST_DIR}/lua_snake_audio.py"
+        "$<TARGET_FILE:tabos_lua_native>" "${TABOS_ROOT}/apps/lua/examples/snake.lua")
+set_tests_properties(component.lua_snake_audio PROPERTIES TIMEOUT 40)
