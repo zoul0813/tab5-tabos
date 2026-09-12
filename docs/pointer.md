@@ -50,6 +50,11 @@ leaving applications with stuck contacts.
 
 ## Diagnostic Utility
 
+Lua applications can use `screen:pointer_open()`, `screen:pointer_poll()`, and
+`screen:pointer_close()` with an open logical canvas. Events include canvas
+coordinates and original display coordinates. See the [Lua API](lua.md#pointer-and-touch-input)
+and run `lua T:/data/lua/touch.lua` for a drag-to-move graphical demo.
+
 Run `touchtest` from the shell. It prints event type, contact ID, logical coordinates,
 buttons, and pressure when available. Press Q or Escape to return to the shell.
 

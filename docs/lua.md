@@ -28,6 +28,7 @@ lua T:/data/lua/hello.lua first 'two words'
 lua T:/data/lua/system.lua
 lua T:/data/lua/snake.lua
 lua T:/data/lua/starfall.lua
+lua T:/data/lua/touch.lua
 lua T:/data/lua/files.lua T:/lua-example.dat
 lua -i T:/data/lua/hello.lua
 lua -l module script.lua
@@ -159,8 +160,8 @@ flat asset staging mechanism; it does not recursively copy module trees.
   nil/message/error-code. Uses the SDK's cooperative yield-based sleep; it does not
   request low-power sleep. Wrong types, fractions, infinities and negatives are errors.
 
-Graphics, keyboard game input, and PCM playback are available as described below. Pointer,
-child execution, native C modules, networking, camera bindings, LuaJIT and LuaRocks
+Graphics, keyboard and pointer/touch input, and PCM playback are available as described below.
+Child execution, native C modules, networking, camera bindings, LuaJIT and LuaRocks
 remain unavailable.
 
 ## Games written in Lua
@@ -307,9 +308,64 @@ and another press. Files remain usable while graphics is open.
   REPL exit. Ctrl-U has its normal clear-line meaning only in console mode; games
   receive it as a key event. Escape is available to games with no automatic action.
 
-No text rendering, image decoder, transformed blit, touch, sprite, or tilemap
+No text rendering, image decoder, transformed blit, sprite, or tilemap
 binding is included in this initial graphics slice. Text can be drawn from Lua-defined pixel
 patterns, as Snake demonstrates. Those capabilities can be added independently.
+
+### Pointer and touch input
+
+Pointer input is optional and belongs to an open screen. It uses the existing
+`touch0` device and a separate SDK stream, so it never consumes keyboard events.
+The same script handles Tab5 touch and host mouse/touch input.
+
+| Method | Result |
+| --- | --- |
+| `screen:pointer_open()` | Opens `touch0`; returns true or `nil, message, errno`. A second open returns `EBUSY`. Missing/offline devices report an error without closing the screen. |
+| `screen:pointer_poll()` | Nonblocking: returns an event, nil when empty, or `nil, message, errno` on a service failure. Also services keyboard interruption. |
+| `screen:pointer_close()` | Returns true or `nil, message, errno`; repeated close succeeds while the screen remains open. |
+
+Calling pointer methods on a closed screen, or polling without an open pointer
+stream, raises a Lua error. Closing the screen also closes its pointer stream;
+`<close>`, garbage collection, script completion/errors, `os.exit`, and process
+teardown use the existing screen cleanup. Failed explicit close retains ownership
+for retry. Reopening starts a fresh stream and discards pending events. No blocking
+pointer wait is exposed; game loops should drain a bounded number of events and
+use `tabos.sleep_ms` between updates.
+
+Event tables contain:
+
+- `type`: `"down"`, `"move"`, `"up"`, or `"cancel"`.
+- `x`, `y`: zero-based integer canvas coordinates, accounting for integer scaling
+  and letterboxing. Coordinates outside the canvas remain unclamped; `inside`
+  says whether the position is within its bounds. Negative coordinates use floor
+  division, so a point just left of the canvas has `x == -1`.
+- `display_x`, `display_y`: original coordinates in the TabOS display space.
+- `device_id`, `contact_id`: integer IDs. Track the pair for each active contact;
+  contact IDs can be reused after release/cancellation. Mouse uses contact 0.
+- `buttons`: bitmask; primary = 1, secondary = 2, middle = 4.
+- `pressure`: integer 0..65535 when supplied by the device; otherwise absent/nil.
+
+Mouse movement delivers contacts while a button is held, without hover events.
+Multiple contacts retain separate IDs. Focus changes, queue overflow, and device
+loss cancel contacts through the SDK; handle `cancel` like a release, without
+assuming a final movement. Device loss can subsequently return an error. Always
+process releases/cancellations even when `inside` is false. Event order is preserved
+within each stream; there is no combined keyboard/pointer ordering. An event whose
+Lua table allocation fails remains pending for retry if the script catches the error.
+
+Run the single-file [touch demo](../apps/lua/examples/touch.lua):
+
+```text
+lua T:/data/lua/touch.lua
+```
+
+Touch or click anywhere inside the canvas to move the square, then drag. It turns
+gold while held and blue when released. The first contact owns movement until
+release/cancellation; additional contacts do not steal it. Movement clamps the
+whole square inside the canvas. Q or Escape quits; Ctrl-C/Ctrl-D interrupt and
+restore the terminal. The 320×200 canvas intentionally has letterboxing on Tab5
+to demonstrate coordinate mapping. It redraws only after a change and uses no
+external artwork or native game code.
 
 ## PCM audio playback
 
@@ -413,6 +469,8 @@ validation is excluded for this implementation at the user's request.
 See the [CLI validation record](validation/lua-cli-2026-09-12.md) and
 [graphics validation record](validation/lua-graphics-2026-09-12.md) for build and test evidence.
 Audio validation is recorded in [Lua audio validation](validation/lua-audio-2026-09-12.md).
+Pointer/touch evidence and the full demo test command are recorded in
+[Lua pointer validation](validation/lua-pointer-2026-09-12.md).
 
 Physical Tab5 acceptance is still pending. Before marking the CLI milestone accepted:
 

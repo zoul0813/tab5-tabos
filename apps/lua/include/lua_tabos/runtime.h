@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <tabos/input.h>
 #include <tabos/graphics.h>
+#include <tabos/pointer.h>
 #include <tabos/audio.h>
 #define LUA_TABOS_AUDIO_STREAMS 8U
 typedef struct {
@@ -28,6 +29,10 @@ typedef struct {
         uint64_t graphics_generation;
         uint32_t graphics_mode;
         bool graphics_mode_changed;
+        tabos_pointer_stream_t pointer;
+        bool pointer_open;
+        bool pointer_pending;
+        tabos_pointer_event_t pointer_event;
         bool keys[TABOS_KEY_SYM + 1U];
         uint32_t inherited_mode;
         tabos_wait_source_t source;

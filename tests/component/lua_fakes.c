@@ -285,7 +285,65 @@ void test_lua_audio_bytes(const void* bytes, size_t count)
     assert(audio_streams[0].buffered == count);
     assert(memcmp(audio_streams[0].pcm, bytes, count) == 0);
 }
+static bool pointer_opened, pointer_available;
+static int pointer_failure;
+static tabos_pointer_event_t pointer_event;
+void test_lua_pointer_failure(int error)
+{
+    pointer_failure = error;
+}
+bool test_lua_pointer_opened(void)
+{
+    return pointer_opened;
+}
+void test_lua_pointer_event(tabos_pointer_event_t event)
+{
+    pointer_event     = event;
+    pointer_available = true;
+}
+static int fake_device_find(const char* name, tabos_device_info_t* info)
+{
+    assert(strcmp(name, "touch0") == 0);
+    *info = (tabos_device_info_t) {.id = 42U, .device_class = TABOS_DEVICE_CLASS_POINTER};
+    return -pointer_failure;
+}
+static int fake_pointer_open(tabos_device_id_t device)
+{
+    assert(device == 42U && !pointer_opened);
+    if (pointer_failure != 0) {
+        return -pointer_failure;
+    }
+    pointer_opened    = true;
+    pointer_available = false;
+    return 7;
+}
+static int fake_pointer_close(tabos_pointer_stream_t stream)
+{
+    assert(stream == 7 && pointer_opened);
+    if (pointer_failure != 0) {
+        return -pointer_failure;
+    }
+    pointer_opened = false;
+    return 0;
+}
+static int fake_pointer_read(tabos_pointer_stream_t stream, tabos_pointer_event_t* event)
+{
+    assert(stream == 7 && pointer_opened);
+    if (pointer_failure != 0) {
+        return -pointer_failure;
+    }
+    if (!pointer_available) {
+        return -EAGAIN;
+    }
+    pointer_available = false;
+    *event            = pointer_event;
+    return 0;
+}
 static const tabos_elf_api_t graphics_api = {
+    .device_find      = fake_device_find,
+    .pointer_open     = fake_pointer_open,
+    .pointer_close    = fake_pointer_close,
+    .pointer_read     = fake_pointer_read,
     .audio_info       = fake_audio_info,
     .audio_open       = fake_audio_open,
     .audio_close      = fake_audio_close,

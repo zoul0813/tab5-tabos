@@ -938,7 +938,8 @@ file(READ "${TABOS_ROOT}/apps/lua/sources.mk" lua_manifest)
 string(REGEX MATCHALL "[a-zA-Z0-9_/]+[.]c" lua_sources "${lua_manifest}")
 list(TRANSFORM lua_sources PREPEND "${TABOS_ROOT}/apps/lua/")
 add_library(tabos_lua_profile STATIC ${lua_sources} "${TABOS_ROOT}/sdk/lib/graphics.c"
-    "${TABOS_ROOT}/sdk/lib/audio.c")
+    "${TABOS_ROOT}/sdk/lib/audio.c" "${TABOS_ROOT}/sdk/lib/pointer.c"
+    "${TABOS_ROOT}/sdk/lib/device.c")
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     foreach(lua_source IN LISTS lua_sources)
         if(lua_source MATCHES "/apps/lua/src/")
@@ -997,3 +998,8 @@ add_test(NAME component.lua_starfall
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_LIST_DIR}/lua_starfall.py"
         "$<TARGET_FILE:tabos_lua_native>" "${TABOS_ROOT}/apps/lua/examples/starfall.lua")
 set_tests_properties(component.lua_starfall PROPERTIES TIMEOUT 60)
+
+add_test(NAME component.lua_touch
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_LIST_DIR}/lua_touch.py"
+        "$<TARGET_FILE:tabos_lua_native>" "${TABOS_ROOT}/apps/lua/examples/touch.lua")
+set_tests_properties(component.lua_touch PROPERTIES TIMEOUT 30)

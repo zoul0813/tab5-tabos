@@ -1836,3 +1836,23 @@ Supply `apps/lua/examples/starfall.lua` after the optional Snake path to
 `tabos_lua_rv32` for real shell-launched title/player/pause pixel checks, Q exit,
 Escape exit after relaunch, and terminal restoration. Physical performance,
 keyboard play and microSD persistence remain acceptance work; Linux is excluded.
+
+## Lua pointer validation (2026-09-12)
+
+`component.lua` links real SDK pointer/device wrappers against deterministic
+transport fakes. It checks canvas/letterbox mapping, contact IDs, pressure, all
+event kinds, empty/error results, keyboard coexistence, stale screens, repeated
+close, cleanup failure/retry, missing devices, GC/scope cleanup, interruption,
+and pending event recovery after allocation failure.
+
+`component.lua_touch` runs the unmodified shipped demo with scripted input and
+real SDK drawing. It checks first-contact ownership (including contact zero),
+letterbox rejection, movement, edge clamping, cancellation/release colors, no
+idle redraws, keyboard exit, and reopening after cleanup.
+
+`tabos_lua_rv32` always checks SDL touch down/move/up/cancel through the real
+loader, SDK stream and Lua canvas mapping. Graphics error/return/exit/interruption
+and forced-teardown scenarios also own pointer streams. Pass `touch.lua` after
+the optional Snake and Starfall paths to exercise the complete graphical demo
+with framebuffer checks and shell restoration. Physical Tab5 validation remains
+open; see `docs/validation/lua-pointer-2026-09-12.md`.

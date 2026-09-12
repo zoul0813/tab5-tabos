@@ -1,6 +1,6 @@
 # Lua Implementation Plan
 
-Status: CLI implementation and automated validation completed 2026-09-12; physical Tab5 acceptance pending. Basic graphics and keyboard game bindings implemented at user direction before final CLI acceptance; PCM playback bindings also implemented at user direction; pointer/process bindings remain follow-up work. Linux builds/tests excluded by user direction for this implementation.
+Status: CLI implementation and automated validation completed 2026-09-12; physical Tab5 acceptance pending. Basic graphics, keyboard, pointer/touch, and PCM playback bindings implemented at user direction before final CLI acceptance; process bindings remain follow-up work. Linux builds/tests excluded by user direction for this implementation.
 
 Current implementation uses the proposed 5.5.1 baseline and resource budgets, with
 48-level C-call/pattern limits. Kilo's keyboard wait source is reused without a new
@@ -14,7 +14,7 @@ This expands the Lua candidate in [Application Port Candidates](../milestone-app
 ## Remaining Work
 
 Track outstanding work here; completed CLI work remains in [Validation and Delivery](#validation-and-delivery).
-User direction on 2026-09-12 authorizes basic graphics and keyboard input now, without waiting for the tile engine or final CLI acceptance. User additionally authorizes PCM playback and native Snake sound port. Remaining acceptance checks stay open.
+User direction on 2026-09-12 authorizes basic graphics and keyboard input now, without waiting for the tile engine or final CLI acceptance. User additionally authorizes PCM playback, native Snake sound port, and pointer/touch input with a graphical demo. Remaining acceptance checks stay open.
 Linux builds/tests remain excluded by user direction. Each binding slice needs its
 own implementation, documentation/example, automated coverage, and physical validation.
 
@@ -54,8 +54,15 @@ Starfall port evidence: [validation](../../docs/validation/lua-starfall-2026-09-
 - [x] Document keyboard game input and demonstrate it in Snake.
 - [x] Complete deterministic host and real RV32 validation for keyboard events, transitions, interruption, and restoration.
 - [ ] Validate keyboard interaction and return to a usable shell on physical Tab5; record results.
-- [ ] Add pointer bindings with documentation/example and host/RV32 validation.
+- [x] Add pointer bindings with documentation/example and host/RV32 validation.
 - [ ] Validate pointer interaction and cleanup on physical Tab5.
+
+Pointer methods are screen-owned `pointer_open`, `pointer_poll`, and `pointer_close`.
+They use the existing `touch0` stream independently of the keyboard broker, map
+display coordinates into the logical canvas, preserve contact/pressure/cancel
+semantics, and close with the screen. `examples/touch.lua` demonstrates touch/click
+and drag to move a square, first-contact ownership, clipping, and keyboard exit.
+Evidence: [pointer validation](../../docs/validation/lua-pointer-2026-09-12.md).
 
 ### Audio Bindings
 
@@ -247,7 +254,7 @@ This module should require no new public TabOS ABI beyond any separately impleme
 
 ## Follow-On: Graphics, Input, Audio, and Process Bindings
 
-The original sequence gated these on CLI acceptance. User direction on 2026-09-12 authorizes basic graphics and keyboard game input now, independently of the tile engine. Each slice still needs API documentation, a small example, deterministic host coverage, and physical validation where relevant. User subsequently authorizes PCM playback and native Snake sound port. Pointer and process slices remain follow-up work.
+The original sequence gated these on CLI acceptance. User direction on 2026-09-12 authorizes basic graphics and keyboard game input now, independently of the tile engine. Each slice still needs API documentation, a small example, deterministic host coverage, and physical validation where relevant. User subsequently authorizes PCM playback, native Snake sound port, and pointer/touch bindings with a graphical demo. Process bindings remain follow-up work.
 
 | Slice | Initial design |
 | --- | --- |

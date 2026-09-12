@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #define _DARWIN_C_SOURCE
 #include <tabos/application.h>
+#include <tabos/graphics.h>
 #include <tabos/internal/console.h>
 #include <tabos/internal/display.h>
 #include <tabos/internal/input.h>
@@ -13,6 +14,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <SDL3/SDL.h>
 
 // This optional executable takes the actual SDK-built shell as argv[1].
 // Override only the host drive mapping; runtime, interpreter and SDK stay real.
@@ -64,6 +66,26 @@ static void pump(void)
         const platform_runtime_events_t events = platform_runtime_wait_until(platform_time_ms());
         kernel_runtime_update(events);
     }
+}
+
+static void finger(Uint32 type, float x, float y)
+{
+    SDL_Event event        = {.type = type};
+    event.tfinger.fingerID = 77U;
+    event.tfinger.x        = x;
+    event.tfinger.y        = y;
+    event.tfinger.pressure = 0.5F;
+    check(SDL_PushEvent(&event), "enqueue SDL touch event");
+    pump();
+}
+
+static void await_pixel(uint32_t x, uint32_t y, uint16_t color)
+{
+    const platform_framebuffer_t* framebuffer = display_framebuffer();
+    for (size_t i = 0U; i < 300U && framebuffer->pixels[y * framebuffer->stride_pixels + x] != color; ++i) {
+        pump();
+    }
+    check(framebuffer->pixels[y * framebuffer->stride_pixels + x] == color, "pointer-driven pixel");
 }
 
 static void key(tabos_key_t code, uint8_t modifiers)
@@ -185,7 +207,7 @@ static void remove_fixture(const char* path)
 }
 int main(int argc, char** argv)
 {
-    check(argc >= 3 && argc <= 5, "pass shell, Lua RV32 artifacts, optional Snake and Starfall scripts");
+    check(argc >= 3 && argc <= 6, "pass shell, Lua RV32 artifacts, optional Snake, Starfall and touch scripts");
     check(mkdtemp(storage_root) != NULL, "temporary storage");
     char shell_path[512], lua_path[512], module_dir[512];
     snprintf(shell_path, sizeof(shell_path), "%s/shell", storage_root);
@@ -213,6 +235,7 @@ int main(int argc, char** argv)
                          "print('SCRIPT_OK')");
     fixture("graphics.lua",
             "local t=require('tabos'); local s = assert(t.graphics.open(320,180)); "
+            "assert(s:pointer_open()); "
             "assert(s:clear(31)); assert(s:fill_rect(0,0,16,16,63488)); "
             "assert(s:blit(20,20,1,1,string.char(224,7))); assert(s:present()); "
             "if arg[1]=='error' then retained=s; error('GRAPHICS_ERROR') end; "
@@ -229,11 +252,28 @@ int main(int argc, char** argv)
         snprintf(snake_path, sizeof(snake_path), "%s/snake.lua", storage_root);
         copy(argv[3], snake_path);
     }
-    if (argc == 5) {
+    if (argc >= 5) {
         char starfall_path[512];
         snprintf(starfall_path, sizeof(starfall_path), "%s/starfall.lua", storage_root);
         copy(argv[4], starfall_path);
     }
+    if (argc == 6) {
+        char touch_path[512];
+        snprintf(touch_path, sizeof(touch_path), "%s/touch.lua", storage_root);
+        copy(argv[5], touch_path);
+    }
+    fixture("pointer.lua", "local t=require('tabos'); local s <close> = assert(t.graphics.open(320,200)); "
+                           "assert(s:pointer_open()); assert(not s:pointer_open()); "
+                           "assert(s:clear(31)); assert(s:present()); "
+                           "local expected={'down','move','up','down','cancel'}; local id; "
+                           "for i,kind in ipairs(expected) do local e; repeat local m; e,m=s:pointer_poll(); "
+                           "assert(not m,m); if not e then t.sleep_ms(1) end until e; "
+                           "assert(e.type==kind and e.inside and e.pressure==32767); "
+                           "if i==1 then id=e.contact_id end; assert(e.contact_id==id); "
+                           "assert(e.y==100); if i==1 then assert(e.x==53) else assert(e.x==160) end; "
+                           "assert(s:fill_rect(0,0,2,2,i)); assert(s:present()) end; "
+                           "assert(s:pointer_close()); assert(s:pointer_close()); assert(s:pointer_open()); "
+                           "print('POINTER_OK')");
     fixture("audio.lua", "local t=require('tabos'); local a=t.audio; local s=assert(a.open()); "
                          "assert(a.info().default_sample_rate==44100); assert(s:set_volume(100)); "
                          "local pcm=string.rep(string.pack('<i2',1000),1000); "
@@ -262,6 +302,32 @@ int main(int argc, char** argv)
     check(bytes != NULL && fread(payload, 1U, sizeof(payload), bytes) == 4U && memcmp(payload, "a\0\377z", 4U) == 0 &&
               fclose(bytes) == 0,
           "binary file bytes on host drive");
+    command("./lua pointer.lua");
+    await_pixel(160U, 60U, 31U);
+    finger(SDL_EVENT_FINGER_DOWN, 0.25F, 0.5F);
+    await_pixel(160U, 60U, 1U);
+    finger(SDL_EVENT_FINGER_MOTION, 0.5F, 0.5F);
+    await_pixel(160U, 60U, 2U);
+    finger(SDL_EVENT_FINGER_UP, 0.5F, 0.5F);
+    await_pixel(160U, 60U, 3U);
+    finger(SDL_EVENT_FINGER_DOWN, 0.5F, 0.5F);
+    await_pixel(160U, 60U, 4U);
+    finger(SDL_EVENT_FINGER_CANCELED, 0.5F, 0.5F);
+    parent();
+    check(output_line("POINTER_OK"), "real RV32 touch lifecycle, scaling and cancellation");
+    if (argc == 6) {
+        command("./lua touch.lua");
+        await_pixel(640U, 360U, TABOS_RGB565(240, 247, 255));
+        finger(SDL_EVENT_FINGER_DOWN, 0.25F, 0.5F);
+        await_pixel(319U, 360U, TABOS_RGB565(240, 247, 255));
+        finger(SDL_EVENT_FINGER_MOTION, 0.75F, 0.5F);
+        await_pixel(958U, 360U, TABOS_RGB565(240, 247, 255));
+        finger(SDL_EVENT_FINGER_UP, 0.75F, 0.5F);
+        await_pixel(982U, 384U, TABOS_RGB565(67, 190, 230));
+        key(TABOS_KEY_Q, 0U);
+        parent();
+        check(console_next_deadline() != UINT64_MAX, "touch demo restores terminal");
+    }
     command("./lua audio.lua");
     parent();
     check(output_line("AUDIO_OK"), "real RV32 audio open/write/status/flush/close");
@@ -319,7 +385,7 @@ int main(int argc, char** argv)
         key(TABOS_KEY_Q, 0U);
         parent();
     }
-    if (argc == 5) {
+    if (argc >= 5) {
         command("./lua starfall.lua");
         const size_t title_pixel = 204U * framebuffer->stride_pixels + 410U;
         for (size_t i = 0U; i < 200U && framebuffer->pixels[title_pixel] != 0x371fU; ++i) {
@@ -473,11 +539,15 @@ int main(int argc, char** argv)
     parent();
     stop();
     remove_fixture("audio.lua");
+    remove_fixture("pointer.lua");
+    if (argc == 6) {
+        remove_fixture("touch.lua");
+    }
     remove_fixture("graphics.lua");
     if (argc >= 4) {
         remove_fixture("snake.lua");
     }
-    if (argc == 5) {
+    if (argc >= 5) {
         remove_fixture("starfall.lua");
     }
     remove_fixture("bytes");

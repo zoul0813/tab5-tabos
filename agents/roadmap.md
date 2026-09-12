@@ -31,7 +31,8 @@
 - [x] Add Lua logical-canvas primitives, packed RGB565 blits, lifecycle and shared-broker keyboard game input; ship a single-file Snake example.
 - [x] Port Starfall to a self-contained Lua example with native gameplay/artwork, fixed-step simulation, and nonfatal high-score persistence.
 - User authorized this basic graphics/input slice before final CLI acceptance and without the tile engine on 2026-09-12.
-- [ ] Complete physical Lua Snake/graphics/input acceptance and frame/memory measurements; pointer/process bindings remain follow-up work.
+- [x] Add screen-owned Lua pointer/touch streams, canvas coordinate mapping and a single-file drag-to-move demo with host/RV32 validation.
+- [ ] Complete physical Lua Snake/graphics/keyboard/pointer acceptance and frame/memory measurements; process bindings remain follow-up work.
 
 - [x] Add nonblocking Lua PCM playback, partial-write/backpressure reporting, bounded stream ownership and cleanup; port native Snake melodies exactly with mute and stream reuse.
 - [ ] Physically validate Lua audio output, cancellation, resource cleanup, and gameplay latency on Tab5.

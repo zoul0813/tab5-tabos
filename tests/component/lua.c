@@ -19,6 +19,9 @@ void test_lua_mode_failure(unsigned long request);
 void test_lua_audio_failure(int error);
 size_t test_lua_audio_open_count(void);
 void test_lua_audio_bytes(const void* bytes, size_t count);
+void test_lua_pointer_failure(int error);
+bool test_lua_pointer_opened(void);
+void test_lua_pointer_event(tabos_pointer_event_t event);
 unsigned int test_lua_graphics_presents(void);
 static int initialize(lua_State* L)
 {
@@ -303,6 +306,77 @@ int main(void)
         lua_gc(L, LUA_GCCOLLECT);
         assert(!rt->graphics.open && test_lua_mode() == 0U);
     }
+    execute(L, "s=assert(t.graphics.open(320,200)); assert(not pcall(s.pointer_poll,s)); "
+               "assert(s:pointer_close()); assert(s:pointer_open()); assert(not s:pointer_open()); "
+               "assert(s:pointer_poll()==nil)");
+    // 320x200 uses scale 3 with (160,60) letterboxing on a 1280x720 display.
+    tabos_pointer_event_t touch = {.type       = TABOS_POINTER_DOWN,
+                                   .device_id  = 42U,
+                                   .contact_id = UINT32_MAX,
+                                   .x          = 190,
+                                   .y          = 120,
+                                   .buttons    = 1U,
+                                   .pressure   = 32768U,
+                                   .flags      = TABOS_POINTER_EVENT_HAS_PRESSURE};
+    test_lua_pointer_event(touch);
+    execute(L, "local e=assert(s:pointer_poll()); assert(e.type=='down' and e.x==10 and e.y==20); "
+               "assert(e.inside and e.display_x==190 and e.display_y==120); "
+               "assert(e.contact_id==4294967295 and e.device_id==42 and e.buttons==1 and e.pressure==32768)");
+    touch.type  = TABOS_POINTER_MOVE;
+    touch.x     = 159;
+    touch.y     = 59;
+    touch.flags = 0U;
+    test_lua_pointer_event(touch);
+    execute(L, "local e=s:pointer_poll(); assert(e.type=='move' and e.x==-1 and e.y==-1); "
+               "assert(not e.inside and e.pressure==nil)");
+    touch.type = TABOS_POINTER_UP;
+    touch.x    = 1120;
+    touch.y    = 660;
+    test_lua_pointer_event(touch);
+    execute(L, "local e=s:pointer_poll(); assert(e.type=='up' and e.x==320 and e.y==200 and not e.inside)");
+    touch.type = TABOS_POINTER_CANCEL;
+    test_lua_pointer_event(touch);
+    execute(L, "assert(s:pointer_poll().type=='cancel')");
+    test_lua_key(TABOS_KEY_LEFT, true);
+    execute(L, "assert(s:pointer_poll()==nil); assert(s:poll().key=='left'); assert(s:is_down('left'))");
+    test_lua_pointer_failure(EIO);
+    execute(L, "local e,m,c=s:pointer_poll(); assert(e==nil and type(m)=='string' and c~=nil); "
+               "assert(not s:pointer_close()); assert(not s:close())");
+    assert(rt->graphics.open && test_lua_pointer_opened());
+    test_lua_pointer_failure(0);
+    execute(L, "assert(s:pointer_close()); assert(s:pointer_close()); assert(s:pointer_open()); "
+               "assert(s:close()); assert(not pcall(s.pointer_open,s)); "
+               "assert(not pcall(s.pointer_poll,s)); assert(not pcall(s.pointer_close,s)); "
+               "old=s; s=assert(t.graphics.open(320,200)); assert(s:pointer_open()); assert(old:close())");
+    assert(test_lua_pointer_opened());
+    execute(L, "assert(s:close()); s=assert(t.graphics.open(320,200))");
+    test_lua_pointer_failure(ENODEV);
+    execute(L, "assert(not s:pointer_open())");
+    assert(!test_lua_pointer_opened());
+    test_lua_pointer_failure(0);
+    execute(L, "assert(s:close()); assert(not pcall(function() local s <close> = "
+               "assert(t.graphics.open(320,200)); assert(s:pointer_open()); error('touch') end)); "
+               "do local s=assert(t.graphics.open(320,200)); assert(s:pointer_open()) end; collectgarbage()");
+    assert(!test_lua_pointer_opened());
+    // Failed event-table construction must preserve the pending release for retry.
+    execute(L, "s=assert(t.graphics.open(320,200)); assert(s:pointer_open())");
+    for (size_t offset = 0U; offset < 15U; ++offset) {
+        test_lua_pointer_event(touch);
+        assert(luaL_loadstring(L, "return s:pointer_poll()") == LUA_OK);
+        rt->fail_after = rt->allocations + offset;
+        int status     = lua_pcall(L, 0, 1, 0);
+        rt->fail_after = 0U;
+        lua_settop(L, 0);
+        if (status != LUA_OK) {
+            execute(L, "assert(s:pointer_poll().type=='cancel')");
+        }
+    }
+    test_lua_interrupt();
+    assert(luaL_loadstring(L, "s:pointer_poll()") == LUA_OK);
+    assert(lua_pcall(L, 0, 0, 0) != LUA_OK);
+    lua_settop(L, 0);
+    rt->interrupted = false;
+    assert(lua_tabos_graphics_close(rt) == 0 && !test_lua_pointer_opened());
     execute(L, "a=t.audio; assert(a.info().default_sample_rate==44100); "
                "assert(a.MAX_WRITE_BYTES==16384); assert(not pcall(a.open,12345)); "
                "assert(not pcall(a.open,'44100')); assert(not pcall(a.open,0/0)); "

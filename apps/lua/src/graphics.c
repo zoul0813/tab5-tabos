@@ -52,6 +52,13 @@ static void reset_input(lua_tabos_runtime_t* rt)
 }
 int lua_tabos_graphics_close(lua_tabos_runtime_t* rt)
 {
+    if (rt->pointer_open) {
+        if (tabos_pointer_close(rt->pointer) != 0) {
+            return -1;
+        }
+        rt->pointer_open    = false;
+        rt->pointer_pending = false;
+    }
     if (rt->graphics.open) {
         if (tabos_graphics_close(&rt->graphics) != 0) {
             return -1;
@@ -313,6 +320,104 @@ static int poll(lua_State* L)
     --rt->count;
     return 1;
 }
+
+static int pointer_open(lua_State* L)
+{
+    (void) screen(L);
+    lua_tabos_runtime_t* rt = lua_tabos_runtime(L);
+    if (rt->closing) {
+        return luaL_error(L, "pointer unavailable during state finalization");
+    }
+    if (rt->pointer_open) {
+        errno = EBUSY;
+        return result(L, -1);
+    }
+    tabos_device_info_t device;
+    if (tabos_device_find(TABOS_DEVICE_NAME_TOUCH, &device) != 0) {
+        return result(L, -1);
+    }
+    rt->pointer = tabos_pointer_open(device.id);
+    if (rt->pointer == TABOS_POINTER_STREAM_INVALID) {
+        return result(L, -1);
+    }
+    // Record ownership before any Lua allocation can fail.
+    rt->pointer_open    = true;
+    rt->pointer_pending = false;
+    return result(L, 0);
+}
+
+static int pointer_close(lua_State* L)
+{
+    (void) screen(L);
+    lua_tabos_runtime_t* rt = lua_tabos_runtime(L);
+    if (rt->pointer_open) {
+        if (tabos_pointer_close(rt->pointer) != 0) {
+            return result(L, -1);
+        }
+        rt->pointer_open    = false;
+        rt->pointer_pending = false;
+    }
+    return result(L, 0);
+}
+
+static lua_Integer canvas_coordinate(int32_t value, uint32_t offset, uint32_t scale)
+{
+    int64_t relative = (int64_t) value - offset;
+    // Floor division keeps coordinates just outside a letterbox edge negative.
+    if (relative < 0) {
+        return -((-relative + scale - 1U) / scale);
+    }
+    return relative / scale;
+}
+
+static int pointer_poll(lua_State* L)
+{
+    tabos_graphics_t* graphics = screen(L);
+    lua_tabos_runtime_t* rt    = lua_tabos_runtime(L);
+    luaL_argcheck(L, rt->pointer_open, 1, "pointer is closed");
+    lua_tabos_console_poll(rt);
+    lua_tabos_hook(L, NULL);
+    if (!rt->pointer_pending && tabos_pointer_read(rt->pointer, &rt->pointer_event) != 0) {
+        if (errno == EAGAIN) {
+            lua_pushnil(L);
+            return 1;
+        }
+        return result(L, -1);
+    }
+    // Retain the event across allocation failures until its whole table is built.
+    rt->pointer_pending         = true;
+    tabos_pointer_event_t event = rt->pointer_event;
+    // Snapshot geometry before allocation can run a finalizer that closes the screen.
+    lua_Integer x = canvas_coordinate(event.x, graphics->output_x, graphics->scale);
+    lua_Integer y = canvas_coordinate(event.y, graphics->output_y, graphics->scale);
+    bool inside   = x >= 0 && y >= 0 && x < graphics->width && y < graphics->height;
+    lua_createtable(L, 0, 10);
+    static const char* const types[] = {"down", "move", "up", "cancel"};
+    lua_pushstring(L, types[event.type]);
+    lua_setfield(L, -2, "type");
+    lua_pushinteger(L, x);
+    lua_setfield(L, -2, "x");
+    lua_pushinteger(L, y);
+    lua_setfield(L, -2, "y");
+    lua_pushboolean(L, inside);
+    lua_setfield(L, -2, "inside");
+    lua_pushinteger(L, event.x);
+    lua_setfield(L, -2, "display_x");
+    lua_pushinteger(L, event.y);
+    lua_setfield(L, -2, "display_y");
+    lua_pushinteger(L, event.device_id);
+    lua_setfield(L, -2, "device_id");
+    lua_pushinteger(L, event.contact_id);
+    lua_setfield(L, -2, "contact_id");
+    lua_pushinteger(L, event.buttons);
+    lua_setfield(L, -2, "buttons");
+    if ((event.flags & TABOS_POINTER_EVENT_HAS_PRESSURE) != 0U) {
+        lua_pushinteger(L, event.pressure);
+        lua_setfield(L, -2, "pressure");
+    }
+    rt->pointer_pending = false;
+    return 1;
+}
 void lua_tabos_graphics_module(lua_State* L)
 {
     static const luaL_Reg methods[] = {
@@ -326,6 +431,9 @@ void lua_tabos_graphics_module(lua_State* L)
         {"set_letterbox_color",       letterbox},
         {               "poll",            poll},
         {            "is_down",         is_down},
+        {       "pointer_open",    pointer_open},
+        {       "pointer_poll",    pointer_poll},
+        {      "pointer_close",   pointer_close},
         {               "__gc", finalize_screen},
         {            "__close", finalize_screen},
         {                 NULL,            NULL}
