@@ -442,6 +442,7 @@
 - [x] Implement file/directory handle ownership and cleanup.
 - [x] Implement application-facing filesystem API dispatch.
 - [x] Add deterministic tests for paths, handles, errors, and boundary cases.
+- [x] Preserve `ENOSPC` when loaded-application directory listings exceed their fixed transport buffer.
 
 ### Host Storage Backend
 

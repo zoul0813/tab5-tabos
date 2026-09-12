@@ -621,6 +621,8 @@ the real cross toolchain after shared-rule changes.
 Filesystem-backed application coverage must keep the global filesystem working directory
 distinct from the child's inherited directory and verify relative PATH entries, `./`,
 `../`, and current-drive `/` executable paths load the file selected by the child.
+It must also verify that an ELF directory listing larger than its fixed transport buffer
+returns `ENOSPC` with both zero and stale nonzero errno state.
 
 Manual console validation must include prompt-boundary Backspace, held Backspace, held printable keys, Enter, and Tab followed by visible text. Host backend synthesizes missing Enter/Tab/repeat text while retaining SDL text input for normal layout and IME behavior; matching SDL text events are suppressed to prevent duplicates.
 

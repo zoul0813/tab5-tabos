@@ -713,12 +713,12 @@ static void* elf_heap_sbrk(int32_t increment)
     return previous;
 }
 
-static int elf_fs_list(const char* path, char* buffer, uint32_t capacity)
+int loader_elf_application_list_directory(loader_elf_application_t* application, const char* path, char* buffer,
+                                          uint32_t capacity)
 {
     if (path == NULL || buffer == NULL || capacity == 0U) {
         return -TABOS_EINVAL;
     }
-    loader_elf_application_t* application = platform_riscv32_current_user_data();
     if (application == NULL) {
         return -TABOS_EINVAL;
     }
@@ -733,7 +733,15 @@ static int elf_fs_list(const char* path, char* buffer, uint32_t capacity)
     size_t used = 0U;
     tabos_dirent_t entry;
     int result = 0;
-    while ((result = tabos_fs_readdir(directory, &entry)) > 0) {
+    for (;;) {
+        const int read_result = tabos_fs_readdir(directory, &entry);
+        if (read_result < 0) {
+            result = -*tabos_errno_location();
+            break;
+        }
+        if (read_result == 0) {
+            break;
+        }
         const size_t length = strlen(entry.name);
         if (length + 3U >= (size_t) capacity - used) {
             result = -TABOS_ENOSPC;
@@ -745,14 +753,16 @@ static int elf_fs_list(const char* path, char* buffer, uint32_t capacity)
         used           += length;
         buffer[used++]  = '\n';
     }
-    if (result < 0) {
-        result = -*tabos_errno_location();
-    }
     if (tabos_fs_closedir(directory) != 0 && result == 0) {
         result = -*tabos_errno_location();
     }
     buffer[used] = '\0';
     return result;
+}
+
+static int elf_fs_list(const char* path, char* buffer, uint32_t capacity)
+{
+    return loader_elf_application_list_directory(platform_riscv32_current_user_data(), path, buffer, capacity);
 }
 
 static uint64_t elf_monotonic_ms(void)

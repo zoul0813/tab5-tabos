@@ -88,6 +88,8 @@ application also has a separate eight-entry `DIR*` wrapper pool; this per-proces
 limit is independent of the shared kernel capacity. Failed directory opens release their
 wrapper entry immediately. A loaded application whose runtime does not provide the
 directory-listing ABI gate receives `ENOSYS` without consuming an entry.
+Loaded-application directory enumeration uses a fixed 4096-byte snapshot. If all entries
+do not fit, `opendir()` fails with `ENOSPC`; it never exposes a silently truncated listing.
 
 Disk format is FAT filesystem supported by Tab5 BSP. `A:` is unavailable until internal
 flash filesystem is implemented, then appears separately in boot diagnostics. Live
