@@ -36,6 +36,9 @@ OUTPUT := $(BUILD_DIR)/$(PROGRAM)
 UNSTRIPPED := $(BUILD_DIR)/$(PROGRAM).elf
 INSTALL_PATH := $(PROJECT_ROOT)/.local/rootfs/T/bin/$(PROGRAM)
 SOURCES := $(APP_DIR)/src/$(PROGRAM)/main.c
+ifeq ($(PROGRAM),irc)
+SOURCES += $(APP_DIR)/src/irc/protocol.c
+endif
 
 include ../../sdk/make/application.mk
 

@@ -274,6 +274,17 @@ tabos_enable_warnings(tabos_starfall_game)
 tabos_enable_sanitizers(tabos_starfall_game)
 add_test(NAME unit.starfall_game COMMAND tabos_starfall_game)
 
+add_executable(tabos_irc_protocol
+    unit/irc_protocol.c
+    "${TABOS_ROOT}/apps/netutils/src/irc/protocol.c"
+)
+target_include_directories(tabos_irc_protocol PRIVATE
+    "${TABOS_ROOT}/apps/netutils/src/irc"
+)
+tabos_enable_warnings(tabos_irc_protocol)
+tabos_enable_sanitizers(tabos_irc_protocol)
+add_test(NAME unit.irc_protocol COMMAND tabos_irc_protocol)
+
 add_executable(tabos_doom_video
     unit/doom_video.c
     "${TABOS_ROOT}/apps/doom/src/doom_tabos_video.c"

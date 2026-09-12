@@ -167,6 +167,11 @@ Host builds are especially useful for:
 - error handling
 - integration tests
 
+IRC protocol tests feed fragmented and coalesced TCP input through the bounded CRLF
+stream parser. They must cover PING, registration welcome, multiple PRIVMSG lines,
+overlong-message recovery, and preservation of an in-progress user draft while
+asynchronous protocol output is generated.
+
 ### Persistent foreground-process validation
 
 [DECIDED] Process tests must model persistent nested execution rather than restarting
