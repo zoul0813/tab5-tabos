@@ -157,6 +157,9 @@ int tabos_graphics_fill_rect(tabos_graphics_t* graphics, int32_t x, int32_t y, u
         const int32_t clipped_right = right > (int64_t) graphics->width ? (int32_t) graphics->width : (int32_t) right;
         const int32_t clipped_bottom =
             bottom > (int64_t) graphics->height ? (int32_t) graphics->height : (int32_t) bottom;
+        if (left >= clipped_right || top >= clipped_bottom) {
+            return 0;
+        }
         for (int32_t row = top; row < clipped_bottom; ++row) {
             tabos_color_t* destination = graphics->pixels + (size_t) row * graphics->width + (size_t) left;
             for (int32_t column = left; column < clipped_right; ++column) {

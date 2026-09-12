@@ -26,6 +26,7 @@ lua -v
 lua -e 'print(1 + 2)'
 lua T:/data/lua/hello.lua first 'two words'
 lua T:/data/lua/system.lua
+lua T:/data/lua/snake.lua
 lua T:/data/lua/files.lua T:/lua-example.dat
 lua -i T:/data/lua/hello.lua
 lua -l module script.lua
@@ -157,13 +158,138 @@ flat asset staging mechanism; it does not recursively copy module trees.
   nil/message/error-code. Uses the SDK's cooperative yield-based sleep; it does not
   request low-power sleep. Wrong types, fractions, infinities and negatives are errors.
 
-Graphics, direct input-event, audio, child execution, native C modules, networking,
-camera bindings, LuaJIT and LuaRocks are not part of this CLI milestone.
+Graphics and keyboard game input are available as described below. Audio, pointer,
+child execution, native C modules, networking, camera bindings, LuaJIT and LuaRocks
+remain unavailable.
+
+## Games written in Lua
+
+A game is an ordinary `.lua` file run with `lua game.lua`. Developers do not compile
+C or embed Lua. The script defines artwork, movement, collisions, input, and scoring;
+drawing methods call the existing portable TabOS SDK. No tile engine is required.
+The installed [Snake example](../apps/lua/examples/snake.lua) includes its own shapes
+and score digits, with no external assets:
+
+```text
+lua T:/data/lua/snake.lua
+```
+
+Arrows or WASD steer, Space pauses, Enter restarts, and Q quits. A white border means
+paused; a red border means game over. Score appears at the top and prints on normal
+exit. Ctrl-C/Ctrl-D interrupt a graphics script and restore the terminal.
+
+A minimal script:
+
+```lua
+local tabos = require("tabos")
+local screen <close> = assert(tabos.graphics.open(320, 180))
+local cyan = tabos.rgb(0, 255, 255)
+local x = 150
+while true do
+    local event = screen:poll()
+    if event and event.type == "key_down" and event.key == "q" then break end
+    if screen:is_down("left") then x = math.max(0, x - 2) end
+    if screen:is_down("right") then x = math.min(300, x + 2) end
+    assert(screen:clear(tabos.rgb(0, 0, 20)))
+    assert(screen:fill_rect(x, 140, 20, 8, cyan))
+    assert(screen:present())
+    assert(tabos.sleep_ms(16))
+end
+```
+
+For a real game, use `tabos.monotonic_ms()` for elapsed time or a fixed simulation
+step; rendering and presentation can take longer than the requested sleep.
+
+### Canvas and drawing API
+
+`tabos.graphics.open(width, height)` returns one screen userdata or
+`nil, message, errno`. Dimensions must be positive integers, fit the physical
+display, and use at most 262144 pixels (512 KiB of RGB565 canvas memory). For example,
+320×180, 426×240, and 640×360 fit. Native framebuffer access is not exposed. TabOS
+centers the canvas at the largest fitting integer scale with black borders.
+Only one screen can be open per Lua process; another open returns `EBUSY`.
+
+`tabos.rgb(red, green, blue)` converts integer channels in 0..255 to an RGB565
+integer. Drawing colors are RGB565 integers in 0..65535.
+
+| Method | Behavior |
+| --- | --- |
+| `screen:size()` | Returns logical width, height. |
+| `screen:clear(color)` | Fills the canvas. |
+| `screen:pixel(x, y, color)` | Draws one pixel. |
+| `screen:line(x0, y0, x1, y1, color)` | Draws a line including both endpoints. |
+| `screen:rect(x, y, width, height, color)` | Draws a rectangle outline. |
+| `screen:fill_rect(x, y, width, height, color)` | Draws a filled rectangle. |
+| `screen:blit(x, y, width, height, bytes)` | Copies row-major, little-endian RGB565 bytes. String length must be exactly `width * height * 2`; bitmap size has the same 512 KiB ceiling. |
+| `screen:set_letterbox_color(color)` | Changes borders for the next presentation. |
+| `screen:present()` | Presents the complete canvas using the SDK's integer upscale. Checks cancellation before and after the SDK call. |
+| `screen:close()` | Closes the screen and restores console input/display. Repeated close succeeds. |
+
+Drawing coordinates are integers in -32768..32767, with origin at the top left,
+positive X right, and positive Y down. Rectangle sizes are integers in 0..32767;
+zero width or height draws nothing. Bitmap sizes must be positive. Drawing clips
+to the canvas, so offscreen shapes are valid. Bounded coordinates limit arithmetic
+and C-call work. Arguments reject fractions, NaN, infinity, numeric strings, invalid
+buffers, and out-of-range values. Methods on a closed screen raise a Lua error,
+except `close()`. Mutating methods return true or `nil, message, errno`; use `assert`
+when an error should stop the game.
+
+Packed images can also be defined entirely in Lua:
+
+```lua
+local red = tabos.rgb(255, 0, 0)
+local blue = tabos.rgb(0, 0, 255)
+assert(screen:blit(10, 10, 2, 1, string.pack("<I2I2", red, blue)))
+```
+
+Blits decode into aligned temporary Lua memory and copy synchronously into the
+logical canvas. The source string may be released immediately after return.
+Presentation retains the canvas through the SDK call; a failed close retains it
+for a later retry instead of freeing memory still borrowed by graphics.
+
+Use `local screen <close> = assert(...)` for deterministic scope cleanup, including
+Lua error unwinding. Unreachable screen userdata also closes during garbage
+collection. Script completion, uncaught errors, `os.exit`, and process teardown
+clean up graphics. The REPL closes any remaining screen before its next prompt;
+a game should run its loop inside one chunk or script. Errors caught by the game
+retain resources still in scope. A stale screen cannot close a newer one.
+
+### Keyboard game input
+
+The same input broker used by the REPL owns graphics keyboard input. Opening a
+screen switches to raw physical events; closing restores the preceding mode.
+Console `io.read` is rejected while graphics is open. Transitioning modes clears
+buffered events and held-key state; keys already held at open may need release
+and another press. Files remain usable while graphics is open.
+
+- `screen:poll()` returns the next event table or nil, without waiting.
+- Keyboard event fields are `type` (`"key_down"` or `"key_up"`), `key` (name),
+  `code` (SDK key number), `modifiers` (SDK bitmask), and `repeat` (boolean;
+  access as `event["repeat"]`, since `repeat` is a Lua keyword).
+- `screen:is_down(name)` returns the latest physical state observed by the broker,
+  without consuming buffered events. Both methods service input and cancellation.
+- Names include lowercase `a`..`z`, `0`..`9`, `left`, `right`, `up`, `down`, `space`,
+  `enter`, `escape`, `tab`, `backspace`, `delete`, `home`, `end`, `page_up`, `page_down`,
+  `ctrl`, `shift`, `alt`, `gui`, and `sym`. Other physical keys still deliver events
+  with `key="unknown"` and their numeric `code`; `is_down` rejects unknown names.
+- The broker buffers 128 press/release events. Overflow drops newest events and
+  delivers `{type="overflow"}` on the next poll. Held-key state still updates for
+  dropped events. Games needing each tap should drain the queue every frame.
+- Ctrl-C and Ctrl-D are reserved for cancellation while graphics is open. They
+  raise an interruption error in scripts; in interactive sessions they also request
+  REPL exit. Ctrl-U has its normal clear-line meaning only in console mode; games
+  receive it as a key event. Escape is available to games with no automatic action.
+
+No text rendering, image decoder, transformed blit, touch, sprite, tilemap, or audio
+binding is included in this initial slice. Text can be drawn from Lua-defined pixel
+patterns, as Snake demonstrates. Those capabilities can be added independently.
 
 ## Resource limits and validation
 
 Metadata requests a 4 MiB application heap and 64 KiB native stack. The Lua allocator
-caps managed allocations at 3 MiB, reserving the rest for newlib and adapter state.
+caps managed allocations at 3 MiB, reserving the rest for newlib, adapter state,
+and the separate SDK canvas (at most 512 KiB). Packed blit scratch buffers count
+toward the 3 MiB Lua limit.
 C-call and pattern recursion limits are 48. These are conservative starting budgets;
 physical stack/heap high-water measurements remain required. Deep parsing, recursion,
 large allocations or long patterns may therefore fail earlier than desktop Lua.
@@ -180,16 +306,19 @@ See [provenance and exclusions](../apps/lua/UPSTREAM.md).
 After building the host and applications, run the optional real-RV32 session harness:
 
 ```sh
-build/macos-debug/tests/tabos_lua_rv32 build/apps/shell/shell build/apps/lua/lua
+build/macos-debug/tests/tabos_lua_rv32 build/apps/shell/shell build/apps/lua/lua apps/lua/examples/snake.lua
 ```
 
 It uses temporary drive roots and the real loader, interpreter, shell, terminal,
 filesystem and wait services. It checks stdout/status, files, modules, argument
 passing, REPL state, error/OOM recovery, Ctrl-C, exit cleanup and repeated launch.
+It also checks Lua-rendered pixels, packed blits, raw key taps, graphics cleanup,
+and (when the optional third path is supplied) the actual Snake script.
 Ordinary CTest does not require separately built application artifacts. Linux
 validation is excluded for this implementation at the user's request.
 
-See the [validation record](validation/lua-cli-2026-09-12.md) for build and test evidence.
+See the [CLI validation record](validation/lua-cli-2026-09-12.md) and
+[graphics validation record](validation/lua-graphics-2026-09-12.md) for build and test evidence.
 
 Physical Tab5 acceptance is still pending. Before marking the CLI milestone accepted:
 

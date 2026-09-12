@@ -27,7 +27,10 @@
 - [x] Validate native sanitizers, official UTF-8/string/math subsets, RV32 sessions and macOS/Tab5 Debug/Release builds.
 - [x] Verify ordinary application build/install, licenses/examples and trailing math-library build tracking.
 - Linux builds/tests excluded by user direction; evidence: `docs/validation/lua-cli-2026-09-12.md`.
-- [ ] Complete physical Tab5 acceptance before follow-on graphics/input/audio/process bindings.
+- [ ] Complete remaining physical Tab5 CLI acceptance and measurements.
+- [x] Add Lua logical-canvas primitives, packed RGB565 blits, lifecycle and shared-broker keyboard game input; ship a single-file Snake example.
+- User authorized this basic graphics/input slice before final CLI acceptance and without the tile engine on 2026-09-12.
+- [ ] Complete physical Lua Snake/graphics/input acceptance and frame/memory measurements; pointer/audio/process bindings remain follow-up work.
 
 ### Kilo Terminal Editor
 

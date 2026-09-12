@@ -30,18 +30,23 @@ void lua_tabos_console_poll(lua_tabos_runtime_t* rt)
     tabos_input_event_t event;
     // Control commands remain detectable even when typeahead is full.
     for (size_t i = 0U; i < 64U && tabos_input_poll(&event); ++i) {
+        if (rt->graphics.open && event.key > TABOS_KEY_UNKNOWN && event.key <= TABOS_KEY_SYM &&
+            (event.type == TABOS_INPUT_KEY_DOWN || event.type == TABOS_INPUT_KEY_UP)) {
+            rt->keys[event.key] = event.type == TABOS_INPUT_KEY_DOWN;
+        }
         bool control = event.type == TABOS_INPUT_KEY_DOWN && (event.modifiers & TABOS_MODIFIER_CONTROL) != 0U;
         bool interrupt =
             (control && event.key == TABOS_KEY_C) || (event.type == TABOS_INPUT_TEXT && event.text[0] == 3);
         bool eof = (control && event.key == TABOS_KEY_D) || (event.type == TABOS_INPUT_TEXT && event.text[0] == 4);
-        if (interrupt || (rt->interactive_session && eof)) {
+        if (interrupt || ((rt->interactive_session || rt->graphics.open) && eof)) {
             rt->interrupted = true;
             if (rt->interactive_session) {
                 rt->exit_requested = true;
             }
-        } else if ((control && event.key == TABOS_KEY_U) || (event.type == TABOS_INPUT_TEXT && event.text[0] == 21)) {
+        } else if (!rt->graphics.open &&
+                   ((control && event.key == TABOS_KEY_U) || (event.type == TABOS_INPUT_TEXT && event.text[0] == 21))) {
             rt->cancelled = true;
-        } else if (event.type != TABOS_INPUT_KEY_UP) {
+        } else if (rt->graphics.open ? event.type != TABOS_INPUT_TEXT : event.type != TABOS_INPUT_KEY_UP) {
             if (rt->count == LUA_TABOS_QUEUE_SIZE) {
                 rt->overflow = true; // Drop newest; reject pending line visibly.
             } else {
@@ -249,6 +254,9 @@ int lua_tabos_readline(lua_tabos_runtime_t* rt, const char* prompt)
 }
 int lua_tabos_console_read(lua_State* L, int first)
 {
+    if (lua_tabos_runtime(L)->graphics.open) {
+        return luaL_error(L, "close graphics before reading console input");
+    }
     int nargs = lua_gettop(L) - 1;
     int count = nargs == 0 ? 1 : nargs;
     // Validate every format before consuming any input.

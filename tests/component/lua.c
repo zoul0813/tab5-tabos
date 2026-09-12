@@ -3,6 +3,7 @@
 #include <lua_tabos/runtime.h>
 #include <tabos/tty.h>
 #include <assert.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -12,6 +13,10 @@ void test_lua_reader(lua_tabos_runtime_t* rt);
 void test_lua_interrupt(void);
 void test_lua_typeahead(size_t count);
 uint32_t test_lua_mode(void);
+void test_lua_key(tabos_key_t key, bool down);
+void test_lua_graphics_failure(int error);
+void test_lua_mode_failure(unsigned long request);
+unsigned int test_lua_graphics_presents(void);
 static int initialize(lua_State* L)
 {
     lua_tabos_libraries(L);
@@ -180,6 +185,121 @@ int main(void)
            "assert(require('mod').value==42 and require('mod')==require('mod')); "
            "assert(os.remove('mod.lua')); package.path='a'..string.char(0)..'b'; assert(not pcall(require,'missing'))");
     assert(chdir(cwd) == 0 && rmdir(temp) == 0);
+    execute(L, "t=require('tabos'); assert(t.rgb(255,0,0)==63488 and t.rgb(0,255,0)==2016 "
+               "and t.rgb(0,0,255)==31); "
+               "assert(not pcall(t.rgb,256,0,0)); assert(not pcall(t.rgb,'1',0,0)); "
+               "assert(not pcall(t.graphics.open,0,10)); assert(not pcall(t.graphics.open,640,480)); "
+               "assert(not pcall(t.graphics.open,0/0,10)); assert(not pcall(t.graphics.open,10.5,10)); "
+               "assert(not t.graphics.open(2000,1)); "
+               "s=assert(t.graphics.open(8,8)); local w,h=s:size(); assert(w==8 and h==8); "
+               "local a,b,c=t.graphics.open(8,8); assert(a==nil and type(b)=='string' and type(c)=='number'); "
+               "assert(s:clear(0)); assert(s:fill_rect(-1,-1,3,3,63488)); "
+               "assert(s:pixel(7,7,31)); assert(s:line(0,3,7,3,2016)); "
+               "assert(s:rect(4,4,3,3,65535)); "
+               "assert(s:fill_rect(32767,0,1,8,123)); assert(s:fill_rect(-32768,0,1,8,123)); "
+               "assert(s:rect(32767,32767,32767,32767,123)); "
+               "assert(s:blit(0,5,2,1,string.char(31,0,0,248))); "
+               "assert(s:set_letterbox_color(31)); assert(s:present()); "
+               "assert(not pcall(s.fill_rect,s,0,0,-1,4,0)); "
+               "assert(not pcall(s.line,s,math.maxinteger,0,0,0,0)); "
+               "assert(not pcall(s.pixel,s,0,0,65536)); "
+               "assert(not pcall(s.blit,s,0,0,2,1,'short')); "
+               "assert(not pcall(s.blit,s,0,0,32767,32767,'')); "
+               "assert(not pcall(io.read)); assert(not pcall(s.is_down,s,'bad')); assert(s:poll()==nil)");
+    assert(rt->graphics.open && test_lua_mode() == TABOS_TTY_MODE_RAW_INPUT);
+    assert(test_lua_graphics_presents() == 1U);
+    const tabos_color_t* pixels = rt->graphics.pixels;
+    for (size_t y = 0U; y < 8U; ++y) {
+        for (size_t x = 0U; x < 8U; ++x) {
+            tabos_color_t expected = 0U;
+            if (x < 2U && y < 2U) {
+                expected = 63488U;
+            }
+            if (y == 3U) {
+                expected = 2016U;
+            }
+            if (x >= 4U && x <= 6U && y >= 4U && y <= 6U && (x != 5U || y != 5U)) {
+                expected = 65535U;
+            }
+            if ((x == 7U && y == 7U) || (x == 0U && y == 5U)) {
+                expected = 31U;
+            }
+            if (x == 1U && y == 5U) {
+                expected = 63488U;
+            }
+            assert(pixels[y * 8U + x] == expected);
+        }
+    }
+    test_lua_key(TABOS_KEY_LEFT, true);
+    execute(L, "assert(s:is_down('left')); local e=s:poll(); "
+               "assert(e.type=='key_down' and e.key=='left' and not e['repeat']); assert(s:poll()==nil)");
+    test_lua_key(TABOS_KEY_LEFT, false);
+    execute(L, "assert(not s:is_down('left')); assert(s:poll().type=='key_up')");
+    // Hooks must buffer short taps including release, and held state survives overflow.
+    test_lua_key(TABOS_KEY_A, true);
+    lua_tabos_console_poll(rt);
+    test_lua_key(TABOS_KEY_A, false);
+    lua_tabos_console_poll(rt);
+    execute(L, "assert(s:poll().type=='key_down'); assert(s:poll().type=='key_up')");
+    for (size_t i = 0U; i < LUA_TABOS_QUEUE_SIZE + 1U; ++i) {
+        test_lua_key(TABOS_KEY_A, i != LUA_TABOS_QUEUE_SIZE);
+        lua_tabos_console_poll(rt);
+    }
+    execute(L, "assert(not s:is_down('a')); assert(s:poll().type=='overflow'); "
+               "for i=1,128 do assert(s:poll().type=='key_down') end; assert(s:poll()==nil)");
+    test_lua_graphics_failure(EIO);
+    execute(L, "local a,b,c=s:present(); assert(a==nil and type(b)=='string' and type(c)=='number'); "
+               "assert(not s:close())");
+    assert(rt->graphics.open); // Keep borrowed memory alive when close fails.
+    test_lua_graphics_failure(0);
+    execute(L, "assert(s:close()); assert(s:close()); assert(not pcall(s.pixel,s,0,0,0)); "
+               "old=s; s=assert(t.graphics.open(8,8)); assert(old:close()); "
+               "old=nil; collectgarbage(); assert(s:clear(0)); assert(s:close()); "
+               "s=nil; collectgarbage(); "
+               "assert(not pcall(function() local g <close> = assert(t.graphics.open(8,8)); error('test') end)); "
+               "do local g=assert(t.graphics.open(8,8)) end; collectgarbage()");
+    assert(!rt->graphics.open && test_lua_mode() == 0U);
+    test_lua_graphics_failure(ENOMEM);
+    execute(L, "local a,b,c=t.graphics.open(8,8); assert(a==nil and type(b)=='string' and type(c)=='number')");
+    test_lua_graphics_failure(0);
+    execute(L, "s=assert(t.graphics.open(8,8))");
+    test_lua_interrupt();
+    execute(L, "local ok,e=pcall(s.present,s); assert(not ok and e:find('interrupted')); assert(s:close())");
+    execute(L, "s=assert(t.graphics.open(8,8)); local data=string.rep('x',128); "
+               "assert(s:blit(0,0,8,8,data))");
+    rt->fail_after = rt->allocations;
+    assert(luaL_loadstring(L, "return s:blit(0,0,8,8,string.rep('x',128))") != LUA_OK ||
+           lua_pcall(L, 0, 0, 0) != LUA_OK);
+    rt->fail_after = 0U;
+    lua_settop(L, 0);
+    assert(lua_tabos_graphics_close(rt) == 0);
+    execute(L, "s=nil; collectgarbage(); s=assert(t.graphics.open(8,8))");
+    assert(lua_tabos_graphics_close(rt) == 0);
+    assert(!rt->graphics.open && test_lua_mode() == 0U);
+    test_lua_mode_failure(TABOS_TTY_GET_MODE);
+    execute(L, "assert(not t.graphics.open(8,8))");
+    assert(!rt->graphics.open);
+    test_lua_mode_failure(TABOS_TTY_SET_MODE);
+    execute(L, "assert(not t.graphics.open(8,8))");
+    assert(!rt->graphics.open && test_lua_mode() == 0U);
+    execute(L, "s=assert(t.graphics.open(8,8))");
+    test_lua_mode_failure(TABOS_TTY_SET_MODE);
+    execute(L, "assert(not s:close()); assert(not t.graphics.open(8,8)); assert(s:close())");
+    assert(!rt->graphics_mode_changed && test_lua_mode() == 0U);
+    // Exercise allocation failure after resource acquisition, including blit scratch
+    // allocation, then recover in the same state without leaked external canvas memory.
+    for (size_t offset = 0U; offset < 20U; ++offset) {
+        assert(luaL_loadstring(L, "local g <close> = assert(t.graphics.open(8,8)); "
+                                  "local bytes=string.rep('z',128); assert(g:blit(0,0,8,8,bytes)); "
+                                  "assert(g:present())") == LUA_OK);
+        rt->fail_after = rt->allocations + offset;
+        (void) lua_pcall(L, 0, 0, 0);
+        rt->fail_after = 0U;
+        lua_settop(L, 0);
+        assert(lua_tabos_graphics_close(rt) == 0);
+        lua_gc(L, LUA_GCCOLLECT);
+        assert(!rt->graphics.open && test_lua_mode() == 0U);
+    }
     test_lua_interrupt();
     assert(luaL_loadstring(L, "while true do end") == LUA_OK);
     assert(lua_pcall(L, 0, 0, 0) != LUA_OK);

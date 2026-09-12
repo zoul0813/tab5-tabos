@@ -78,5 +78,6 @@ int lua_tabos_open_module(lua_State* L)
         {          NULL,      NULL}
     };
     luaL_newlib(L, functions);
+    lua_tabos_graphics_module(L);
     return 1;
 }

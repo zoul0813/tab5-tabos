@@ -27,4 +27,4 @@ LUA_VENDOR_SOURCES := vendor/lua/src/lapi.c \
     vendor/lua/src/lstrlib.c \
     vendor/lua/src/ltablib.c \
     vendor/lua/src/lutf8lib.c
-LUA_LOCAL_SOURCES := src/runtime.c src/console.c src/libraries.c src/module_tabos.c src/os.c src/cli.c
+LUA_LOCAL_SOURCES := src/runtime.c src/console.c src/libraries.c src/module_tabos.c src/graphics.c src/os.c src/cli.c

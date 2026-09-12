@@ -1784,3 +1784,20 @@ macOS Debug/Release and Tab5 Debug/Release builds passed. Linux builds/tests exc
 by explicit user direction for this implementation. Physical Tab5 functional acceptance,
 stack/heap high-water, timing and service responsiveness remain separate required checks.
 Evidence and exact commands: `docs/validation/lua-cli-2026-09-12.md`.
+
+
+## Lua graphics validation (2026-09-12)
+
+`component.lua` links the real portable SDK graphics implementation against a fake
+display transport. Independent expected pixels cover primitive clipping, outlines,
+lines and packed little-endian RGB565 blits. Tests cover invalid arguments, canvas
+limits, duplicate opens, stale handles, finalizers, `<close>` unwinding, failed
+open/present/close, OOM recovery, raw press/release delivery, held state through
+queue overflow, console-read exclusion and interruption. A failed close retains
+canvas memory until retry succeeds.
+
+`tabos_lua_rv32` additionally checks real shell-launched Lua rendering and upscale,
+packed pixels, short raw key taps, return/error/os.exit/Ctrl-C/Ctrl-D cleanup and
+terminal restoration. Supply `apps/lua/examples/snake.lua` as the optional third
+path to exercise the actual shipped Lua game. Physical graphics/input and timing
+acceptance remains separate; Linux stays excluded by user direction.

@@ -185,7 +185,7 @@ static void remove_fixture(const char* path)
 }
 int main(int argc, char** argv)
 {
-    check(argc == 3, "pass shell and Lua RV32 artifacts");
+    check(argc == 3 || argc == 4, "pass shell, Lua RV32 artifacts, and optional Snake script");
     check(mkdtemp(storage_root) != NULL, "temporary storage");
     char shell_path[512], lua_path[512], module_dir[512];
     snprintf(shell_path, sizeof(shell_path), "%s/shell", storage_root);
@@ -211,6 +211,23 @@ int main(int argc, char** argv)
                          "assert(f:read('a')=='a'..string.char(0,255)..'z'); "
                          "assert(f:seek('set',1)==1 and f:read(1)==string.char(0)); assert(f:close()); "
                          "print('SCRIPT_OK')");
+    fixture("graphics.lua",
+            "local t=require('tabos'); local s = assert(t.graphics.open(320,180)); "
+            "assert(s:clear(31)); assert(s:fill_rect(0,0,16,16,63488)); "
+            "assert(s:blit(20,20,1,1,string.char(224,7))); assert(s:present()); "
+            "if arg[1]=='error' then retained=s; error('GRAPHICS_ERROR') end; "
+            "if arg[1]=='exit' then os.exit(7) end; "
+            "if arg[1]=='return' then return end; "
+            "local down=false; while true do local e=s:poll(); "
+            "if e and e.key=='left' then "
+            "if e.type=='key_down' then down=true else assert(down); print('GRAPHICS_INPUT_OK') end end; "
+            "if e and e.type=='key_down' and e.key=='q' then break end; "
+            "t.sleep_ms(1) end; assert(s:close()); print('GRAPHICS_CLOSED')");
+    if (argc == 4) {
+        char snake_path[512];
+        snprintf(snake_path, sizeof(snake_path), "%s/snake.lua", storage_root);
+        copy(argv[3], snake_path);
+    }
     fixture("exit.lua", "local f=assert(io.open('exit-cleanup','w')); f:write('closed'); os.exit(7)");
     check(setenv("SDL_VIDEODRIVER", "dummy", 1) == 0 && setenv("SDL_AUDIODRIVER", "dummy", 1) == 0, "headless");
     boot();
@@ -230,6 +247,49 @@ int main(int argc, char** argv)
     check(bytes != NULL && fread(payload, 1U, sizeof(payload), bytes) == 4U && memcmp(payload, "a\0\377z", 4U) == 0 &&
               fclose(bytes) == 0,
           "binary file bytes on host drive");
+    command("./lua graphics.lua");
+    platform_framebuffer_t* framebuffer = display_framebuffer();
+    for (size_t i = 0U; i < 100U && framebuffer->pixels[20U * framebuffer->stride_pixels + 20U] != 63488U; ++i) {
+        pump();
+    }
+    check(tabos_process_count() == 2U && console_next_deadline() == UINT64_MAX, "Lua graphics owns display");
+    check(framebuffer->pixels[20U * framebuffer->stride_pixels + 20U] == 63488U,
+          "Lua rectangle rendered through RV32 and logical upscale");
+    check(framebuffer->pixels[81U * framebuffer->stride_pixels + 81U] == 2016U,
+          "packed RGB565 blit rendered through RV32");
+    key(TABOS_KEY_LEFT, 0U);
+    for (size_t i = 0U; i < 100U && !output_line("GRAPHICS_INPUT_OK"); ++i) {
+        pump();
+    }
+    check(output_line("GRAPHICS_INPUT_OK"), "Lua broker delivers short raw key press and release");
+    key(TABOS_KEY_Q, 0U);
+    parent();
+    check(console_next_deadline() != UINT64_MAX && output_line("GRAPHICS_CLOSED"), "graphics restores terminal");
+    command("./lua graphics.lua return");
+    parent();
+    command("./lua graphics.lua error");
+    parent_status(1);
+    check(console_next_deadline() != UINT64_MAX, "graphics error restores terminal");
+    command("./lua graphics.lua exit");
+    parent_status(7);
+    command("./lua graphics.lua");
+    key(TABOS_KEY_C, TABOS_MODIFIER_CONTROL);
+    parent_status(1);
+    command("./lua graphics.lua");
+    key(TABOS_KEY_D, TABOS_MODIFIER_CONTROL);
+    parent_status(1);
+    if (argc == 4) {
+        command("./lua snake.lua");
+        for (size_t i = 0U; i < 50U && console_next_deadline() != UINT64_MAX; ++i) {
+            pump();
+        }
+        check(tabos_process_count() == 2U && console_next_deadline() == UINT64_MAX, "Lua Snake runs");
+        key(TABOS_KEY_UP, 0U);
+        key(TABOS_KEY_SPACE, 0U);
+        key(TABOS_KEY_ENTER, 0U);
+        key(TABOS_KEY_Q, 0U);
+        parent();
+    }
     command("./lua -l n=nested -e 'assert(n.value==42)'");
     parent();
     command("./lua -e 'error(42)'");
@@ -345,7 +405,20 @@ int main(int argc, char** argv)
     boot();
     command("./lua -e 'assert(6*7==42)'");
     parent();
+    command("./lua graphics.lua");
+    for (size_t i = 0U; i < 100U && console_next_deadline() != UINT64_MAX; ++i) {
+        pump();
+    }
+    check(console_next_deadline() == UINT64_MAX, "forced teardown has live graphics");
     stop();
+    boot();
+    command("./lua graphics.lua return");
+    parent();
+    stop();
+    remove_fixture("graphics.lua");
+    if (argc == 4) {
+        remove_fixture("snake.lua");
+    }
     remove_fixture("bytes");
     remove_fixture("check.lua");
     remove_fixture("nested/init.lua");
@@ -358,6 +431,6 @@ int main(int argc, char** argv)
     check(unlink(shell_path) == 0 && unlink(lua_path) == 0 && unlink(history) == 0 && rmdir(user) == 0 &&
               rmdir(storage_root) == 0,
           "cleanup");
-    puts("RV32 Lua scripts, modules, files, REPL, errors, interruption, cleanup and repeat launch passed");
+    puts("RV32 Lua scripts, REPL, graphics pixels, keyboard, Snake, errors, interruption and cleanup passed");
     return 0;
 }

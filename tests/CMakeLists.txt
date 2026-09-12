@@ -937,7 +937,7 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${TABOS_ROOT}/ap
 file(READ "${TABOS_ROOT}/apps/lua/sources.mk" lua_manifest)
 string(REGEX MATCHALL "[a-zA-Z0-9_/]+[.]c" lua_sources "${lua_manifest}")
 list(TRANSFORM lua_sources PREPEND "${TABOS_ROOT}/apps/lua/")
-add_library(tabos_lua_profile STATIC ${lua_sources})
+add_library(tabos_lua_profile STATIC ${lua_sources} "${TABOS_ROOT}/sdk/lib/graphics.c")
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     foreach(lua_source IN LISTS lua_sources)
         if(lua_source MATCHES "/apps/lua/src/")

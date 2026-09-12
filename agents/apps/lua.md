@@ -1,6 +1,6 @@
 # Lua Implementation Plan
 
-Status: CLI implementation and automated validation completed 2026-09-12; physical Tab5 acceptance pending. Graphics/input/audio/process bindings remain gated on CLI acceptance. Linux builds/tests excluded by user direction for this implementation.
+Status: CLI implementation and automated validation completed 2026-09-12; physical Tab5 acceptance pending. Basic graphics and keyboard game bindings implemented at user direction before final CLI acceptance; pointer/audio/process bindings remain follow-up work. Linux builds/tests excluded by user direction for this implementation.
 
 Current implementation uses the proposed 5.5.1 baseline and resource budgets, with
 48-level C-call/pattern limits. Kilo's keyboard wait source is reused without a new
@@ -14,14 +14,14 @@ This expands the Lua candidate in [Application Port Candidates](../milestone-app
 ## Remaining Work
 
 Track outstanding work here; completed CLI work remains in [Validation and Delivery](#validation-and-delivery).
-Start graphics, input, audio, and foreground child execution only after CLI acceptance.
+User direction on 2026-09-12 authorizes basic graphics and keyboard input now, without waiting for the tile engine or final CLI acceptance. Remaining acceptance checks stay open.
 Linux builds/tests remain excluded by user direction. Each binding slice needs its
 own implementation, documentation/example, automated coverage, and physical validation.
 
 ### CLI Acceptance on Tab5
 
-- [ ] Verify physical keyboard editing, Aa/Sym typing, multiline input, Ctrl-U cancellation, and Ctrl-C/Ctrl-D REPL exit.
-- [ ] Run examples and nested modules from microSD; verify binary file reads/writes.
+- [X] Verify physical keyboard editing, Aa/Sym typing, multiline input, Ctrl-U cancellation, and Ctrl-C/Ctrl-D REPL exit.
+- [X] Run examples and nested modules from microSD; verify binary file reads/writes.
 - [ ] Verify recovery from allocation, parser-depth, and recursion failures; repeat launches and `os.exit(7)` with a usable shell afterward.
 - [ ] Measure interruption latency in loops and coroutines; verify runtime service responsiveness.
 - [ ] Record stack/heap high-water usage, count-hook overhead, and representative computation/allocation performance.
@@ -29,19 +29,31 @@ own implementation, documentation/example, automated coverage, and physical vali
 
 ### Graphics Bindings
 
-- [ ] Implement SDK-owned logical canvas lifecycle, RGB565 primitives/blits, explicit present/close, and dimension/buffer validation using packed buffers or userdata.
-- [ ] Implement idempotent resource cleanup on explicit close, Lua errors, finalization, and process teardown; define cancellation and buffer lifetime for blocking operations.
-- [ ] Document the Lua graphics API and ship a small runnable example.
-- [ ] Add deterministic host coverage for drawing, argument validation, resource failures, and cleanup; exercise bindings through the real RV32 runtime.
+- [x] Implement SDK-owned logical canvas lifecycle, RGB565 primitives/blits, explicit present/close, and dimension/buffer validation using packed buffers or userdata.
+- [x] Implement idempotent resource cleanup on explicit close, Lua errors, finalization, and process teardown; define cancellation and buffer lifetime for blocking operations.
+- [x] Document the Lua graphics API and ship a single-file Snake game.
+- [x] Complete deterministic host and real RV32 validation for drawing, argument validation, resource failures, and cleanup.
 - [ ] Validate rendering, presentation, cleanup, memory use, and representative frame performance on physical Tab5; record results.
+
+Initial API: `tabos.rgb`, `tabos.graphics.open(width,height)`, and screen methods
+`size`, `clear`, `pixel`, `line`, `rect`, `fill_rect`, packed little-endian RGB565
+`blit`, `set_letterbox_color`, `present`, `close`, `poll`, and `is_down`.
+One SDK canvas uses at most 512 KiB outside the 3 MiB Lua-managed budget; blit
+scratch memory counts against that Lua budget. Userdata generation checks prevent
+stale handles/finalizers from closing a later screen. `<close>` is recommended;
+CLI boundaries close graphics before error reporting and the next prompt.
+No tile-engine dependency, public ABI change, image decoder, or text renderer.
+Evidence: [graphics validation](../../docs/validation/lua-graphics-2026-09-12.md).
 
 ### Input Bindings
 
-- [ ] Expose keyboard press/release and pointer events through the existing shared input ownership policy.
-- [ ] Implement console/graphics input transitions without competing consumers; preserve interruption handling and restore console mode on close/error.
-- [ ] Document the Lua input API and ship a small interactive example.
-- [ ] Add deterministic host coverage for event delivery, input transitions, interruption, and restoration; exercise bindings through the real RV32 runtime.
-- [ ] Validate keyboard/pointer interaction and return to a usable shell on physical Tab5; record results.
+- [x] Expose keyboard press/release and held-key state through the shared console broker.
+- [x] Implement console/graphics input transitions without competing consumers; preserve interruption handling and restore console mode on close/error.
+- [x] Document keyboard game input and demonstrate it in Snake.
+- [x] Complete deterministic host and real RV32 validation for keyboard events, transitions, interruption, and restoration.
+- [ ] Validate keyboard interaction and return to a usable shell on physical Tab5; record results.
+- [ ] Add pointer bindings with documentation/example and host/RV32 validation.
+- [ ] Validate pointer interaction and cleanup on physical Tab5.
 
 ### Audio Bindings
 
@@ -73,7 +85,7 @@ Provide an independently built `T:/bin/lua` application that runs source scripts
 Deliver two distinct milestones:
 
 1. **CLI Lua:** language runtime, files, pure-Lua modules, usable REPL, bounded memory, errors/interruption, and a small system-information/time module.
-2. **TabOS scripting bindings:** graphics, input, audio, and foreground child execution, added in separate validated slices after CLI acceptance.
+2. **TabOS scripting bindings:** graphics, input, audio, and foreground child execution, added in separate validated slices. User direction permits the basic graphics/keyboard slice before final CLI acceptance.
 
 The CLI milestone does not depend on Kilo being implemented. Reuse any generic keyboard-wait work completed for Kilo, but do not require its terminal-size or ANSI improvements just to execute scripts.
 
@@ -229,7 +241,7 @@ This module should require no new public TabOS ABI beyond any separately impleme
 
 ## Follow-On: Graphics, Input, Audio, and Process Bindings
 
-Start these only after the CLI milestone passes. Each slice needs API documentation, a small example, deterministic host coverage, and physical validation where relevant.
+The original sequence gated these on CLI acceptance. User direction on 2026-09-12 authorizes basic graphics and keyboard game input now, independently of the tile engine. Each slice still needs API documentation, a small example, deterministic host coverage, and physical validation where relevant. Audio, pointer, and process slices remain follow-up work.
 
 | Slice | Initial design |
 | --- | --- |
