@@ -110,3 +110,5 @@ NATIVE_GATE(int, camera_release, (int stream, tabos_camera_lease_t lease), (stre
 NATIVE_GATE(int, camera_wait_source, (int stream), (stream))
 NATIVE_GATE(int, tty_get_size, (int descriptor, tabos_tty_size_t* size), (descriptor, size))
 NATIVE_GATE(int, input_wait_source, (void), ())
+NATIVE_GATE(int, spawn, (const char* path, uint32_t argc, const char* const* argv), (path, argc, argv))
+NATIVE_GATE(int, waitpid, (int pid, int* status), (pid, status))

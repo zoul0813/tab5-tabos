@@ -204,6 +204,8 @@ typedef struct {
         int (*camera_wait_source)(int stream);
         int (*tty_get_size)(int descriptor, tabos_tty_size_t* size);
         int (*input_wait_source)(void);
+        int (*spawn)(const char* path, uint32_t argc, const char* const* argv);
+        int (*waitpid)(int pid, int* status);
 } tabos_elf_api_t;
 
 typedef int (*tabos_elf_entry_fn)(const tabos_elf_api_t* api, int argc, const char* const* argv);

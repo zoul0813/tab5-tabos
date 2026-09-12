@@ -221,11 +221,7 @@ static void execute_command(char* line)
             copy_string(path, sizeof(path), command);
         }
     }
-    const int pid = tabos_spawn(path, (int) argc, (const char* const*) argv);
-    int status    = pid < 0 ? pid : 0;
-    if (pid >= 0 && waitpid(pid, &status, 0) < 0) {
-        status = -errno;
-    }
+    const int status = tabos_exec(path, (int) argc, (const char* const*) argv);
     if (status != 0) {
         write_exit_status(status);
     }

@@ -119,7 +119,9 @@ static _Thread_local uint32_t host_rv32_active_ram_size;
     X(CAMERA_RELEASE, 384U)                  \
     X(CAMERA_WAIT_SOURCE, 388U)              \
     X(TTY_GET_SIZE, 392U)                    \
-    X(INPUT_WAIT_SOURCE, 396U)
+    X(INPUT_WAIT_SOURCE, 396U)               \
+    X(SPAWN, 400U)                           \
+    X(WAITPID, 404U)
 
 enum {
 #define HOST_RV32_GATE_INDEX(name, api_offset) HOST_RV32_GATE_INDEX_##name,
@@ -465,11 +467,24 @@ static platform_riscv32_result_t step_inner(platform_riscv32_context_t* context,
             context->state.pc       = context->state.regs[1];
             continue;
         }
-        if (context->state.pc == HOST_RV32_EXEC) {
+        if (context->state.pc == HOST_RV32_WAITPID) {
+            int* status = guest_buffer(context->memory, context->state.regs[11], sizeof(*status));
+            if (status == NULL || context->api.waitpid == NULL) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data       = context->user_data;
+            context->state.regs[10] = (uint32_t) context->api.waitpid((int) context->state.regs[10], status);
+            current_user_data       = NULL;
+            context->state.pc       = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_EXEC || context->state.pc == HOST_RV32_SPAWN) {
+            int (*operation)(const char*, uint32_t, const char* const*) =
+                context->state.pc == HOST_RV32_EXEC ? context->api.exec : context->api.spawn;
             const char* path            = guest_string(context->memory, context->state.regs[10]);
             const uint32_t argc         = context->state.regs[11];
             const uint32_t argv_address = context->state.regs[12];
-            if (path == NULL || argc > TABOS_ELF_ARG_MAX || context->api.exec == NULL ||
+            if (path == NULL || argc > TABOS_ELF_ARG_MAX || operation == NULL ||
                 argv_address > host_rv32_active_ram_size - (argc + 1U) * 4U) {
                 return PLATFORM_RISCV32_FAULT;
             }
@@ -486,7 +501,7 @@ static platform_riscv32_result_t step_inner(platform_riscv32_context_t* context,
             }
             arguments[argc]         = NULL;
             current_user_data       = context->user_data;
-            context->state.regs[10] = (uint32_t) context->api.exec(path, argc, arguments);
+            context->state.regs[10] = (uint32_t) operation(path, argc, arguments);
             current_user_data       = NULL;
             context->state.pc       = context->state.regs[1];
             continue;

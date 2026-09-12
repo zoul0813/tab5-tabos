@@ -16,6 +16,42 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <tabos/tty.h>
+#include <tabos/graphics.h>
+#include <tabos/runtime_time.h>
+#include <sys/stat.h>
+
+void tester_test_concurrent_process(tester_context_t* context);
+
+static int run_concurrent_peer(const char* index)
+{
+    const bool first = strcmp(index, "1") == 0;
+    if (!first && strcmp(index, "2") != 0) {
+        return 1;
+    }
+    tabos_graphics_t graphics = {0};
+    if (tabos_graphics_open(&graphics) == 0) {
+        (void) tabos_graphics_close(&graphics);
+        return 2;
+    }
+    const char* own      = first ? "T:/tabos-concurrent-1.tmp" : "T:/tabos-concurrent-2.tmp";
+    const char* peer     = first ? "T:/tabos-concurrent-2.tmp" : "T:/tabos-concurrent-1.tmp";
+    const int descriptor = open(own, O_CREAT | O_WRONLY | O_TRUNC, 0600);
+    if (descriptor < 0) {
+        return 3;
+    }
+    if (close(descriptor) != 0) {
+        return 4;
+    }
+    const uint64_t deadline = tabos_monotonic_ms() + 10000U;
+    struct stat info;
+    while (stat(peer, &info) != 0) {
+        if (tabos_monotonic_ms() >= deadline) {
+            return 5;
+        }
+        (void) tabos_sleep_ms(1U);
+    }
+    return first ? 91 : 92;
+}
 
 enum {
     PROCESS_LEAK_DESCRIPTOR_COUNT   = 8,
@@ -127,6 +163,15 @@ static int run_process_fixture(int argc, char** argv)
 
 int main(int argc, char** argv)
 {
+    if (argc == 3 && strcmp(argv[1], "--concurrent-peer") == 0) {
+        return run_concurrent_peer(argv[2]);
+    }
+    if (argc == 2 && strcmp(argv[1], "--concurrent") == 0) {
+        tester_context_t context = {.argc = argc, .argv = argv};
+        tester_test_concurrent_process(&context);
+        printf("Concurrent assertions: %u; failures: %u\n", context.assertions, context.failures);
+        return context.failures == 0U ? 0 : 1;
+    }
     if (argc == 2 && strcmp(argv[1], "--input") == 0) {
         tester_context_t context = {.argc = argc, .argv = argv};
         tester_test_input(&context);

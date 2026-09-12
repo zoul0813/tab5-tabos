@@ -14,6 +14,14 @@ iteration, and nonblocking flags. `stat`/`fstat` expose `st_dev` and `st_ino` fo
 same-file checks; applications must not treat them as persistent identifiers. TabOS
 does not claim full POSIX compatibility.
 
+## Process Launch
+
+`<tabos/process.h>` provides synchronous foreground `tabos_exec()` and concurrent
+background `tabos_spawn()`. Spawn returns an actual positive PID after loading and
+copies arguments; use `tabos_waitpid()` to wait and reap each direct child once.
+Background launch grants no raw input or fullscreen display access. See
+[application process behavior](applications.md#concurrent-processes).
+
 ## Time and System Information
 
 `<tabos/runtime_time.h>` provides monotonic milliseconds and cooperative sleep.

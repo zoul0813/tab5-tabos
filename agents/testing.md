@@ -1938,3 +1938,13 @@ portable/host filesystem loading and the real runtime with fake time/display: pe
 settings apply after restart, exact custom deadlines and restoration use custom brightness,
 edits do not hot-reload, invalid saved files survive default fallback, and dimming cannot
 raise brightness. Physical microSD reboot loading remains a separate validation check.
+
+## GUI Concurrent ELF Validation
+
+`unit.sdk_process` tests real wrappers against bounded pending replies, distinct
+PIDs, validation, status preservation and repeated/foreign reaping errors.
+`tabos_process_rv32` accepts an SDK-built tester artifact and runs its `--concurrent`
+module through real RV32 loading with temporary storage. Three pairs rendezvous
+while parent waits; each proves background graphics denial and both children
+complete before root ownership restoration. The test never launches `tabos_host`.
+Physical concurrent service/gate contention remains a separate acceptance gate.

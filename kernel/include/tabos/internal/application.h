@@ -37,5 +37,7 @@ tabos_app_result_t kernel_process_spawn_descriptor(tabos_app_context_t* parent,
                                                    tabos_process_id_t* child_id);
 /* 1: reaped, 0: still running, -1: not an asynchronous child of this parent. */
 int kernel_process_reap(tabos_app_context_t* parent, tabos_process_id_t child_id, int* status);
+tabos_app_result_t kernel_process_spawn_path(tabos_app_context_t* parent, const char* path, size_t argc,
+                                             const char* const* argv, tabos_process_id_t* child_id);
 
 #endif

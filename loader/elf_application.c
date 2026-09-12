@@ -142,6 +142,13 @@ struct loader_elf_application {
         atomic_bool exec_requested;
         atomic_bool exec_in_flight;
         atomic_bool exec_status_ready;
+        bool exec_asynchronous;
+        atomic_bool reap_requested;
+        atomic_bool reap_ready;
+        bool reap_in_flight;
+        int reap_pid;
+        int reap_result;
+        int reap_status;
         bool graphics_active;
         uint32_t graphics_overlay_flags;
         elf_graphics_command_t graphics_commands[ELF_GRAPHICS_COMMAND_CAPACITY];
@@ -1914,6 +1921,12 @@ static int elf_graphics_open(uint32_t* width, uint32_t* height)
     if (application == NULL || framebuffer == NULL || width == NULL || height == NULL) {
         return -TABOS_EINVAL;
     }
+    if (!tabos_console_is_foreground(application->console)) {
+        return -TABOS_EPERM;
+    }
+    if (application->graphics_active) {
+        return -TABOS_EBUSY;
+    }
     if (!platform_graphics_begin()) {
         return -TABOS_EIO;
     }
@@ -2016,8 +2029,7 @@ static int elf_graphics_blit(int32_t x, int32_t y, uint32_t width, uint32_t heig
     loader_elf_application_t* application = platform_riscv32_current_user_data();
     platform_framebuffer_t* framebuffer   = display_framebuffer();
     if (application == NULL || !application->graphics_active || framebuffer == NULL || pixels == NULL || width == 0U ||
-        height == 0U || width > SIZE_MAX / height ||
-        (size_t) width * height > SIZE_MAX / sizeof(*pixels)) {
+        height == 0U || width > SIZE_MAX / height || (size_t) width * height > SIZE_MAX / sizeof(*pixels)) {
         return -TABOS_EINVAL;
     }
     const size_t pixel_bytes = (size_t) width * height * sizeof(*pixels);
@@ -2111,7 +2123,7 @@ static int elf_graphics_set_overlays(uint32_t flags)
     return 0;
 }
 
-static int elf_exec(const char* path, uint32_t argc, const char* const* argv)
+static int elf_launch(const char* path, uint32_t argc, const char* const* argv, bool asynchronous)
 {
     loader_elf_application_t* application = platform_riscv32_current_user_data();
     if (application == NULL || path == NULL || path[0] == '\0') {
@@ -2138,10 +2150,47 @@ static int elf_exec(const char* path, uint32_t argc, const char* const* argv)
         return -TABOS_EINVAL;
     }
     memcpy(application->exec_path, readable_path, length + 1U);
-    application->exec_argc = (size_t) argc;
+    application->exec_argc         = (size_t) argc;
+    application->exec_asynchronous = asynchronous;
     atomic_store_explicit(&application->exec_in_flight, true, memory_order_release);
     atomic_store_explicit(&application->exec_requested, true, memory_order_release);
     platform_runtime_notify(PLATFORM_RUNTIME_EVENT_APPLICATION);
+    return TABOS_ELF_EXEC_PENDING;
+}
+
+static int elf_exec(const char* path, uint32_t argc, const char* const* argv)
+{
+    return elf_launch(path, argc, argv, false);
+}
+
+static int elf_spawn(const char* path, uint32_t argc, const char* const* argv)
+{
+    return elf_launch(path, argc, argv, true);
+}
+
+static int elf_waitpid(int pid, int* status)
+{
+    loader_elf_application_t* application = platform_riscv32_current_user_data();
+    int* writable                         = (int*) platform_executable_data_pointer(status, sizeof(*status));
+    if (application == NULL || pid <= 0 || writable == NULL) {
+        return -TABOS_EINVAL;
+    }
+    if (application->reap_in_flight && application->reap_pid != pid) {
+        return -TABOS_EBUSY;
+    }
+    if (atomic_exchange_explicit(&application->reap_ready, false, memory_order_acq_rel)) {
+        application->reap_in_flight = false;
+        if (application->reap_result > 0) {
+            *writable = application->reap_status;
+        }
+        return application->reap_result;
+    }
+    if (!application->reap_in_flight) {
+        application->reap_pid       = pid;
+        application->reap_in_flight = true;
+        atomic_store_explicit(&application->reap_requested, true, memory_order_release);
+        platform_runtime_notify(PLATFORM_RUNTIME_EVENT_APPLICATION);
+    }
     return TABOS_ELF_EXEC_PENDING;
 }
 
@@ -2157,10 +2206,9 @@ static bool elf_entry(tabos_app_context_t* context)
         return false;
     }
     application->context = context;
-    application->console = tabos_app_console(context);
-    if (application->console == NULL) {
-        return false;
-    }
+    /* Background processes retain a token-zero session. Every console operation
+     * checks its token without granting access merely because the app runs. */
+    application->console = &context->console;
 
     const loader_elf_result_t result = loader_elf_load_file(application->path, &application->image);
     if (result != LOADER_ELF_OK) {
@@ -2283,6 +2331,8 @@ static bool elf_entry(tabos_app_context_t* context)
         .camera_wait_source              = elf_camera_wait_source,
         .tty_get_size                    = elf_tty_get_size,
         .input_wait_source               = elf_input_wait_source,
+        .spawn                           = elf_spawn,
+        .waitpid                         = elf_waitpid,
     };
     application->execution = platform_riscv32_create(
         application->image.entry, application->image.memory, application->image.memory_size,
@@ -2309,6 +2359,15 @@ static void elf_update(tabos_app_context_t* context)
         atomic_store_explicit(&application->exec_status_ready, true, memory_order_release);
     }
     if (atomic_exchange_explicit(&application->exec_requested, false, memory_order_acq_rel)) {
+        if (application->exec_asynchronous) {
+            tabos_process_id_t pid          = TABOS_PROCESS_ID_INVALID;
+            const tabos_app_result_t result = kernel_process_spawn_path(
+                context, application->exec_path, application->exec_argc, application->exec_argv, &pid);
+            const int reply = result == TABOS_APP_RESULT_OK ? (int) pid : -(100 + (int) result);
+            atomic_store_explicit(&application->exec_status, reply, memory_order_release);
+            atomic_store_explicit(&application->exec_status_ready, true, memory_order_release);
+            return;
+        }
         const tabos_app_result_t launch_result =
             tabos_app_exec_args(context, application->exec_path, application->exec_argc, application->exec_argv);
         if (launch_result != TABOS_APP_RESULT_OK) {
@@ -2322,6 +2381,16 @@ static void elf_update(tabos_app_context_t* context)
             atomic_store_explicit(&application->exec_status_ready, true, memory_order_release);
         } else {
             return;
+        }
+    }
+    if (atomic_load_explicit(&application->reap_requested, memory_order_acquire)) {
+        int status       = 0;
+        const int result = kernel_process_reap(context, (tabos_process_id_t) application->reap_pid, &status);
+        if (result != 0) {
+            application->reap_result = result > 0 ? application->reap_pid : -TABOS_ECHILD;
+            application->reap_status = status;
+            atomic_store_explicit(&application->reap_requested, false, memory_order_release);
+            atomic_store_explicit(&application->reap_ready, true, memory_order_release);
         }
     }
     if (atomic_exchange_explicit(&application->exit_requested, false, memory_order_acq_rel)) {

@@ -6,9 +6,35 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <errno.h>
+
+void tester_test_concurrent_process(tester_context_t* context)
+{
+    const char* const first_args[]  = {"T:/bin/tester", "--concurrent-peer", "1", NULL};
+    const char* const second_args[] = {"T:/bin/tester", "--concurrent-peer", "2", NULL};
+    for (unsigned int round = 0U; round < 3U; ++round) {
+        const int first  = tabos_spawn(first_args[0], 3, first_args);
+        const int second = tabos_spawn(second_args[0], 3, second_args);
+        tester_expect(context, first > 0 && second > 0 && first != second, "concurrent children have distinct PIDs");
+        int first_status  = -1;
+        int second_status = -1;
+        if (first > 0) {
+            tester_expect(context, tabos_waitpid(first, &first_status) == first, "wait reaps first actual PID");
+            tester_expect(context, tabos_waitpid(first, NULL) == -ECHILD, "second reap rejected");
+        }
+        if (second > 0) {
+            tester_expect(context, tabos_waitpid(second, &second_status) == second, "wait reaps second actual PID");
+        }
+        tester_expect(context, first_status == 91 && second_status == 92,
+                      "both independent RV32 children progress while parent waits; background display denied");
+        (void) unlink("T:/tabos-concurrent-1.tmp");
+        (void) unlink("T:/tabos-concurrent-2.tmp");
+    }
+}
 
 void tester_test_process(tester_context_t* context)
 {
+    tester_test_concurrent_process(context);
     const char* const arguments[] = {
         "T:/bin/tester",
         "--process-child",

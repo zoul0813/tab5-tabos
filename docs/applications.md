@@ -242,7 +242,7 @@ Loader reads ELF with debug sections removed and static relocations retained thr
 TabOS filesystem API and maps its entry into this
 lifecycle without making ELF details part of normal application source API. See
 [ELF Loader Experiment](elf-loader.md).
-# Concurrent Process Foundation
+## Concurrent Processes
 
 The internal process manager supports background descriptor children without
 transferring foreground ownership. An exited asynchronous child releases execution
@@ -250,5 +250,13 @@ resources and remains in process inspection as `TABOS_PROCESS_EXITED` until its
 parent reaps its status; its `name` is then `NULL`. Unreaped records count toward
 the 16-process capacity. Parent teardown removes descendants.
 
-This is infrastructure for the GUI. Independently loaded applications still use
-the existing synchronous SDK execution path until concurrent ELF transport lands.
+`tabos_spawn(path, argc, argv)` now loads an independent background RV32 child and
+returns its actual positive PID, or a negative launch error. Launch data and
+working directory are copied. The caller may reuse its argument storage after
+spawn returns. `tabos_waitpid(pid, &status)` waits and reaps one direct child,
+returning its PID; a second or foreign reap returns `-ECHILD`. Passing `NULL` for
+status discards it. Background children receive no foreground console, raw input
+or fullscreen display grant. They may use ordinary filesystem and other services.
+
+Shell commands continue to use `tabos_exec()` for synchronous foreground execution.
+The GUI desktop, session ownership and cooperative handoff are still in progress.

@@ -93,3 +93,17 @@ foreign/stale source, nested cleanup, and parent TTY policy checks. This module 
 only public SDK services and also runs in the ordinary tester suite.
 When launched by bare command name, its child checks use `T:/bin/tester` because
 `tabos_exec` does not search the shell PATH. Explicit launch paths are retained.
+
+## Concurrent Process Validation
+
+Run `tester --concurrent` for three pairs of independent RV32 children. Each child
+publishes a temporary filesystem marker and waits for its peer while the parent
+waits for exit. The test checks distinct PIDs, repeated-reap rejection, background
+graphics denial, returned statuses and cleanup. The ordinary process module also
+runs these cases. The test removes its `T:/tabos-concurrent-*.tmp` fixtures.
+
+For automated macOS validation, build tester with the SDK, then run
+`build/macos-debug/tests/tabos_process_rv32 build/apps/tester/tester`.
+This dedicated component test uses temporary storage and a headless backend;
+it does not launch the host simulator executable or use UI automation.
+Physical native contention and GUI handoff acceptance remain separate.

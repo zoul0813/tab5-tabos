@@ -235,6 +235,12 @@ tabos_enable_warnings(tabos_sdk_input)
 tabos_enable_sanitizers(tabos_sdk_input)
 add_test(NAME unit.sdk_input COMMAND tabos_sdk_input)
 
+add_executable(tabos_sdk_process unit/sdk_process.c ${PROJECT_SOURCE_DIR}/sdk/lib/process.c)
+target_include_directories(tabos_sdk_process PRIVATE ${PROJECT_SOURCE_DIR}/sdk/include)
+tabos_enable_warnings(tabos_sdk_process)
+tabos_enable_sanitizers(tabos_sdk_process)
+add_test(NAME unit.sdk_process COMMAND tabos_sdk_process)
+
 add_executable(tabos_sdk_reboot
     unit/sdk_reboot.c
     "${TABOS_ROOT}/sdk/lib/reboot.c"
@@ -583,7 +589,7 @@ target_include_directories(tabos_shell_session_main PRIVATE
 )
 target_compile_definitions(tabos_shell_session_main PRIVATE
     main=shell_test_main read=test_shell_read getcwd=test_shell_getcwd
-    ioctl=test_shell_ioctl tabos_spawn=test_shell_spawn waitpid=test_shell_waitpid
+    ioctl=test_shell_ioctl tabos_exec=test_shell_exec
 )
 if(TABOS_TARGET STREQUAL "linux")
     target_compile_options(tabos_shell_session_main PRIVATE -U_FORTIFY_SOURCE)
@@ -705,6 +711,24 @@ tabos_enable_warnings(tabos_rv32_execution)
 tabos_enable_sanitizers(tabos_rv32_execution)
 
 add_test(NAME component.rv32_execution COMMAND tabos_rv32_execution)
+
+# Optional actual SDK artifact test; does not launch the host simulator executable.
+add_executable(tabos_process_rv32 component/process_rv32.c)
+target_include_directories(tabos_process_rv32 PRIVATE
+    "${TABOS_ROOT}/kernel/include"
+    "${TABOS_ROOT}/console/include"
+    "${TABOS_ROOT}/graphics/include"
+    "${TABOS_ROOT}/platform/include"
+)
+if(TABOS_TARGET STREQUAL "linux")
+    target_link_libraries(tabos_process_rv32 PRIVATE
+        "-Wl,--start-group" tabos_core tabos_platform_host "-Wl,--end-group" SDL3::SDL3
+    )
+else()
+    target_link_libraries(tabos_process_rv32 PRIVATE tabos_core tabos_platform_host SDL3::SDL3)
+endif()
+tabos_enable_warnings(tabos_process_rv32)
+tabos_enable_sanitizers(tabos_process_rv32)
 
 add_executable(tabos_elf_graphics_cleanup component/elf_graphics_cleanup.c)
 target_include_directories(tabos_elf_graphics_cleanup PRIVATE

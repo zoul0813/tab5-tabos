@@ -1,8 +1,8 @@
 # GUI Implementation Tasks
 
 Status: implementation in progress, 2026-09-12. Contracts and the initial internal
-process scheduling foundation are implemented; desktop and public concurrent SDK
-launch are not yet available. Evidence below is scoped to completed work.
+process scheduling foundation and public concurrent SDK/ELF spawn/wait are
+implemented; desktop and GUI services are not yet available. Evidence below is scoped to completed work.
 
 Direction and scope: [TabOS Retro Desktop milestone](../milestone-gui.md). This file tracks executable work packages; the milestone records agreed product behavior. Read [context](../TABOS_CONTEXT.md), [architecture](../architecture.md), [testing](../testing.md), and [roadmap](../roadmap.md) before implementation, plus [coding style](../coding-style.md) before C changes.
 
@@ -134,3 +134,26 @@ foreign/repeated reaping, exit-before-wait, forced descendant cleanup, slot reus
 unreaped table exhaustion and all existing nested/PID-0 cases. No simulator binary
 was run. `./tools/tabos tab5 debug build` also passed; firmware has 12,016
 bytes of app-partition headroom. No flashing or physical validation was performed.
+
+### Concurrent ELF Transport Evidence
+
+The next increment implements actual SDK spawn PIDs and wait/reap, copied loader
+requests, background ELF startup with no console grant, graphics-open ownership
+checks, shell migration to synchronous exec and native mapping-table synchronization.
+GUI-102 remains open for generic child-exit wait sources and complete error mapping;
+GUI-104/105 remain open for full service/session audit and physical contention.
+
+`unit.sdk_process` checks validation, multiple outstanding children, pending launch
+and wait replies, status preservation, repeated reaping and POSIX errno adaptation.
+`component.shell_session` retains command/history regression using synchronous exec.
+`tabos_process_rv32 build/apps/tester/tester` passes ASan/UBSan with SDK-built tester:
+three pairs rendezvous while parent waits, background display is denied, exact
+statuses return and the root regains console with only one process left.
+
+macOS and Tab5 Debug/Release builds pass. `./apps/build.sh build --with-doom`
+rebuilt all bundled RV32 apps. Debug macOS suite excluding simulator/Linux: 82/83
+passed; Lua touch timed out during a run with large wall-clock stalls, then passed
+an isolated rerun in 0.17 seconds. Ten targeted Release process/shell/native/boundary
+tests and the Release real-RV32 concurrency harness passed. Tab5 firmware remaining
+app-partition headroom: Debug 10,704 bytes; Release 113,264 bytes. No Linux build/test,
+flash or simulator executable was run.

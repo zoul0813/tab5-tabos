@@ -17,8 +17,7 @@ int shell_test_main(int argc, char** argv);
 ssize_t test_shell_read(int descriptor, void* buffer, size_t size);
 char* test_shell_getcwd(char* buffer, size_t size);
 int test_shell_ioctl(int descriptor, unsigned long request, ...);
-int test_shell_spawn(const char* path, int argc, const char* const argv[]);
-int test_shell_waitpid(int pid, int* status, int options);
+int test_shell_exec(const char* path, int argc, const char* const argv[]);
 
 static const char* input;
 static unsigned int launches;
@@ -63,10 +62,10 @@ int test_shell_ioctl(int descriptor, unsigned long request, ...)
     return 0;
 }
 
-int test_shell_spawn(const char* path, int argc, const char* const argv[])
+int test_shell_exec(const char* path, int argc, const char* const argv[])
 {
     shell_history_t saved;
-    check(shell_history_load(&saved) == 0 && saved.count > 0U, "saved before spawn");
+    check(shell_history_load(&saved) == 0 && saved.count > 0U, "saved before exec");
     const char* last = saved.entries[saved.count - 1U];
     if (strcmp(path, "probe") == 0) {
         check(argc == 2 && strcmp(argv[1], "two words") == 0, "recalled arguments");
@@ -75,14 +74,7 @@ int test_shell_spawn(const char* path, int argc, const char* const argv[])
         check(strcmp(path, "reboot") == 0 && strcmp(last, "reboot") == 0, "save before reboot");
     }
     ++launches;
-    return 1;
-}
-
-int test_shell_waitpid(int pid, int* status, int options)
-{
-    check(pid == 1 && options == 0, "wait child");
-    *status = 0;
-    return pid;
+    return 0;
 }
 
 static void session(const char* commands)

@@ -525,6 +525,29 @@ tabos_app_result_t tabos_app_exec(tabos_app_context_t* context, const char* path
     return tabos_app_exec_args(context, path, 1U, argv);
 }
 
+tabos_app_result_t kernel_process_spawn_path(tabos_app_context_t* parent, const char* path, size_t argc,
+                                             const char* const* argv, tabos_process_id_t* child_id)
+{
+    const kernel_process_t* owner = process_from_context(parent);
+    if (owner == NULL || child_id == NULL) {
+        return TABOS_APP_RESULT_INVALID;
+    }
+    loader_elf_application_t* application = loader_elf_application_create(path, argc, argv);
+    if (application == NULL) {
+        return TABOS_APP_RESULT_INVALID;
+    }
+    if (owner->application_data_destroy == loader_elf_application_destroy &&
+        (!loader_elf_application_set_working_directory(
+             application, loader_elf_application_working_directory(parent->application_data)) ||
+         !loader_elf_application_set_tty_mode(application,
+                                              loader_elf_application_tty_mode(parent->application_data)))) {
+        loader_elf_application_destroy(application);
+        return TABOS_APP_RESULT_INVALID;
+    }
+    return kernel_process_spawn_descriptor(parent, loader_elf_application_descriptor(application), application,
+                                           loader_elf_application_destroy, child_id);
+}
+
 tabos_app_result_t tabos_app_exec_args(tabos_app_context_t* context, const char* path, size_t argc,
                                        const char* const* argv)
 {

@@ -20,12 +20,21 @@ enum {
     EXECUTABLE_MAPPING_CAPACITY = 16
 };
 static executable_mapping_t mappings[EXECUTABLE_MAPPING_CAPACITY];
+/* Loader mutations run on runtime. Application gates concurrently inspect the
+ * table; copy records under this lock before performing cache synchronization. */
+static platform_mutex_t* mappings_mutex;
 static const char* const TAG = TABOS_PLATFORM_LOG_TAG;
 
 void* platform_executable_alloc(size_t size)
 {
     if (size == 0U) {
         return NULL;
+    }
+    if (mappings_mutex == NULL) {
+        mappings_mutex = platform_mutex_create();
+        if (mappings_mutex == NULL) {
+            return NULL;
+        }
     }
     executable_mapping_t* mapping = NULL;
     for (size_t index = 0U; index < EXECUTABLE_MAPPING_CAPACITY; ++index) {
@@ -43,7 +52,9 @@ void* platform_executable_alloc(size_t size)
     if (writable == NULL) {
         return NULL;
     }
+    platform_mutex_lock(mappings_mutex);
     *mapping = (executable_mapping_t) {.writable = writable, .mapped_size = mapped_size};
+    platform_mutex_unlock(mappings_mutex);
     return writable;
 }
 
@@ -75,7 +86,9 @@ void* platform_executable_prepare(void* memory, size_t size)
         ESP_LOGE(TAG, "Could not map executable PSRAM: %s", esp_err_to_name(result));
         return NULL;
     }
+    platform_mutex_lock(mappings_mutex);
     mapping->executable = executable;
+    platform_mutex_unlock(mappings_mutex);
     __builtin___clear_cache((char*) executable, (char*) executable + size);
     return executable;
 }
@@ -102,7 +115,10 @@ const void* platform_executable_data_pointer(const void* memory, size_t size)
 {
     const uintptr_t address = (uintptr_t) memory;
     for (size_t index = 0U; index < EXECUTABLE_MAPPING_CAPACITY; ++index) {
-        const executable_mapping_t* mapping = &mappings[index];
+        platform_mutex_lock(mappings_mutex);
+        const executable_mapping_t snapshot = mappings[index];
+        platform_mutex_unlock(mappings_mutex);
+        const executable_mapping_t* mapping = &snapshot;
         const uintptr_t executable          = (uintptr_t) mapping->executable;
         if (mapping->executable != NULL && address >= executable && address - executable < mapping->mapped_size) {
             const size_t offset       = address - executable;
@@ -137,7 +153,9 @@ void platform_executable_free(void* memory)
             (void) esp_mmu_unmap(mapping->executable);
         }
         heap_caps_free(mapping->writable);
+        platform_mutex_lock(mappings_mutex);
         *mapping = (executable_mapping_t) {0};
+        platform_mutex_unlock(mappings_mutex);
         return;
     }
 }

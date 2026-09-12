@@ -325,7 +325,8 @@ state does not imply console, raw input or display ownership. See
 [GUI contracts](gui-contracts.md) for lifecycle and admission rules. The first
 implementation provides runtime-owned asynchronous descriptor launch, rotating
 snapshot dispatch and resource-free exit records retained until parent reaping.
-Public SDK/ELF asynchronous launch and GUI ownership are still pending.
+SDK/ELF asynchronous spawn and wait now use copied runtime request/reply gates.
+Shell retains synchronous exec. GUI session ownership remains pending.
 
 The intended application model is:
 

@@ -5,11 +5,6 @@
 #include <errno.h>
 #include <sched.h>
 
-static const char* pending_path;
-static int pending_argc;
-static const char* const* pending_argv;
-static int pending_pid;
-
 extern const tabos_elf_api_t* tabos_runtime_api;
 
 int tabos_exec(const char* path, int argc, const char* const argv[])
@@ -32,37 +27,39 @@ int tabos_exec(const char* path, int argc, const char* const argv[])
 
 int tabos_spawn(const char* path, int argc, const char* const argv[])
 {
-    if (pending_path != NULL) {
-        return -TABOS_EBUSY;
+    const tabos_elf_api_t* api = tabos_runtime_api;
+    if (api == NULL || api->spawn == NULL || api->yield == NULL || path == NULL || path[0] == '\0' || argc < 1 ||
+        argc > TABOS_ELF_ARG_MAX || argv == NULL) {
+        return -TABOS_EINVAL;
     }
-    const int result = tabos_runtime_api->exec(path, (uint32_t) argc, argv);
-    if (result < 0 && result != TABOS_ELF_EXEC_PENDING) {
-        return result;
-    }
-    pending_path = path;
-    pending_argc = argc;
-    pending_argv = argv;
-    pending_pid  = 1;
-    return pending_pid;
+    int result;
+    do {
+        result = api->spawn(path, (uint32_t) argc, argv);
+        if (result == TABOS_ELF_EXEC_PENDING) {
+            api->yield();
+        }
+    } while (result == TABOS_ELF_EXEC_PENDING);
+    return result;
 }
 
 int tabos_waitpid(int pid, int* status)
 {
-    if (pending_path == NULL || pid != pending_pid) {
-        return -TABOS_ECHILD;
+    const tabos_elf_api_t* api = tabos_runtime_api;
+    if (api == NULL || api->waitpid == NULL || api->yield == NULL || pid <= 0) {
+        return -TABOS_EINVAL;
     }
+    int copied_status = 0;
     int result;
     do {
-        result = tabos_runtime_api->exec(pending_path, (uint32_t) pending_argc, pending_argv);
+        result = api->waitpid(pid, &copied_status);
         if (result == TABOS_ELF_EXEC_PENDING) {
-            (void) sched_yield();
+            api->yield();
         }
     } while (result == TABOS_ELF_EXEC_PENDING);
-    pending_path = NULL;
-    if (status != NULL) {
-        *status = result;
+    if (result > 0 && status != NULL) {
+        *status = copied_status;
     }
-    return pid;
+    return result;
 }
 
 int execve(const char* path, char* const argv[], char* const envp[])
