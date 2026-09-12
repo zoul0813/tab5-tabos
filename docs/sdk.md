@@ -178,3 +178,26 @@ through `ioctl` on foreground console descriptors. `<tabos/wait.h>` adds
 `tabos_input_wait_source()` for non-consuming keyboard readiness. See
 [console controls](console.md) and [keyboard waits](input.md). These extend private
 pre-release transport; rebuild bundled applications and firmware together.
+
+## GUI Client SDK
+
+The GUI SDK is under development with the desktop. `<tabos/gui.h>` supplies a
+single-window client that connects to its inherited session. Initialize a zeroed
+`tabos_gui_t` with `draw`, `action`, optional `input`, `closing`, `pause` and `resume`
+callbacks plus `user` data. Call `tabos_gui_open()`, repeatedly call
+`tabos_gui_step()`, then call `tabos_gui_shutdown()` after zero/negative return.
+A GUI application sets `TABOS_APP_GUI=1` and should request at least a 4 MiB heap
+for the initial 1280x592 RGB565 canvas plus transactional resize overlap.
+
+Drawing callbacks rebuild layout without modifying application state. Add widgets
+through `tabos_gui_ui_add()`; the SDK renders them after the callback. Custom RGB565
+canvas drawing is available through `gui->canvas` and `<tabos/gui_draw.h>`. Text is
+CP437 using the existing TabOS 8x12 font. `tabos_gui_invalidate()` schedules a new
+surface commit. Old geometry remains displayed until a replacement commits and
+is acknowledged. Failed resize preserves the committed image and reports an error.
+
+A close callback returns 1 to exit, -1 to cancel, or 0 to display application
+confirmation controls. Resolve those controls with `tabos_gui_close_reply()`.
+Pause hooks must finish bounded work and release leases; after acknowledgement,
+the kernel retains memory but closes audio/camera streams. Reopen these in the
+resume callback. The client waits when idle and does not repaint periodically.

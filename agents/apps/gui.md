@@ -2,7 +2,9 @@
 
 Status: implementation in progress, 2026-09-12. Contracts and the initial internal
 process scheduling foundation and public concurrent SDK/ELF spawn/wait are
-implemented; desktop and GUI services are not yet available. Evidence below is scoped to completed work.
+implemented. Session control, IPC, retained surfaces, executable inspection and the
+initial GUI client SDK are available; desktop and GUI applications remain in progress.
+Evidence below is scoped to completed work.
 
 Direction and scope: [TabOS Retro Desktop milestone](../milestone-gui.md). This file tracks executable work packages; the milestone records agreed product behavior. Read [context](../TABOS_CONTEXT.md), [architecture](../architecture.md), [testing](../testing.md), and [roadmap](../roadmap.md) before implementation, plus [coding style](../coding-style.md) before C changes.
 
@@ -254,3 +256,27 @@ cancellation tests also pass after root cleanup changes. Native socket-loop test
 verify foreign cancellation leaves accept/receive/infinite wait running, matching
 owner cancellation stops them, and late cancellation cannot affect the next owner.
 macOS Debug and Tab5 Debug builds pass. No simulator, Linux or flashing was used.
+
+### GUI Client SDK and Drawing Foundation
+
+Added a versioned copied window protocol and portable SDK client lifecycle. Clients
+publish OS surfaces, carry geometry serials with input and retain old surfaces until
+compositor acknowledgement. Failed resize restores old geometry/canvas and preserves
+committed pixels. The bounded event loop checks kernel pause safe points, supports
+close confirmation/cancellation and retries queued lifecycle replies. Idle waits are
+bounded to 100 ms for cooperative pause detection; idle does not repaint.
+
+Portable drawing uses the existing CP437 8x12 bitmap, RGB565 clipped fills and bevels.
+Initial controls include labels/buttons/checkboxes/text fields/lists/scrollbars,
+contact capture and keyboard focus/text handling. Menus/dialogs, richer editing,
+complete client applications and desktop integration remain unfinished; GUI-401/402
+are not checked complete yet.
+
+Six macOS Debug drawing/client/boundary tests pass under ASan/UBSan. Client tests
+use production IPC/surface services with deterministic gate/wait adapters, verifying
+publication, deferred old-surface release, failed upload resize rollback, close
+cancellation, saturated control reply retry and zero remaining surface allocations.
+Input tests cover clipping guards, CP437 drawing, capture cancellation, focus,
+exactly-once printable text, buffer bounds and cursor preservation across layout.
+The SDK tester cross-build compiles the new GUI sources; real RV32 GUI execution
+remains the next integration gate. These tests do not launch the host simulator.

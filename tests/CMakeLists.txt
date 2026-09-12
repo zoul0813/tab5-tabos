@@ -1132,3 +1132,28 @@ add_test(NAME component.lua_touch
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_LIST_DIR}/lua_touch.py"
         "$<TARGET_FILE:tabos_lua_native>" "${TABOS_ROOT}/apps/lua/examples/touch.lua")
 set_tests_properties(component.lua_touch PROPERTIES TIMEOUT 30)
+
+add_executable(tabos_gui_draw unit/gui_draw.c
+    "${TABOS_ROOT}/sdk/lib/gui_draw.c"
+    "${TABOS_ROOT}/sdk/lib/gui_font.c")
+target_include_directories(tabos_gui_draw PRIVATE "${TABOS_ROOT}/sdk/include")
+tabos_enable_warnings(tabos_gui_draw)
+tabos_enable_sanitizers(tabos_gui_draw)
+add_test(NAME unit.gui_draw COMMAND tabos_gui_draw)
+
+add_executable(tabos_gui_client unit/gui_client.c ${TABOS_TEST_PLATFORM_FAKES}
+    "${TABOS_ROOT}/sdk/lib/gui.c"
+    "${TABOS_ROOT}/sdk/lib/gui_draw.c"
+    "${TABOS_ROOT}/sdk/lib/gui_font.c"
+    "${TABOS_ROOT}/sdk/lib/ipc.c"
+    "${TABOS_ROOT}/sdk/lib/surface.c"
+    "${TABOS_ROOT}/sdk/lib/process.c"
+    "${TABOS_ROOT}/sdk/lib/wait.c")
+target_include_directories(tabos_gui_client PRIVATE
+    "${TABOS_ROOT}/console/include" "${TABOS_ROOT}/graphics/include"
+    "${TABOS_ROOT}/input/include" "${TABOS_ROOT}/kernel/include"
+    "${TABOS_ROOT}/platform/include" "${TABOS_ROOT}/sdk/include")
+target_link_libraries(tabos_gui_client PRIVATE tabos_core)
+tabos_enable_warnings(tabos_gui_client)
+tabos_enable_sanitizers(tabos_gui_client)
+add_test(NAME unit.gui_client COMMAND tabos_gui_client)

@@ -52,6 +52,9 @@ TABOS_RUNTIME_SOURCES := $(SDK_ROOT)/crt/crt0.c $(SDK_ROOT)/crt/metadata.S $(SDK
                          $(SDK_ROOT)/lib/process.c \
                          $(SDK_ROOT)/lib/ipc.c \
                          $(SDK_ROOT)/lib/surface.c \
+                         $(SDK_ROOT)/lib/gui_draw.c \
+                         $(SDK_ROOT)/lib/gui.c \
+                         $(SDK_ROOT)/lib/gui_font.c \
                          $(SDK_ROOT)/lib/graphics.c \
                          $(SDK_ROOT)/lib/input.c \
                          $(SDK_ROOT)/lib/network.c \
