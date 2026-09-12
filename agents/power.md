@@ -107,6 +107,12 @@ Meter precision and two-second stability interval limit accuracy. Light sleep re
 
 ## Phase 3 — Remove avoidable idle service work
 
+Display timings and normal/dim brightness now have optional boot-time configuration in
+`T:/etc/power.conf` (`version=1`, `[display]`). Defaults remain 60/180/300 seconds and
+75/20 percent. See `docs/power.md` for supported keys and validation. File loading adds
+no periodic work or sleep behavior; edits apply on reboot, and invalid files retain
+safe defaults without rewriting user data.
+
 - [x] Extend display policy with 180-second idle screen-off, separate from system suspend, using the existing runtime deadline mechanism.
 - [x] Restore screen and previous active brightness on touch/keyboard activity during runtime input dispatch through the backlight-only stage; preserve framebuffer contents.
 - [x] Add 300-second panel-off stage with keyboard restoration and deliberate pointer-restoration suppression; separate panel and brightness control with ordered failure handling.

@@ -1,5 +1,10 @@
 # Project Configuration
 
+Display power settings are runtime configuration, separate from build options below.
+Edit `T:/etc/power.conf` to set idle dim/backlight-off/panel-off seconds and normal/dim
+brightness, then reboot. See [display configuration](power.md#display-configuration)
+for the INI format, defaults, limits, and recovery behavior.
+
 TabOS works without a saved project configuration. Built-in defaults start
 `T:/bin/shell` on both host and Tab5 targets. To override TabOS-owned options, use:
 

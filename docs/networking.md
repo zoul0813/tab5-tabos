@@ -3,7 +3,14 @@
 TabOS uses the Tab5 ESP32-C6 companion over ESP-Hosted SDIO for Wi-Fi. Host
 builds simulate Wi-Fi state without changing the workstation connection.
 
-Saved credentials use `T:/etc/wifi.conf`:
+Saved credentials use `T:/etc/wifi.conf`. A documented, fully commented template
+is provided in the repository at [`etc/wifi.conf`](../etc/wifi.conf). Copy it to
+`etc/wifi.conf` on the microSD card, uncomment the version, section, and desired
+settings, then replace the examples. For the host simulator, use `T/etc/wifi.conf`
+below the configured host root. The template alone configures no network.
+Credentials are plaintext; keep real passwords out of the repository.
+
+Example active configuration:
 
 ```ini
 version=1

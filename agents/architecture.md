@@ -1576,3 +1576,12 @@ blanking, while keyboard still restores. All deadlines share last physical activ
 held input, fullscreen/media ownership, and panic inhibit idle blanking. No off retry
 deadline is added after failure; invalidate corresponding effective status and retry on activity
 or policy updates. DMA/VSYNC quiescence remains a separate driver lifecycle requirement.
+
+[DECIDED] Runtime loads optional version-1 INI `T:/etc/power.conf` once after filesystem
+initialization and before power-manager initialization. Portable `kernel/power_config.c`
+owns bounded parsing/loading through TabOS filesystem APIs; defaults remain 60/180/300
+seconds and 75/20 percent. All configurable timeouts are absolute inactivity durations.
+Missing fields use defaults; invalid complete policy or I/O failure leaves defaults intact.
+No hot reload, periodic storage access, automatic writes, public ABI, or sleep enablement
+is added. Normal brightness must remain nonzero; dim brightness is capped at normal by
+existing policy. The checked-in `etc/power.conf` is a user-copyable template.

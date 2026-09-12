@@ -883,7 +883,7 @@ and framebuffers. Backlight turns off before panel disable; panel enables before
 restoration. DMA/VSYNC continues. Touch/keyboard restore through the backlight-only stage;
 after panel-off is requested, only keyboard activity restores (pointer activity is ignored
 for restoration and idle inhibition).
-existing dim inhibitors also inhibit screen-off. Panic restores brightness and prevents
+Existing dim inhibitors also inhibit screen-off. Panic restores brightness and prevents
 idle blanking. SDL uses zero texture brightness. Physical off/restore and incremental
 current measurements remain pending; this does not enable system sleep.
 
@@ -899,3 +899,10 @@ headphone attempts/errors, VSYNC and PPA completions with boot-lifetime lock-fre
 atomics; no new periodic task/deadline exists. Release compiles out updates; host does
 not manufacture physical peripheral measurements. These counts are not PM policy or
 synchronization state.
+
+Runtime optionally loads `T:/etc/power.conf` at boot using portable bounded INI parsing.
+Version 1 `[display]` configures dim/backlight-off/panel-off total seconds plus normal/dim
+brightness. Defaults remain 60/180/300 seconds and 75/20 percent. File is read-only to
+the service; reboot applies user edits. Invalid files fall back atomically with a log
+warning; absent storage/file remains nonfatal. Template and user instructions live in
+`etc/power.conf` and `docs/power.md`; no configuration polling or system sleep is added.

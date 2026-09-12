@@ -66,7 +66,7 @@ GPIO interrupt ownership, pinned-SDK restrictions, unverified wake paths, and th
 repeatable measurement worksheet. Functional sleep/wake and instrumented power
 measurements remain separate validation gates.
 
-Display policy uses three deadlines from the same last physical activity:
+Display policy defaults to three deadlines from the same last physical activity:
 
 - 60 seconds: dim to at most 20%.
 - 180 seconds: backlight off, panel enabled; touch or keyboard restores active brightness.
@@ -107,6 +107,53 @@ value and observed range, not a sampled mean. The operator confirms that tapping
 screen restores it from backlight-only off. The typical reading is 0.01 A above the earlier panel-off
 reading, but meter resolution and uncontrolled variation limit the comparison.
 
+## Display configuration
+
+Edit `T:/etc/power.conf` and reboot to apply saved settings. On Tab5 this is
+`etc/power.conf` on the microSD card, alongside `wifi.conf`. Copy the repository's
+`etc/power.conf` template there when first configuring it; existing files are never
+created or overwritten by boot or firmware builds. In the host simulator use
+`T/etc/power.conf` below the configured host root (default `.local/rootfs`).
+
+```ini
+version=1
+
+[display]
+dim_seconds=60
+backlight_off_seconds=180
+panel_off_seconds=300
+normal_brightness=75
+dim_brightness=20
+```
+
+All timings are total seconds since last physical activity, not delays between stages.
+For example, `backlight_off_seconds=120` turns the backlight off two minutes after
+activity. Defaults remain 60/180/300 seconds. Settings take effect at normal runtime
+startup, not during early hardware initialization or USB storage mode. No file polling
+or live reload occurs; editing the file alone does not change the running policy.
+
+- `dim_seconds`: integer 1 through 4294967295.
+- `backlight_off_seconds`: same range, at least `dim_seconds`; zero disables this stage
+  and requires `panel_off_seconds=0` too.
+- `panel_off_seconds`: same range, at least `backlight_off_seconds`; zero keeps the panel
+  enabled indefinitely, retaining touch restoration from backlight-off.
+- `normal_brightness`: integer percent 1 through 100. Zero is rejected to avoid a
+  permanently invisible active screen.
+- `dim_brightness`: integer percent 0 through 100; effective dim brightness is capped at
+  normal brightness, so dimming never makes the screen brighter.
+
+Use unquoted decimal numbers. Names are case-sensitive. Blank lines, surrounding
+whitespace, LF/CRLF line endings, and whole-line `#` or `;` comments are supported,
+matching Wi-Fi configuration style. Inline comments are not supported. `version=1`
+must appear before any section; omitted display keys use defaults. Unknown keys and
+sections are ignored for forward compatibility. Duplicate recognized keys, invalid
+values/order, malformed syntax, embedded NUL bytes, or files over 4096 bytes reject
+the complete file. Missing file/storage uses defaults silently; invalid/unreadable
+files use defaults with a serial/log warning. Configuration loading never changes
+the saved file. These settings do not enable system sleep or change display inhibitors.
+
+## Display policy validation
+
 TabOS now contains an internal portable power-state manager and deterministic host
 simulation used for development tests. After 60 seconds without physical keyboard or
 pointer activity, display dims from default 75% active brightness to 20%. If active setting
@@ -120,7 +167,8 @@ restores when inhibitor begins; final inhibitor release starts fresh 60-second i
 Framebuffer pixels, terminal contents, display ownership, and input ordering remain intact.
 Host SDL applies dimming only while presenting texture, so framebuffer and screenshots retain
 original pixel values. Brightness failures remain recorded internally with desired and last
-known effective values. No public power configuration API or Tab5 light sleep exists yet.
+known effective values. Boot-time file configuration is supported; no public power
+configuration API or Tab5 light sleep exists yet.
 
 Physical Tab5 validation confirms dimming after 60 seconds, restoration from touch and
 keyboard input, no dimming during fullscreen `gdemo`, and no dimming beneath a held contact.

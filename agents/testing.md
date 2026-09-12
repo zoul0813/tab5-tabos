@@ -1788,3 +1788,12 @@ audits continue. On hardware, first test touch restoration between 180 and 300 s
 then begin a fresh uninterrupted 300-second idle interval, confirm touch does not restore,
 and use keyboard to restore. Repeat cycles and check touchtest after keyboard restoration.
 Record all three stage currents separately; the combined policy is not physically validated yet.
+
+Power-file configuration tests cover INI defaults/overrides, LF/CRLF and comments,
+unknown fields, duplicate keys, version scope, numeric overflow, embedded NULs, file
+bounds, timing order, brightness limits, and atomic rejection. Loader fakes exercise
+short reads, read/close failures and absent storage. `component.power_config` uses real
+portable/host filesystem loading and the real runtime with fake time/display: persisted
+settings apply after restart, exact custom deadlines and restoration use custom brightness,
+edits do not hot-reload, invalid saved files survive default fallback, and dimming cannot
+raise brightness. Physical microSD reboot loading remains a separate validation check.

@@ -66,6 +66,11 @@
 
 ### Low-Power Integration Milestone
 
+- [x] Add boot-time `T:/etc/power.conf` INI settings for three idle durations and normal/dim
+  brightness, bounded validation, safe defaults, template, and restart tests. macOS
+  Debug/Release full suites pass (71 tests each); Tab5 Debug/Release cross-builds pass.
+- [ ] Physically verify custom power.conf values load from microSD after reboot.
+
 - [x] Accept interrupt/event-runtime handoff as power-policy foundation.
 - [x] Power Phase 0 source inventory, conservative blocker classification, SDK/wake-route
   audit, measurement worksheet, and shared GPIO service ownership; macOS Debug 53/53

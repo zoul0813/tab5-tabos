@@ -13,6 +13,7 @@
 #include <tabos/internal/network.h>
 #include <tabos/internal/pointer.h>
 #include <tabos/internal/power.h>
+#include <tabos/internal/power_config.h>
 #include <tabos/internal/camera.h>
 #include <tabos/internal/terminal.h>
 #include <tabos/internal/time.h>
@@ -412,13 +413,15 @@ bool kernel_runtime_start(bool launch_startup_application)
         filesystem_shutdown();
         return false;
     }
-    const power_policy_t power_policy = {.idle_ms           = 60000U,
-                                         .screen_off_ms     = 180000U,
-                                         .panel_off_ms      = 300000U,
-                                         .suspend_ms        = 600000U,
-                                         .active_brightness = 75U,
-                                         .idle_brightness   = 20U,
-                                         .automatic_suspend = false};
+    power_policy_t power_policy                     = power_config_defaults();
+    const power_config_result_t power_config_result = power_config_load(&power_policy);
+    if (power_config_result != POWER_CONFIG_OK && power_config_result != POWER_CONFIG_NOT_FOUND &&
+        power_config_result != POWER_CONFIG_UNAVAILABLE) {
+        char message[128];
+        (void) snprintf(message, sizeof(message), "Power: %s: %s; using defaults", POWER_CONFIG_PATH,
+                        power_config_result_name(power_config_result));
+        platform_log(message);
+    }
     if (!power_manager_init(&power_manager, power_policy, platform_time_ms())) {
         kernel_application_system_shutdown();
         console_shutdown();
