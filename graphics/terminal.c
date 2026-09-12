@@ -441,6 +441,7 @@ bool terminal_resize(terminal_t* terminal, platform_framebuffer_t* framebuffer, 
             const terminal_cell_t* cell = &cells[column];
             resized.foreground          = cell->foreground;
             resized.background          = cell->background;
+            resized.reverse             = cell->reverse;
             put_character(&resized, cell->character == '\0' ? ' ' : cell->character);
         }
         if (terminal->hard_breaks[slot]) {
@@ -449,6 +450,7 @@ bool terminal_resize(terminal_t* terminal, platform_framebuffer_t* framebuffer, 
     }
     resized.foreground = terminal->foreground;
     resized.background = terminal->background;
+    resized.reverse    = terminal->reverse;
 
     const uint64_t new_live_top = live_viewport_top(&resized);
     const uint64_t available    = new_live_top - resized.first_line;

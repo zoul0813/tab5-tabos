@@ -98,8 +98,10 @@ CSI supports bounded row/column `H` and `f`, omitted/default parameters, multipl
 SGR values, default colors 39/49, and private cursor visibility `?25h`/`?25l`.
 Sequences may span writes. Overflow, excessive parameters (more than eight), and
 unsupported sequences are consumed without exposing parameter bytes as text.
-Cursor addressing is clamped to the live screen, independently of retained
-scrollback. Moving the cursor does not discard rows below it.
+Cursor addressing and saved-cursor restoration are clamped to the live screen,
+independently of retained scrollback. If a saved line is evicted, restoration
+selects the oldest row on the current live screen. Moving the cursor does not
+discard rows below it.
 
 Wrapping remains immediate, including at the bottom-right cell. Full-screen painters
 should reserve the final column and explicitly position each row without a final

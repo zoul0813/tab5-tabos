@@ -92,6 +92,53 @@ int main(void)
     check(terminal.last_line == terminal.current_line && terminal.current_line == 1U, "backspace trims live tail");
     terminal_write(&terminal, "\033[;5fD");
     check(terminal.current_line == 0U && terminal.column == 5U, "omitted row defaults to one");
+
+    terminal_write(&terminal, "\033[3;3H\033[A");
+    check(terminal.current_line == 1U && terminal.column == 2U, "parameterless cursor up defaults to one");
+    terminal_write(&terminal, "\033[B");
+    check(terminal.current_line == 2U && terminal.column == 2U, "parameterless cursor down defaults to one");
+    terminal_write(&terminal, "\033[C");
+    check(terminal.column == 3U, "parameterless cursor right defaults to one");
+    terminal_write(&terminal, "\033[D");
+    check(terminal.column == 2U, "parameterless cursor left defaults to one");
+
+    terminal_write(&terminal, "\033[65535A");
+    check(terminal.current_line == terminal.viewport_top, "oversized cursor up clamps to live screen");
+    terminal_write(&terminal, "\033[65535B");
+    check(terminal.current_line == terminal.viewport_top + terminal.rows - 1U,
+          "oversized cursor down clamps to live screen");
+    terminal_write(&terminal, "\033[s");
+    for (size_t index = 0U; index < terminal.line_capacity + terminal.rows; ++index) {
+        terminal_write(&terminal, "evict\n");
+    }
+    check(terminal.first_line > 0U, "saved cursor line evicted");
+    terminal_write(&terminal, "\033[u");
+    check(terminal.current_line == terminal.viewport_top && terminal.current_line >= terminal.first_line,
+          "evicted saved cursor clamps to live screen");
+
+    platform_pixel_t resized_pixels[WIDTH * HEIGHT];
+    platform_framebuffer_t resized_framebuffer = {
+        .pixels        = resized_pixels,
+        .width         = WIDTH,
+        .height        = HEIGHT,
+        .stride_pixels = WIDTH,
+    };
+    check(terminal_resize(&terminal, &resized_framebuffer, 2U), "resize after bounded cursor input");
+    check(terminal.current_line >= terminal.first_line && terminal.current_line <= terminal.last_line,
+          "resize retains a valid history cursor");
+
+    terminal_clear(&terminal);
+    terminal_write(&terminal, "\033[31;44mN\033[7mR");
+    check(!cell(&terminal, 0U, 0U)->reverse && cell(&terminal, 1U, 0U)->reverse,
+          "mixed reverse attributes before resize");
+    check(terminal_resize(&terminal, &framebuffer, 1U), "resize reverse attributes");
+    check(terminal.cells[0].character == 'N' && !terminal.cells[0].reverse && terminal.cells[1].character == 'R' &&
+              terminal.cells[1].reverse,
+          "resize preserves per-cell reverse attributes");
+    check(terminal.reverse, "resize preserves active reverse attribute");
+    terminal_write(&terminal, "S");
+    check(terminal.cells[2].character == 'S' && terminal.cells[2].reverse,
+          "output after resize retains active reverse attribute");
     terminal_shutdown(&terminal);
     return 0;
 }
