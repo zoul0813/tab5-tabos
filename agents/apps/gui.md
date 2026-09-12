@@ -51,7 +51,7 @@ Exit gate: separate RV32 clients publish coherent retained images through public
 
 - [x] GUI-201: Implement copied IPC endpoints, process ownership, endpoint grants/discovery, bounded queues, lifecycle/control delivery, and disconnect notification.
 - [ ] GUI-202: Connect IPC readiness to generic waits on host and Tab5; cover lost-wakeup races, finite deadlines, cancellation, and stale handles.
-- [ ] GUI-203: Implement OS-owned RGB565 surfaces, clipped/bounded rectangle uploads, staged commits, compositor read grants, and explicit release using GUI-005's contract.
+- [x] GUI-203: Implement OS-owned RGB565 surfaces, clipped/bounded rectangle uploads, staged commits, compositor read grants, and explicit release using GUI-005's contract.
 - [ ] GUI-204: Enforce measured process/aggregate surface and staging limits. Preserve the last committed image on failed upload/commit; release endpoints, staging, surfaces, and grants during stopped-process teardown.
 - [ ] GUI-205: Add public SDK wrappers and private native/host gates consistently; rebuild bundled apps under the current pre-release ABI policy.
 - [ ] GUI-206: Add sanitizer-backed IPC/surface tests for saturation, lifecycle delivery under saturation, foreign/stale handles, invalid dimensions/rectangles, atomic visibility, reader/commit races, exit during commit, allocation failures, and repeated cleanup. Add real RV32 `tester` coverage.
@@ -188,3 +188,20 @@ RV32 tester verifies finite child-exit waits and stale-source rejection after
 reaping across three IPC/concurrency rounds. macOS Debug and Tab5 Debug builds
 pass; Tab5 Debug app-partition headroom is 8,064 bytes. GUI-104/105/106/107 still
 track the remaining full service/session/cancellation and hardware coverage.
+
+### Retained Surface Prototype Evidence
+
+GUI-203 is implemented with public SDK/native/RV32 gates: copied RGB565 uploads,
+lazy transaction staging, atomic committed-image swap, IPC peer read grants,
+explicit abort/release and owner cleanup. Configurable provisional budgets are
+12 MiB aggregate and 6 MiB per process, including retained and staging buffers.
+GUI-005/006/204 remain open for measured physical resource selection/acceptance;
+these prototype limits are explicitly not measured Tab5 production limits.
+
+Eight targeted macOS Debug surface/IPC/process/native/boundary tests pass.
+`unit.surface` covers invisible staging, owner/read-grant separation, invalid upload
+rollback, stale handles, quota failure with old pixels preserved, and concurrent
+reader versus 500 committed frames. Real RV32 tester reads granted pixels while
+new pixels are staged and checks explicit plus leaked staging cleanup to baseline.
+macOS Debug and Tab5 Debug builds pass; Tab5 app-partition headroom is 6,016 bytes.
+No Linux build/test, flashing or simulator executable was run.

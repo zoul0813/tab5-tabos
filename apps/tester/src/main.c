@@ -20,6 +20,7 @@
 #include <tabos/runtime_time.h>
 #include <sys/stat.h>
 #include <tabos/ipc.h>
+#include <tabos/surface.h>
 
 void tester_test_concurrent_process(tester_context_t* context);
 
@@ -55,7 +56,19 @@ static int run_concurrent_peer(const char* index)
     if (channel <= 0) {
         return 6;
     }
-    tabos_ipc_message_t message = {.kind = first ? 1U : 2U};
+    tabos_ipc_message_t message   = {.kind = first ? 1U : 2U};
+    const tabos_surface_t surface = tabos_surface_create(2U, 2U);
+    uint16_t pixels[4]            = {0xf800U, 0x07e0U, 0x001fU, 0xffffU};
+    if (surface <= 0 || tabos_surface_upload(surface, 0U, 0U, 2U, 2U, pixels) != 0 ||
+        tabos_surface_commit(surface) != 0 || tabos_surface_grant(surface, channel) != 0) {
+        return 10;
+    }
+    memset(pixels, 0, sizeof(pixels));
+    if (tabos_surface_upload(surface, 0U, 0U, 2U, 2U, pixels) != 0) {
+        return 11;
+    }
+    message.size = sizeof(surface);
+    memcpy(message.data, &surface, sizeof(surface));
     if (tabos_ipc_send(channel, &message, false) != 0) {
         return 7;
     }
@@ -66,6 +79,10 @@ static int run_concurrent_peer(const char* index)
     if (tabos_ipc_close(channel) != 0) {
         return 9;
     }
+    if (first && (tabos_surface_abort(surface) != 0 || tabos_surface_release(surface) != 0)) {
+        return 12;
+    }
+    /* Second peer intentionally leaves committed/staged images for exit cleanup. */
     return first ? 91 : 92;
 }
 

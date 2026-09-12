@@ -1,0 +1,11 @@
+# Provisional bounded prototype limits; physical Tab5 peak/timing validation pending.
+set(TABOS_GUI_SURFACE_BYTES 12582912 CACHE STRING "Aggregate retained and staging surface bytes")
+set(TABOS_GUI_PROCESS_SURFACE_BYTES 6291456 CACHE STRING "Per-process retained and staging surface bytes")
+foreach(setting TABOS_GUI_SURFACE_BYTES TABOS_GUI_PROCESS_SURFACE_BYTES)
+    if(NOT ${setting} MATCHES "^[1-9][0-9]*$" OR ${setting} GREATER 33554432)
+        message(FATAL_ERROR "${setting} must be an integer from 1 through 33554432")
+    endif()
+endforeach()
+if(TABOS_GUI_PROCESS_SURFACE_BYTES GREATER TABOS_GUI_SURFACE_BYTES)
+    message(FATAL_ERROR "Per-process GUI surface budget cannot exceed aggregate budget")
+endif()

@@ -39,6 +39,22 @@ writable and hangup events. Close preserves messages already delivered to the pe
 a drained disconnected channel returns EPIPE. Owner exit closes its channels.
 The GUI pause/close protocol remains under development.
 
+## Retained Surfaces
+
+`<tabos/surface.h>` provides process-owned RGB565 surfaces for session clients.
+Create a surface, upload copied rectangles and commit; readers see only committed
+pixels. Uploads allocate temporary staging and commit frees the previous image.
+Abort discards staged work. Grant a compositor read/info access through its IPC
+channel. Read grants cannot change or release client images. Each copied read
+observes one complete revision; read a whole window in one call when needed.
+
+Bounds are 1280 by 720 and sixteen live surfaces. Prototype budgets are 12 MiB
+aggregate and 6 MiB per owner, counting committed and staging pixels. Query current
+usage/peak with `tabos_surface_stats()`. These are provisional limits pending Tab5
+measurements; app heaps, canvases and display buffers consume additional RAM.
+Allocation failure preserves existing images. Owner exit reclaims all images.
+Fullscreen application heaps are outside surface quotas and still share physical RAM.
+
 ## Time and System Information
 
 `<tabos/runtime_time.h>` provides monotonic milliseconds and cooperative sleep.

@@ -3,6 +3,7 @@
 #include <tabos/internal/elf_application.h>
 #include <tabos/internal/pointer.h>
 #include <tabos/internal/ipc.h>
+#include <tabos/internal/surface.h>
 
 #include <tabos/platform/platform.h>
 
@@ -148,6 +149,7 @@ static void release_process_resources(kernel_process_t* process)
         descriptor->cleanup(context, status);
     }
     ipc_service_close_owner(process->id);
+    surface_service_close_owner(process->id);
     if (context->console_owned) {
         tabos_console_release(&context->console);
     }
@@ -244,6 +246,7 @@ void kernel_application_system_init(void)
         child_snapshot_mutex = platform_mutex_create();
     }
     (void) ipc_service_init();
+    (void) surface_service_init();
     for (size_t index = 0U; index < KERNEL_PROCESS_CAPACITY; ++index) {
         processes[index] = (kernel_process_t) {0};
     }
@@ -353,6 +356,7 @@ void kernel_application_system_shutdown(void)
     foreground_depth   = 0U;
     application_registry_reset();
     ipc_service_shutdown();
+    surface_service_shutdown();
     platform_mutex_destroy(child_snapshot_mutex);
     child_snapshot_mutex = NULL;
 }

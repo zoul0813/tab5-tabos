@@ -8,6 +8,8 @@
 #include <unistd.h>
 #include <errno.h>
 #include <tabos/ipc.h>
+#include <tabos/surface.h>
+#include <string.h>
 
 void tester_test_concurrent_process(tester_context_t* context)
 {
@@ -18,8 +20,10 @@ void tester_test_concurrent_process(tester_context_t* context)
         return;
     }
     const tabos_wait_source_t source = tabos_ipc_wait_source(listener);
-    const char* const first_args[]   = {"T:/bin/tester", "--concurrent-peer", "1", NULL};
-    const char* const second_args[]  = {"T:/bin/tester", "--concurrent-peer", "2", NULL};
+    tabos_surface_stats_t baseline   = {0};
+    tester_expect(context, tabos_surface_stats(&baseline) == 0, "surface allocation baseline");
+    const char* const first_args[]  = {"T:/bin/tester", "--concurrent-peer", "1", NULL};
+    const char* const second_args[] = {"T:/bin/tester", "--concurrent-peer", "2", NULL};
     for (unsigned int round = 0U; round < 3U; ++round) {
         const int first                         = tabos_spawn(first_args[0], 3, first_args);
         const int second                        = tabos_spawn(second_args[0], 3, second_args);
@@ -43,6 +47,22 @@ void tester_test_concurrent_process(tester_context_t* context)
                           tabos_ipc_receive(channel, &message) == 0 &&
                               (message.sender_pid == (uint32_t) first || message.sender_pid == (uint32_t) second),
                           "copied IPC carries actual child identity");
+            tabos_surface_t surface = -1;
+            if (message.size == sizeof(surface)) {
+                memcpy(&surface, message.data, sizeof(surface));
+            }
+            tabos_surface_info_t info = {0};
+            uint16_t pixels[4]        = {0};
+            tester_expect(context,
+                          tabos_surface_info(surface, &info) == 0 && info.width == 2U && info.height == 2U &&
+                              info.revision == 1U,
+                          "compositor grant exposes committed surface geometry");
+            tester_expect(context,
+                          tabos_surface_read(surface, 0U, 0U, 2U, 2U, pixels) == 0 && pixels[0] == 0xf800U &&
+                              pixels[1] == 0x07e0U && pixels[2] == 0x001fU && pixels[3] == 0xffffU,
+                          "cross-process read sees committed pixels while next upload is staged");
+            tester_expect(context, tabos_surface_release(surface) == -1 && errno == EBADF,
+                          "compositor read grant cannot release client surface");
             message.kind = 42U;
             tester_expect(context, tabos_ipc_send(channel, &message, true) == 0, "control reply delivered");
             tester_expect(context, tabos_ipc_close(channel) == 0, "reply channel close preserves queued delivery");
@@ -66,6 +86,9 @@ void tester_test_concurrent_process(tester_context_t* context)
                       "both independent RV32 children progress while parent waits; background display denied");
         (void) unlink("T:/tabos-concurrent-1.tmp");
         (void) unlink("T:/tabos-concurrent-2.tmp");
+        tabos_surface_stats_t stats = {0};
+        tester_expect(context, tabos_surface_stats(&stats) == 0 && stats.used_bytes == baseline.used_bytes,
+                      "normal and leaked staged surfaces reclaimed on child exit");
     }
     tester_expect(context, tabos_ipc_close(listener) == 0, "listener cleanup");
 }

@@ -1958,3 +1958,10 @@ after peer close. These tests do not establish physical native contention.
 Child-exit readiness uses copied snapshots of runtime-owned process metadata.
 Lifecycle tests check pending/exited/foreign/reaped snapshots. The real RV32 tester
 waits on both child-exit sources and proves reaping invalidates stale sources.
+
+`unit.surface` checks committed/staged separation, read-grant permissions,
+transaction rollback on invalid rectangles, quotas, stale handles, cleanup and
+concurrent copied reads across 500 commits. Real RV32 tester passes a granted
+surface handle over IPC, verifies old committed pixels during a new upload and
+checks explicit/exit cleanup restores the allocation baseline. Physical PSRAM
+limits, bandwidth and maximum usable windows remain unvalidated.

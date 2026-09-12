@@ -76,20 +76,30 @@ Implemented channel contract:
 
 ## Retained RGB565 surfaces
 
-- Create validates nonzero dimensions and overflow before allocation. Owner uploads
-  copied rectangles; an explicit compositor grant permits copied rectangle reads.
-  Grants never expose raw cross-process buffers. Release invalidates all handles.
-- Committed pixels remain immutable to readers during an upload transaction.
-  Uploads accumulate in bounded staging; commit validates and applies the whole
-  transaction under service synchronization. Failure/abort leaves committed pixels
-  unchanged and releases staging. Reads serialize with commit; no partial frame.
-- Resize creates a replacement surface while preserving the old one. Desktop
-  adopts the new geometry only after a valid committed replacement arrives. Failed
-  allocation/upload/close cancellation keeps the old window usable.
-- Initial implementation must measure alternatives before fixing quotas: bounded
-  rectangle staging, tiled copy-on-write, and a temporary full replacement. Account
-  for simultaneously live SDK canvas, staging, retained pixels and resize overlap.
-  No assumption of a permanent full-size back buffer per client is authorized.
+Prototype implemented; physical resource gate remains open:
+
+- Sixteen generation-tagged surfaces support nonzero dimensions up to 1280 by 720.
+  Each owns one zero-initialized committed RGB565 image. An upload transaction
+  lazily allocates a full-size staging copy, applies copied rectangles there and
+  swaps images atomically at commit. Commit frees the previous image immediately;
+  no permanent full-size back buffer remains between transactions.
+- Service reads and commits serialize under a platform mutex. Each copied rectangle
+  read observes one complete committed revision. A compositor that needs coherent
+  whole-window pixels reads that rectangle in one call. No raw buffer escapes.
+- Upload bounds and multiplication are checked before copying. Failed service
+  uploads abort staging; SDK wrappers also abort on errors while preserving errno.
+  Explicit abort releases staging. Neither failure nor abort changes committed pixels.
+- Surface owner grants read/info access through a live IPC channel to its peer.
+  Read grants do not allow mutation or release. Owner exit frees all committed and
+  staging images; reader exit revokes grants. Generations prevent stale reuse.
+- Resize creates a replacement while retaining the old image and geometry; desktop
+  adopts replacement only after a valid commit. Failed replacement leaves old state.
+- Configurable provisional budgets include committed and staging allocations:
+  `TABOS_GUI_SURFACE_BYTES=12582912` aggregate and
+  `TABOS_GUI_PROCESS_SURFACE_BYTES=6291456` per owner. Stats expose used/peak/limits.
+  These bound the prototype; they are not physically measured production limits.
+  Client heaps/canvases, compositor, scanout, executable and OS memory remain separate
+  consumers and must be measured together before declaring hardware feasibility.
 
 ## ELF launch marker
 

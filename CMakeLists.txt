@@ -9,6 +9,7 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/config/Pointer.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/config/Console.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/config/Acceleration.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/config/Loader.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/config/Gui.cmake")
 project(${TABOS_CMAKE_PROJECT_NAME} VERSION ${TABOS_PROJECT_VERSION} LANGUAGES C ASM)
 
 add_compile_definitions(TABOS_POINTER_MAX_CONTACTS=${TABOS_POINTER_MAX_CONTACTS})
@@ -18,6 +19,8 @@ set(TABOS_GENERATED_FONT_FILE "${CMAKE_BINARY_DIR}/generated/font.bin")
 set(TABOS_GENERATED_FONT_SOURCE "${CMAKE_BINARY_DIR}/generated/font_data.S")
 configure_file("${TABOS_FONT_FILE}" "${TABOS_GENERATED_FONT_FILE}" COPYONLY)
 set(TABOS_FONT_EMBED_FILE "${TABOS_GENERATED_FONT_FILE}")
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/config/gui.h.in"
+    "${TABOS_GENERATED_INCLUDE_DIR}/tabos/config/gui.h")
 configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/graphics/font_data.S.in"
     "${TABOS_GENERATED_FONT_SOURCE}"

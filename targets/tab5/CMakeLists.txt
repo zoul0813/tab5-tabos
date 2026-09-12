@@ -10,12 +10,15 @@ include("${TABOS_ROOT}/config/Pointer.cmake")
 include("${TABOS_ROOT}/config/Console.cmake")
 include("${TABOS_ROOT}/config/Acceleration.cmake")
 include("${TABOS_ROOT}/config/Loader.cmake")
+include("${TABOS_ROOT}/config/Gui.cmake")
 
 set(TABOS_GENERATED_INCLUDE_DIR "${CMAKE_BINARY_DIR}/generated")
 set(TABOS_GENERATED_FONT_FILE "${CMAKE_BINARY_DIR}/generated/font.bin")
 set(TABOS_GENERATED_FONT_SOURCE "${CMAKE_BINARY_DIR}/generated/font_data.S")
 configure_file("${TABOS_FONT_FILE}" "${TABOS_GENERATED_FONT_FILE}" COPYONLY)
 set(TABOS_FONT_EMBED_FILE "${TABOS_GENERATED_FONT_FILE}")
+configure_file("${TABOS_ROOT}/config/gui.h.in"
+    "${TABOS_GENERATED_INCLUDE_DIR}/tabos/config/gui.h")
 configure_file(
     "${TABOS_ROOT}/graphics/font_data.S.in"
     "${TABOS_GENERATED_FONT_SOURCE}"

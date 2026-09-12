@@ -14,6 +14,8 @@ CONFIG_DEFAULTS = {
     "TABOS_FILESYSTEM_MAX_FILES": "32",
     "TABOS_FILESYSTEM_MAX_DIRECTORIES": "8",
     "TABOS_POINTER_MAX_CONTACTS": "5",
+    "TABOS_GUI_SURFACE_BYTES": "12582912",
+    "TABOS_GUI_PROCESS_SURFACE_BYTES": "6291456",
     "TABOS_FONT_FILE": "graphics/blueterm.f12",
     "TABOS_FONT_GLYPH_WIDTH": "8",
     "TABOS_FONT_GLYPH_HEIGHT": "12",
@@ -51,6 +53,11 @@ def validate_project_config(config: dict[str, str]) -> None:
         fail("TABOS_POINTER_MAX_CONTACTS must be an integer from 1 through 32")
     if not config["TABOS_ELF_STARTUP_PATH"]:
         fail("TABOS_ELF_STARTUP_PATH must not be empty")
+    for name in ("TABOS_GUI_SURFACE_BYTES", "TABOS_GUI_PROCESS_SURFACE_BYTES"):
+        if not re.fullmatch(r"[1-9][0-9]*", config[name]) or int(config[name]) > 33554432:
+            fail(f"{name} must be an integer from 1 through 33554432")
+    if int(config["TABOS_GUI_PROCESS_SURFACE_BYTES"]) > int(config["TABOS_GUI_SURFACE_BYTES"]):
+        fail("Per-process GUI surface budget cannot exceed aggregate budget")
     if not config["TABOS_SHELL_PATH"]:
         fail("TABOS_SHELL_PATH must not be empty")
     for name in (
@@ -237,6 +244,8 @@ def project_cmake_arguments(target: str) -> list[str]:
         f"-DTABOS_FILESYSTEM_MAX_FILES={config['TABOS_FILESYSTEM_MAX_FILES']}",
         f"-DTABOS_FILESYSTEM_MAX_DIRECTORIES={config['TABOS_FILESYSTEM_MAX_DIRECTORIES']}",
         f"-DTABOS_POINTER_MAX_CONTACTS={config['TABOS_POINTER_MAX_CONTACTS']}",
+        f"-DTABOS_GUI_SURFACE_BYTES={config['TABOS_GUI_SURFACE_BYTES']}",
+        f"-DTABOS_GUI_PROCESS_SURFACE_BYTES={config['TABOS_GUI_PROCESS_SURFACE_BYTES']}",
         f"-DTABOS_FONT_FILE={font_path}",
         f"-DTABOS_FONT_GLYPH_WIDTH={config['TABOS_FONT_GLYPH_WIDTH']}",
         f"-DTABOS_FONT_GLYPH_HEIGHT={config['TABOS_FONT_GLYPH_HEIGHT']}",

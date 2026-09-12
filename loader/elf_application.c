@@ -4,6 +4,7 @@
 #include <tabos/internal/pointer.h>
 #include <tabos/internal/camera.h>
 #include <tabos/internal/ipc.h>
+#include <tabos/internal/surface.h>
 
 #include <tabos/internal/elf_api.h>
 #include <tabos/filesystem.h>
@@ -1346,6 +1347,25 @@ static int elf_ipc(uint32_t operation, ipc_transport_packet_t* packet)
     return result;
 }
 
+static int elf_surface(uint32_t operation, surface_transport_packet_t* packet, void* pixels)
+{
+    loader_elf_application_t* application = platform_riscv32_current_user_data();
+    surface_transport_packet_t* writable =
+        (surface_transport_packet_t*) platform_executable_data_pointer(packet, sizeof(*packet));
+    if (application == NULL || writable == NULL || application->context->session_id == 0U) {
+        return -TABOS_EPERM;
+    }
+    size_t bytes = 0U;
+    if (operation == SURFACE_TRANSPORT_UPLOAD || operation == SURFACE_TRANSPORT_READ) {
+        if (writable->width > 1280U || writable->height > 720U) {
+            return surface_service_request(application->context->process_id, operation, writable, NULL, 0U);
+        }
+        bytes  = (size_t) writable->width * writable->height * sizeof(uint16_t);
+        pixels = (void*) platform_executable_data_pointer(pixels, bytes);
+    }
+    return surface_service_request(application->context->process_id, operation, writable, pixels, bytes);
+}
+
 static int elf_wait_poll_device_subscription(loader_elf_application_t* application, uintptr_t parent,
                                              uint32_t requested_events, uint32_t* returned_events)
 {
@@ -2426,6 +2446,7 @@ static bool elf_entry(tabos_app_context_t* context)
         .session_open                    = elf_session_open,
         .ipc                             = elf_ipc,
         .process_wait_source             = elf_process_wait_source,
+        .surface                         = elf_surface,
     };
     application->execution = platform_riscv32_create(
         application->image.entry, application->image.memory, application->image.memory_size,

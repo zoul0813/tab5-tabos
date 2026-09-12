@@ -124,7 +124,8 @@ static _Thread_local uint32_t host_rv32_active_ram_size;
     X(WAITPID, 404U)                         \
     X(SESSION_OPEN, 408U)                    \
     X(IPC, 412U)                             \
-    X(PROCESS_WAIT_SOURCE, 416U)
+    X(PROCESS_WAIT_SOURCE, 416U)             \
+    X(SURFACE, 420U)
 
 enum {
 #define HOST_RV32_GATE_INDEX(name, api_offset) HOST_RV32_GATE_INDEX_##name,
@@ -497,6 +498,29 @@ static platform_riscv32_result_t step_inner(platform_riscv32_context_t* context,
             }
             current_user_data       = context->user_data;
             context->state.regs[10] = (uint32_t) context->api.process_wait_source((int) context->state.regs[10]);
+            current_user_data       = NULL;
+            context->state.pc       = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_SURFACE) {
+            surface_transport_packet_t* packet =
+                guest_buffer(context->memory, context->state.regs[11], sizeof(*packet));
+            if (packet == NULL || context->api.surface == NULL) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            const uint32_t operation = context->state.regs[10];
+            void* pixels             = NULL;
+            if (operation == SURFACE_TRANSPORT_UPLOAD || operation == SURFACE_TRANSPORT_READ) {
+                if (packet->width <= 1280U && packet->height <= 720U) {
+                    pixels =
+                        guest_buffer(context->memory, context->state.regs[12], packet->width * packet->height * 2U);
+                    if (pixels == NULL) {
+                        return PLATFORM_RISCV32_FAULT;
+                    }
+                }
+            }
+            current_user_data       = context->user_data;
+            context->state.regs[10] = (uint32_t) context->api.surface(operation, packet, pixels);
             current_user_data       = NULL;
             context->state.pc       = context->state.regs[1];
             continue;

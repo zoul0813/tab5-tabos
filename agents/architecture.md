@@ -988,7 +988,9 @@ tabos_timer_t
 
 or similar.
 
-The specific handle model is not yet decided.
+GUI IPC and surface services use generation-tagged positive handles with copied
+messages/pixels, inherited session scope and per-owner permissions. See
+[GUI contracts](gui-contracts.md) for the implemented prototype and remaining gates.
 
 IPC may eventually include:
 

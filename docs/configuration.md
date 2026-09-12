@@ -57,3 +57,15 @@ idf.py -C targets/tab5 -B build/tab5-debug menuconfig
 Tab5 uses a custom 2 MiB single-factory-app partition on the device's 16 MiB
 flash. TabOS does not currently reserve OTA application partitions; future
 internal `A:` filesystem partitioning remains separate work.
+
+## Provisional GUI Surface Budgets
+
+`TABOS_GUI_SURFACE_BYTES` defaults to 12582912 (12 MiB aggregate), and
+`TABOS_GUI_PROCESS_SURFACE_BYTES` to 6291456 (6 MiB per owner). They count both
+retained and temporary staging images. Set them through the existing project
+configuration workflow; wrappers pass them to macOS and Tab5 builds. Values must
+be positive integers no greater than 33554432, with per-owner no greater than total.
+
+These are bounded prototype defaults, pending physical Tab5 peak and timing
+validation. They do not include client canvases, app heaps, compositor/scanout,
+executables or OS memory, and do not reserve RAM for fullscreen games.
