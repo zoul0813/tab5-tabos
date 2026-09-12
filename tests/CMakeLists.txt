@@ -311,7 +311,9 @@ add_executable(tabos_display_diagnostic unit/display_diagnostic.c ${TABOS_TEST_P
 target_include_directories(tabos_display_diagnostic PRIVATE
     "${TABOS_ROOT}/graphics/include"
     "${TABOS_ROOT}/kernel/include"
+    "${TABOS_ROOT}/net/include"
     "${TABOS_ROOT}/platform/include"
+    "${CMAKE_CURRENT_LIST_DIR}/fakes"
     "${TABOS_GENERATED_INCLUDE_DIR}"
 )
 target_link_libraries(tabos_display_diagnostic PRIVATE tabos_core)

@@ -92,6 +92,12 @@ void platform_graphics_end(void)
     graphics_present_deadline_ns = 0U;
 }
 
+bool platform_graphics_overlay(platform_framebuffer_t* framebuffer, const platform_graphics_overlay_t* overlay)
+{
+    (void) overlay;
+    return framebuffer != NULL;
+}
+
 bool platform_graphics_present(platform_framebuffer_t* framebuffer)
 {
     if (!host_is_headless() && !renderer_vsync) {

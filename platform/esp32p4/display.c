@@ -28,7 +28,17 @@
 
 #define TAB5_DSI_LANE_BITRATE_MBPS 965
 
-#define TAB5_PPA_BLIT_MIN_PIXELS (16U * 1024U)
+#define TAB5_PPA_BLIT_MIN_PIXELS         (16U * 1024U)
+#define TAB5_GRAPHICS_OVERLAY_MAX_PIXELS (160U * 32U)
+
+typedef struct {
+        platform_pixel_t* saved;
+        int32_t x;
+        int32_t y;
+        uint32_t width;
+        uint32_t height;
+        bool active;
+} direct_overlay_state_t;
 
 static const char* const TAG = TABOS_PLATFORM_LOG_TAG;
 static bsp_lcd_handles_t display_handles;
@@ -52,6 +62,10 @@ static platform_pixel_t* ppa_scratch;
 static bool direct_graphics_active;
 static bool direct_frame_prepared;
 static bool direct_frame_dirty;
+static direct_overlay_state_t direct_overlays[2];
+
+static size_t native_framebuffer_index(const platform_pixel_t* pixels);
+static void copy_saved_overlay(platform_pixel_t* destination, const direct_overlay_state_t* overlay);
 
 static bool IRAM_ATTR display_refresh_done(esp_lcd_panel_handle_t panel, esp_lcd_dpi_panel_event_data_t* event_data,
                                            void* user_data)
@@ -327,9 +341,12 @@ uint32_t platform_graphics_capabilities(void)
 
 bool platform_graphics_begin(void)
 {
-    direct_graphics_active = native_pixels != NULL;
-    direct_frame_prepared  = false;
-    direct_frame_dirty     = false;
+    direct_graphics_active =
+        native_pixels != NULL && direct_overlays[0].saved != NULL && direct_overlays[1].saved != NULL;
+    direct_frame_prepared     = false;
+    direct_frame_dirty        = false;
+    direct_overlays[0].active = false;
+    direct_overlays[1].active = false;
     return direct_graphics_active;
 }
 
@@ -347,6 +364,14 @@ bool platform_graphics_present(platform_framebuffer_t* framebuffer)
         return wait_for_vsync();
     }
     if (!submit_native_frame()) {
+        direct_overlay_state_t* overlay = &direct_overlays[native_framebuffer_index(native_pixels)];
+        if (overlay->active) {
+            copy_saved_overlay(native_pixels, overlay);
+            overlay->active = false;
+            (void) esp_cache_msync(native_pixels,
+                                   (size_t) TABOS_DISPLAY_WIDTH * TABOS_DISPLAY_HEIGHT * sizeof(*native_pixels),
+                                   ESP_CACHE_MSYNC_FLAG_DIR_C2M);
+        }
         return false;
     }
     direct_frame_prepared = false;
@@ -414,13 +439,32 @@ static platform_pixel_t native_blend(platform_pixel_t source, platform_pixel_t d
     return (platform_pixel_t) ((red << 11U) | (green << 5U) | blue);
 }
 
+static size_t native_framebuffer_index(const platform_pixel_t* pixels)
+{
+    return pixels == native_framebuffers[1] ? 1U : 0U;
+}
+
+static void copy_saved_overlay(platform_pixel_t* destination, const direct_overlay_state_t* overlay)
+{
+    for (uint32_t row = 0U; row < overlay->height; ++row) {
+        for (uint32_t column = 0U; column < overlay->width; ++column) {
+            const int32_t logical_x = overlay->x + (int32_t) column;
+            const int32_t logical_y = overlay->y + (int32_t) row;
+            destination[(size_t) (TABOS_DISPLAY_WIDTH - 1 - logical_x) * TABOS_DISPLAY_HEIGHT + (size_t) logical_y] =
+                overlay->saved[(size_t) row * overlay->width + column];
+        }
+    }
+}
+
 static bool prepare_direct_back_buffer(bool replaces_entire_frame)
 {
     if (direct_frame_prepared) {
         return true;
     }
-    direct_frame_prepared = true;
+    direct_frame_prepared                = true;
+    direct_overlay_state_t* back_overlay = &direct_overlays[native_framebuffer_index(native_pixels)];
     if (replaces_entire_frame) {
+        back_overlay->active = false;
         return true;
     }
     const size_t bytes  = (size_t) TABOS_DISPLAY_WIDTH * TABOS_DISPLAY_HEIGHT * sizeof(*native_pixels);
@@ -428,7 +472,76 @@ static bool prepare_direct_back_buffer(bool replaces_entire_frame)
     if (!esp32p4_pie_copy16(native_pixels, native_front_pixels, pixels)) {
         memcpy(native_pixels, native_front_pixels, bytes);
     }
+    back_overlay->active                        = false;
+    const direct_overlay_state_t* front_overlay = &direct_overlays[native_framebuffer_index(native_front_pixels)];
+    if (front_overlay->active) {
+        copy_saved_overlay(native_pixels, front_overlay);
+    }
     return esp_cache_msync(native_pixels, bytes, ESP_CACHE_MSYNC_FLAG_DIR_C2M) == ESP_OK;
+}
+
+bool platform_graphics_overlay(platform_framebuffer_t* framebuffer, const platform_graphics_overlay_t* overlay)
+{
+    if (!direct_graphics_active) {
+        return framebuffer != NULL;
+    }
+    if (framebuffer == NULL || framebuffer->pixels != logical_pixels) {
+        return false;
+    }
+    const direct_overlay_state_t* front_overlay = &direct_overlays[native_framebuffer_index(native_front_pixels)];
+    if (overlay == NULL) {
+        if (!front_overlay->active) {
+            return true;
+        }
+        if (!prepare_direct_back_buffer(false)) {
+            return false;
+        }
+        direct_frame_dirty = true;
+        return true;
+    }
+    if (overlay->background == NULL || overlay->x < 0 || overlay->y < 0 || overlay->width == 0U ||
+        overlay->height == 0U || (uint64_t) (uint32_t) overlay->x + overlay->width > framebuffer->width ||
+        (uint64_t) (uint32_t) overlay->y + overlay->height > framebuffer->height ||
+        (uint64_t) overlay->width * overlay->height > TAB5_GRAPHICS_OVERLAY_MAX_PIXELS ||
+        !prepare_direct_back_buffer(false)) {
+        return false;
+    }
+
+    direct_overlay_state_t* back_overlay = &direct_overlays[native_framebuffer_index(native_pixels)];
+    back_overlay->x                      = overlay->x;
+    back_overlay->y                      = overlay->y;
+    back_overlay->width                  = overlay->width;
+    back_overlay->height                 = overlay->height;
+    for (uint32_t row = 0U; row < overlay->height; ++row) {
+        for (uint32_t column = 0U; column < overlay->width; ++column) {
+            const int32_t logical_x = overlay->x + (int32_t) column;
+            const int32_t logical_y = overlay->y + (int32_t) row;
+            platform_pixel_t* destination =
+                native_pixels + (size_t) (TABOS_DISPLAY_WIDTH - 1 - logical_x) * TABOS_DISPLAY_HEIGHT + logical_y;
+            const size_t overlay_index         = (size_t) row * overlay->width + column;
+            back_overlay->saved[overlay_index] = *destination;
+            const platform_pixel_t source =
+                framebuffer->pixels[(size_t) logical_y * framebuffer->stride_pixels + (size_t) logical_x];
+            if (source != overlay->background[overlay_index]) {
+                *destination = source;
+            }
+        }
+    }
+    back_overlay->active = true;
+    const size_t first = (size_t) (TABOS_DISPLAY_WIDTH - overlay->x - (int32_t) overlay->width) * TABOS_DISPLAY_HEIGHT +
+                         (size_t) overlay->y;
+    const size_t last =
+        (size_t) (TABOS_DISPLAY_WIDTH - overlay->x - 1) * TABOS_DISPLAY_HEIGHT + (size_t) overlay->y + overlay->height;
+    if (esp_cache_msync(native_pixels + first, (last - first) * sizeof(*native_pixels),
+                        ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_UNALIGNED) != ESP_OK) {
+        copy_saved_overlay(native_pixels, back_overlay);
+        back_overlay->active = false;
+        (void) esp_cache_msync(native_pixels + first, (last - first) * sizeof(*native_pixels),
+                               ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_UNALIGNED);
+        return false;
+    }
+    direct_frame_dirty = true;
+    return true;
 }
 
 static bool native_blit_cpu(const tabos_graphics_blit_options_t* options)
@@ -791,6 +904,15 @@ bool platform_display_init(platform_framebuffer_t* framebuffer)
         platform_display_shutdown();
         return false;
     }
+    for (size_t index = 0U; index < 2U; ++index) {
+        direct_overlays[index].saved = heap_caps_aligned_calloc(
+            64U, TAB5_GRAPHICS_OVERLAY_MAX_PIXELS, sizeof(*direct_overlays[index].saved), MALLOC_CAP_SPIRAM);
+        if (direct_overlays[index].saved == NULL) {
+            ESP_LOGE(TAG, "Could not allocate direct graphics overlay buffer in PSRAM");
+            platform_display_shutdown();
+            return false;
+        }
+    }
     esp_err_t create_result;
     if (panel_type == TAB5_PANEL_ST7121) {
         display_uses_bsp = false;
@@ -881,6 +1003,7 @@ bool platform_display_present(const platform_framebuffer_t* framebuffer)
             return false;
         }
     }
+    direct_overlays[native_framebuffer_index(native_pixels)].active = false;
     if (!submit_native_frame()) {
         ESP_LOGE(TAG, "Could not submit Tab5 framebuffer at VSYNC");
         return false;
@@ -960,10 +1083,16 @@ void platform_display_shutdown(void)
         display_created  = false;
         display_uses_bsp = false;
     }
-    native_pixels          = NULL;
-    native_front_pixels    = NULL;
-    native_framebuffers[0] = NULL;
-    native_framebuffers[1] = NULL;
+    native_pixels             = NULL;
+    native_front_pixels       = NULL;
+    native_framebuffers[0]    = NULL;
+    native_framebuffers[1]    = NULL;
+    direct_overlays[0].active = false;
+    direct_overlays[1].active = false;
+    free(direct_overlays[0].saved);
+    free(direct_overlays[1].saved);
+    direct_overlays[0].saved = NULL;
+    direct_overlays[1].saved = NULL;
     if (vsync_done != NULL) {
         vSemaphoreDelete(vsync_done);
         vsync_done = NULL;

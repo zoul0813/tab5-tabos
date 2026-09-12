@@ -1030,6 +1030,13 @@ termination, then repeats the cases to exercise cleanup and parent restoration. 
 present/close control proves explicit flushing still works. The regression must pass
 under ASan/UBSan; teardown discards pending drawing without accessing freed guest RAM.
 
+Overlay coverage must exercise enabled and disabled status icons through both logical
+host presentation and a direct-native backend. The entire overlay region must be
+pixel-equivalent across paths, untouched application pixels must remain unchanged, and
+the portable logical framebuffer must be restored after presentation. Tab5 direct-buffer
+state must retain covered pixels per scanout buffer and remove old overlays before partial
+frame copies; cross-build the real backend after platform-contract changes.
+
 Scaled-canvas tests must cover zero-initialized native opening, dimensions supplied before
 the single open call, rejection when only one dimension is supplied, fullscreen and 4:3
 dimensions, integer fit/centering,

@@ -608,6 +608,8 @@ but is not a substitute for this execution path.
 - [x] Resolve AUD-007: clip line and rectangle-outline geometry with widened arithmetic
   before bounded visible rasterization and gate dispatch.
 - [x] Resolve AUD-008: reject empty raster-fill intersections before pointer and span arithmetic.
+- [x] Resolve AUD-021: composite status overlays into direct Tab5 scanout buffers while
+  retaining covered application pixels across double-buffer swaps.
 - [x] Add a portable graphics benchmark application.
 - [x] Add application-owned integer-scaled logical canvases with automatic presentation.
 - [ ] Validate PPA orientation, transforms, and fallback on physical Tab5 variants.
