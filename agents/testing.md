@@ -1797,3 +1797,27 @@ portable/host filesystem loading and the real runtime with fake time/display: pe
 settings apply after restart, exact custom deadlines and restoration use custom brightness,
 edits do not hot-reload, invalid saved files survive default fallback, and dimming cannot
 raise brightness. Physical microSD reboot loading remains a separate validation check.
+
+## Power application-parking foundation
+
+`unit.application_admission` covers operations on both sides of freeze, in-flight drain,
+explicit execution acknowledgement, stale acknowledgement clearing, reopening, and 1,000
+threaded freeze cycles. `unit.native_task` exercises the actual Tab5 gate wrapper against
+the concurrent scheduler fake: computing guests and lock-owning gates do not park; 100
+cooperative cycles preserve execution; a parked wait can be stopped without deleting an
+active gate stack. Existing destructive-stop tests remain independent.
+
+`unit.application_lifecycle` retains all three levels of a nested foreground stack through
+repeated parking. `component.elf_wait` uses actual RV32 guests and runtime dispatch to
+check launch rejection, queued pointer readiness while parked, finite-deadline expiry
+without cancellation, and noncooperating guest timeout at exactly two seconds with blocker
+PID and reopened execution. Host instruction slices are explicitly not safe points.
+
+These checks validate application admission only, not service-wide suspend safety or
+whole-system sleep. Physical native parking, service drain, display quiescence, wake
+arming, and current measurements remain separate gates. No user-facing suspend command
+or automatic parking policy is enabled by this foundation.
+
+Local validation: macOS Debug and Release builds and full suites pass (72 tests each;
+Debug uses configured AddressSanitizer/UndefinedBehaviorSanitizer). Tab5 Debug and Release
+cross-builds pass. Linux and physical Tab5 parking were not exercised in this local run.

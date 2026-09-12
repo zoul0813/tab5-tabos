@@ -98,7 +98,8 @@ typedef enum {
     SOCKET_WAIT,
     MIXED_WAIT,
     SOCKET_RECEIVE,
-    NETWORK_RESOLVE
+    NETWORK_RESOLVE,
+    COMPUTE_FOREVER
 } wait_kind_t;
 
 static void emit(uint32_t instruction)
@@ -144,7 +145,7 @@ static void write_child(const char* path, wait_kind_t kind, int timeout, uint16_
         store(10U, ITEMS);
         write_u32(code + ITEMS + 4U, TABOS_WAIT_READABLE);
     }
-    if (kind != POINTER_WAIT && kind != NETWORK_RESOLVE) {
+    if (kind != POINTER_WAIT && kind != NETWORK_RESOLVE && kind != COMPUTE_FOREVER) {
         immediate(10U, 4);
         immediate(11U, TABOS_SOCKET_UDP);
         call(184U);
@@ -161,7 +162,9 @@ static void write_child(const char* path, wait_kind_t kind, int timeout, uint16_
         write_u32(code + ENDPOINT + 52U, port);
     }
     call(36U); /* yield: test can queue readiness before a zero wait */
-    if (kind == NETWORK_RESOLVE) {
+    if (kind == COMPUTE_FOREVER) {
+        emit(0x0000006fU); /* jal x0, 0: no API gates or cooperative safe points */
+    } else if (kind == NETWORK_RESOLVE) {
         strcpy((char*) code + ENDPOINT, "localhost");
         immediate(10U, ENDPOINT);
         immediate(11U, 4);
@@ -280,12 +283,49 @@ int main(void)
 
     launch(path, POINTER_WAIT, -1, 0U);
     enter_wait();
+    check(kernel_application_power_begin(platform_time_ms()), "freeze blocked pointer wait");
+    kernel_application_system_update();
+    check(kernel_application_power_status().state == APPLICATION_POWER_PARKED, "wait acknowledges safe parking");
+    check(!kernel_application_system_runnable() &&
+              kernel_application_system_next_deadline() == PLATFORM_RUNTIME_DEADLINE_NONE,
+          "parked wait has no deadline");
+    check(tabos_app_exec(parent_context, "T:/child") == TABOS_APP_RESULT_BUSY, "launch admission frozen");
     SDL_Event pointer     = {.type = SDL_EVENT_MOUSE_BUTTON_DOWN};
     pointer.button.button = SDL_BUTTON_LEFT;
     pointer.button.x      = 50.0F;
     pointer.button.y      = 50.0F;
     check(SDL_PushEvent(&pointer), "queue SDL pointer event");
+    pump();
+    check(tabos_process_count() == 2U && kernel_application_power_status().state == APPLICATION_POWER_PARKED,
+          "queued readiness does not execute parked application");
+    kernel_application_power_end();
     finish(1);
+
+    launch(path, POINTER_WAIT, 70, 0U);
+    enter_wait();
+    check(kernel_application_power_begin(platform_time_ms()), "freeze finite wait");
+    kernel_application_system_update();
+    check(kernel_application_power_status().state == APPLICATION_POWER_PARKED, "finite wait parked");
+    SDL_Delay(80U);
+    kernel_application_power_end();
+    finish(0); /* Original absolute deadline expires; no false cancellation. */
+
+    launch(path, COMPUTE_FOREVER, 0, 0U);
+    kernel_application_system_update(); /* Run past initial yield into computation. */
+    const uint64_t freeze_start = platform_time_ms();
+    check(kernel_application_power_begin(freeze_start), "freeze computing guest");
+    kernel_application_system_update();
+    check(kernel_application_power_status().state == APPLICATION_POWER_PARKING,
+          "instruction slicing does not conceal noncooperation");
+    kernel_application_power_update(freeze_start + 1999U);
+    check(kernel_application_power_status().state == APPLICATION_POWER_PARKING, "two-second boundary not early");
+    kernel_application_power_update(freeze_start + 2000U);
+    check(kernel_application_power_status().state == APPLICATION_POWER_TIMEOUT &&
+              kernel_application_power_status().blocker == child_id,
+          "timeout names stable process blocker");
+    check(kernel_application_system_runnable(), "timeout reopens execution");
+    check(kernel_process_force_terminate(child_id, 9), "stop computing fixture");
+    finish(9);
 
     launch(path, NETWORK_RESOLVE, 0, 0U);
     enter_wait();

@@ -129,6 +129,12 @@
 - [x] Record measurement boundary: available equipment cannot intercept battery-only
   power, so power validation uses USB-C input measurements only.
 
+Power continuation: application admission/parking foundation implemented. Native guarded
+gates and generic waits cooperate; noncooperating native/RV32 execution blocks and times
+out after two seconds. All nested processes retain state and ownership. This remains an
+internal testable handshake, disconnected from sleep until service admission, drain, and
+ordered callbacks are implemented. No new display policy or CPU sleep behavior is enabled.
+
 ### Hardware Services Phase 6 Validation
 
 - [x] Physical RAW8 capture writes 921,600 payload bytes to microSD (operator confirmed).

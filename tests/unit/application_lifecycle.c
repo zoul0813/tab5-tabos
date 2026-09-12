@@ -235,6 +235,24 @@ int main(void)
         process_info.state != TABOS_PROCESS_RUNNING) {
         return 1;
     }
+    for (unsigned int cycle = 0U; cycle < 3U; ++cycle) {
+        if (!kernel_application_power_begin(platform_time_ms()) || kernel_application_power_begin(platform_time_ms())) {
+            return 1;
+        }
+        kernel_application_system_update();
+        if (kernel_application_power_status().state != APPLICATION_POWER_PARKED || tabos_process_count() != 3U ||
+            kernel_application_system_runnable() ||
+            kernel_application_system_next_deadline() != PLATFORM_RUNTIME_DEADLINE_NONE) {
+            return 1;
+        }
+        kernel_application_system_update();
+        if (!tabos_process_info(0U, &process_info) || process_info.state != TABOS_PROCESS_BLOCKED ||
+            !tabos_process_info(1U, &process_info) || process_info.state != TABOS_PROCESS_BLOCKED ||
+            !tabos_process_info(2U, &process_info) || process_info.state != TABOS_PROCESS_RUNNING) {
+            return 1;
+        }
+        kernel_application_power_end();
+    }
     kernel_application_system_update();
     if ((platform_runtime_wait_until(PLATFORM_RUNTIME_DEADLINE_NONE) & PLATFORM_RUNTIME_EVENT_APPLICATION) == 0U) {
         return 1;

@@ -906,3 +906,14 @@ brightness. Defaults remain 60/180/300 seconds and 75/20 percent. File is read-o
 the service; reboot applies user edits. Invalid files fall back atomically with a log
 warning; absent storage/file remains nonfatal. Template and user instructions live in
 `etc/power.conf` and `docs/power.md`; no configuration polling or system sleep is added.
+
+Power Phase 4 application parking is an internal, runtime-owned building block, not yet
+registered in the system suspend graph. It freezes launches and every native ABI gate
+using atomic admission/in-flight accounting; only execution-owned safe points acknowledge
+parking. All loaded processes participate, including blocked parents. Generic waits and
+yield expose lock-free checkpoints; other pending I/O must drain or cause the two-second
+timeout. Host RV32 slices do not acknowledge parking: gates or retained generic waits do.
+Timeout and lifecycle conflicts reopen admission, with copied state and blocker PID.
+Readiness, original wait deadlines, identities, stacks, and focus are retained. Shutdown
+and forced exit release the freeze before existing teardown. Service-wide admission and
+sleep orchestration remain future work; no automatic parking or hardware sleep is enabled.

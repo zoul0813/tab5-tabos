@@ -197,16 +197,34 @@ operator confirms touch restoration passes. Keep these readings separate from th
 
 ## Phase 4 — Admission freeze and process safe points
 
-- [ ] Add short-lived synchronization around admission state and operation counters. Never hold power-manager lock across driver I/O or callbacks.
+- [x] Add short-lived synchronization around application admission state and operation counters. Never hold power-manager lock across driver I/O or callbacks.
 - [ ] Once transition starts, prevent new unsafe operations from racing past completed preflight.
 - [ ] Add cooperative parking handshake to native yield, supported blocking waits, and explicit suspend request.
-- [ ] Park only where application owns no kernel/service lock or active hardware operation. Do not forcibly suspend arbitrary native instruction execution.
-- [ ] Track every live process, including parents waiting for children. Preserve nesting, child status, foreground owner, and process-0 invariant.
-- [ ] Stop host RV32 execution only at equivalent safe boundaries; host instruction slicing must not conceal native noncooperation.
-- [ ] Wake blocked application waits into parking handshake without exposing false cancellation or consuming their readiness.
-- [ ] Use two-second default parking/drain deadline. On timeout, report stable blocker, release freeze, and restore operation.
-- [ ] Freeze process launch/foreground changes during transition; prioritize existing exit, reboot, and power-off requests.
-- [ ] Ensure process teardown releases counters, pending requests, and parking state exactly once.
+- [x] Park only where application owns no kernel/service lock or active hardware operation. Do not forcibly suspend arbitrary native instruction execution.
+- [x] Track every live process, including parents waiting for children. Preserve nesting, child status, foreground owner, and process-0 invariant.
+- [x] Stop host RV32 execution only at equivalent safe boundaries; host instruction slicing must not conceal native noncooperation.
+- [x] Bring supported generic waits into parking handshake without exposing false cancellation or consuming their readiness.
+- [x] Use two-second default application parking/drain deadline. On timeout, report stable blocker, release freeze, and restore operation.
+- [x] Freeze process launch/foreground changes during transition; prioritize existing exit, reboot, and power-off requests.
+- [x] Ensure application teardown releases counters, pending requests, and parking state exactly once.
+
+Application foundation implemented through internal `kernel_application_power_*` requests.
+Native ABI ingress/egress and lock-free yield/generic-wait checkpoints cooperate; pending
+non-wait I/O must drain or block. All occupied processes participate, including parents.
+Host interpreter slices never count as acknowledgement. Readiness and original wait
+deadlines survive parking. Atomic admission tests exercise 1,000 concurrent freeze cycles;
+native scheduler tests exercise repeated parking plus computing/active-gate blockers and
+teardown of a parked wait. Component tests cover retained readiness/deadlines, nested
+process metadata, launch rejection, and exact timeout rollback.
+
+This is not yet registered in the system suspend graph and does not enable automatic
+parking or CPU sleep. The remaining checklist items include service-wide freeze/preflight
+integration and the explicit suspend request, which depend on Phases 5/6/9. Physical native
+parking validation and power measurements remain pending; no current savings claimed.
+
+Application-parking software validation: macOS Debug/Release full suites pass (72 tests
+each), including native scheduler-fake coverage. Tab5 Debug/Release cross-builds pass.
+Linux and physical parking validation were not run locally.
 
 Initial blockers include:
 

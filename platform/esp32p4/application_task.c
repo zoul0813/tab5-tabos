@@ -1,4 +1,5 @@
 #include <tabos/platform/platform.h>
+#include <tabos/platform/application_admission.h>
 #include <tabos/config/identity.h>
 #include <esp_heap_caps.h>
 #include <esp_log.h>
@@ -26,6 +27,7 @@ struct platform_riscv32_context {
         atomic_bool finished;
         atomic_bool stop_requested;
         atomic_uint gate_depth;
+        platform_application_admission_t admission;
         int returned_status;
 };
 
@@ -45,14 +47,64 @@ static platform_riscv32_context_t* gate_enter(void)
 {
     platform_riscv32_context_t* context = current_context();
     park_if_stopping(context);
+    while (!platform_application_admit(&context->admission)) {
+        if (platform_application_acknowledge(&context->admission)) {
+            platform_runtime_notify(PLATFORM_RUNTIME_EVENT_APPLICATION);
+            (void) ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        }
+        park_if_stopping(context);
+    }
     atomic_fetch_add_explicit(&context->gate_depth, 1U, memory_order_acq_rel);
     return context;
 }
 
 static void gate_leave(platform_riscv32_context_t* context)
 {
+    platform_application_release(&context->admission);
     if (atomic_fetch_sub_explicit(&context->gate_depth, 1U, memory_order_acq_rel) == 1U) {
         park_if_stopping(context);
+        while (platform_application_acknowledge(&context->admission)) {
+            platform_runtime_notify(PLATFORM_RUNTIME_EVENT_APPLICATION);
+            (void) ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+            park_if_stopping(context);
+        }
+    }
+}
+
+void platform_riscv32_power_freeze(platform_riscv32_context_t* context, bool frozen)
+{
+    if (context == NULL) {
+        return;
+    }
+    platform_application_freeze(&context->admission, frozen);
+    if (context->task != NULL) {
+        xTaskNotifyGive(context->task);
+    }
+}
+
+bool platform_riscv32_power_parked(const platform_riscv32_context_t* context)
+{
+    return context != NULL && platform_application_parked(&context->admission);
+}
+
+void platform_riscv32_power_checkpoint(void)
+{
+    platform_riscv32_context_t* context = current_context();
+    if (context == NULL || atomic_load(&context->gate_depth) != 1U) {
+        return;
+    }
+    /* Caller guarantees this wait boundary owns no service lock or I/O. Keep
+     * gate_depth intact so destructive teardown still drains this stack. */
+    platform_application_release(&context->admission);
+    while (!platform_application_admit(&context->admission)) {
+        if (platform_application_acknowledge(&context->admission)) {
+            platform_runtime_notify(PLATFORM_RUNTIME_EVENT_APPLICATION);
+            (void) ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        }
+        if (atomic_load(&context->stop_requested)) {
+            /* Teardown clears freeze before it waits for the active gate. */
+            platform_application_freeze(&context->admission, false);
+        }
     }
 }
 
@@ -95,6 +147,7 @@ static void elf_task_main(void* argument)
 {
     platform_riscv32_context_t* context = argument;
     vTaskSetThreadLocalStoragePointer(NULL, 0, context);
+    gate_leave(gate_enter());
     context->returned_status = context->entry(&context->guarded_api, (int) context->argc, context->argv);
     atomic_store_explicit(&context->finished, true, memory_order_release);
     platform_runtime_notify(PLATFORM_RUNTIME_EVENT_APPLICATION);
@@ -198,6 +251,7 @@ void platform_riscv32_stop(platform_riscv32_context_t* context, void (*cancel)(v
         return;
     }
     atomic_store_explicit(&context->stop_requested, true, memory_order_release);
+    platform_riscv32_power_freeze(context, false);
     for (;;) {
         vTaskSuspend(context->task);
         /* eTaskGetState checks both cores' current TCBs before suspended lists.

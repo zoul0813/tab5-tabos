@@ -20,6 +20,7 @@ struct fake_native_task {
         bool suspend;
         bool parked;
         bool deleted;
+        unsigned int notifications;
         unsigned int delayed_state_reads;
         void* tls;
         void (*entry)(void*);
@@ -38,6 +39,8 @@ static unsigned int cancellations;
 static unsigned int deletions;
 static unsigned int running_observations;
 static int owner;
+static atomic_bool hold_completion = true;
+static atomic_uint power_calls;
 
 static void checkpoint(void)
 {
@@ -70,6 +73,7 @@ void vTaskSuspend(TaskHandle_t task)
     TaskHandle_t target = task != NULL ? task : self;
     pthread_mutex_lock(&target->mutex);
     target->suspend = true;
+    pthread_cond_broadcast(&target->changed);
     pthread_mutex_unlock(&target->mutex);
     if (target == self) {
         checkpoint();
@@ -80,6 +84,28 @@ void vTaskResume(TaskHandle_t task)
 {
     pthread_mutex_lock(&task->mutex);
     task->suspend = false;
+    pthread_cond_broadcast(&task->changed);
+    pthread_mutex_unlock(&task->mutex);
+}
+
+uint32_t ulTaskNotifyTake(BaseType_t clear, TickType_t ticks)
+{
+    assert(clear == pdTRUE && ticks == portMAX_DELAY);
+    pthread_mutex_lock(&self->mutex);
+    while (self->notifications == 0U && !self->suspend && !self->deleted) {
+        pthread_cond_wait(&self->changed, &self->mutex);
+    }
+    const unsigned int notifications = self->notifications;
+    self->notifications              = 0U;
+    pthread_mutex_unlock(&self->mutex);
+    checkpoint();
+    return notifications;
+}
+
+void xTaskNotifyGive(TaskHandle_t task)
+{
+    pthread_mutex_lock(&task->mutex);
+    ++task->notifications;
     pthread_cond_broadcast(&task->changed);
     pthread_mutex_unlock(&task->mutex);
 }
@@ -179,6 +205,9 @@ void platform_runtime_notify(platform_runtime_events_t events)
 {
     assert(events == PLATFORM_RUNTIME_EVENT_APPLICATION);
     atomic_store(&returned, true);
+    if (!atomic_load(&hold_completion)) {
+        return;
+    }
     /* Hold completion before self-suspension to reproduce the reported window. */
     for (;;) {
         checkpoint();
@@ -239,7 +268,38 @@ static int computing_entry(const tabos_elf_api_t* api, int argc, const char* con
 static int flags_gate(int descriptor)
 {
     assert(descriptor == 17);
+    atomic_fetch_add(&power_calls, 1U);
     return 42;
+}
+
+static int power_entry(const tabos_elf_api_t* api, int argc, const char* const* argv)
+{
+    (void) argc;
+    (void) argv;
+    atomic_store(&guest_entered, true);
+    for (;;) {
+        (void) api->fd_get_flags(17);
+        vTaskDelay(1U);
+    }
+}
+
+static void wait_gate(void)
+{
+    atomic_store(&guest_entered, true);
+    while (!platform_riscv32_current_cancelled()) {
+        platform_riscv32_power_checkpoint();
+        atomic_fetch_add(&power_calls, 1U);
+        vTaskDelay(1U);
+    }
+}
+
+static int wait_entry(const tabos_elf_api_t* api, int argc, const char* const* argv)
+{
+    (void) argc;
+    (void) argv;
+    api->yield();
+    atomic_store(&guest_after_gate, true);
+    return 0;
 }
 
 static uint64_t clock_gate(void)
@@ -261,6 +321,7 @@ static platform_riscv32_context_t* create(tabos_elf_entry_fn entry)
                                  .console_write = service,
                                  .fd_get_flags  = flags_gate,
                                  .monotonic_ms  = clock_gate,
+                                 .yield         = wait_gate,
                                  .heap_sbrk     = heap_gate};
     platform_riscv32_context_t* context =
         platform_riscv32_create(address, NULL, 0U, 0U, 128U, 4096U, &api, 0U, NULL, &owner);
@@ -294,6 +355,10 @@ int main(void)
         while (!atomic_load(&guest_entered)) {
             vTaskDelay(1U);
         }
+        platform_riscv32_power_freeze(computing, true);
+        vTaskDelay(1U);
+        assert(!platform_riscv32_power_parked(computing));
+        platform_riscv32_power_freeze(computing, false);
         platform_riscv32_stop(computing, cancel_service, &owner);
         platform_riscv32_destroy(computing);
 
@@ -303,11 +368,50 @@ int main(void)
         while (!atomic_load(&in_service)) {
             vTaskDelay(1U);
         }
+        platform_riscv32_power_freeze(blocked, true);
+        assert(!platform_riscv32_power_parked(blocked));
         platform_riscv32_stop(blocked, cancel_service, &owner);
         platform_riscv32_stop(blocked, cancel_service, &owner);
         platform_riscv32_destroy(blocked);
         assert(!atomic_load(&guest_after_gate));
     }
     assert(deletions == 60U && cancellations >= 20U && running_observations >= 120U);
+    atomic_store(&hold_completion, false);
+    atomic_store(&guest_entered, false);
+    platform_riscv32_context_t* power = create(power_entry);
+    assert(platform_riscv32_step(power, 1U, &status) == PLATFORM_RISCV32_YIELDED);
+    while (!atomic_load(&guest_entered)) {
+        vTaskDelay(1U);
+    }
+    for (unsigned int cycle = 0U; cycle < 100U; ++cycle) {
+        platform_riscv32_power_freeze(power, true);
+        while (!platform_riscv32_power_parked(power)) {
+            vTaskDelay(1U);
+        }
+        const unsigned int before = atomic_load(&power_calls);
+        vTaskDelay(1U);
+        assert(atomic_load(&power_calls) == before);
+        platform_riscv32_power_freeze(power, false);
+        assert(!platform_riscv32_power_parked(power));
+    }
+    platform_riscv32_stop(power, NULL, NULL);
+    platform_riscv32_destroy(power);
+    atomic_store(&guest_entered, false);
+    platform_riscv32_context_t* waiting = create(wait_entry);
+    assert(platform_riscv32_step(waiting, 1U, &status) == PLATFORM_RISCV32_YIELDED);
+    while (!atomic_load(&guest_entered)) {
+        vTaskDelay(1U);
+    }
+    platform_riscv32_power_freeze(waiting, true);
+    while (!platform_riscv32_power_parked(waiting)) {
+        vTaskDelay(1U);
+    }
+    const unsigned int before = atomic_load(&power_calls);
+    vTaskDelay(1U);
+    assert(atomic_load(&power_calls) == before);
+    /* Stop supersedes a retained, parked gate without deleting its active stack. */
+    platform_riscv32_stop(waiting, NULL, NULL);
+    platform_riscv32_destroy(waiting);
+    assert(!atomic_load(&guest_after_gate));
     return 0;
 }

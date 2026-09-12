@@ -16,4 +16,12 @@ bool loader_elf_application_set_tty_mode(loader_elf_application_t* application, 
 bool loader_elf_application_runtime_runnable(const tabos_app_descriptor_t* descriptor, const void* application_data);
 uint64_t loader_elf_application_next_deadline(const tabos_app_descriptor_t* descriptor, const void* application_data);
 
+typedef enum {
+    LOADER_POWER_PENDING,
+    LOADER_POWER_PARKED,
+    LOADER_POWER_LIFECYCLE
+} loader_power_result_t;
+void loader_elf_application_power_freeze(const tabos_app_descriptor_t* descriptor, void* data, bool frozen);
+loader_power_result_t loader_elf_application_power_update(const tabos_app_descriptor_t* descriptor, void* data);
+
 #endif

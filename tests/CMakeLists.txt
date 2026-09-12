@@ -376,6 +376,15 @@ tabos_enable_warnings(tabos_runtime_event)
 tabos_enable_sanitizers(tabos_runtime_event)
 add_test(NAME unit.runtime_event COMMAND tabos_runtime_event)
 
+find_package(Threads REQUIRED)
+add_executable(tabos_application_admission unit/application_admission.c)
+target_include_directories(tabos_application_admission PRIVATE "${TABOS_ROOT}/platform/include")
+target_link_libraries(tabos_application_admission PRIVATE Threads::Threads)
+tabos_enable_warnings(tabos_application_admission)
+tabos_enable_sanitizers(tabos_application_admission)
+add_test(NAME unit.application_admission COMMAND tabos_application_admission)
+set_tests_properties(unit.application_admission PROPERTIES TIMEOUT 15)
+
 add_executable(tabos_power_manager unit/power_manager.c ${TABOS_TEST_PLATFORM_FAKES})
 target_include_directories(tabos_power_manager PRIVATE
     "${TABOS_ROOT}/kernel/include"

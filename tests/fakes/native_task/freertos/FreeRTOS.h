@@ -6,5 +6,7 @@ typedef unsigned int UBaseType_t;
 typedef uint32_t StackType_t;
 typedef uint32_t TickType_t;
 typedef struct fake_native_task* TaskHandle_t;
-#define pdPASS 1
-#define pdFAIL 0
+#define pdPASS        1
+#define pdFAIL        0
+#define pdTRUE        1
+#define portMAX_DELAY UINT32_MAX

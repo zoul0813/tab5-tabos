@@ -66,6 +66,15 @@ GPIO interrupt ownership, pinned-SDK restrictions, unverified wake paths, and th
 repeatable measurement worksheet. Functional sleep/wake and instrumented power
 measurements remain separate validation gates.
 
+An internal application-parking foundation is implemented for future suspend. It freezes
+new application calls and launches, waits for cooperative safe points across all loaded
+processes, and releases the freeze after a two-second timeout if an application does not
+cooperate. Supported generic waits retain readiness and their original deadlines; parking
+does not cancel the wait or consume input. This is not connected to idle display policy
+or exposed as a suspend command. Services and hardware remain running. Storage/service
+drain, reversible display scanout shutdown, ordered resume, and hardware validation are
+still required before CPU sleep can be enabled. No additional current savings are claimed.
+
 Display policy defaults to three deadlines from the same last physical activity:
 
 - 60 seconds: dim to at most 20%.

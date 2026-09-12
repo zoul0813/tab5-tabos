@@ -190,6 +190,9 @@ struct platform_riscv32_context {
         uint64_t resume_at;
         uint64_t wait_deadline;
         bool waiting;
+        bool power_frozen;
+        bool power_parked;
+        bool power_safe_point;
 };
 
 static void* current_user_data;
@@ -367,14 +370,15 @@ platform_riscv32_context_t* platform_riscv32_create(const void* entry, const voi
     context->heap_break = (uint32_t) heap_base;
     context->heap_end   = (uint32_t) heap_end;
 
-    context->api            = *api;
-    context->user_data      = user_data;
-    context->state.pc       = minimum_address + (uint32_t) entry_offset;
-    context->state.regs[2]  = context->memory_size - 16U;
-    context->state.regs[10] = guest_api_address;
-    context->state.regs[11] = (uint32_t) argc;
-    context->state.regs[12] = (uint32_t) argv_address;
-    context->state.regs[1]  = HOST_RV32_RETURN;
+    context->api              = *api;
+    context->user_data        = user_data;
+    context->state.pc         = minimum_address + (uint32_t) entry_offset;
+    context->state.regs[2]    = context->memory_size - 16U;
+    context->state.regs[10]   = guest_api_address;
+    context->state.regs[11]   = (uint32_t) argc;
+    context->state.regs[12]   = (uint32_t) argv_address;
+    context->state.regs[1]    = HOST_RV32_RETURN;
+    context->power_safe_point = true;
     return context;
 }
 
@@ -386,6 +390,23 @@ static platform_riscv32_result_t step_inner(platform_riscv32_context_t* context,
     }
     host_rv32_active_ram_size = context->memory_size;
     for (unsigned int count = 0U; count < instruction_budget; ++count) {
+        if (context->state.pc == HOST_RV32_RETURN) {
+            *returned_status = (int) context->state.regs[10];
+            return PLATFORM_RISCV32_RETURNED;
+        }
+        if (context->state.pc != context->gate_state.pc && !context->io.pending) {
+            context->io.retrying = false;
+        }
+        const bool at_gate =
+            context->state.pc >= HOST_RV32_API_GATE_FIRST && context->state.pc <= HOST_RV32_API_GATE_LAST;
+        /* A pending worker or socket operation must finish at its original gate.
+         * A generic readiness wait owns no operation between host retries. */
+        const bool safe_wait = context->waiting && context->io.job == NULL;
+        if (context->power_frozen && (context->power_safe_point || at_gate) &&
+            ((!context->io.pending && !context->io.retrying) || safe_wait)) {
+            context->power_parked = true;
+            return PLATFORM_RISCV32_YIELDED;
+        }
         if (context->io.pending) {
             return PLATFORM_RISCV32_YIELDED;
         }
@@ -393,11 +414,8 @@ static platform_riscv32_result_t step_inner(platform_riscv32_context_t* context,
             context->io.retrying = false;
             host_io_cancel(&context->io);
         }
-        context->gate_state = context->state;
-        if (context->state.pc == HOST_RV32_RETURN) {
-            *returned_status = (int) context->state.regs[10];
-            return PLATFORM_RISCV32_RETURNED;
-        }
+        context->gate_state       = context->state;
+        context->power_safe_point = at_gate;
         if (context->state.pc == HOST_RV32_CONSOLE_WRITE) {
             const char* text = guest_string(context->memory, context->state.regs[10]);
             if (text == NULL || context->api.console_write == NULL) {
@@ -1371,6 +1389,7 @@ static platform_riscv32_result_t step_inner(platform_riscv32_context_t* context,
             return PLATFORM_RISCV32_YIELDED;
         }
         const uint64_t cycle_before         = ((uint64_t) context->state.cycleh << 32U) | context->state.cyclel;
+        context->power_safe_point           = false;
         const unsigned int remaining_budget = instruction_budget - count;
         int batch_budget                    = INT_MAX;
         if (remaining_budget <= (unsigned int) INT_MAX) {
@@ -1400,7 +1419,31 @@ bool platform_riscv32_requires_runtime_slices(void)
 
 uint64_t platform_riscv32_next_deadline(const platform_riscv32_context_t* context)
 {
+    if (context != NULL && context->power_parked) {
+        return PLATFORM_RUNTIME_DEADLINE_NONE;
+    }
     return context != NULL ? context->resume_at : PLATFORM_RUNTIME_DEADLINE_NONE;
+}
+
+void platform_riscv32_power_freeze(platform_riscv32_context_t* context, bool frozen)
+{
+    if (context != NULL) {
+        context->power_frozen = frozen;
+        context->power_parked = false;
+        /* Let a waiting guest reach the handshake without changing its original
+         * wait deadline, PC, result, or readiness. */
+        context->resume_at = 0U;
+    }
+}
+
+bool platform_riscv32_power_parked(const platform_riscv32_context_t* context)
+{
+    return context != NULL && context->power_frozen && context->power_parked;
+}
+
+void platform_riscv32_power_checkpoint(void)
+{
+    /* Host gates never block the runtime. step_inner handles their continuation. */
 }
 
 platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* context, unsigned int instruction_budget,
@@ -1413,6 +1456,9 @@ platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* cont
     platform_riscv32_result_t result = step_inner(context, instruction_budget, returned_status);
     host_io_leave();
     current_user_data = NULL;
+    if (context->power_parked) {
+        return result;
+    }
     if (context->io.pending) {
         context->state       = context->gate_state;
         context->io.retrying = true;

@@ -2,6 +2,7 @@
 #include <tabos/internal/console.h>
 #include <tabos/internal/elf_application.h>
 #include <tabos/internal/pointer.h>
+#include <tabos/internal/time.h>
 
 #include <tabos/platform/platform.h>
 
@@ -28,6 +29,90 @@ static tabos_process_id_t next_process_id;
 static kernel_process_t* foreground_process;
 static bool last_exit_valid;
 static int last_exit_status;
+static application_power_status_t power_status;
+
+static bool power_frozen(void)
+{
+    return power_status.state == APPLICATION_POWER_PARKING || power_status.state == APPLICATION_POWER_PARKED;
+}
+
+application_power_status_t kernel_application_power_status(void)
+{
+    return power_status;
+}
+
+void kernel_application_power_end(void)
+{
+    const bool was_frozen = power_frozen();
+    for (size_t index = 0U; index < KERNEL_PROCESS_CAPACITY; ++index) {
+        if (processes[index].occupied && was_frozen) {
+            loader_elf_application_power_freeze(processes[index].context.descriptor,
+                                                processes[index].context.application_data, false);
+        }
+    }
+    power_status = (application_power_status_t) {
+        .state = APPLICATION_POWER_ACTIVE, .blocker = TABOS_PROCESS_ID_INVALID, .deadline_ms = TIME_DEADLINE_NONE};
+    if (was_frozen) {
+        platform_runtime_notify(PLATFORM_RUNTIME_EVENT_APPLICATION);
+    }
+}
+
+bool kernel_application_power_begin(uint64_t now_ms)
+{
+    if (power_frozen() || tabos_process_system_panicked()) {
+        return false;
+    }
+    power_status = (application_power_status_t) {.state       = APPLICATION_POWER_PARKING,
+                                                 .blocker     = TABOS_PROCESS_ID_INVALID,
+                                                 .deadline_ms = time_deadline_after(now_ms, 2000U)};
+    for (size_t index = 0U; index < KERNEL_PROCESS_CAPACITY; ++index) {
+        if (processes[index].occupied) {
+            loader_elf_application_power_freeze(processes[index].context.descriptor,
+                                                processes[index].context.application_data, true);
+        }
+    }
+    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_APPLICATION);
+    return true;
+}
+
+void kernel_application_power_update(uint64_t now_ms)
+{
+    if (power_status.state != APPLICATION_POWER_PARKING) {
+        return;
+    }
+    tabos_process_id_t blocker = TABOS_PROCESS_ID_INVALID;
+    bool lifecycle             = false;
+    for (size_t index = 0U; index < KERNEL_PROCESS_CAPACITY; ++index) {
+        kernel_process_t* process = &processes[index];
+        if (!process->occupied) {
+            continue;
+        }
+        loader_power_result_t result = LOADER_POWER_LIFECYCLE;
+        if (!process->context.exit_requested) {
+            result =
+                loader_elf_application_power_update(process->context.descriptor, process->context.application_data);
+        }
+        if (result == LOADER_POWER_LIFECYCLE) {
+            blocker   = process->id;
+            lifecycle = true;
+            break;
+        }
+        if (result == LOADER_POWER_PENDING && blocker == TABOS_PROCESS_ID_INVALID) {
+            blocker = process->id;
+        }
+    }
+    if (lifecycle || (blocker != TABOS_PROCESS_ID_INVALID && now_ms >= power_status.deadline_ms)) {
+        kernel_application_power_end();
+        power_status.state   = lifecycle ? APPLICATION_POWER_LIFECYCLE : APPLICATION_POWER_TIMEOUT;
+        power_status.blocker = blocker;
+    } else if (blocker == TABOS_PROCESS_ID_INVALID) {
+        power_status.state       = APPLICATION_POWER_PARKED;
+        power_status.blocker     = TABOS_PROCESS_ID_INVALID;
+        power_status.deadline_ms = TIME_DEADLINE_NONE;
+    } else {
+        power_status.blocker = blocker;
+    }
+}
 
 static const char* termination_name(tabos_process_termination_t cause)
 {
@@ -157,11 +242,16 @@ void kernel_application_system_init(void)
     next_process_id    = 0U;
     last_exit_valid    = false;
     last_exit_status   = 0;
+    kernel_application_power_end();
     application_registry_reset();
 }
 
 void kernel_application_system_update(void)
 {
+    kernel_application_power_update(platform_time_ms());
+    if (power_frozen()) {
+        return;
+    }
     if (foreground_process == NULL) {
         return;
     }
@@ -181,6 +271,18 @@ void kernel_application_system_update(void)
 
 bool kernel_application_system_runnable(void)
 {
+    if (power_frozen()) {
+        if (power_status.state == APPLICATION_POWER_PARKING) {
+            for (size_t index = 0U; index < KERNEL_PROCESS_CAPACITY; ++index) {
+                if (processes[index].occupied &&
+                    loader_elf_application_runtime_runnable(processes[index].context.descriptor,
+                                                            processes[index].context.application_data)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
     if (foreground_process == NULL || foreground_process->state != TABOS_PROCESS_RUNNING ||
         foreground_process->context.exit_requested) {
         return false;
@@ -191,6 +293,21 @@ bool kernel_application_system_runnable(void)
 
 uint64_t kernel_application_system_next_deadline(void)
 {
+    if (power_frozen()) {
+        uint64_t deadline = power_status.deadline_ms;
+        if (power_status.state == APPLICATION_POWER_PARKING) {
+            for (size_t index = 0U; index < KERNEL_PROCESS_CAPACITY; ++index) {
+                if (processes[index].occupied) {
+                    const uint64_t candidate = loader_elf_application_next_deadline(
+                        processes[index].context.descriptor, processes[index].context.application_data);
+                    if (candidate < deadline) {
+                        deadline = candidate;
+                    }
+                }
+            }
+        }
+        return deadline;
+    }
     if (foreground_process == NULL || foreground_process->state != TABOS_PROCESS_RUNNING ||
         foreground_process->context.exit_requested) {
         return PLATFORM_RUNTIME_DEADLINE_NONE;
@@ -201,6 +318,7 @@ uint64_t kernel_application_system_next_deadline(void)
 
 void kernel_application_system_shutdown(void)
 {
+    kernel_application_power_end();
     pointer_service_set_foreground_owner(NULL);
     for (size_t index = KERNEL_PROCESS_CAPACITY; index > 0U; --index) {
         if (processes[index - 1U].occupied) {
@@ -221,7 +339,7 @@ static tabos_app_result_t launch_root_descriptor(const tabos_app_descriptor_t* d
         }
         return TABOS_APP_RESULT_INVALID;
     }
-    if (foreground_process != NULL) {
+    if (foreground_process != NULL || power_frozen()) {
         if (application_data_destroy != NULL) {
             application_data_destroy(application_data);
         }
@@ -301,6 +419,9 @@ tabos_app_result_t tabos_app_launch_path(const char* path)
 
 tabos_app_result_t tabos_app_launch_path_args(const char* path, size_t argc, const char* const* argv)
 {
+    if (power_frozen()) {
+        return TABOS_APP_RESULT_BUSY;
+    }
     if (path == NULL || path[0] == '\0') {
         return TABOS_APP_RESULT_INVALID;
     }
@@ -321,7 +442,7 @@ static tabos_app_result_t launch_child_descriptor(tabos_app_context_t* parent, c
         }
         return TABOS_APP_RESULT_INVALID;
     }
-    if (foreground_process == NULL || parent != &foreground_process->context ||
+    if (power_frozen() || foreground_process == NULL || parent != &foreground_process->context ||
         foreground_process->state != TABOS_PROCESS_RUNNING) {
         if (application_data_destroy != NULL) {
             application_data_destroy(application_data);
@@ -390,6 +511,9 @@ tabos_app_result_t tabos_app_exec(tabos_app_context_t* context, const char* path
 tabos_app_result_t tabos_app_exec_args(tabos_app_context_t* context, const char* path, size_t argc,
                                        const char* const* argv)
 {
+    if (power_frozen()) {
+        return TABOS_APP_RESULT_BUSY;
+    }
     if (context == NULL || path == NULL || path[0] == '\0') {
         return TABOS_APP_RESULT_INVALID;
     }
@@ -437,6 +561,7 @@ const tabos_app_descriptor_t* tabos_app_active(void)
 void tabos_app_request_exit(tabos_app_context_t* context, int exit_status)
 {
     if (foreground_process != NULL && context == &foreground_process->context) {
+        kernel_application_power_end();
         if (context->termination_cause == TABOS_PROCESS_TERMINATION_NONE) {
             context->termination_cause = TABOS_PROCESS_TERMINATION_EXIT_REQUEST;
         }
@@ -452,6 +577,7 @@ void kernel_process_fail(tabos_app_context_t* context, tabos_process_termination
         cause == TABOS_PROCESS_TERMINATION_NONE) {
         return;
     }
+    kernel_application_power_end();
     context->termination_cause = cause;
     context->exit_requested    = true;
     context->exit_status       = exit_status;

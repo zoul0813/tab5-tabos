@@ -1379,6 +1379,7 @@ static int elf_wait_sources(loader_elf_application_t* application, tabos_elf_wai
     const uint64_t deadline_ms =
         finite_timeout ? time_deadline_after(platform_time_ms(), timeout_ms) : TIME_DEADLINE_NONE;
     while (true) {
+        platform_riscv32_power_checkpoint();
         int ready = 0;
         for (uint32_t type = 0U; type < ELF_WAIT_SOURCE_TYPE_COUNT; ++type) {
             if (update_sources[type]) {
@@ -1417,6 +1418,9 @@ static int elf_wait_sources(loader_elf_application_t* application, tabos_elf_wai
             }
         }
 
+        if (socket_timeout > ELF_WAIT_POLL_SLICE_MS) {
+            socket_timeout = ELF_WAIT_POLL_SLICE_MS;
+        }
         if (socket_count > 0U || (ready == 0 && requires_polling && timeout_ms != 0U)) {
             for (uint32_t index = 0U; index < socket_count; ++index) {
                 socket_items[index].returned_events = 0U;
@@ -1435,8 +1439,7 @@ static int elf_wait_sources(loader_elf_application_t* application, tabos_elf_wai
             }
         }
 
-        if (ready > 0 || timeout_ms == 0U || !requires_polling ||
-            (finite_timeout && platform_time_ms() >= deadline_ms)) {
+        if (ready > 0 || timeout_ms == 0U || (finite_timeout && platform_time_ms() >= deadline_ms)) {
             return ready;
         }
         if (atomic_load_explicit(&application->wait_cancel_requested, memory_order_acquire)) {
@@ -2012,8 +2015,7 @@ static int elf_graphics_blit(int32_t x, int32_t y, uint32_t width, uint32_t heig
     loader_elf_application_t* application = platform_riscv32_current_user_data();
     platform_framebuffer_t* framebuffer   = display_framebuffer();
     if (application == NULL || !application->graphics_active || framebuffer == NULL || pixels == NULL || width == 0U ||
-        height == 0U || width > SIZE_MAX / height ||
-        (size_t) width * height > SIZE_MAX / sizeof(*pixels)) {
+        height == 0U || width > SIZE_MAX / height || (size_t) width * height > SIZE_MAX / sizeof(*pixels)) {
         return -TABOS_EINVAL;
     }
     const size_t pixel_bytes = (size_t) width * height * sizeof(*pixels);
@@ -2143,6 +2145,7 @@ static int elf_exec(const char* path, uint32_t argc, const char* const* argv)
 
 static void elf_yield(void)
 {
+    platform_riscv32_power_checkpoint();
     platform_input_wait();
 }
 
@@ -2572,4 +2575,41 @@ uint64_t loader_elf_application_next_deadline(const tabos_app_descriptor_t* desc
     }
     const loader_elf_application_t* application = application_data;
     return platform_riscv32_next_deadline(application->execution);
+}
+
+void loader_elf_application_power_freeze(const tabos_app_descriptor_t* descriptor, void* data, bool frozen)
+{
+    if (descriptor != NULL && descriptor->update == elf_update && data != NULL) {
+        loader_elf_application_t* application = data;
+        platform_riscv32_power_freeze(application->execution, frozen);
+    }
+}
+
+loader_power_result_t loader_elf_application_power_update(const tabos_app_descriptor_t* descriptor, void* data)
+{
+    /* Built-in callbacks execute only on the runtime dispatcher, which is
+     * outside every callback while running this handshake. */
+    if (descriptor == NULL || descriptor->update != elf_update) {
+        return LOADER_POWER_PARKED;
+    }
+    loader_elf_application_t* application = data;
+    if (application == NULL || application->execution == NULL || atomic_load(&application->exit_requested) ||
+        atomic_load(&application->exec_requested)) {
+        return LOADER_POWER_LIFECYCLE;
+    }
+    if (!platform_riscv32_power_parked(application->execution)) {
+        if (platform_riscv32_requires_runtime_slices() &&
+            platform_riscv32_next_deadline(application->execution) > platform_time_ms()) {
+            return LOADER_POWER_PENDING;
+        }
+        int status = 0;
+        if (platform_riscv32_step(application->execution, ELF_INSTRUCTIONS_PER_UPDATE, &status) !=
+            PLATFORM_RISCV32_YIELDED) {
+            return LOADER_POWER_LIFECYCLE;
+        }
+    }
+    if (atomic_load(&application->exit_requested) || atomic_load(&application->exec_requested)) {
+        return LOADER_POWER_LIFECYCLE;
+    }
+    return platform_riscv32_power_parked(application->execution) ? LOADER_POWER_PARKED : LOADER_POWER_PENDING;
 }

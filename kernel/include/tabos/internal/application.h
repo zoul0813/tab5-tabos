@@ -24,6 +24,27 @@ bool kernel_application_system_runnable(void);
 uint64_t kernel_application_system_next_deadline(void);
 void kernel_application_system_shutdown(void);
 
+typedef enum {
+    APPLICATION_POWER_ACTIVE,
+    APPLICATION_POWER_PARKING,
+    APPLICATION_POWER_PARKED,
+    APPLICATION_POWER_TIMEOUT,
+    APPLICATION_POWER_LIFECYCLE
+} application_power_state_t;
+
+typedef struct {
+        application_power_state_t state;
+        tabos_process_id_t blocker;
+        uint64_t deadline_ms;
+} application_power_status_t;
+
+/* Runtime-dispatcher only. This freezes application admission, not services,
+ * and does not enable platform sleep. Status is copied, never a process pointer. */
+bool kernel_application_power_begin(uint64_t now_ms);
+void kernel_application_power_update(uint64_t now_ms);
+void kernel_application_power_end(void);
+application_power_status_t kernel_application_power_status(void);
+
 bool application_registry_register(const tabos_app_descriptor_t* descriptor);
 void application_registry_reset(void);
 void application_report_diagnostic_result(tabos_app_context_t* context, int status);

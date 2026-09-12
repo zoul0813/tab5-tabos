@@ -16,6 +16,13 @@ enum {
 
 typedef uint16_t platform_pixel_t;
 typedef struct platform_riscv32_context platform_riscv32_context_t;
+
+/* Cooperative power parking, distinct from destructive execution stop. Freeze
+ * and status are runtime-owned; checkpoint is called only without service locks
+ * or outstanding operations by the executing application at a supported wait. */
+void platform_riscv32_power_freeze(platform_riscv32_context_t* context, bool frozen);
+bool platform_riscv32_power_parked(const platform_riscv32_context_t* context);
+void platform_riscv32_power_checkpoint(void);
 typedef struct platform_mutex platform_mutex_t;
 
 typedef uint32_t platform_runtime_events_t;

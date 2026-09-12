@@ -1585,3 +1585,24 @@ Missing fields use defaults; invalid complete policy or I/O failure leaves defau
 No hot reload, periodic storage access, automatic writes, public ABI, or sleep enablement
 is added. Normal brightness must remain nonzero; dim brightness is capped at normal by
 existing policy. The checked-in `etc/power.conf` is a user-copyable template.
+
+Application power parking is separate from destructive native-task stop. The runtime-only
+`kernel_application_power_*` handshake freezes process launch/focus transitions and visits
+every occupied process, including blocked parents, without modifying public process states.
+Native ABI admission uses one atomic word for freeze, in-flight count, and execution-owned
+acknowledgement. No lock spans a driver call or parked task; zero in-flight calls alone do
+not establish that guest code has stopped. Gate ingress/egress and explicitly lock-free
+yield/generic-wait checkpoints acknowledge parking. Native notification waits preserve
+resume-before-block signals. Generic socket waits use bounded 10 ms slices to reach a
+checkpoint without cancelling operations or consuming readiness. Other pending I/O must
+finish or remain a blocker. Host interpreter slicing is not a safe point; host gates and
+retained generic waits mirror cooperative native boundaries, preserving pending worker
+ownership and original deadlines.
+
+The two-second parking deadline joins runtime deadline dispatch. Timeout or a pending
+lifecycle transition releases all freezes and reports copied state plus stable blocker PID.
+Parked applications supply no runnable/deadline hint, while services remain scheduled.
+Exit and shutdown supersede parking and use existing cleanup only after admission reopens.
+This internal foundation is not yet connected to power-manager participant callbacks;
+service-wide admission, storage drain, preflight rechecks, and ordered resume must land
+before platform sleep is enabled. Public suspend controls remain deferred.

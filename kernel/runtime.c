@@ -558,7 +558,8 @@ void kernel_runtime_update(platform_runtime_events_t events)
     if (device_ready) {
         hardware_devices_update();
     }
-    if (application_ready || kernel_application_system_runnable()) {
+    if (application_ready || kernel_application_system_runnable() ||
+        (deadline_wake && deadline_ready(kernel_application_system_next_deadline(), now))) {
         kernel_application_system_update();
 #ifndef NDEBUG
         ++wake_counts.application_slice;

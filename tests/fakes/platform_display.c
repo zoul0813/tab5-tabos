@@ -1046,6 +1046,22 @@ bool platform_riscv32_current_cancelled(void)
     return false;
 }
 
+void platform_riscv32_power_freeze(platform_riscv32_context_t* context, bool frozen)
+{
+    (void) context;
+    (void) frozen;
+}
+
+bool platform_riscv32_power_parked(const platform_riscv32_context_t* context)
+{
+    (void) context;
+    return false;
+}
+
+void platform_riscv32_power_checkpoint(void)
+{
+}
+
 void platform_network_operations_cancel(void)
 {
 }
