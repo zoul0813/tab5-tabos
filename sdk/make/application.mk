@@ -48,6 +48,7 @@ TABOS_LDFLAGS := -nostartfiles -Wl,-T,$(SDK_ROOT)/linker/app-riscv32.ld
 TABOS_LDFLAGS += -Wl,--build-id=none -Wl,--gc-sections -Wl,-N -Wl,--emit-relocs
 TABOS_RUNTIME_SOURCES := $(SDK_ROOT)/crt/crt0.c $(SDK_ROOT)/crt/metadata.S $(SDK_ROOT)/libc/syscalls.c \
                          $(SDK_ROOT)/lib/process.c \
+                         $(SDK_ROOT)/lib/ipc.c \
                          $(SDK_ROOT)/lib/graphics.c \
                          $(SDK_ROOT)/lib/input.c \
                          $(SDK_ROOT)/lib/network.c \

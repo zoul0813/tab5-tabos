@@ -632,6 +632,22 @@ endif()
 tabos_enable_warnings(tabos_shell_rv32)
 tabos_enable_sanitizers(tabos_shell_rv32)
 
+add_executable(tabos_ipc unit/ipc.c ${TABOS_TEST_PLATFORM_FAKES})
+target_include_directories(tabos_ipc PRIVATE
+    "${TABOS_ROOT}/console/include"
+    "${TABOS_ROOT}/graphics/include"
+    "${TABOS_ROOT}/input/include"
+    "${TABOS_ROOT}/kernel/include"
+    "${TABOS_ROOT}/platform/include"
+    "${TABOS_ROOT}/sdk/include"
+    "${CMAKE_CURRENT_LIST_DIR}/fakes"
+)
+target_link_libraries(tabos_ipc PRIVATE tabos_core)
+tabos_enable_warnings(tabos_ipc)
+tabos_enable_sanitizers(tabos_ipc)
+
+add_test(NAME unit.ipc COMMAND tabos_ipc)
+
 add_executable(tabos_application_lifecycle unit/application_lifecycle.c ${TABOS_TEST_PLATFORM_FAKES})
 target_include_directories(tabos_application_lifecycle PRIVATE
     "${TABOS_ROOT}/console/include"

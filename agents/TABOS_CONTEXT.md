@@ -206,7 +206,8 @@ runnable processes from foreground ownership. The process manager now supports
 internal asynchronous descriptor children and rotates a snapshot of running PIDs.
 Exit releases resources and retains status until one parent reap; parent teardown
 removes descendants. Public concurrent SDK/ELF spawn and wait are implemented through copied
-runtime mailboxes; GUI sessions remain pending. See [GUI contracts](gui-contracts.md) and [tasks](apps/gui.md).
+runtime mailboxes. GUI session IDs and scoped paired IPC channels are implemented;
+cooperative pause/handoff remains pending. See [GUI contracts](gui-contracts.md) and [tasks](apps/gui.md).
 
 TabOS will initially support multiple loaded processes but only one focused application
 at a time. Shell is persistent root process (initially process 0). When foreground

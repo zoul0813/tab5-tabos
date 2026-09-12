@@ -112,3 +112,5 @@ NATIVE_GATE(int, tty_get_size, (int descriptor, tabos_tty_size_t* size), (descri
 NATIVE_GATE(int, input_wait_source, (void), ())
 NATIVE_GATE(int, spawn, (const char* path, uint32_t argc, const char* const* argv), (path, argc, argv))
 NATIVE_GATE(int, waitpid, (int pid, int* status), (pid, status))
+NATIVE_GATE(int, session_open, (void), ())
+NATIVE_GATE(int, ipc, (uint32_t operation, ipc_transport_packet_t* packet), (operation, packet))

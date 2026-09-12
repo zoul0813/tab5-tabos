@@ -2,6 +2,7 @@
 #include <tabos/internal/console.h>
 #include <tabos/internal/elf_application.h>
 #include <tabos/internal/pointer.h>
+#include <tabos/internal/ipc.h>
 
 #include <tabos/platform/platform.h>
 
@@ -101,6 +102,7 @@ static void release_process_resources(kernel_process_t* process)
     if (descriptor->cleanup != NULL) {
         descriptor->cleanup(context, status);
     }
+    ipc_service_close_owner(process->id);
     if (context->console_owned) {
         tabos_console_release(&context->console);
     }
@@ -191,6 +193,7 @@ static void finish_child_process(kernel_process_t* child)
 
 void kernel_application_system_init(void)
 {
+    (void) ipc_service_init();
     for (size_t index = 0U; index < KERNEL_PROCESS_CAPACITY; ++index) {
         processes[index] = (kernel_process_t) {0};
     }
@@ -201,6 +204,20 @@ void kernel_application_system_init(void)
     last_exit_status   = 0;
     scheduler_cursor   = 0U;
     application_registry_reset();
+}
+
+int kernel_process_session_open(tabos_app_context_t* context)
+{
+    kernel_process_t* process = process_from_context(context);
+    if (process == NULL || process != foreground_process || process->id == 0U ||
+        process->state != TABOS_PROCESS_RUNNING) {
+        return -1;
+    }
+    if (context->session_id != 0U && context->session_id != process->id) {
+        return -1;
+    }
+    context->session_id = process->id;
+    return (int) process->id;
 }
 
 void kernel_application_system_update(void)
@@ -284,6 +301,7 @@ void kernel_application_system_shutdown(void)
     foreground_process = NULL;
     foreground_depth   = 0U;
     application_registry_reset();
+    ipc_service_shutdown();
 }
 
 static tabos_app_result_t launch_root_descriptor(const tabos_app_descriptor_t* descriptor, void* application_data,
@@ -466,6 +484,7 @@ tabos_app_result_t kernel_process_spawn_descriptor(tabos_app_context_t* parent,
                         {
                                   .descriptor       = descriptor,
                                   .process_id       = id,
+                                  .session_id       = parent->session_id,
                                   .application_data = application_data,
                                   },
                                          .application_data_destroy = application_data_destroy,

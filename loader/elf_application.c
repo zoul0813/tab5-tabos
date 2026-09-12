@@ -3,6 +3,7 @@
 #include <tabos/internal/audio.h>
 #include <tabos/internal/pointer.h>
 #include <tabos/internal/camera.h>
+#include <tabos/internal/ipc.h>
 
 #include <tabos/internal/elf_api.h>
 #include <tabos/filesystem.h>
@@ -97,6 +98,7 @@ typedef enum {
     ELF_WAIT_SOURCE_POINTER,
     ELF_WAIT_SOURCE_CAMERA,
     ELF_WAIT_SOURCE_INPUT,
+    ELF_WAIT_SOURCE_IPC,
     ELF_WAIT_SOURCE_TYPE_COUNT,
 } elf_wait_source_type_t;
 
@@ -149,6 +151,10 @@ struct loader_elf_application {
         int reap_pid;
         int reap_result;
         int reap_status;
+        atomic_bool session_requested;
+        atomic_bool session_ready;
+        bool session_in_flight;
+        int session_result;
         bool graphics_active;
         uint32_t graphics_overlay_flags;
         elf_graphics_command_t graphics_commands[ELF_GRAPHICS_COMMAND_CAPACITY];
@@ -1277,6 +1283,42 @@ static int elf_wait_poll_input(loader_elf_application_t* application, uintptr_t 
     return 0;
 }
 
+static int elf_wait_poll_ipc(loader_elf_application_t* application, uintptr_t parent, uint32_t requested_events,
+                             uint32_t* returned_events)
+{
+    return ipc_service_poll(application->context->process_id, (int) parent, requested_events, returned_events);
+}
+
+static int elf_ipc(uint32_t operation, ipc_transport_packet_t* packet)
+{
+    loader_elf_application_t* application = platform_riscv32_current_user_data();
+    ipc_transport_packet_t* writable =
+        (ipc_transport_packet_t*) platform_executable_data_pointer(packet, sizeof(*packet));
+    if (application == NULL || writable == NULL) {
+        return -TABOS_EINVAL;
+    }
+    if (operation == IPC_TRANSPORT_WAIT_SOURCE) {
+        uint32_t ignored;
+        if (ipc_service_poll(application->context->process_id, writable->channel, 0U, &ignored) != 0) {
+            return -TABOS_EBADF;
+        }
+        tabos_wait_source_t source =
+            elf_wait_source_find(application, ELF_WAIT_SOURCE_IPC, (uintptr_t) writable->channel);
+        if (source == TABOS_WAIT_SOURCE_INVALID) {
+            source = elf_wait_source_allocate(application, ELF_WAIT_SOURCE_IPC, (uintptr_t) writable->channel);
+        }
+        return source == TABOS_WAIT_SOURCE_INVALID ? -TABOS_EMFILE : source;
+    }
+    const int result =
+        ipc_service_request(application->context->process_id, application->context->session_id, operation, writable);
+    if (result == 0 && operation == IPC_TRANSPORT_CLOSE) {
+        const tabos_wait_source_t source =
+            elf_wait_source_find(application, ELF_WAIT_SOURCE_IPC, (uintptr_t) writable->channel);
+        elf_wait_source_invalidate(application, source);
+    }
+    return result;
+}
+
 static int elf_wait_poll_device_subscription(loader_elf_application_t* application, uintptr_t parent,
                                              uint32_t requested_events, uint32_t* returned_events)
 {
@@ -1318,6 +1360,8 @@ static int elf_wait_prepare_socket(loader_elf_application_t* application, uintpt
 }
 
 static const elf_wait_source_adapter_t elf_wait_source_adapters[ELF_WAIT_SOURCE_TYPE_COUNT] = {
+    [ELF_WAIT_SOURCE_IPC]   = {.valid_events = TABOS_WAIT_READABLE | TABOS_WAIT_WRITABLE | TABOS_WAIT_HANGUP,
+                               .poll         = elf_wait_poll_ipc},
     [ELF_WAIT_SOURCE_INPUT] = {.valid_events = TABOS_WAIT_READABLE, .poll = elf_wait_poll_input},
     [ELF_WAIT_SOURCE_SOCKET] =
         {
@@ -2199,6 +2243,24 @@ static void elf_yield(void)
     platform_input_wait();
 }
 
+static int elf_session_open(void)
+{
+    loader_elf_application_t* application = platform_riscv32_current_user_data();
+    if (application == NULL) {
+        return -TABOS_EINVAL;
+    }
+    if (atomic_exchange_explicit(&application->session_ready, false, memory_order_acq_rel)) {
+        application->session_in_flight = false;
+        return application->session_result;
+    }
+    if (!application->session_in_flight) {
+        application->session_in_flight = true;
+        atomic_store_explicit(&application->session_requested, true, memory_order_release);
+        platform_runtime_notify(PLATFORM_RUNTIME_EVENT_APPLICATION);
+    }
+    return TABOS_ELF_EXEC_PENDING;
+}
+
 static bool elf_entry(tabos_app_context_t* context)
 {
     loader_elf_application_t* application = application_from_context(context);
@@ -2333,6 +2395,8 @@ static bool elf_entry(tabos_app_context_t* context)
         .input_wait_source               = elf_input_wait_source,
         .spawn                           = elf_spawn,
         .waitpid                         = elf_waitpid,
+        .session_open                    = elf_session_open,
+        .ipc                             = elf_ipc,
     };
     application->execution = platform_riscv32_create(
         application->image.entry, application->image.memory, application->image.memory_size,
@@ -2354,6 +2418,11 @@ static void elf_update(tabos_app_context_t* context)
     }
 
     int child_status = 0;
+    if (atomic_exchange_explicit(&application->session_requested, false, memory_order_acq_rel)) {
+        const int result            = kernel_process_session_open(context);
+        application->session_result = result > 0 ? result : -TABOS_EPERM;
+        atomic_store_explicit(&application->session_ready, true, memory_order_release);
+    }
     if (tabos_app_take_child_status(context, &child_status)) {
         atomic_store_explicit(&application->exec_status, child_status, memory_order_release);
         atomic_store_explicit(&application->exec_status_ready, true, memory_order_release);

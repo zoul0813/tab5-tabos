@@ -52,6 +52,7 @@ enum {
     TABOS_ENOTTY       = 25,
     TABOS_ENOSPC       = 28,
     TABOS_EROFS        = 30,
+    TABOS_EPIPE        = 32,
     TABOS_ENAMETOOLONG = 36,
     TABOS_ENOTEMPTY    = 39,
     TABOS_ENOTSUP      = 95,

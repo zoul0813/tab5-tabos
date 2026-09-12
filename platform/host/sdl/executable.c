@@ -121,7 +121,9 @@ static _Thread_local uint32_t host_rv32_active_ram_size;
     X(TTY_GET_SIZE, 392U)                    \
     X(INPUT_WAIT_SOURCE, 396U)               \
     X(SPAWN, 400U)                           \
-    X(WAITPID, 404U)
+    X(WAITPID, 404U)                         \
+    X(SESSION_OPEN, 408U)                    \
+    X(IPC, 412U)
 
 enum {
 #define HOST_RV32_GATE_INDEX(name, api_offset) HOST_RV32_GATE_INDEX_##name,
@@ -474,6 +476,27 @@ static platform_riscv32_result_t step_inner(platform_riscv32_context_t* context,
             }
             current_user_data       = context->user_data;
             context->state.regs[10] = (uint32_t) context->api.waitpid((int) context->state.regs[10], status);
+            current_user_data       = NULL;
+            context->state.pc       = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_SESSION_OPEN) {
+            if (context->api.session_open == NULL) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data       = context->user_data;
+            context->state.regs[10] = (uint32_t) context->api.session_open();
+            current_user_data       = NULL;
+            context->state.pc       = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_IPC) {
+            ipc_transport_packet_t* packet = guest_buffer(context->memory, context->state.regs[11], sizeof(*packet));
+            if (packet == NULL || context->api.ipc == NULL) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data       = context->user_data;
+            context->state.regs[10] = (uint32_t) context->api.ipc(context->state.regs[10], packet);
             current_user_data       = NULL;
             context->state.pc       = context->state.regs[1];
             continue;

@@ -7,15 +7,42 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <errno.h>
+#include <tabos/ipc.h>
 
 void tester_test_concurrent_process(tester_context_t* context)
 {
-    const char* const first_args[]  = {"T:/bin/tester", "--concurrent-peer", "1", NULL};
-    const char* const second_args[] = {"T:/bin/tester", "--concurrent-peer", "2", NULL};
+    tester_expect(context, tabos_session_open() > 0, "foreground tester opens inherited GUI session");
+    const tabos_ipc_channel_t listener = tabos_ipc_listen();
+    tester_expect(context, listener > 0, "session listener opens");
+    if (listener <= 0) {
+        return;
+    }
+    const tabos_wait_source_t source = tabos_ipc_wait_source(listener);
+    const char* const first_args[]   = {"T:/bin/tester", "--concurrent-peer", "1", NULL};
+    const char* const second_args[]  = {"T:/bin/tester", "--concurrent-peer", "2", NULL};
     for (unsigned int round = 0U; round < 3U; ++round) {
         const int first  = tabos_spawn(first_args[0], 3, first_args);
         const int second = tabos_spawn(second_args[0], 3, second_args);
         tester_expect(context, first > 0 && second > 0 && first != second, "concurrent children have distinct PIDs");
+        for (unsigned int index = 0U; index < 2U; ++index) {
+            tabos_wait_item_t pending = {.source = source, .events = TABOS_WAIT_READABLE};
+            tester_expect(context, tabos_wait(&pending, 1U, 10000U) == 1, "listener wakes for peer connection");
+            const tabos_ipc_channel_t channel = tabos_ipc_accept(listener);
+            tester_expect(context, channel > 0, "accept grants private reply channel");
+            if (channel <= 0) {
+                continue;
+            }
+            pending = (tabos_wait_item_t) {.source = tabos_ipc_wait_source(channel), .events = TABOS_WAIT_READABLE};
+            tester_expect(context, tabos_wait(&pending, 1U, 10000U) == 1, "channel readable wait wakes");
+            tabos_ipc_message_t message = {0};
+            tester_expect(context,
+                          tabos_ipc_receive(channel, &message) == 0 &&
+                              (message.sender_pid == (uint32_t) first || message.sender_pid == (uint32_t) second),
+                          "copied IPC carries actual child identity");
+            message.kind = 42U;
+            tester_expect(context, tabos_ipc_send(channel, &message, true) == 0, "control reply delivered");
+            tester_expect(context, tabos_ipc_close(channel) == 0, "reply channel close preserves queued delivery");
+        }
         int first_status  = -1;
         int second_status = -1;
         if (first > 0) {
@@ -30,6 +57,7 @@ void tester_test_concurrent_process(tester_context_t* context)
         (void) unlink("T:/tabos-concurrent-1.tmp");
         (void) unlink("T:/tabos-concurrent-2.tmp");
     }
+    tester_expect(context, tabos_ipc_close(listener) == 0, "listener cleanup");
 }
 
 void tester_test_process(tester_context_t* context)

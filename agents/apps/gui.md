@@ -27,7 +27,7 @@ Exit gate: ownership/lifecycle contracts are recorded and measured memory feasib
 - [x] GUI-001: Audit current process manager, SDK spawn/wait wrappers, host RV32 scheduling, native task guards, input ownership, graphics close, loader metadata, and build integration. Record relevant entry points and stale documentation in this task file.
 - [x] GUI-002: Specify concurrent spawn, actual PID return, copied launch arguments, child-exit readiness, wait/reap, process-table exhaustion, and parent-exit cleanup. Preserve synchronous `tabos_exec()` and define the shell migration from the existing spawn wrapper.
 - [x] GUI-003: Specify GUI-session membership, inherited membership for GUI-client descendants, exclusive display/input grants, and ownership restoration. Keep fullscreen handoff descendants outside the paused GUI-client set; prevent launches from escaping a pause/shutdown already in progress.
-- [ ] GUI-004: Specify public copied IPC operations, endpoint discovery/grant handoff, queue/message limits, stale-handle behavior, generic waits, and disconnect semantics. Reserve bounded lifecycle/control delivery so data/input saturation cannot prevent pause, close, or recovery.
+- [x] GUI-004: Specify public copied IPC operations, endpoint discovery/grant handoff, queue/message limits, stale-handle behavior, generic waits, and disconnect semantics. Reserve bounded lifecycle/control delivery so data/input saturation cannot prevent pause, close, or recovery.
 - [ ] GUI-005: Specify surface create/upload/commit/read-grant/release semantics, bounded staging, atomic visibility, damage bounds, read/commit synchronization, and abort/failure cleanup. Choose buffering from measurements rather than assuming two full buffers per client.
 - [ ] GUI-006: Measure representative maximized RGB565 client memory on Tab5, including client canvas/heap, staging, retained surface, compositor, scanout, executable, and OS allocations. Measure prototype upload/composition time and existing Starfall/DOOM requirements; record peak/headroom and choose initial configurable resource limits. Do not promise a reserved game budget.
 - [ ] GUI-007: Specify the minimal SDK-generated ELF GUI marker and pre-execution query through public services. Define absent-marker compatibility and malformed-marker errors using existing ELF metadata/validation conventions; marker grants no privileges.
@@ -49,7 +49,7 @@ Exit gate: independent real RV32 clients progress on host and native tasks remai
 
 Exit gate: separate RV32 clients publish coherent retained images through public services under bounded memory and queue pressure.
 
-- [ ] GUI-201: Implement copied IPC endpoints, process ownership, endpoint grants/discovery, bounded queues, lifecycle/control delivery, and disconnect notification.
+- [x] GUI-201: Implement copied IPC endpoints, process ownership, endpoint grants/discovery, bounded queues, lifecycle/control delivery, and disconnect notification.
 - [ ] GUI-202: Connect IPC readiness to generic waits on host and Tab5; cover lost-wakeup races, finite deadlines, cancellation, and stale handles.
 - [ ] GUI-203: Implement OS-owned RGB565 surfaces, clipped/bounded rectangle uploads, staged commits, compositor read grants, and explicit release using GUI-005's contract.
 - [ ] GUI-204: Enforce measured process/aggregate surface and staging limits. Preserve the last committed image on failed upload/commit; release endpoints, staging, surfaces, and grants during stopped-process teardown.
@@ -157,3 +157,20 @@ an isolated rerun in 0.17 seconds. Ten targeted Release process/shell/native/bou
 tests and the Release real-RV32 concurrency harness passed. Tab5 firmware remaining
 app-partition headroom: Debug 10,704 bytes; Release 113,264 bytes. No Linux build/test,
 flash or simulator executable was run.
+
+### Session IPC Evidence
+
+Public `tabos_session_open()` establishes a non-root foreground coordinator;
+concurrent descendants inherit its session. Session-owned listener/connect/accept
+create paired channels with 32 endpoint slots, eight pending accepts, eight data
+messages and two separate control messages per endpoint, with 224-byte payloads.
+Native and RV32 gates, SDK wrappers, generic waits and owner cleanup are integrated.
+Admission closure during pause/shutdown remains GUI-105/502 work.
+
+`unit.ipc` passes ASan/UBSan: session/foreign/stale denial, copied sender identity,
+FIFO data, control priority under full data queues, independent capacity bounds,
+peer hangup, closed-peer errors, listener-backlog cleanup and 100 reuse rounds.
+The SDK-built real RV32 tester passes three session/IPC rounds, including listener
+waits, channel waits, authenticated sender PIDs, control replies and drain-after-close.
+Seven IPC/process/native/boundary tests pass; macOS Debug and Tab5 Debug builds
+pass. Tab5 Debug retains 8,720 bytes of app-partition headroom.

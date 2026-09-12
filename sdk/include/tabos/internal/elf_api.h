@@ -1,6 +1,8 @@
 #ifndef TABOS_INTERNAL_ELF_API_H
 #define TABOS_INTERNAL_ELF_API_H
 
+#include <tabos/internal/ipc_transport.h>
+
 #include <tabos/graphics.h>
 #include <tabos/input.h>
 #include <tabos/tty.h>
@@ -206,6 +208,8 @@ typedef struct {
         int (*input_wait_source)(void);
         int (*spawn)(const char* path, uint32_t argc, const char* const* argv);
         int (*waitpid)(int pid, int* status);
+        int (*session_open)(void);
+        int (*ipc)(uint32_t operation, ipc_transport_packet_t* packet);
 } tabos_elf_api_t;
 
 typedef int (*tabos_elf_entry_fn)(const tabos_elf_api_t* api, int argc, const char* const* argv);

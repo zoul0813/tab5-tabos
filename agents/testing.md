@@ -1948,3 +1948,9 @@ module through real RV32 loading with temporary storage. Three pairs rendezvous
 while parent waits; each proves background graphics denial and both children
 complete before root ownership restoration. The test never launches `tabos_host`.
 Physical concurrent service/gate contention remains a separate acceptance gate.
+
+`unit.ipc` covers bounded session channel ownership, generation reuse, copied
+identity/data, saturated data/control queues, FIFO/control priority, listener backlog,
+disconnect and owner cleanup. The real RV32 process harness additionally exercises
+session inheritance, listen/connect/accept, generic waits, reply delivery and draining
+after peer close. These tests do not establish physical native contention.

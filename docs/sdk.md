@@ -22,6 +22,21 @@ copies arguments; use `tabos_waitpid()` to wait and reap each direct child once.
 Background launch grants no raw input or fullscreen display access. See
 [application process behavior](applications.md#concurrent-processes).
 
+## Session IPC
+
+`<tabos/ipc.h>` supplies a session owner/listener and inherited client connections.
+`tabos_session_open()` is available to a foreground non-root coordinator. Open the
+session before spawning clients. The owner listens and accepts private channels;
+children connect using their inherited session. APIs return nonnegative results on
+success or `-1` with errno. Send/receive copy a fixed message structure containing
+up to 224 payload bytes. The OS fills sender PID; kinds/tokens are application policy.
+
+Each endpoint queues eight normal and two independent control messages. Full queues
+return EAGAIN. Receive prioritizes control. Generic wait sources expose readable,
+writable and hangup events. Close preserves messages already delivered to the peer;
+a drained disconnected channel returns EPIPE. Owner exit closes its channels.
+The GUI pause/close protocol remains under development.
+
 ## Time and System Information
 
 `<tabos/runtime_time.h>` provides monotonic milliseconds and cooperative sleep.

@@ -19,6 +19,7 @@
 #include <tabos/graphics.h>
 #include <tabos/runtime_time.h>
 #include <sys/stat.h>
+#include <tabos/ipc.h>
 
 void tester_test_concurrent_process(tester_context_t* context);
 
@@ -49,6 +50,21 @@ static int run_concurrent_peer(const char* index)
             return 5;
         }
         (void) tabos_sleep_ms(1U);
+    }
+    const tabos_ipc_channel_t channel = tabos_ipc_connect();
+    if (channel <= 0) {
+        return 6;
+    }
+    tabos_ipc_message_t message = {.kind = first ? 1U : 2U};
+    if (tabos_ipc_send(channel, &message, false) != 0) {
+        return 7;
+    }
+    tabos_wait_item_t pending = {.source = tabos_ipc_wait_source(channel), .events = TABOS_WAIT_READABLE};
+    if (tabos_wait(&pending, 1U, 10000U) != 1 || tabos_ipc_receive(channel, &message) != 0 || message.kind != 42U) {
+        return 8;
+    }
+    if (tabos_ipc_close(channel) != 0) {
+        return 9;
     }
     return first ? 91 : 92;
 }

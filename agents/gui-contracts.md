@@ -49,21 +49,30 @@ Track implementation and evidence in [GUI tasks](apps/gui.md).
 
 ## Copied IPC
 
-- Endpoints and grants use generation-tagged positive handles; callers never pass
-  kernel pointers. Endpoint owner alone receives/closes; granted peers may send.
-  The kernel supplies sender identity and copied payload length.
-- Fixed endpoint/message capacities bound memory. Data send returns EAGAIN when
-  full. Receive copies one complete message or leaves it queued if the destination
-  is too small. Empty receive returns EAGAIN; stale/foreign handles return EBADF.
-- Lifecycle state has separate bounded storage per admitted peer. Close, pause,
-  resume and disconnect cannot be crowded out by ordinary input/damage messages.
-  Transition tokens permit coalescing superseded state without dropping the
-  current required acknowledgement. Repeated control sends cannot allocate memory.
-- Discovery publishes the desktop endpoint only within its session. Client endpoint
-  handoff explicitly grants the desktop reply access; names alone grant no access.
-- Generic waits report readable data/control and peer hangup. Closing an endpoint
-  revokes grants, wakes waiters and publishes disconnect without relying on space
-  in the ordinary queue. Teardown closes all owned endpoints and grants.
+Implemented channel contract:
+
+- A foreground non-root process opens a session before launching clients. Its
+  concurrent descendants inherit the session ID; a synchronous fullscreen child
+  starts outside it. Only the session owner may listen, and only session members
+  may connect. Accepted channel pairs grant each peer private send/receive access.
+- The service has 32 generation-tagged endpoint slots. One listener exists per
+  session with at most eight pending accepts. Each channel endpoint has eight data
+  messages and two independent control messages; each message has 224 data bytes,
+  kind, transition token and an OS-filled sender PID. Unused data bytes are zeroed.
+- Send and receive copy whole messages. Empty receive and saturated send return
+  EAGAIN. Control receives precede ordinary messages; saturation of one client's
+  data cannot occupy its control capacity or another client's channel. Full control
+  capacity requires bounded retry by the lifecycle coordinator.
+- Closing preserves messages already delivered into the peer queue and exposes
+  level-triggered hangup. After queued messages drain, receive returns EPIPE.
+  Listener close disconnects unaccepted peers; accepted channels remain independent.
+  Owner cleanup closes all owned endpoints. Stale/foreign handles return EBADF.
+- Generic wait sources report readable accept/messages, writable data capacity and
+  peer hangup. Source lookup rechecks endpoint generation on every poll; close
+  invalidates the owning source. Existing host/native wait cancellation applies.
+- All table, grant and queue operations serialize through a platform mutex. Handles
+  never wrap to alias an earlier generation; generation exhaustion refuses allocation.
+  APIs expose no native queue handles or cross-process pointers.
 
 ## Retained RGB565 surfaces
 

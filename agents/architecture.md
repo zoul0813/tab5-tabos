@@ -326,7 +326,8 @@ state does not imply console, raw input or display ownership. See
 implementation provides runtime-owned asynchronous descriptor launch, rotating
 snapshot dispatch and resource-free exit records retained until parent reaping.
 SDK/ELF asynchronous spawn and wait now use copied runtime request/reply gates.
-Shell retains synchronous exec. GUI session ownership remains pending.
+Shell retains synchronous exec. Session ownership and inherited paired IPC channels
+are implemented; pause admission and fullscreen handoff remain pending.
 
 The intended application model is:
 
