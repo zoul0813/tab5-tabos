@@ -237,6 +237,11 @@ Process module must remain self-contained: tester parent launches tester child, 
 launches tester grandchild, known statuses unwind in reverse, and parent repeats chain to
 prove cleanup and reload. Run tester from shell so this also exercises persistent PID 0.
 
+macOS release packaging recursively bundles every non-system dynamic dependency, rewrites
+each reference to `@executable_path`, and rejects unresolved or machine-specific references
+before signing. The extracted-archive startup smoke test then exercises the relocated host
+binary and packaged rootfs.
+
 `component.elf_wait` executes real RV32 fixtures through the loader and headless SDL
 runtime. It checks finite/infinite pointer waits, SDL pointer delivery and shutdown,
 blocking UDP receive, socket-only/mixed zero and infinite waits, DNS continuation,

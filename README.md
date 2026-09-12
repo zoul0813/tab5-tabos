@@ -187,7 +187,7 @@ Ordinary Tab5 builds never flash hardware.
 
 Each successful GitHub Actions run publishes release packages from its release jobs:
 
-- `tabos-macos-arm64.tar.gz`: macOS Apple Silicon host and bundled SDL3 library. Run `./run.sh` after extracting it. The launcher removes quarantine attributes from the extracted package before starting TabOS.
+- `tabos-macos-arm64.tar.gz`: macOS Apple Silicon host with bundled SDL3 and OpenSSL runtime libraries. Run `./run.sh` after extracting it. The launcher removes quarantine attributes from the extracted package before starting TabOS.
 - `tabos-linux-x64.tar.gz`: Linux x86-64 host and bundled SDL3 library. Run `./run.sh` after extracting it. The launcher configures the bundled SDL3 library path before starting TabOS.
 - `tabos-tab5-release.tar.gz`: Tab5 application, bootloader, partition table, ESP-IDF flash metadata, and an `sdcard/` directory containing the maintained applications. Copy the contents of `sdcard/` to the root of the Tab5 TF/microSD card.
 

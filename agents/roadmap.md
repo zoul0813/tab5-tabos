@@ -277,6 +277,7 @@
 - [x] Publish downloadable macOS, Linux, and Tab5 artifacts.
 - [x] Include executable `run.sh` launchers in macOS and Linux artifacts.
 - [x] Package maintained applications and a checkout-independent writable rootfs with host artifacts.
+- [x] Bundle and relocate macOS SDL3/OpenSSL runtime dependencies and reject nonportable links.
 - [x] Let macOS launcher remove quarantine attribute before starting unsigned host binary.
 - [x] Package correctly capitalized Tab5 firmware image and flash metadata.
 
