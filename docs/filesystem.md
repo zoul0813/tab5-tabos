@@ -49,6 +49,14 @@ case-folded normalized-path identity there; FAT links are unsupported. These val
 support current-file comparisons and must not be persisted across rename, unmount, or
 reboot.
 
+Same-drive `rename()` follows replacement semantics: when the destination exists, the
+source replaces it. On the Tab5 FAT backend, TabOS implements this with a recoverable
+multi-step fallback because FatFs itself returns `EEXIST`: the old destination is moved
+to a reserved `.tabos-rename-*.bak` file at the drive root, the source is installed, and
+the old destination is restored if installation fails. This protects the prior contents
+from reported I/O failures, but it is not power-loss atomic. An interrupted cleanup or
+failed rollback can leave the hidden backup for manual recovery.
+
 Use `tabos_fs_drive_count()` and `tabos_fs_drive_info()` to enumerate available drives,
 their letters, names, removable status, capacity, and free space.
 Boot diagnostics list every available drive on its own line with the same letter,

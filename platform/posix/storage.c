@@ -17,7 +17,8 @@
 #endif
 
 enum {
-    PLATFORM_STORAGE_MAX_DRIVES = 26
+    PLATFORM_STORAGE_MAX_DRIVES      = 26,
+    PLATFORM_STORAGE_BACKUP_ATTEMPTS = 32
 };
 
 typedef struct {
@@ -30,6 +31,7 @@ typedef struct {
 
 static storage_drive_t storage_drives[PLATFORM_STORAGE_MAX_DRIVES];
 static size_t storage_drive_count;
+static uint32_t storage_backup_sequence;
 
 static storage_drive_t* find_drive(char letter)
 {
@@ -135,6 +137,31 @@ static uint32_t map_mode(mode_t mode)
         return TABOS_S_IFDIR;
     }
     return TABOS_S_IFREG;
+}
+
+static int directory_empty(const char* path, bool* empty)
+{
+    DIR* directory = opendir(path);
+    if (directory == NULL) {
+        return errno;
+    }
+    int error = 0;
+    *empty    = true;
+    errno     = 0;
+    struct dirent* entry;
+    while ((entry = readdir(directory)) != NULL) {
+        if (strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
+            *empty = false;
+            break;
+        }
+    }
+    if (entry == NULL && errno != 0) {
+        error = errno;
+    }
+    if (closedir(directory) != 0 && error == 0) {
+        error = errno;
+    }
+    return error;
 }
 
 static void map_status(const struct stat* source, tabos_stat_t* destination)
@@ -388,7 +415,82 @@ int platform_storage_rename(char drive, const char* old_path, const char* new_pa
     if (error != 0) {
         return error;
     }
-    return rename(old_translated, new_translated) == 0 ? 0 : map_error(errno);
+    if (rename(old_translated, new_translated) == 0) {
+        return 0;
+    }
+    const int rename_error = errno;
+    if (rename_error == EEXIST && strcmp(old_translated, new_translated) == 0) {
+        return 0;
+    }
+    if (rename_error != EEXIST) {
+        return map_error(rename_error);
+    }
+
+    struct stat old_status;
+    struct stat new_status;
+    if (stat(old_translated, &old_status) != 0 || stat(new_translated, &new_status) != 0) {
+        return map_error(errno);
+    }
+    if (S_ISDIR(old_status.st_mode) != S_ISDIR(new_status.st_mode)) {
+        return S_ISDIR(old_status.st_mode) ? TABOS_ENOTDIR : TABOS_EISDIR;
+    }
+    if (S_ISDIR(new_status.st_mode)) {
+        bool empty                = false;
+        const int directory_error = directory_empty(new_translated, &empty);
+        if (directory_error != 0) {
+            return map_error(directory_error);
+        }
+        if (!empty) {
+            return TABOS_ENOTEMPTY;
+        }
+    }
+
+    /*
+     * FatFs refuses to rename over an existing destination. Move that
+     * destination aside first so a failed install can put it back. This is
+     * error-recoverable, but as with any multi-step FAT update, not power-loss
+     * atomic. Backups live at the drive root so maximum-length destination
+     * paths still have room for a recovery name.
+     */
+    char backup[TABOS_FS_PATH_MAX];
+    bool reserved = false;
+    for (unsigned int attempt = 0U; attempt < PLATFORM_STORAGE_BACKUP_ATTEMPTS; ++attempt) {
+        const unsigned long sequence = (unsigned long) storage_backup_sequence++;
+        const int length             = snprintf(backup, sizeof(backup), "%s/.tabos-rename-%08lx.bak", root, sequence);
+        if (length <= 0 || (size_t) length >= sizeof(backup)) {
+            return TABOS_ENAMETOOLONG;
+        }
+        const int descriptor = open(backup, O_WRONLY | O_CREAT | O_EXCL, 0600);
+        if (descriptor < 0) {
+            if (errno == EEXIST) {
+                continue;
+            }
+            return map_error(errno);
+        }
+        int reserve_error = close(descriptor) == 0 ? 0 : errno;
+        if (unlink(backup) != 0 && reserve_error == 0) {
+            reserve_error = errno;
+        }
+        if (reserve_error != 0) {
+            (void) unlink(backup);
+            return map_error(reserve_error);
+        }
+        reserved = true;
+        break;
+    }
+    if (!reserved) {
+        return TABOS_EEXIST;
+    }
+    if (rename(new_translated, backup) != 0) {
+        return map_error(errno);
+    }
+    if (rename(old_translated, new_translated) == 0) {
+        (void) remove(backup);
+        return 0;
+    }
+    const int install_error = errno;
+    (void) rename(backup, new_translated);
+    return map_error(install_error);
 }
 
 int platform_storage_opendir(char drive, const char* path, platform_dir_t* directory)

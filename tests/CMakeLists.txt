@@ -588,6 +588,24 @@ tabos_enable_sanitizers(tabos_shell_history_file)
 add_test(NAME component.shell_history_file COMMAND tabos_shell_history_file)
 set_tests_properties(component.shell_history_file PROPERTIES TIMEOUT 10)
 
+add_library(tabos_starfall_storage_faults OBJECT "${TABOS_ROOT}/apps/starfall/src/storage.c")
+target_include_directories(tabos_starfall_storage_faults PRIVATE "${TABOS_ROOT}/apps/starfall/include")
+target_compile_definitions(tabos_starfall_storage_faults PRIVATE rename=test_starfall_rename)
+if(TABOS_TARGET STREQUAL "linux")
+    target_compile_options(tabos_starfall_storage_faults PRIVATE -U_FORTIFY_SOURCE)
+endif()
+tabos_enable_warnings(tabos_starfall_storage_faults)
+tabos_enable_sanitizers(tabos_starfall_storage_faults)
+add_executable(tabos_starfall_storage
+    component/starfall_storage.c
+    $<TARGET_OBJECTS:tabos_starfall_storage_faults>
+)
+target_include_directories(tabos_starfall_storage PRIVATE "${TABOS_ROOT}/apps/starfall/include")
+tabos_enable_warnings(tabos_starfall_storage)
+tabos_enable_sanitizers(tabos_starfall_storage)
+add_test(NAME component.starfall_storage COMMAND tabos_starfall_storage)
+set_tests_properties(component.starfall_storage PROPERTIES TIMEOUT 10)
+
 add_library(tabos_shell_session_main OBJECT "${TABOS_ROOT}/apps/shell/src/main.c")
 target_include_directories(tabos_shell_session_main PRIVATE
     "${TABOS_ROOT}/apps/shell/include" "${TABOS_ROOT}/sdk/include"
@@ -836,6 +854,34 @@ tabos_enable_warnings(tabos_filesystem)
 tabos_enable_sanitizers(tabos_filesystem)
 
 add_test(NAME component.filesystem COMMAND tabos_filesystem)
+
+add_library(tabos_storage_rename_source OBJECT "${TABOS_ROOT}/platform/posix/storage.c")
+target_include_directories(tabos_storage_rename_source PRIVATE
+    "${TABOS_ROOT}/fs/include"
+    "${TABOS_ROOT}/platform/include"
+    "${TABOS_ROOT}/sdk/include"
+)
+target_compile_definitions(tabos_storage_rename_source PRIVATE rename=test_storage_rename)
+if(TABOS_TARGET STREQUAL "linux")
+    target_compile_options(tabos_storage_rename_source PRIVATE -U_FORTIFY_SOURCE)
+endif()
+tabos_enable_warnings(tabos_storage_rename_source)
+tabos_enable_sanitizers(tabos_storage_rename_source)
+add_executable(tabos_storage_rename
+    component/storage_rename.c
+    fakes/storage_backend.c
+    $<TARGET_OBJECTS:tabos_storage_rename_source>
+)
+target_include_directories(tabos_storage_rename PRIVATE
+    "${TABOS_ROOT}/fs/include"
+    "${TABOS_ROOT}/platform/include"
+    "${TABOS_ROOT}/sdk/include"
+    "${CMAKE_CURRENT_LIST_DIR}/fakes"
+)
+target_link_libraries(tabos_storage_rename PRIVATE tabos_core)
+tabos_enable_warnings(tabos_storage_rename)
+tabos_enable_sanitizers(tabos_storage_rename)
+add_test(NAME component.storage_rename COMMAND tabos_storage_rename)
 
 add_library(tabos_posix_source OBJECT
     component/posix_filesystem.c

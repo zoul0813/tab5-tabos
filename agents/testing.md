@@ -1739,6 +1739,15 @@ then opens a real directory. Application-mode coverage must verify a missing run
 directory-listing gate returns `ENOSYS`, releases the provisional wrapper entry, and
 allows a later gate-backed open.
 
+`component.storage_rename` substitutes a deterministic backend that rejects replacement
+with `EEXIST`. It verifies replacement succeeds through the platform fallback, failure
+to move the old destination leaves both files untouched, and installation failure rolls
+the backup back without losing either version. `component.shell_history_file` performs
+successive saves, and `unit.netutils_fetch` verifies successful commit plus preservation
+of an existing destination across finalization failures. The Tab5 build cross-compiles
+these consumers and the FatFs replacement fallback; physical power-loss behavior is not
+claimed.
+
 The native production-source `fetch` regression runs with ASan/UBSan. It must exercise
 every first-read split through the HTTP header terminator, a header that fills the
 bounded accumulator without a terminator, successful length and close framing, error
@@ -1893,6 +1902,10 @@ Supply `apps/lua/examples/starfall.lua` after the optional Snake path to
 `tabos_lua_rv32` for real shell-launched title/player/pause pixel checks, Q exit,
 Escape exit after relaunch, and terminal restoration. Physical performance,
 keyboard play and microSD persistence remain acceptance work; Linux is excluded.
+
+`component.starfall_storage` exercises the native game's production score storage. It
+checks initial and replacement saves and injects a rename failure, proving the previous
+score remains readable and the failed temporary file is removed.
 
 ## Lua pointer validation (2026-09-12)
 

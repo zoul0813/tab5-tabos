@@ -667,6 +667,11 @@ backends retain native device/inode identity and therefore recognize hard links.
 ESP-IDF FAT reports no inode, so portable core supplies case-folded normalized-path
 identity and updates open-file fallback identity across rename. Identity values are
 comparison data for current files, not persistent storage IDs.
+[DECIDED] Same-drive rename replaces an existing destination. Backends such as the
+pinned FatFs implementation that reject replacement move the destination to a reserved
+drive-root recovery name, install the source, and restore the destination if installation
+fails. This multi-step fallback preserves recoverable data but is not power-loss atomic;
+a cleanup or rollback failure may leave a `.tabos-rename-*.bak` recovery file.
 Tab5 FAT uses heap-backed long-filename buffers with a 255-character maximum so
 the backend honors the public filesystem name limit instead of silently imposing
 8.3 names.
