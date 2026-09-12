@@ -745,7 +745,7 @@ add_executable(tabos_host_network_io component/host_network_io.c
     "${TABOS_ROOT}/platform/posix/network.c"
     "${TABOS_ROOT}/platform/posix/tls.c")
 target_include_directories(tabos_host_network_io PRIVATE "${TABOS_ROOT}/platform/include" "${TABOS_ROOT}/sdk/include")
-target_compile_definitions(tabos_host_network_io PRIVATE _POSIX_C_SOURCE=200809L)
+target_compile_definitions(tabos_host_network_io PRIVATE _POSIX_C_SOURCE=200809L TABOS_TEST_TLS_HOOKS=1)
 if(TABOS_TARGET STREQUAL "macos")
     target_compile_definitions(tabos_host_network_io PRIVATE _DARWIN_C_SOURCE)
 endif()

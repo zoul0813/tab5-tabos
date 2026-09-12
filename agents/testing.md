@@ -244,10 +244,12 @@ repeated forced socket/DNS teardown, and parent restoration. `unit.host_io` hold
 cancelled workers behind a barrier, checks bounded exhaustion and copied inputs, then
 checks disposal and normal delivery. `component.host_network_io` exercises suspended
 TCP accept/connect/receive, explicit EAGAIN, DNS, verified TLS connection setup and
-TLS read/write against an ephemeral local CA/server. These tests use host sanitizers;
-loopback tests need permission to bind local ports. Closed-peer socket coverage runs in a
-subprocess with the default SIGPIPE action and requires repeated sends to return errors
-without terminating the process.
+TLS read/write against an ephemeral local CA/server. It injects repeated trust-store
+initialization failures and a rejected final verification result, proving each attempt
+uses a newly configured context and never publishes a rejected connection. These tests
+use host sanitizers; loopback tests need permission to bind local ports. Closed-peer
+socket coverage runs in a subprocess with the default SIGPIPE action and requires repeated
+sends to return errors without terminating the process.
 
 Generic-wait validation covers zero and finite application waits, cancellable infinite
 backend waits, monotonic timeout, readiness clearing, source ordering, mixed socket/device
