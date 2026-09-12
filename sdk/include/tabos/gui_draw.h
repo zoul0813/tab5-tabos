@@ -12,6 +12,8 @@ typedef struct {
 typedef struct {
         uint16_t* pixels;
         uint32_t width, height;
+        /* Zero dimensions mean full canvas; otherwise all drawing is clipped. */
+        tabos_gui_rect_t clip;
 } tabos_gui_canvas_t;
 
 enum {
@@ -26,6 +28,7 @@ enum {
 
 typedef enum {
     TABOS_GUI_LABEL,
+    TABOS_GUI_PANEL,
     TABOS_GUI_BUTTON,
     TABOS_GUI_CHECKBOX,
     TABOS_GUI_TEXT_FIELD,

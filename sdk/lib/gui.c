@@ -258,6 +258,9 @@ int tabos_gui_step(tabos_gui_t* gui, uint32_t timeout_ms)
             }
         } else if (kind == TABOS_GUI_CANCEL_INPUT) {
             tabos_gui_ui_cancel(&gui->ui);
+            if (gui->input != NULL) {
+                gui->input(gui, &packet, kind);
+            }
             gui->dirty = true;
         } else if (kind == TABOS_GUI_CLOSE && !gui->close_pending) {
             gui->close_pending = true;

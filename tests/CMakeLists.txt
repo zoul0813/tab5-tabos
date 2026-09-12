@@ -1157,3 +1157,27 @@ target_link_libraries(tabos_gui_client PRIVATE tabos_core)
 tabos_enable_warnings(tabos_gui_client)
 tabos_enable_sanitizers(tabos_gui_client)
 add_test(NAME unit.gui_client COMMAND tabos_gui_client)
+
+add_executable(tabos_desktop_model unit/desktop_model.c
+    "${TABOS_ROOT}/apps/desktop/src/model.c"
+    "${TABOS_ROOT}/sdk/lib/gui_draw.c"
+    "${TABOS_ROOT}/sdk/lib/gui_font.c")
+target_include_directories(tabos_desktop_model PRIVATE
+    "${TABOS_ROOT}/sdk/include" "${TABOS_ROOT}/apps/desktop/include")
+tabos_enable_warnings(tabos_desktop_model)
+tabos_enable_sanitizers(tabos_desktop_model)
+add_test(NAME unit.desktop_model COMMAND tabos_desktop_model)
+
+add_executable(tabos_gui_rv32 component/gui_rv32.c fixtures/elf/hello_elf.c)
+target_include_directories(tabos_gui_rv32 PRIVATE
+    "${TABOS_ROOT}/kernel/include" "${TABOS_ROOT}/console/include"
+    "${TABOS_ROOT}/graphics/include" "${TABOS_ROOT}/input/include"
+    "${TABOS_ROOT}/pointer/include" "${TABOS_ROOT}/platform/include"
+    "${CMAKE_CURRENT_LIST_DIR}/fixtures/elf")
+if(TABOS_TARGET STREQUAL "linux")
+    target_link_libraries(tabos_gui_rv32 PRIVATE "-Wl,--start-group" tabos_core tabos_platform_host "-Wl,--end-group" SDL3::SDL3)
+else()
+    target_link_libraries(tabos_gui_rv32 PRIVATE tabos_core tabos_platform_host SDL3::SDL3)
+endif()
+tabos_enable_warnings(tabos_gui_rv32)
+tabos_enable_sanitizers(tabos_gui_rv32)

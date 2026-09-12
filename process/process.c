@@ -333,13 +333,15 @@ int kernel_process_session_control(tabos_app_context_t* context, uint32_t operat
     }
     session_advance(owner);
     if (operation == TABOS_SESSION_CHECKPOINT) {
-        return caller != owner && owner->session_phase != 0U ? (int) owner->session_token : 0;
+        return caller != owner && (owner->session_phase == 1U || owner->session_phase == 2U) ?
+                   (int) owner->session_token :
+                   0;
     }
     if (operation == TABOS_SESSION_ACKNOWLEDGE) {
         if (caller == owner || token == 0U) {
             return -TABOS_EINVAL;
         }
-        if (owner->session_phase == 0U || token != owner->session_token) {
+        if (owner->session_phase == 0U || owner->session_phase == 3U || token != owner->session_token) {
             return 0;
         }
         caller->pause_token = token;
@@ -350,6 +352,13 @@ int kernel_process_session_control(tabos_app_context_t* context, uint32_t operat
         return -TABOS_EPERM;
     }
     switch (operation) {
+        case TABOS_SESSION_SHUTDOWN_BEGIN:
+            if (owner->session_phase != 0U || owner->session_token >= INT_MAX) {
+                return -TABOS_EBUSY;
+            }
+            ++owner->session_token;
+            owner->session_phase = 3U;
+            return (int) owner->session_token;
         case TABOS_SESSION_BEGIN:
             if (owner->session_phase != 0U || owner->session_token >= INT_MAX) {
                 return -TABOS_EBUSY;

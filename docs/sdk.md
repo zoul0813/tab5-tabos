@@ -201,3 +201,11 @@ confirmation controls. Resolve those controls with `tabos_gui_close_reply()`.
 Pause hooks must finish bounded work and release leases; after acknowledgement,
 the kernel retains memory but closes audio/camera streams. Reopen these in the
 resume callback. The client waits when idle and does not repaint periodically.
+
+Build `apps/desktop` and `apps/canvas` with the SDK application build script. Launch
+`T:/bin/desktop` from the shell, then choose Canvas. The desktop opens windows
+maximized above its dock; title controls minimize, restore/maximize and close.
+Restored windows move by their title bar and resize using the lower-right grip.
+Ctrl+Tab cycles windows, Ctrl+Q requests close and Ctrl+Escape opens Files (when
+installed). Exit returns to the persistent shell after client close confirmations.
+Canvas preserves its drawing across resize and its Run hello fullscreen handoff.

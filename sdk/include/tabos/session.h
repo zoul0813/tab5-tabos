@@ -11,6 +11,7 @@ typedef enum {
     TABOS_SESSION_ACKNOWLEDGE,
     TABOS_SESSION_FORCE_CLOSE,
     TABOS_SESSION_BLOCKER,
+    TABOS_SESSION_SHUTDOWN_BEGIN,
 } tabos_session_operation_t;
 
 /* BEGIN returns a positive transition token. STATUS returns first blocking PID

@@ -40,6 +40,9 @@ void tabos_gui_fill(tabos_gui_canvas_t* canvas, tabos_gui_rect_t rectangle, uint
                              &clipped)) {
         return;
     }
+    if (canvas->clip.width > 0 && canvas->clip.height > 0 && !tabos_gui_intersect(clipped, canvas->clip, &clipped)) {
+        return;
+    }
     for (int32_t y = clipped.y; y < clipped.y + clipped.height; ++y) {
         uint16_t* pixels = canvas->pixels + (size_t) y * canvas->width + (size_t) clipped.x;
         for (int32_t x = 0; x < clipped.width; ++x) {

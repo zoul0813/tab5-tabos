@@ -280,3 +280,19 @@ Input tests cover clipping guards, CP437 drawing, capture cancellation, focus,
 exactly-once printable text, buffer bounds and cursor preservation across layout.
 The SDK tester cross-build compiles the new GUI sources; real RV32 GUI execution
 remains the next integration gate. These tests do not launch the host simulator.
+
+### Desktop and Canvas Integration
+
+Added the independent desktop coordinator, retained damage compositor, window
+stack/focus/dock, move/outline resize, close/force-close controls and resident
+fullscreen handoff. Shutdown closes session launch admission while clients remain
+runnable for confirmation. Canvas retains normalized strokes and exercises custom
+drawing and fullscreen launch through the public SDK.
+
+The dedicated macOS Debug RV32 component harness executes the actual desktop and
+Canvas ELF images without launching the host simulator. It verifies pointer launch,
+drawing, restore/maximize with old-surface release, fullscreen execution while the
+desktop is blocked and its surface retained, restoration of exact drawing pixels,
+client cleanup and desktop exit to the persistent root. Desktop model tests cover
+stacking, bounds, resize adoption/failure and drag cancellation. Physical touch,
+layout and memory acceptance remain pending; Files/calculator/editor remain next.
