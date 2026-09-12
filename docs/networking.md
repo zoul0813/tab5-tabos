@@ -191,6 +191,13 @@ fetch https://example.com/files/readme.txt
 fetch https://example.com/ T:/example.html
 ```
 
+Responses must use HTTP/1.0 or HTTP/1.1 and a successful 2xx status. `fetch`
+supports a decimal `Content-Length` or a body delimited by a clean TLS close;
+it rejects transfer codings, malformed or oversized headers, HTTP errors, and
+truncated length-delimited bodies. The destination is replaced only after the
+complete response has been written and closed successfully. Failed downloads
+remove the `.part` file and preserve an existing destination.
+
 ## Ping
 
 The `ping` core utility uses only these public APIs. Build and install it with:
