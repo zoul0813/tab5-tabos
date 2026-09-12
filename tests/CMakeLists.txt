@@ -992,3 +992,8 @@ add_test(NAME component.lua_snake_audio
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_LIST_DIR}/lua_snake_audio.py"
         "$<TARGET_FILE:tabos_lua_native>" "${TABOS_ROOT}/apps/lua/examples/snake.lua")
 set_tests_properties(component.lua_snake_audio PROPERTIES TIMEOUT 40)
+
+add_test(NAME component.lua_starfall
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_LIST_DIR}/lua_starfall.py"
+        "$<TARGET_FILE:tabos_lua_native>" "${TABOS_ROOT}/apps/lua/examples/starfall.lua")
+set_tests_properties(component.lua_starfall PROPERTIES TIMEOUT 60)

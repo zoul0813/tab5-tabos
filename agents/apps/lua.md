@@ -32,6 +32,7 @@ own implementation, documentation/example, automated coverage, and physical vali
 - [x] Implement SDK-owned logical canvas lifecycle, RGB565 primitives/blits, explicit present/close, and dimension/buffer validation using packed buffers or userdata.
 - [x] Implement idempotent resource cleanup on explicit close, Lua errors, finalization, and process teardown; define cancellation and buffer lifetime for blocking operations.
 - [x] Document the Lua graphics API and ship a single-file Snake game.
+- [x] Port native Starfall gameplay, artwork, font, and high-score storage to `examples/starfall.lua` using existing bindings; stage/install the single-file example.
 - [x] Complete deterministic host and real RV32 validation for drawing, argument validation, resource failures, and cleanup.
 - [ ] Validate rendering, presentation, cleanup, memory use, and representative frame performance on physical Tab5; record results.
 
@@ -44,6 +45,7 @@ stale handles/finalizers from closing a later screen. `<close>` is recommended;
 CLI boundaries close graphics before error reporting and the next prompt.
 No tile-engine dependency, public ABI change, image decoder, or text renderer.
 Evidence: [graphics validation](../../docs/validation/lua-graphics-2026-09-12.md).
+Starfall port evidence: [validation](../../docs/validation/lua-starfall-2026-09-12.md).
 
 ### Input Bindings
 

@@ -185,7 +185,7 @@ static void remove_fixture(const char* path)
 }
 int main(int argc, char** argv)
 {
-    check(argc == 3 || argc == 4, "pass shell, Lua RV32 artifacts, and optional Snake script");
+    check(argc >= 3 && argc <= 5, "pass shell, Lua RV32 artifacts, optional Snake and Starfall scripts");
     check(mkdtemp(storage_root) != NULL, "temporary storage");
     char shell_path[512], lua_path[512], module_dir[512];
     snprintf(shell_path, sizeof(shell_path), "%s/shell", storage_root);
@@ -224,10 +224,15 @@ int main(int argc, char** argv)
             "if e.type=='key_down' then down=true else assert(down); print('GRAPHICS_INPUT_OK') end end; "
             "if e and e.type=='key_down' and e.key=='q' then break end; "
             "t.sleep_ms(1) end; assert(s:close()); print('GRAPHICS_CLOSED')");
-    if (argc == 4) {
+    if (argc >= 4) {
         char snake_path[512];
         snprintf(snake_path, sizeof(snake_path), "%s/snake.lua", storage_root);
         copy(argv[3], snake_path);
+    }
+    if (argc == 5) {
+        char starfall_path[512];
+        snprintf(starfall_path, sizeof(starfall_path), "%s/starfall.lua", storage_root);
+        copy(argv[4], starfall_path);
     }
     fixture("audio.lua", "local t=require('tabos'); local a=t.audio; local s=assert(a.open()); "
                          "assert(a.info().default_sample_rate==44100); assert(s:set_volume(100)); "
@@ -300,7 +305,7 @@ int main(int argc, char** argv)
     command("./lua graphics.lua");
     key(TABOS_KEY_D, TABOS_MODIFIER_CONTROL);
     parent_status(1);
-    if (argc == 4) {
+    if (argc >= 4) {
         command("./lua snake.lua");
         for (size_t i = 0U; i < 200U && framebuffer->pixels[0] != 0x0883U; ++i) {
             pump();
@@ -312,6 +317,34 @@ int main(int argc, char** argv)
         key(TABOS_KEY_SPACE, 0U);
         key(TABOS_KEY_ENTER, 0U);
         key(TABOS_KEY_Q, 0U);
+        parent();
+    }
+    if (argc == 5) {
+        command("./lua starfall.lua");
+        const size_t title_pixel = 204U * framebuffer->stride_pixels + 410U;
+        for (size_t i = 0U; i < 200U && framebuffer->pixels[title_pixel] != 0x371fU; ++i) {
+            pump();
+        }
+        check(tabos_process_count() == 2U && framebuffer->pixels[title_pixel] == 0x371fU,
+              "Lua Starfall title font renders at 640x360 logical resolution");
+        key(TABOS_KEY_K, 0U);
+        const size_t ship_pixel = 636U * framebuffer->stride_pixels + 636U;
+        for (size_t i = 0U; i < 200U && framebuffer->pixels[ship_pixel] != 0xf7dfU; ++i) {
+            pump();
+        }
+        check(framebuffer->pixels[ship_pixel] == 0xf7dfU, "Lua Starfall starts and draws player");
+        key(TABOS_KEY_P, 0U);
+        const size_t pause_pixel = 290U * framebuffer->stride_pixels + 496U;
+        for (size_t i = 0U; i < 200U && framebuffer->pixels[pause_pixel] != 0x371fU; ++i) {
+            pump();
+        }
+        check(framebuffer->pixels[pause_pixel] == 0x371fU, "Lua Starfall pause overlay");
+        key(TABOS_KEY_P, 0U);
+        key(TABOS_KEY_Q, 0U);
+        parent();
+        check(console_next_deadline() != UINT64_MAX, "Lua Starfall restores terminal");
+        command("./lua starfall.lua");
+        key(TABOS_KEY_ESCAPE, 0U);
         parent();
     }
     command("./lua -l n=nested -e 'assert(n.value==42)'");
@@ -441,8 +474,11 @@ int main(int argc, char** argv)
     stop();
     remove_fixture("audio.lua");
     remove_fixture("graphics.lua");
-    if (argc == 4) {
+    if (argc >= 4) {
         remove_fixture("snake.lua");
+    }
+    if (argc == 5) {
+        remove_fixture("starfall.lua");
     }
     remove_fixture("bytes");
     remove_fixture("check.lua");
@@ -456,6 +492,6 @@ int main(int argc, char** argv)
     check(unlink(shell_path) == 0 && unlink(lua_path) == 0 && unlink(history) == 0 && rmdir(user) == 0 &&
               rmdir(storage_root) == 0,
           "cleanup");
-    puts("RV32 Lua scripts, REPL, graphics pixels, keyboard, Snake, errors, interruption and cleanup passed");
+    puts("RV32 Lua scripts, REPL, graphics, audio, keyboard, optional games, errors and cleanup passed");
     return 0;
 }

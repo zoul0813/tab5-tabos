@@ -9,3 +9,8 @@ offline builds. Lua canvas drawing and keyboard input support games written enti
 in Lua; run `lua T:/data/lua/snake.lua` for the bundled example. Snake includes Lua-generated audio matching native Snake. PCM playback is available;
 pointer, tile/sprite and child-process bindings remain follow-on work. Physical CLI and
 graphics acceptance is still pending.
+
+Run `lua T:/data/lua/starfall.lua` for the single-file port of `apps/starfall`.
+It includes all artwork and its font: A/S move, K starts/fires/restarts, P pauses,
+and Q or Escape quits. High scores use `T:/data/lua/starfall-highscore.dat`;
+storage failure is nonfatal. Starfall has no audio, matching the native game.

@@ -1820,3 +1820,19 @@ replacement, stop, and mute. No game-loop timing is used for PCM equivalence.
 os.exit cleanup, interruption, repeat launch, and forced teardown alongside live
 graphics. The optional Snake path includes its audio startup and M toggle.
 Physical audible output and latency acceptance remain separate.
+
+## Lua Starfall validation (2026-09-12)
+
+`component.lua_starfall` runs the shipped Starfall code in the native Lua profile.
+It checks uint32 RNG vectors, bounded pools, movement/clamping, fire cadence, all
+enemy score types, drift/seeking, wave/spawn timing, damage immunity, pause, death,
+restart, and rendering through real SDK canvas methods. Temporary filesystem tests
+cover score round trips/replacement/clamping, invalid input, missing directories,
+and preservation of the previous score after an injected rename failure. A second
+run executes the entire unmodified game with scheduled input around the real canvas,
+checking held movement/fire, pause-repeat suppression, resume and normal cleanup.
+
+Supply `apps/lua/examples/starfall.lua` after the optional Snake path to
+`tabos_lua_rv32` for real shell-launched title/player/pause pixel checks, Q exit,
+Escape exit after relaunch, and terminal restoration. Physical performance,
+keyboard play and microSD persistence remain acceptance work; Linux is excluded.

@@ -27,6 +27,7 @@ lua -e 'print(1 + 2)'
 lua T:/data/lua/hello.lua first 'two words'
 lua T:/data/lua/system.lua
 lua T:/data/lua/snake.lua
+lua T:/data/lua/starfall.lua
 lua T:/data/lua/files.lua T:/lua-example.dat
 lua -i T:/data/lua/hello.lua
 lua -l module script.lua
@@ -181,6 +182,28 @@ Snake (`apps/snake/src/sound.c` at commit `809b65f`). PCM is generated once in L
 and cached; new effects flush and reuse the playback stream. Pause stops queued
 audio, mute closes the stream, and unavailable audio never stops gameplay.
 Ctrl-C/Ctrl-D interrupt a graphics script and restore the terminal.
+
+The [Starfall example](../apps/lua/examples/starfall.lua) ports `apps/starfall` into
+one Lua file, including its 640×360 artwork, 5×7 font, scrolling stars, three enemy
+types, shots, particles, lives, waves, and title/pause/game-over screens:
+
+```text
+lua T:/data/lua/starfall.lua
+```
+
+A/S move left/right, K starts or restarts and fires while held, P pauses/resumes,
+and Q or Escape returns to the shell. The simulation uses fixed 60 Hz steps with
+bounded catch-up; actual presentation speed depends on the device. Like native
+Starfall, this example has no sound.
+
+Starfall saves its best score on game over or normal exit to
+`T:/data/lua/starfall-highscore.dat`, capped at 999999. Installation creates this
+directory. Scores are separate from native Starfall's `T:/data/starfall/highscore.dat`.
+A temporary file is renamed after a successful write/close; failed replacement
+preserves the previous score. Missing or read-only storage never prevents play.
+Ctrl-C/Ctrl-D restore the terminal but do not save the current session's score.
+Copying the script alone is enough to play; no font, image, or native game library
+is needed.
 
 A minimal script:
 

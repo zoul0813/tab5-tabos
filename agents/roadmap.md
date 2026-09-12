@@ -29,6 +29,7 @@
 - Linux builds/tests excluded by user direction; evidence: `docs/validation/lua-cli-2026-09-12.md`.
 - [ ] Complete remaining physical Tab5 CLI acceptance and measurements.
 - [x] Add Lua logical-canvas primitives, packed RGB565 blits, lifecycle and shared-broker keyboard game input; ship a single-file Snake example.
+- [x] Port Starfall to a self-contained Lua example with native gameplay/artwork, fixed-step simulation, and nonfatal high-score persistence.
 - User authorized this basic graphics/input slice before final CLI acceptance and without the tile engine on 2026-09-12.
 - [ ] Complete physical Lua Snake/graphics/input acceptance and frame/memory measurements; pointer/process bindings remain follow-up work.
 

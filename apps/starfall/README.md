@@ -18,4 +18,8 @@ make -C apps/starfall
 
 Run `starfall` from the TabOS shell. High score is stored at
 `T:/data/starfall/highscore.dat`. Storage failure is nonfatal. Starfall currently has
-no audio because TabOS does not yet expose a public audio API.
+no audio.
+
+A single-file Lua port is installed as `T:/data/lua/starfall.lua` by the Lua app.
+Run `lua T:/data/lua/starfall.lua` with the same controls. It includes the artwork
+and font in Lua and keeps a separate high score. See [Lua games](../../docs/lua.md#games-written-in-lua).
