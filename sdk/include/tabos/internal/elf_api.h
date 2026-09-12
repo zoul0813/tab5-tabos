@@ -215,6 +215,7 @@ typedef struct {
         int (*process_wait_source)(int pid);
         int (*surface)(uint32_t operation, surface_transport_packet_t* packet, void* pixels);
         int (*program_query)(const char* path, tabos_program_info_t* info);
+        int (*session_control)(uint32_t operation, uint32_t token, uint32_t pid);
 } tabos_elf_api_t;
 
 typedef int (*tabos_elf_entry_fn)(const tabos_elf_api_t* api, int argc, const char* const* argv);

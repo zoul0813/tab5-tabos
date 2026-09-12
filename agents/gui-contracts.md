@@ -46,6 +46,13 @@ Track implementation and evidence in [GUI tasks](apps/gui.md).
 - Pause uses a monotonically increasing transition token, bounded control events
   and a two-second absolute deadline. Acknowledgements name the token. Late replies
   cannot park clients after rollback. Exit counts as removal, not a pending reply.
+- Implemented lifecycle control travels through a separate copied runtime mailbox,
+  independent of IPC data saturation. `CHECKPOINT` returns the active token;
+  `ACKNOWLEDGE` keeps the caller inside its waiting gate until resume. Runtime
+  quiesces audio/camera ownership before another runtime request can observe all
+  members acknowledged. Applications must reach checkpoints after bounded work;
+  uncooperative descendants cause the two-second rollback. Clients reopen any
+  audio/camera streams after resume. No arbitrary task suspension occurs.
 
 ## Copied IPC
 

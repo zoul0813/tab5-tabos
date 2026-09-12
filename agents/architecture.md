@@ -1608,3 +1608,14 @@ Missing fields use defaults; invalid complete policy or I/O failure leaves defau
 No hot reload, periodic storage access, automatic writes, public ABI, or sleep enablement
 is added. Normal brightness must remain nonzero; dim brightness is capped at normal by
 existing policy. The checked-in `etc/power.conf` is a user-copyable template.
+
+## GUI Session Pause Transport
+
+Session control uses a copied runtime-owned mailbox, separate from IPC queues.
+Admission closes before the inherited member set is inspected. Monotonic tokens
+and a two-second deadline reject late acknowledgements and resume on timeout.
+Safe-point acknowledgement holds the client in its gate, with audio/camera streams
+closed before the coordinator observes readiness. Fullscreen exec from a session
+requires all members parked; its descendants remain outside the GUI session.
+Forced blocked-coordinator teardown unwinds the active foreground chain first.
+Physical contention and complete desktop ownership restoration remain acceptance work.

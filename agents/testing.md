@@ -1965,3 +1965,12 @@ concurrent copied reads across 500 commits. Real RV32 tester passes a granted
 surface handle over IPC, verifies old committed pixels during a new upload and
 checks explicit/exit cleanup restores the allocation baseline. Physical PSRAM
 limits, bandwidth and maximum usable windows remain unvalidated.
+
+## GUI Session Control Coverage
+
+`unit.application_lifecycle` covers inherited descendants, closed admission, pause
+timeout, blocker identity, stale tokens, scoped force-close and forced teardown
+of a coordinator blocked below a nested fullscreen chain. Keyboard queue/repeat
+state clears at session handoff. The real RV32 tester pauses two live clients with
+retained surfaces, resumes them and verifies statuses/cleanup across three rounds.
+These automated checks do not establish physical native service contention.

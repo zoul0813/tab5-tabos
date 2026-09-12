@@ -157,6 +157,14 @@ struct loader_elf_application {
         atomic_bool session_ready;
         bool session_in_flight;
         int session_result;
+        atomic_bool control_requested;
+        atomic_bool control_ready;
+        bool control_in_flight;
+        bool control_quiesced;
+        uint32_t control_operation;
+        uint32_t control_token;
+        uint32_t control_pid;
+        int control_result;
         bool graphics_active;
         uint32_t graphics_overlay_flags;
         elf_graphics_command_t graphics_commands[ELF_GRAPHICS_COMMAND_CAPACITY];
@@ -2335,6 +2343,27 @@ static int elf_session_open(void)
     return TABOS_ELF_EXEC_PENDING;
 }
 
+static int elf_session_control(uint32_t operation, uint32_t token, uint32_t pid)
+{
+    loader_elf_application_t* application = platform_riscv32_current_user_data();
+    if (application == NULL) {
+        return -TABOS_EINVAL;
+    }
+    if (atomic_exchange_explicit(&application->control_ready, false, memory_order_acq_rel)) {
+        application->control_in_flight = false;
+        return application->control_result;
+    }
+    if (!application->control_in_flight) {
+        application->control_in_flight = true;
+        application->control_operation = operation;
+        application->control_token     = token;
+        application->control_pid       = pid;
+        atomic_store_explicit(&application->control_requested, true, memory_order_release);
+        platform_runtime_notify(PLATFORM_RUNTIME_EVENT_APPLICATION);
+    }
+    return TABOS_ELF_EXEC_PENDING;
+}
+
 static bool elf_entry(tabos_app_context_t* context)
 {
     loader_elf_application_t* application = application_from_context(context);
@@ -2474,6 +2503,7 @@ static bool elf_entry(tabos_app_context_t* context)
         .process_wait_source             = elf_process_wait_source,
         .surface                         = elf_surface,
         .program_query                   = elf_program_query,
+        .session_control                 = elf_session_control,
     };
     application->execution = platform_riscv32_create(
         application->image.entry, application->image.memory, application->image.memory_size,
@@ -2495,6 +2525,21 @@ static void elf_update(tabos_app_context_t* context)
     }
 
     int child_status = 0;
+    if (atomic_load_explicit(&application->control_requested, memory_order_acquire)) {
+        const int result = kernel_process_session_control(context, application->control_operation,
+                                                          application->control_token, application->control_pid);
+        if (result == TABOS_ELF_EXEC_PENDING && !application->control_quiesced) {
+            audio_service_close_owner(application);
+            camera_service_close_owner(application);
+            application->control_quiesced = true;
+        }
+        if (result != TABOS_ELF_EXEC_PENDING) {
+            application->control_quiesced = false;
+            application->control_result   = result;
+            atomic_store_explicit(&application->control_requested, false, memory_order_release);
+            atomic_store_explicit(&application->control_ready, true, memory_order_release);
+        }
+    }
     if (atomic_exchange_explicit(&application->session_requested, false, memory_order_acq_rel)) {
         const int result            = kernel_process_session_open(context);
         application->session_result = result > 0 ? result : -TABOS_EPERM;

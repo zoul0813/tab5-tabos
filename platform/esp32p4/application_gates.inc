@@ -117,3 +117,4 @@ NATIVE_GATE(int, ipc, (uint32_t operation, ipc_transport_packet_t* packet), (ope
 NATIVE_GATE(int, process_wait_source, (int pid), (pid))
 NATIVE_GATE(int, surface, (uint32_t operation, surface_transport_packet_t* packet, void* pixels), (operation, packet, pixels))
 NATIVE_GATE(int, program_query, (const char* path, tabos_program_info_t* info), (path, info))
+NATIVE_GATE(int, session_control, (uint32_t operation, uint32_t token, uint32_t pid), (operation, token, pid))

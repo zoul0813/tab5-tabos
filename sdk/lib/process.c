@@ -4,8 +4,24 @@
 #include <tabos/posix_compat.h>
 #include <errno.h>
 #include <sched.h>
+#include <tabos/session.h>
 
 extern const tabos_elf_api_t* tabos_runtime_api;
+
+int tabos_session_control(tabos_session_operation_t operation, uint32_t token, uint32_t pid)
+{
+    if (tabos_runtime_api == NULL || tabos_runtime_api->session_control == NULL || tabos_runtime_api->yield == NULL) {
+        return -ENOSYS;
+    }
+    int result;
+    do {
+        result = tabos_runtime_api->session_control(operation, token, pid);
+        if (result == TABOS_ELF_EXEC_PENDING) {
+            tabos_runtime_api->yield();
+        }
+    } while (result == TABOS_ELF_EXEC_PENDING);
+    return result;
+}
 
 int tabos_program_query(const char* path, tabos_program_info_t* info)
 {

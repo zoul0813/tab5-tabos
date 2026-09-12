@@ -4,6 +4,10 @@
 #include <tabos/internal/pointer.h>
 #include <tabos/internal/ipc.h>
 #include <tabos/internal/surface.h>
+#include <tabos/internal/input.h>
+#include <tabos/session.h>
+#include <tabos/filesystem.h>
+#include <tabos/internal/elf_api.h>
 
 #include <tabos/platform/platform.h>
 
@@ -24,6 +28,12 @@ typedef struct {
         void (*application_data_destroy)(void* data);
         bool asynchronous;
         bool resources_released;
+        uint32_t pause_token;
+        uint32_t session_token;
+        uint32_t session_phase;
+        uint64_t pause_deadline;
+        uint32_t timeout_token;
+        uint32_t blocker;
 } kernel_process_t;
 
 static kernel_process_t processes[KERNEL_PROCESS_CAPACITY];
@@ -228,6 +238,9 @@ static void finish_child_process(kernel_process_t* child)
     foreground_process->state                      = TABOS_PROCESS_RUNNING;
     foreground_process->context.child_status       = status;
     foreground_process->context.child_status_valid = true;
+    if (foreground_process->context.session_id != 0U) {
+        input_cancel_foreground();
+    }
     pointer_service_set_foreground_owner(foreground_process->context.application_data);
     if (!acquire_process_console(foreground_process)) {
         foreground_process->context.exit_status = -1;
@@ -270,8 +283,112 @@ int kernel_process_session_open(tabos_app_context_t* context)
     if (context->session_id != 0U && context->session_id != process->id) {
         return -1;
     }
+    if (context->session_id == 0U) {
+        for (size_t index = 0U; index < KERNEL_PROCESS_CAPACITY; ++index) {
+            if (processes[index].occupied && processes[index].parent_id == process->id) {
+                return -1;
+            }
+        }
+    }
     context->session_id = process->id;
     return (int) process->id;
+}
+
+static uint32_t session_blocker(const kernel_process_t* owner)
+{
+    for (size_t index = 0U; index < KERNEL_PROCESS_CAPACITY; ++index) {
+        const kernel_process_t* member = &processes[index];
+        if (member->occupied && member != owner && member->context.session_id == owner->id &&
+            member->state != TABOS_PROCESS_EXITED && member->pause_token != owner->session_token) {
+            return member->id;
+        }
+    }
+    return 0U;
+}
+
+static void session_advance(kernel_process_t* owner)
+{
+    if (owner->session_phase != 1U) {
+        return;
+    }
+    const uint32_t blocker = session_blocker(owner);
+    if (blocker == 0U) {
+        owner->session_phase = 2U;
+    } else if (platform_time_ms() >= owner->pause_deadline) {
+        owner->session_phase = 0U;
+        owner->timeout_token = owner->session_token;
+        owner->blocker       = blocker;
+        platform_runtime_notify(PLATFORM_RUNTIME_EVENT_APPLICATION);
+    }
+}
+
+int kernel_process_session_control(tabos_app_context_t* context, uint32_t operation, uint32_t token, uint32_t pid)
+{
+    kernel_process_t* caller = process_from_context(context);
+    kernel_process_t* owner  = caller != NULL && context->session_id != 0U ? find_process(context->session_id) : NULL;
+    if (owner == NULL || caller->state != TABOS_PROCESS_RUNNING) {
+        return -TABOS_EPERM;
+    }
+    session_advance(owner);
+    if (operation == TABOS_SESSION_CHECKPOINT) {
+        return caller != owner && owner->session_phase != 0U ? (int) owner->session_token : 0;
+    }
+    if (operation == TABOS_SESSION_ACKNOWLEDGE) {
+        if (caller == owner || token == 0U) {
+            return -TABOS_EINVAL;
+        }
+        if (owner->session_phase == 0U || token != owner->session_token) {
+            return 0;
+        }
+        caller->pause_token = token;
+        session_advance(owner);
+        return TABOS_ELF_EXEC_PENDING;
+    }
+    if (caller != owner) {
+        return -TABOS_EPERM;
+    }
+    switch (operation) {
+        case TABOS_SESSION_BEGIN:
+            if (owner->session_phase != 0U || owner->session_token >= INT_MAX) {
+                return -TABOS_EBUSY;
+            }
+            ++owner->session_token;
+            owner->session_phase  = 1U;
+            owner->pause_deadline = platform_time_ms() + 2000U;
+            owner->blocker        = 0U;
+            session_advance(owner);
+            return (int) owner->session_token;
+        case TABOS_SESSION_STATUS:
+            if (token != 0U && token == owner->timeout_token) {
+                return -TABOS_ETIMEDOUT;
+            }
+            if (token != owner->session_token || owner->session_phase == 0U) {
+                return -TABOS_EINVAL;
+            }
+            return (int) session_blocker(owner);
+        case TABOS_SESSION_RESUME:
+            if (token != owner->session_token) {
+                return -TABOS_EINVAL;
+            }
+            owner->session_phase = 0U;
+            platform_runtime_notify(PLATFORM_RUNTIME_EVENT_APPLICATION);
+            return 0;
+        case TABOS_SESSION_BLOCKER: return (int) owner->blocker;
+        case TABOS_SESSION_FORCE_CLOSE: {
+            kernel_process_t* target = find_process(pid);
+            if (target == NULL || target == owner || target->context.session_id != owner->id || !target->asynchronous) {
+                return -TABOS_EPERM;
+            }
+            return kernel_process_force_terminate(pid, -1) ? 0 : -TABOS_ECHILD;
+        }
+        default: return -TABOS_EINVAL;
+    }
+}
+
+static bool session_admission_open(const tabos_app_context_t* context)
+{
+    const kernel_process_t* owner = context->session_id != 0U ? find_process(context->session_id) : NULL;
+    return owner == NULL || owner->session_phase == 0U;
 }
 
 void kernel_application_system_update(void)
@@ -288,6 +405,11 @@ void kernel_application_system_update(void)
         }
     }
     scheduler_cursor = (scheduler_cursor + 1U) % KERNEL_PROCESS_CAPACITY;
+    for (size_t index = 0U; index < KERNEL_PROCESS_CAPACITY; ++index) {
+        if (processes[index].occupied) {
+            session_advance(&processes[index]);
+        }
+    }
     for (size_t index = 0U; index < count; ++index) {
         kernel_process_t* process = find_process(ready[index]);
         if (process == NULL || process->state != TABOS_PROCESS_RUNNING) {
@@ -333,6 +455,9 @@ uint64_t kernel_application_system_next_deadline(void)
     for (size_t index = 0U; index < KERNEL_PROCESS_CAPACITY; ++index) {
         const kernel_process_t* process = &processes[index];
         if (process->occupied && process->state == TABOS_PROCESS_RUNNING) {
+            if (process->session_phase == 1U && process->pause_deadline < deadline) {
+                deadline = process->pause_deadline;
+            }
             const uint64_t candidate =
                 loader_elf_application_next_deadline(process->context.descriptor, process->context.application_data);
             if (candidate < deadline) {
@@ -472,7 +597,8 @@ static tabos_app_result_t launch_child_descriptor(tabos_app_context_t* parent, c
         return TABOS_APP_RESULT_INVALID;
     }
     if (foreground_process == NULL || parent != &foreground_process->context ||
-        foreground_process->state != TABOS_PROCESS_RUNNING) {
+        foreground_process->state != TABOS_PROCESS_RUNNING ||
+        (parent->session_id != 0U && foreground_process->session_phase != 2U)) {
         if (application_data_destroy != NULL) {
             application_data_destroy(application_data);
         }
@@ -502,6 +628,9 @@ static tabos_app_result_t launch_child_descriptor(tabos_app_context_t* parent, c
                                    .application_data_destroy = application_data_destroy,
     };
     release_process_console(parent_process);
+    if (parent->session_id != 0U) {
+        input_cancel_foreground();
+    }
     parent_process->state                = TABOS_PROCESS_BLOCKED;
     foreground_stack[foreground_depth++] = child_id;
     foreground_process                   = child;
@@ -528,7 +657,8 @@ tabos_app_result_t kernel_process_spawn_descriptor(tabos_app_context_t* parent,
     tabos_app_result_t result = TABOS_APP_RESULT_INVALID;
     if (owner != NULL && descriptor != NULL && descriptor->entry != NULL && child_id != NULL) {
         result = TABOS_APP_RESULT_BUSY;
-        if (owner->state == TABOS_PROCESS_RUNNING && !parent->exit_requested && !tabos_process_system_panicked()) {
+        if (owner->state == TABOS_PROCESS_RUNNING && !parent->exit_requested && !tabos_process_system_panicked() &&
+            session_admission_open(parent)) {
             kernel_process_t* child = free_process_slot();
             result                  = TABOS_APP_RESULT_LIMIT;
             if (child != NULL && next_process_id < INT_MAX) {
@@ -701,6 +831,19 @@ void kernel_process_fail(tabos_app_context_t* context, tabos_process_termination
 bool kernel_process_force_terminate(tabos_process_id_t process_id, int exit_status)
 {
     kernel_process_t* process = find_process(process_id);
+    if (process != NULL && process->state == TABOS_PROCESS_BLOCKED) {
+        bool ancestor = false;
+        for (size_t index = 0U; index < foreground_depth; ++index) {
+            ancestor = ancestor || foreground_stack[index] == process_id;
+        }
+        if (!ancestor) {
+            return false;
+        }
+        while (foreground_process != process && foreground_depth > 1U) {
+            foreground_process->context.exit_status = exit_status;
+            finish_child_process(foreground_process);
+        }
+    }
     if (process == NULL || process->state != TABOS_PROCESS_RUNNING) {
         return false;
     }

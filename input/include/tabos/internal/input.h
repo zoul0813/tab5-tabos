@@ -10,6 +10,7 @@
 bool input_pending(void);
 void input_wait_ready(uint32_t timeout_ms);
 void input_wake_waiter(void);
+void input_cancel_foreground(void);
 bool input_init(void);
 void input_shutdown(void);
 void input_update(void);

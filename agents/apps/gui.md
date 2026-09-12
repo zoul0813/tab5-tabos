@@ -116,6 +116,22 @@ Real RV32 tester queries itself and a missing executable before concurrency roun
 macOS Debug and Tab5 Debug builds pass; Tab5 retains 5,648 partition bytes.
 Desktop launch routing remains GUI-403 work.
 
+Session lifecycle increment: kernel closes admission before enumerating inherited
+members, assigns monotonic pause tokens and rolls back after two seconds with a
+blocking PID. Clients acknowledge at a public safe-point gate that retains their
+execution and memory until resume; runtime closes caller audio/camera streams before
+publishing readiness. Only the coordinator may resume or force-close session members.
+Fullscreen exec requires a parked session and creates an outside-session chain.
+Forced termination of a blocked coordinator unwinds that chain before cleanup;
+handoff clears queued keyboard input and repeat state.
+
+Eight targeted macOS Debug process/input/native/boundary tests pass, including
+descendant admission, timeout, stale acknowledgements, force-close and nested recovery.
+Real RV32 tester pauses and resumes two live clients across three rounds while
+surfaces remain resident. Native physical contention and complete desktop handoff
+remain pending; these checks do not claim final GUI acceptance.
+macOS Debug and Tab5 Debug builds pass; Tab5 has 4,064 app-partition bytes free.
+
 - Desktop auto-start, independent terminal windows, clipboard, drag-and-drop, full app manifests, transparency, and third-party GUI framework integration.
 - GUI checkpoint/unload, switching away from a running fullscreen game, and arbitrary native crash recovery.
 - USB HID backends and controller navigation mapping; these may later feed normalized input services and do not block the initial desktop.

@@ -32,6 +32,7 @@ tabos_app_result_t kernel_process_launch_child(tabos_app_context_t* parent, cons
 void kernel_process_fail(tabos_app_context_t* context, tabos_process_termination_t cause, int exit_status);
 bool kernel_process_force_terminate(tabos_process_id_t process_id, int exit_status);
 int kernel_process_session_open(tabos_app_context_t* context);
+int kernel_process_session_control(tabos_app_context_t* context, uint32_t operation, uint32_t token, uint32_t pid);
 /* Thread-safe copied child state; no process/descriptor pointers escape. */
 int kernel_process_child_poll(tabos_process_id_t owner, tabos_process_id_t child, bool* exited);
 /* Runtime-thread only. Spawn consumes application_data on success and failure. */

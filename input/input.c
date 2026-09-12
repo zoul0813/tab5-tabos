@@ -108,6 +108,21 @@ void input_shutdown(void)
     queue_signal = NULL;
 }
 
+void input_cancel_foreground(void)
+{
+    if (!lock_queue()) {
+        return;
+    }
+    queue_head          = 0U;
+    queue_count         = 0U;
+    held_key            = TABOS_KEY_UNKNOWN;
+    held_modifiers      = 0U;
+    held_text[0]        = '\0';
+    held_text_modifiers = 0U;
+    tabos_timer_cancel(&repeat_timer);
+    unlock_queue();
+}
+
 bool input_submit(const tabos_input_event_t* event)
 {
     if (event == NULL) {

@@ -7,6 +7,17 @@ ESP-IDF, FreeRTOS, or SDL.
 
 ## Supported Runtime
 
+Session coordinators use `<tabos/session.h>` to begin a pause, inspect blocking PIDs,
+resume, or explicitly force-close a member. `tabos_session_control()` returns a
+nonnegative result or negative TabOS error. `BEGIN` returns a token; `STATUS` returns
+the first unacknowledged PID or zero. A two-second timeout resumes members and returns
+`-TABOS_ETIMEDOUT`; `BLOCKER` reports the last blocker. Launch admission stays closed
+until resume. Fullscreen `tabos_exec()` from a session requires all members parked.
+Clients call `CHECKPOINT` between bounded work batches, then `ACKNOWLEDGE` with its
+positive token. Acknowledgement waits until resume, retaining memory, but closes
+audio/camera streams; reopen them afterward. Finish resource leases before entering
+the checkpoint. Late acknowledgements cannot park a resumed or newer transition.
+
 GUI clients set `TABOS_APP_GUI=1` before including `sdk/make/application.mk`.
 This emits metadata version 2 with the GUI launch flag; default is unmarked.
 `tabos_program_query(path, &info)` in `<tabos/process.h>` inspects an executable

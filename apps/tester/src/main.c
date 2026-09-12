@@ -21,6 +21,7 @@
 #include <sys/stat.h>
 #include <tabos/ipc.h>
 #include <tabos/surface.h>
+#include <tabos/session.h>
 
 void tester_test_concurrent_process(tester_context_t* context);
 
@@ -73,7 +74,15 @@ static int run_concurrent_peer(const char* index)
         return 7;
     }
     tabos_wait_item_t pending = {.source = tabos_ipc_wait_source(channel), .events = TABOS_WAIT_READABLE};
-    if (tabos_wait(&pending, 1U, 10000U) != 1 || tabos_ipc_receive(channel, &message) != 0 || message.kind != 42U) {
+    int ready                 = 0;
+    for (unsigned int attempt = 0U; attempt < 400U && ready == 0; ++attempt) {
+        const int token = tabos_session_control(TABOS_SESSION_CHECKPOINT, 0U, 0U);
+        if (token > 0 && tabos_session_control(TABOS_SESSION_ACKNOWLEDGE, (uint32_t) token, 0U) != 0) {
+            return 13;
+        }
+        ready = tabos_wait(&pending, 1U, 25U);
+    }
+    if (ready != 1 || tabos_ipc_receive(channel, &message) != 0 || message.kind != 42U) {
         return 8;
     }
     if (tabos_ipc_close(channel) != 0) {

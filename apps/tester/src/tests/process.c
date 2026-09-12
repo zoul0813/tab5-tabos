@@ -9,6 +9,8 @@
 #include <errno.h>
 #include <tabos/ipc.h>
 #include <tabos/surface.h>
+#include <tabos/session.h>
+#include <tabos/runtime_time.h>
 #include <string.h>
 
 void tester_test_concurrent_process(tester_context_t* context)
@@ -31,6 +33,7 @@ void tester_test_concurrent_process(tester_context_t* context)
     const char* const first_args[]  = {"T:/bin/tester", "--concurrent-peer", "1", NULL};
     const char* const second_args[] = {"T:/bin/tester", "--concurrent-peer", "2", NULL};
     for (unsigned int round = 0U; round < 3U; ++round) {
+        tabos_ipc_channel_t channels[2]         = {-1, -1};
         const int first                         = tabos_spawn(first_args[0], 3, first_args);
         const int second                        = tabos_spawn(second_args[0], 3, second_args);
         const tabos_wait_source_t first_source  = tabos_process_wait_source(first);
@@ -42,6 +45,7 @@ void tester_test_concurrent_process(tester_context_t* context)
             tabos_wait_item_t pending = {.source = source, .events = TABOS_WAIT_READABLE};
             tester_expect(context, tabos_wait(&pending, 1U, 10000U) == 1, "listener wakes for peer connection");
             const tabos_ipc_channel_t channel = tabos_ipc_accept(listener);
+            channels[index]                   = channel;
             tester_expect(context, channel > 0, "accept grants private reply channel");
             if (channel <= 0) {
                 continue;
@@ -69,9 +73,26 @@ void tester_test_concurrent_process(tester_context_t* context)
                           "cross-process read sees committed pixels while next upload is staged");
             tester_expect(context, tabos_surface_release(surface) == -1 && errno == EBADF,
                           "compositor read grant cannot release client surface");
-            message.kind = 42U;
-            tester_expect(context, tabos_ipc_send(channel, &message, true) == 0, "control reply delivered");
-            tester_expect(context, tabos_ipc_close(channel) == 0, "reply channel close preserves queued delivery");
+        }
+        const int token = tabos_session_control(TABOS_SESSION_BEGIN, 0U, 0U);
+        tester_expect(context, token > 0, "begin resident session pause");
+        tester_expect(context, tabos_spawn(first_args[0], 3, first_args) == -EBUSY, "pause closes launch admission");
+        int blocker = -1;
+        for (unsigned int attempt = 0U; attempt < 200U; ++attempt) {
+            blocker = tabos_session_control(TABOS_SESSION_STATUS, (uint32_t) token, 0U);
+            if (blocker <= 0) {
+                break;
+            }
+            tabos_sleep_ms(5U);
+        }
+        tester_expect(context, blocker == 0, "both real RV32 clients acknowledge and remain resident");
+        tester_expect(context, tabos_session_control(TABOS_SESSION_RESUME, (uint32_t) token, 0U) == 0,
+                      "resume parked RV32 clients");
+        for (unsigned int index = 0U; index < 2U; ++index) {
+            tabos_ipc_message_t message = {.kind = 42U};
+            tester_expect(context, tabos_ipc_send(channels[index], &message, true) == 0, "control reply delivered");
+            tester_expect(context, tabos_ipc_close(channels[index]) == 0,
+                          "reply channel close preserves queued delivery");
         }
         int first_status  = -1;
         int second_status = -1;
@@ -102,6 +123,9 @@ void tester_test_concurrent_process(tester_context_t* context)
 void tester_test_process(tester_context_t* context)
 {
     tester_test_concurrent_process(context);
+    const int pause_token = tabos_session_control(TABOS_SESSION_BEGIN, 0U, 0U);
+    tester_expect(context, pause_token > 0 && tabos_session_control(TABOS_SESSION_STATUS, pause_token, 0U) == 0,
+                  "empty GUI session parks before fullscreen chain");
     const char* const arguments[] = {
         "T:/bin/tester",
         "--process-child",
@@ -138,4 +162,6 @@ void tester_test_process(tester_context_t* context)
     }
     tester_expect(context, unlink("T:/tabos-process-resource.tmp") == 0,
                   "parent resumes and removes failed child fixture");
+    tester_expect(context, tabos_session_control(TABOS_SESSION_RESUME, pause_token, 0U) == 0,
+                  "GUI session resumes after fullscreen chain");
 }

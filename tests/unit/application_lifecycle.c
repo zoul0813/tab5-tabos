@@ -11,6 +11,9 @@
 
 #include <string.h>
 #include <assert.h>
+#include <tabos/session.h>
+#include <tabos/filesystem.h>
+
 
 static tabos_app_context_t* concurrent_root;
 static tabos_app_context_t* concurrent_contexts[32];
@@ -132,6 +135,72 @@ static void test_concurrent_processes(void)
 }
 
 static unsigned int entry_calls;
+
+static void test_session_lifecycle(void)
+{
+    kernel_application_system_init();
+    tabos_app_descriptor_t owner_app = concurrent_root_app;
+    owner_app.name                   = "session-owner";
+    assert(application_registry_register(&concurrent_root_app));
+    assert(application_registry_register(&owner_app));
+    assert(tabos_app_launch("concurrent-root") == TABOS_APP_RESULT_OK);
+    tabos_app_context_t* root = concurrent_root;
+    assert(kernel_process_session_open(root) < 0);
+    assert(kernel_process_launch_child(root, "session-owner") == TABOS_APP_RESULT_OK);
+    tabos_app_context_t* owner = concurrent_root;
+    assert(kernel_process_session_open(owner) == 1);
+    tabos_process_id_t child, descendant, rejected;
+    assert(kernel_process_spawn_descriptor(owner, &concurrent_child_app, NULL, NULL, &child) == TABOS_APP_RESULT_OK);
+    assert(kernel_process_spawn_descriptor(concurrent_contexts[child], &concurrent_child_app, NULL, NULL,
+                                           &descendant) == TABOS_APP_RESULT_OK);
+    assert(concurrent_contexts[descendant]->session_id == 1U);
+    assert(kernel_process_session_control(concurrent_contexts[child], TABOS_SESSION_BEGIN, 0U, 0U) == -TABOS_EPERM);
+    const int token = kernel_process_session_control(owner, TABOS_SESSION_BEGIN, 0U, 0U);
+    assert(token > 0);
+    assert(kernel_process_spawn_descriptor(concurrent_contexts[child], &concurrent_child_app, NULL, NULL, &rejected) ==
+           TABOS_APP_RESULT_BUSY);
+    assert(kernel_process_spawn_descriptor(owner, &concurrent_child_app, NULL, NULL, &rejected) ==
+           TABOS_APP_RESULT_BUSY);
+    assert(kernel_process_launch_child(owner, "concurrent-root") == TABOS_APP_RESULT_BUSY);
+    assert(kernel_process_session_control(concurrent_contexts[child], TABOS_SESSION_CHECKPOINT, 0U, 0U) == token);
+    assert(kernel_process_session_control(concurrent_contexts[child], TABOS_SESSION_ACKNOWLEDGE, (uint32_t) token,
+                                          0U) == TABOS_ELF_EXEC_PENDING);
+    assert(kernel_process_session_control(owner, TABOS_SESSION_STATUS, (uint32_t) token, 0U) == (int) descendant);
+    test_platform_advance_time_ms(2000U);
+    kernel_application_system_update();
+    assert(kernel_process_session_control(owner, TABOS_SESSION_STATUS, (uint32_t) token, 0U) == -TABOS_ETIMEDOUT);
+    assert(kernel_process_session_control(owner, TABOS_SESSION_BLOCKER, 0U, 0U) == (int) descendant);
+    assert(kernel_process_session_control(concurrent_contexts[descendant], TABOS_SESSION_ACKNOWLEDGE, (uint32_t) token,
+                                          0U) == 0);
+    const int next = kernel_process_session_control(owner, TABOS_SESSION_BEGIN, 0U, 0U);
+    assert(next > token);
+    assert(kernel_process_session_control(concurrent_contexts[child], TABOS_SESSION_ACKNOWLEDGE, (uint32_t) token,
+                                          0U) == 0);
+    assert(kernel_process_session_control(concurrent_contexts[child], TABOS_SESSION_ACKNOWLEDGE, (uint32_t) next, 0U) ==
+           TABOS_ELF_EXEC_PENDING);
+    assert(kernel_process_session_control(concurrent_contexts[descendant], TABOS_SESSION_ACKNOWLEDGE, (uint32_t) next,
+                                          0U) == TABOS_ELF_EXEC_PENDING);
+    assert(kernel_process_session_control(owner, TABOS_SESSION_STATUS, (uint32_t) next, 0U) == 0);
+    assert(kernel_process_session_control(owner, TABOS_SESSION_FORCE_CLOSE, 0U, 0U) == -TABOS_EPERM);
+    assert(kernel_process_session_control(owner, TABOS_SESSION_RESUME, (uint32_t) next, 0U) == 0);
+    assert(kernel_process_session_control(concurrent_contexts[child], TABOS_SESSION_ACKNOWLEDGE, (uint32_t) next, 0U) ==
+           0);
+    assert(kernel_process_session_control(owner, TABOS_SESSION_FORCE_CLOSE, 0U, child) == 0);
+    kernel_application_system_update();
+    int status;
+    assert(kernel_process_reap(owner, child, &status) == 1 && status == -1);
+    assert(tabos_process_count() == 2U);
+    assert(kernel_process_session_control(owner, TABOS_SESSION_BEGIN, 0U, 0U) > next);
+    tabos_input_event_t key = {.type = TABOS_INPUT_KEY_DOWN, .key = TABOS_KEY_A};
+    assert(input_submit(&key));
+    assert(kernel_process_launch_child(owner, "concurrent-root") == TABOS_APP_RESULT_OK);
+    assert(concurrent_root->session_id == 0U && !input_pending());
+    assert(kernel_process_launch_child(concurrent_root, "concurrent-root") == TABOS_APP_RESULT_OK);
+    assert(kernel_process_force_terminate(1U, 5));
+    kernel_application_system_update();
+    assert(tabos_process_count() == 1U && tabos_app_console(root) != NULL);
+    kernel_application_system_shutdown();
+}
 static unsigned int update_calls;
 static unsigned int cleanup_calls;
 static int cleanup_status;
@@ -494,6 +563,7 @@ int main(void)
     }
 
     test_concurrent_processes();
+    test_session_lifecycle();
 
     console_shutdown();
     terminal_shutdown(&terminal);
