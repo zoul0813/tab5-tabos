@@ -1954,3 +1954,7 @@ identity/data, saturated data/control queues, FIFO/control priority, listener ba
 disconnect and owner cleanup. The real RV32 process harness additionally exercises
 session inheritance, listen/connect/accept, generic waits, reply delivery and draining
 after peer close. These tests do not establish physical native contention.
+
+Child-exit readiness uses copied snapshots of runtime-owned process metadata.
+Lifecycle tests check pending/exited/foreign/reaped snapshots. The real RV32 tester
+waits on both child-exit sources and proves reaping invalidates stale sources.

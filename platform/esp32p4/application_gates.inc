@@ -114,3 +114,4 @@ NATIVE_GATE(int, spawn, (const char* path, uint32_t argc, const char* const* arg
 NATIVE_GATE(int, waitpid, (int pid, int* status), (pid, status))
 NATIVE_GATE(int, session_open, (void), ())
 NATIVE_GATE(int, ipc, (uint32_t operation, ipc_transport_packet_t* packet), (operation, packet))
+NATIVE_GATE(int, process_wait_source, (int pid), (pid))

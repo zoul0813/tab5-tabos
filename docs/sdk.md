@@ -19,6 +19,8 @@ does not claim full POSIX compatibility.
 `<tabos/process.h>` provides synchronous foreground `tabos_exec()` and concurrent
 background `tabos_spawn()`. Spawn returns an actual positive PID after loading and
 copies arguments; use `tabos_waitpid()` to wait and reap each direct child once.
+`tabos_process_wait_source(pid)` adds child-exit READABLE readiness to generic
+wait sets alongside IPC and input; reaping invalidates the source.
 Background launch grants no raw input or fullscreen display access. See
 [application process behavior](applications.md#concurrent-processes).
 

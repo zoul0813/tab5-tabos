@@ -34,6 +34,51 @@ static bool last_exit_valid;
 static int last_exit_status;
 static size_t scheduler_cursor;
 
+typedef struct {
+        bool occupied;
+        bool asynchronous;
+        tabos_process_id_t id;
+        tabos_process_id_t parent;
+        tabos_process_state_t state;
+} kernel_child_snapshot_t;
+
+static kernel_child_snapshot_t child_snapshots[KERNEL_PROCESS_CAPACITY];
+static platform_mutex_t* child_snapshot_mutex;
+
+static void publish_children(void)
+{
+    platform_mutex_lock(child_snapshot_mutex);
+    for (size_t index = 0U; index < KERNEL_PROCESS_CAPACITY; ++index) {
+        child_snapshots[index] = (kernel_child_snapshot_t) {
+            .occupied     = processes[index].occupied,
+            .asynchronous = processes[index].asynchronous,
+            .id           = processes[index].id,
+            .parent       = processes[index].parent_id,
+            .state        = processes[index].state,
+        };
+    }
+    platform_mutex_unlock(child_snapshot_mutex);
+}
+
+int kernel_process_child_poll(tabos_process_id_t owner, tabos_process_id_t child, bool* exited)
+{
+    if (child_snapshot_mutex == NULL || exited == NULL) {
+        return -1;
+    }
+    int result = -1;
+    platform_mutex_lock(child_snapshot_mutex);
+    for (size_t index = 0U; index < KERNEL_PROCESS_CAPACITY; ++index) {
+        const kernel_child_snapshot_t* snapshot = &child_snapshots[index];
+        if (snapshot->occupied && snapshot->asynchronous && snapshot->id == child && snapshot->parent == owner) {
+            *exited = snapshot->state == TABOS_PROCESS_EXITED;
+            result  = 0;
+            break;
+        }
+    }
+    platform_mutex_unlock(child_snapshot_mutex);
+    return result;
+}
+
 static const char* termination_name(tabos_process_termination_t cause)
 {
     switch (cause) {
@@ -121,6 +166,7 @@ static void destroy_process(kernel_process_t* process)
 {
     release_process_resources(process);
     *process = (kernel_process_t) {0};
+    publish_children();
 }
 
 static void destroy_descendants(tabos_process_id_t parent_id)
@@ -163,6 +209,7 @@ static void finish_child_process(kernel_process_t* child)
         release_process_resources(child);
         child->state                  = TABOS_PROCESS_EXITED;
         child->context.exit_requested = false;
+        publish_children();
         platform_runtime_notify(PLATFORM_RUNTIME_EVENT_APPLICATION);
         return;
     }
@@ -193,6 +240,9 @@ static void finish_child_process(kernel_process_t* child)
 
 void kernel_application_system_init(void)
 {
+    if (child_snapshot_mutex == NULL) {
+        child_snapshot_mutex = platform_mutex_create();
+    }
     (void) ipc_service_init();
     for (size_t index = 0U; index < KERNEL_PROCESS_CAPACITY; ++index) {
         processes[index] = (kernel_process_t) {0};
@@ -204,6 +254,7 @@ void kernel_application_system_init(void)
     last_exit_status   = 0;
     scheduler_cursor   = 0U;
     application_registry_reset();
+    publish_children();
 }
 
 int kernel_process_session_open(tabos_app_context_t* context)
@@ -302,6 +353,8 @@ void kernel_application_system_shutdown(void)
     foreground_depth   = 0U;
     application_registry_reset();
     ipc_service_shutdown();
+    platform_mutex_destroy(child_snapshot_mutex);
+    child_snapshot_mutex = NULL;
 }
 
 static tabos_app_result_t launch_root_descriptor(const tabos_app_descriptor_t* descriptor, void* application_data,
@@ -366,6 +419,7 @@ static tabos_app_result_t launch_root_descriptor(const tabos_app_descriptor_t* d
     if (context->exit_requested) {
         panic_root_process(process);
     }
+    publish_children();
     platform_runtime_notify(PLATFORM_RUNTIME_EVENT_APPLICATION);
     return TABOS_APP_RESULT_OK;
 }
@@ -472,7 +526,7 @@ tabos_app_result_t kernel_process_spawn_descriptor(tabos_app_context_t* parent,
         result = TABOS_APP_RESULT_BUSY;
         if (owner->state == TABOS_PROCESS_RUNNING && !parent->exit_requested && !tabos_process_system_panicked()) {
             kernel_process_t* child = free_process_slot();
-            result                  = TABOS_APP_RESULT_START_FAILED;
+            result                  = TABOS_APP_RESULT_LIMIT;
             if (child != NULL && next_process_id < INT_MAX) {
                 const tabos_process_id_t id = next_process_id++;
                 *child                      = (kernel_process_t) {
@@ -500,6 +554,7 @@ tabos_app_result_t kernel_process_spawn_descriptor(tabos_app_context_t* parent,
                 if (child->context.exit_requested) {
                     finish_child_process(child);
                 }
+                publish_children();
                 platform_runtime_notify(PLATFORM_RUNTIME_EVENT_APPLICATION);
                 return TABOS_APP_RESULT_OK;
             }

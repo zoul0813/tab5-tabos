@@ -210,6 +210,7 @@ typedef struct {
         int (*waitpid)(int pid, int* status);
         int (*session_open)(void);
         int (*ipc)(uint32_t operation, ipc_transport_packet_t* packet);
+        int (*process_wait_source)(int pid);
 } tabos_elf_api_t;
 
 typedef int (*tabos_elf_entry_fn)(const tabos_elf_api_t* api, int argc, const char* const* argv);

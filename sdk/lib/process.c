@@ -7,6 +7,20 @@
 
 extern const tabos_elf_api_t* tabos_runtime_api;
 
+tabos_wait_source_t tabos_process_wait_source(int pid)
+{
+    if (tabos_runtime_api == NULL || tabos_runtime_api->process_wait_source == NULL) {
+        errno = ENOSYS;
+        return TABOS_WAIT_SOURCE_INVALID;
+    }
+    const int result = tabos_runtime_api->process_wait_source(pid);
+    if (result < 0) {
+        errno = -result;
+        return TABOS_WAIT_SOURCE_INVALID;
+    }
+    return result;
+}
+
 int tabos_exec(const char* path, int argc, const char* const argv[])
 {
     const tabos_elf_api_t* api = tabos_runtime_api;

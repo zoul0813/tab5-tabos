@@ -31,15 +31,15 @@ Exit gate: ownership/lifecycle contracts are recorded and measured memory feasib
 - [ ] GUI-005: Specify surface create/upload/commit/read-grant/release semantics, bounded staging, atomic visibility, damage bounds, read/commit synchronization, and abort/failure cleanup. Choose buffering from measurements rather than assuming two full buffers per client.
 - [ ] GUI-006: Measure representative maximized RGB565 client memory on Tab5, including client canvas/heap, staging, retained surface, compositor, scanout, executable, and OS allocations. Measure prototype upload/composition time and existing Starfall/DOOM requirements; record peak/headroom and choose initial configurable resource limits. Do not promise a reserved game budget.
 - [ ] GUI-007: Specify the minimal SDK-generated ELF GUI marker and pre-execution query through public services. Define absent-marker compatibility and malformed-marker errors using existing ELF metadata/validation conventions; marker grants no privileges.
-- [ ] GUI-008: Record concurrent execution as the successor to initial foreground-only architecture/context decisions and scope old tests to synchronous execution. Keep PID 0 liveness, platform boundaries, current pre-release ABI policy, and shell recovery intact.
+- [x] GUI-008: Record concurrent execution as the successor to initial foreground-only architecture/context decisions and scope old tests to synchronous execution. Keep PID 0 liveness, platform boundaries, current pre-release ABI policy, and shell recovery intact.
 
 ## Phase 1 — Concurrent Processes and Session Ownership
 
 Exit gate: independent real RV32 clients progress on host and native tasks remain safe on Tab5; synchronous shell nesting still behaves as before.
 
-- [ ] GUI-101: Separate runnable/blocked execution state from console ownership, keyboard focus, display ownership, and parent/child relationships.
-- [ ] GUI-102: Implement asynchronous `tabos_spawn()`, child-owned launch data, actual PIDs, child-exit wait sources, status retention, and single reaping. Preserve synchronous `tabos_exec()`; update shell launch/wait handling.
-- [ ] GUI-103: Schedule all runnable host RV32 contexts in bounded round-robin slices. Suspend blocked call gates without starving clients or service/runtime work; wake from existing readiness/deadline mechanisms.
+- [x] GUI-101: Separate runnable/blocked execution state from console ownership, keyboard focus, display ownership, and parent/child relationships.
+- [x] GUI-102: Implement asynchronous `tabos_spawn()`, child-owned launch data, actual PIDs, child-exit wait sources, status retention, and single reaping. Preserve synchronous `tabos_exec()`; update shell launch/wait handling.
+- [x] GUI-103: Schedule all runnable host RV32 contexts in bounded round-robin slices. Suspend blocked call gates without starving clients or service/runtime work; wake from existing readiness/deadline mechanisms.
 - [ ] GUI-104: Extend managed Tab5 task lifecycle to concurrent processes. Audit caller identity, per-process libc/filesystem state, locking, cancellable waits, and stop-before-resource-release across multiple service callers.
 - [ ] GUI-105: Implement session membership and owner-exit cleanup from GUI-003. Launch desktop as shell child with shell retained; reject unauthorized raw input/display access from background clients.
 - [ ] GUI-106: Add deterministic process/session tests for two progressing clients, blocked waits, exit before wait, repeated reaping attempts, capacity failures, descendant cleanup, slot reuse, and cancellation during service calls. Retain nested shell/child/grandchild and PID 0 panic coverage.
@@ -174,3 +174,17 @@ The SDK-built real RV32 tester passes three session/IPC rounds, including listen
 waits, channel waits, authenticated sender PIDs, control replies and drain-after-close.
 Seven IPC/process/native/boundary tests pass; macOS Debug and Tab5 Debug builds
 pass. Tab5 Debug retains 8,720 bytes of app-partition headroom.
+
+### Child-Exit Wait Sources
+
+`tabos_process_wait_source(pid)` now supplies generic READABLE readiness for an
+exited direct child until reaping. Native gates inspect copied state behind a
+short mutex; runtime callbacks/cleanup never run while that mutex is held.
+Reaping invalidates its source. Spawn capacity/PID exhaustion returns EAGAIN;
+invalid requests return EINVAL, busy launch EBUSY and load failure EIO.
+
+Eight targeted macOS Debug SDK/process/IPC/native/boundary tests pass. The actual
+RV32 tester verifies finite child-exit waits and stale-source rejection after
+reaping across three IPC/concurrency rounds. macOS Debug and Tab5 Debug builds
+pass; Tab5 Debug app-partition headroom is 8,064 bytes. GUI-104/105/106/107 still
+track the remaining full service/session/cancellation and hardware coverage.

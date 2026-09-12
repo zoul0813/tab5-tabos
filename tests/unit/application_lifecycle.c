@@ -75,6 +75,9 @@ static void test_concurrent_processes(void)
     assert(kernel_process_spawn_descriptor(concurrent_root, &concurrent_child_app, NULL, NULL, &second) ==
            TABOS_APP_RESULT_OK);
     assert(first != second);
+    bool exited = true;
+    assert(kernel_process_child_poll(0U, first, &exited) == 0 && !exited);
+    assert(kernel_process_child_poll(second, first, &exited) == -1);
     assert(tabos_app_active() == &concurrent_root_app);
     for (unsigned int pass = 0U; pass < 5U; ++pass) {
         kernel_application_system_update();
@@ -86,10 +89,12 @@ static void test_concurrent_processes(void)
     tabos_app_request_exit(concurrent_contexts[first], 42);
     kernel_application_system_update();
     assert(concurrent_cleanups == 1U);
+    assert(kernel_process_child_poll(0U, first, &exited) == 0 && exited);
     assert(concurrent_progress[first] == 5U && concurrent_progress[second] == 6U);
     tabos_process_info_t info;
     assert(tabos_process_info(first, &info) && info.state == TABOS_PROCESS_EXITED && info.name == NULL);
     assert(kernel_process_reap(concurrent_root, first, &status) == 1 && status == 42);
+    assert(kernel_process_child_poll(0U, first, &exited) == -1);
     assert(kernel_process_reap(concurrent_root, first, &status) == -1);
     assert(concurrent_cleanups == 1U);
 
@@ -116,7 +121,7 @@ static void test_concurrent_processes(void)
     assert(tabos_process_count() == 16U && concurrent_cleanups == 18U);
     tabos_process_id_t rejected = TABOS_PROCESS_ID_INVALID;
     assert(kernel_process_spawn_descriptor(concurrent_root, &concurrent_child_app, NULL, NULL, &rejected) ==
-           TABOS_APP_RESULT_START_FAILED);
+           TABOS_APP_RESULT_LIMIT);
     assert(rejected == TABOS_PROCESS_ID_INVALID);
     for (size_t index = 0U; index < 15U; ++index) {
         assert(kernel_process_reap(concurrent_root, children[index], &status) == 1 && status == (int) index);

@@ -99,6 +99,7 @@ typedef enum {
     ELF_WAIT_SOURCE_CAMERA,
     ELF_WAIT_SOURCE_INPUT,
     ELF_WAIT_SOURCE_IPC,
+    ELF_WAIT_SOURCE_CHILD,
     ELF_WAIT_SOURCE_TYPE_COUNT,
 } elf_wait_source_type_t;
 
@@ -1289,6 +1290,32 @@ static int elf_wait_poll_ipc(loader_elf_application_t* application, uintptr_t pa
     return ipc_service_poll(application->context->process_id, (int) parent, requested_events, returned_events);
 }
 
+static int elf_wait_poll_child(loader_elf_application_t* application, uintptr_t parent, uint32_t requested_events,
+                               uint32_t* returned_events)
+{
+    bool exited = false;
+    if (kernel_process_child_poll(application->context->process_id, (tabos_process_id_t) parent, &exited) != 0) {
+        return -TABOS_EBADF;
+    }
+    *returned_events = exited ? requested_events & TABOS_WAIT_READABLE : 0U;
+    return 0;
+}
+
+static int elf_process_wait_source(int pid)
+{
+    loader_elf_application_t* application = platform_riscv32_current_user_data();
+    bool exited                           = false;
+    if (application == NULL || pid <= 0 ||
+        kernel_process_child_poll(application->context->process_id, (tabos_process_id_t) pid, &exited) != 0) {
+        return -TABOS_ECHILD;
+    }
+    tabos_wait_source_t source = elf_wait_source_find(application, ELF_WAIT_SOURCE_CHILD, (uintptr_t) pid);
+    if (source == TABOS_WAIT_SOURCE_INVALID) {
+        source = elf_wait_source_allocate(application, ELF_WAIT_SOURCE_CHILD, (uintptr_t) pid);
+    }
+    return source == TABOS_WAIT_SOURCE_INVALID ? -TABOS_EMFILE : source;
+}
+
 static int elf_ipc(uint32_t operation, ipc_transport_packet_t* packet)
 {
     loader_elf_application_t* application = platform_riscv32_current_user_data();
@@ -1360,6 +1387,7 @@ static int elf_wait_prepare_socket(loader_elf_application_t* application, uintpt
 }
 
 static const elf_wait_source_adapter_t elf_wait_source_adapters[ELF_WAIT_SOURCE_TYPE_COUNT] = {
+    [ELF_WAIT_SOURCE_CHILD] = {.valid_events = TABOS_WAIT_READABLE, .poll = elf_wait_poll_child},
     [ELF_WAIT_SOURCE_IPC]   = {.valid_events = TABOS_WAIT_READABLE | TABOS_WAIT_WRITABLE | TABOS_WAIT_HANGUP,
                                .poll         = elf_wait_poll_ipc},
     [ELF_WAIT_SOURCE_INPUT] = {.valid_events = TABOS_WAIT_READABLE, .poll = elf_wait_poll_input},
@@ -2397,6 +2425,7 @@ static bool elf_entry(tabos_app_context_t* context)
         .waitpid                         = elf_waitpid,
         .session_open                    = elf_session_open,
         .ipc                             = elf_ipc,
+        .process_wait_source             = elf_process_wait_source,
     };
     application->execution = platform_riscv32_create(
         application->image.entry, application->image.memory, application->image.memory_size,
@@ -2432,7 +2461,15 @@ static void elf_update(tabos_app_context_t* context)
             tabos_process_id_t pid          = TABOS_PROCESS_ID_INVALID;
             const tabos_app_result_t result = kernel_process_spawn_path(
                 context, application->exec_path, application->exec_argc, application->exec_argv, &pid);
-            const int reply = result == TABOS_APP_RESULT_OK ? (int) pid : -(100 + (int) result);
+            int reply = -TABOS_EIO;
+            switch (result) {
+                case TABOS_APP_RESULT_OK: reply = (int) pid; break;
+                case TABOS_APP_RESULT_INVALID: reply = -TABOS_EINVAL; break;
+                case TABOS_APP_RESULT_BUSY: reply = -TABOS_EBUSY; break;
+                case TABOS_APP_RESULT_LIMIT: reply = -TABOS_EAGAIN; break;
+                case TABOS_APP_RESULT_NOT_FOUND: reply = -TABOS_ENOENT; break;
+                case TABOS_APP_RESULT_START_FAILED: break;
+            }
             atomic_store_explicit(&application->exec_status, reply, memory_order_release);
             atomic_store_explicit(&application->exec_status_ready, true, memory_order_release);
             return;
@@ -2456,6 +2493,11 @@ static void elf_update(tabos_app_context_t* context)
         int status       = 0;
         const int result = kernel_process_reap(context, (tabos_process_id_t) application->reap_pid, &status);
         if (result != 0) {
+            if (result > 0) {
+                const tabos_wait_source_t source =
+                    elf_wait_source_find(application, ELF_WAIT_SOURCE_CHILD, (uintptr_t) application->reap_pid);
+                elf_wait_source_invalidate(application, source);
+            }
             application->reap_result = result > 0 ? application->reap_pid : -TABOS_ECHILD;
             application->reap_status = status;
             atomic_store_explicit(&application->reap_requested, false, memory_order_release);

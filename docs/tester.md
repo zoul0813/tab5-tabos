@@ -101,7 +101,8 @@ publishes a temporary filesystem marker and waits for its peer while the parent
 waits for exit. The test checks distinct PIDs, repeated-reap rejection, background
 graphics denial, returned statuses and cleanup. It also opens a session and tests
 inherited listener connections, channel waits, sender identity, control replies
-and queued-message delivery after peer close. The ordinary process module also
+and queued-message delivery after peer close. Child-exit wait sources become
+readable on completion and are rejected after reaping. The ordinary process module also
 runs these cases. The test removes its `T:/tabos-concurrent-*.tmp` fixtures.
 
 For automated macOS validation, build tester with the SDK, then run

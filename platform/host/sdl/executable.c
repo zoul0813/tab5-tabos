@@ -123,7 +123,8 @@ static _Thread_local uint32_t host_rv32_active_ram_size;
     X(SPAWN, 400U)                           \
     X(WAITPID, 404U)                         \
     X(SESSION_OPEN, 408U)                    \
-    X(IPC, 412U)
+    X(IPC, 412U)                             \
+    X(PROCESS_WAIT_SOURCE, 416U)
 
 enum {
 #define HOST_RV32_GATE_INDEX(name, api_offset) HOST_RV32_GATE_INDEX_##name,
@@ -486,6 +487,16 @@ static platform_riscv32_result_t step_inner(platform_riscv32_context_t* context,
             }
             current_user_data       = context->user_data;
             context->state.regs[10] = (uint32_t) context->api.session_open();
+            current_user_data       = NULL;
+            context->state.pc       = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_PROCESS_WAIT_SOURCE) {
+            if (context->api.process_wait_source == NULL) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data       = context->user_data;
+            context->state.regs[10] = (uint32_t) context->api.process_wait_source((int) context->state.regs[10]);
             current_user_data       = NULL;
             context->state.pc       = context->state.regs[1];
             continue;

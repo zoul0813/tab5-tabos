@@ -63,6 +63,7 @@ typedef enum {
     TABOS_APP_RESULT_BUSY,
     TABOS_APP_RESULT_INVALID,
     TABOS_APP_RESULT_START_FAILED,
+    TABOS_APP_RESULT_LIMIT,
 } tabos_app_result_t;
 
 /* Inspect applications registered with the running system. */
