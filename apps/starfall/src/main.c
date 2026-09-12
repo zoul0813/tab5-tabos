@@ -44,6 +44,9 @@ int main(void)
     while (running) {
         tabos_input_event_t event;
         while (tabos_input_poll(&event)) {
+            if ((event.flags & TABOS_INPUT_EVENT_OVERFLOW) != 0U) {
+                game.input = (starfall_input_t) {0};
+            }
             if (event.type == TABOS_INPUT_KEY_DOWN || event.type == TABOS_INPUT_KEY_UP) {
                 set_held(&game.input, event.key, event.type == TABOS_INPUT_KEY_DOWN);
             }

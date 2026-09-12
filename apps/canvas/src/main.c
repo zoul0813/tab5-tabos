@@ -46,24 +46,24 @@ static void draw(tabos_gui_t* gui)
     const sketch_t* sketch = gui->user;
     (void) tabos_gui_ui_add(&gui->ui,
                             (tabos_gui_widget_t) {
-                                .id = 1, .kind = TABOS_GUI_BUTTON, .bounds = {12, 12, 96, 48},
+                                .id = 1, .kind = TABOS_GUI_BUTTON, .bounds = {12, 12, 104, 48},
                                         .label = "Clear"
     });
     (void) tabos_gui_ui_add(&gui->ui,
                             (tabos_gui_widget_t) {
-                                .id = 2, .kind = TABOS_GUI_BUTTON, .bounds = {120, 12, 80, 48},
+                                .id = 2, .kind = TABOS_GUI_BUTTON, .bounds = {124, 12, 80, 48},
                                         .label = "Ink"
     });
     (void) tabos_gui_ui_add(
         &gui->ui,
         (tabos_gui_widget_t) {
-            .id = 3, .kind = TABOS_GUI_CHECKBOX, .bounds = {212, 12, 108, 48},
+            .id = 3, .kind = TABOS_GUI_CHECKBOX, .bounds = {212, 12, 120, 48},
                     .label = "Grid", .value = sketch->grid
     });
     if (gui->canvas.width >= 540U) {
         (void) tabos_gui_ui_add(
             &gui->ui, (tabos_gui_widget_t) {
-                          .id = 4, .kind = TABOS_GUI_BUTTON, .bounds = {332, 12, 192, 48},
+                          .id = 4, .kind = TABOS_GUI_BUTTON, .bounds = {340, 12, 192, 48},
                                   .label = "Run hello"
         });
     }

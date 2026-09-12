@@ -153,6 +153,10 @@ void doom_tabos_input_init(doom_tabos_input_t* input)
 
 void doom_tabos_input_feed(doom_tabos_input_t* input, const tabos_input_event_t* event)
 {
+    if (input != NULL && event != NULL && (event->flags & TABOS_INPUT_EVENT_OVERFLOW) != 0U) {
+        begin_recovery(input);
+        return;
+    }
     if (input == NULL || event == NULL || input->recovering ||
         (event->type != TABOS_INPUT_KEY_DOWN && event->type != TABOS_INPUT_KEY_UP)) {
         return;

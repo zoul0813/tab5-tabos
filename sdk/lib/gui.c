@@ -257,6 +257,9 @@ int tabos_gui_step(tabos_gui_t* gui, uint32_t timeout_ms)
                 gui->retired = -1;
             }
         } else if (kind == TABOS_GUI_CANCEL_INPUT) {
+            if (packet.input_sequence > gui->cancelled_input_sequence) {
+                gui->cancelled_input_sequence = packet.input_sequence;
+            }
             tabos_gui_ui_cancel(&gui->ui);
             if (gui->input != NULL) {
                 gui->input(gui, &packet, kind);
@@ -272,7 +275,8 @@ int tabos_gui_step(tabos_gui_t* gui, uint32_t timeout_ms)
         } else if (kind == TABOS_GUI_ERROR) {
             gui->last_error = packet.data.error;
             gui->dirty      = true;
-        } else if (packet.serial == gui->serial && (kind == TABOS_GUI_POINTER || kind == TABOS_GUI_KEYBOARD)) {
+        } else if (packet.serial == gui->serial && packet.input_sequence > gui->cancelled_input_sequence &&
+                   (kind == TABOS_GUI_POINTER || kind == TABOS_GUI_KEYBOARD)) {
             const int action = kind == TABOS_GUI_POINTER ? tabos_gui_ui_pointer(&gui->ui, &packet.data.pointer) :
                                                            tabos_gui_ui_keyboard(&gui->ui, &packet.data.keyboard);
             gui->dirty       = gui->dirty || gui->ui.changed;

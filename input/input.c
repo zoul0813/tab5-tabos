@@ -173,12 +173,19 @@ bool input_submit(const tabos_input_event_t* event)
         held_text[sizeof(held_text) - 1U] = '\0';
         held_text_modifiers               = event->modifiers;
     }
-    if (queue_count == INPUT_QUEUE_CAPACITY) {
-        queue_head = (queue_head + 1U) % INPUT_QUEUE_CAPACITY;
-        --queue_count;
+    const bool overflow = queue_count == INPUT_QUEUE_CAPACITY;
+    if (overflow) {
+        queue_head   = 0U;
+        queue_count  = 0U;
+        held_key     = TABOS_KEY_UNKNOWN;
+        held_text[0] = '\0';
+        tabos_timer_cancel(&repeat_timer);
     }
     const size_t tail = (queue_head + queue_count) % INPUT_QUEUE_CAPACITY;
     event_queue[tail] = *event;
+    if (overflow) {
+        event_queue[tail].flags |= TABOS_INPUT_EVENT_OVERFLOW;
+    }
     ++queue_count;
     unlock_queue();
     platform_runtime_notify(PLATFORM_RUNTIME_EVENT_INPUT);
@@ -215,9 +222,9 @@ void input_update(void)
         .modifiers = held_modifiers,
         .repeat    = true,
     };
-    if (queue_count == INPUT_QUEUE_CAPACITY) {
-        queue_head = (queue_head + 1U) % INPUT_QUEUE_CAPACITY;
-        --queue_count;
+    if (queue_count + (held_text[0] != '\0' ? 2U : 1U) > INPUT_QUEUE_CAPACITY) {
+        unlock_queue();
+        return;
     }
     size_t tail       = (queue_head + queue_count) % INPUT_QUEUE_CAPACITY;
     event_queue[tail] = key_event;
@@ -233,12 +240,8 @@ void input_update(void)
         };
         (void) strncpy(text_event.text, held_text, sizeof(text_event.text) - 1U);
         text_event.text[sizeof(text_event.text) - 1U] = '\0';
-        if (queue_count == INPUT_QUEUE_CAPACITY) {
-            queue_head = (queue_head + 1U) % INPUT_QUEUE_CAPACITY;
-            --queue_count;
-        }
-        tail              = (queue_head + queue_count) % INPUT_QUEUE_CAPACITY;
-        event_queue[tail] = text_event;
+        tail                                          = (queue_head + queue_count) % INPUT_QUEUE_CAPACITY;
+        event_queue[tail]                             = text_event;
         ++queue_count;
         text_repeated = true;
     }

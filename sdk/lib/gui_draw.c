@@ -279,6 +279,11 @@ static void draw_label(tabos_gui_canvas_t* canvas, int32_t x, int32_t y, int32_t
         ++used;
     }
     visible[used] = '\0';
+    if (used >= 4U && text[used] != '\0') {
+        visible[used - 3U] = '.';
+        visible[used - 2U] = '.';
+        visible[used - 1U] = '.';
+    }
     tabos_gui_text(canvas, x, y, visible, color, 2U);
 }
 

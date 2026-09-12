@@ -1,5 +1,12 @@
 # TabOS Architecture
 
+GUI implementation update (2026-09-12): the optional desktop and four initial clients
+are separate ordinary RV32 applications. Kernel owns IPC, committed surfaces,
+process/session lifetime and exclusive fullscreen grants; desktop owns window policy
+and composition. Protocol v2 uses geometry serials and input cancellation sequence
+fences. Keyboard overflow and device-loss notifications clear GUI input state.
+See [GUI contracts](gui-contracts.md) and [validation tasks](apps/gui.md).
+
 > Status: agreed project architecture as of 2026-08-10.
 >
 > This document defines the intended structure of TabOS and the architectural boundaries that implementation work should preserve. It is written primarily for Codex and contributors working in the repository.

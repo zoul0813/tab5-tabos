@@ -44,6 +44,7 @@ typedef struct {
         uint16_t* scratch;
         tabos_ipc_channel_t listener;
         tabos_pointer_stream_t pointer;
+        tabos_device_subscription_t devices;
         tabos_ipc_channel_t incoming[TABOS_GUI_WINDOW_MAX];
         desktop_child_t children[TABOS_GUI_WINDOW_MAX];
         desktop_capture_t captures[TABOS_POINTER_MAX_CONTACTS];
@@ -62,7 +63,7 @@ typedef struct {
 static desktop_t desktop;
 static void cancel_window(int slot);
 static const char* const launch_paths[] = {"T:/bin/files", "T:/bin/calculator", "T:/bin/editor", "T:/bin/canvas"};
-static const char* const launch_names[] = {"Files", "Calculator", "Text editor", "Canvas"};
+static const char* const launch_names[] = {"    Files", "    Calculator", "    Text editor", "    Canvas"};
 
 static void invalidate_all(void)
 {
@@ -94,7 +95,8 @@ static void cancel_window(int slot)
     if (slot < 0 || slot >= TABOS_GUI_WINDOW_MAX) {
         return;
     }
-    desktop.outgoing[slot] |= SEND_CANCEL;
+    desktop.outgoing[slot]                               |= SEND_CANCEL;
+    desktop.model.windows[slot].cancelled_input_sequence  = desktop.model.windows[slot].input_sequence;
     for (size_t index = 0U; index < TABOS_POINTER_MAX_CONTACTS; ++index) {
         if (desktop.captures[index].active && desktop.captures[index].slot == slot) {
             desktop.captures[index].active = false;
@@ -138,6 +140,9 @@ static void flush_controls(void)
                 continue;
             }
             tabos_gui_packet_t packet = {.version = TABOS_GUI_PROTOCOL_VERSION, .serial = window->serial};
+            if (flags[index] == SEND_CANCEL) {
+                packet.input_sequence = window->cancelled_input_sequence;
+            }
             if (flags[index] == SEND_CONFIGURE) {
                 packet.serial             = window->requested_serial;
                 packet.data.window.width  = (uint32_t) window->proposed.width;
@@ -494,6 +499,38 @@ static void draw_ui(void)
         }
     }
     tabos_gui_ui_draw(&desktop.ui, &desktop.canvas);
+    if (desktop.model.focus < 0 && desktop.modal == 0) {
+        for (int index = 0; index < 4; ++index) {
+            const int x = 80 + index * 288, y = 164;
+            if (index == 0) {
+                tabos_gui_fill(&desktop.canvas, (tabos_gui_rect_t) {x, y, 24, 12}, 0xf5c4U);
+                tabos_gui_fill(&desktop.canvas, (tabos_gui_rect_t) {x, y + 8, 48, 36}, 0xf6e8U);
+                tabos_gui_fill(&desktop.canvas, (tabos_gui_rect_t) {x + 4, y + 16, 40, 2}, TABOS_GUI_LIGHT);
+            } else if (index == 1) {
+                tabos_gui_fill(&desktop.canvas, (tabos_gui_rect_t) {x, y, 48, 48}, TABOS_GUI_SHADOW);
+                tabos_gui_fill(&desktop.canvas, (tabos_gui_rect_t) {x + 4, y + 4, 40, 12}, 0xaf56U);
+                for (int key = 0; key < 6; ++key) {
+                    tabos_gui_fill(&desktop.canvas,
+                                   (tabos_gui_rect_t) {x + 6 + (key % 3) * 14, y + 22 + (key / 3) * 14, 8, 8},
+                                   TABOS_GUI_LIGHT);
+                }
+            } else if (index == 2) {
+                tabos_gui_fill(&desktop.canvas, (tabos_gui_rect_t) {x + 4, y, 40, 48}, TABOS_GUI_LIGHT);
+                for (int line = 0; line < 4; ++line) {
+                    tabos_gui_fill(&desktop.canvas, (tabos_gui_rect_t) {x + 10, y + 8 + line * 9, 28, 2},
+                                   TABOS_GUI_ACCENT);
+                }
+            } else {
+                tabos_gui_fill(&desktop.canvas, (tabos_gui_rect_t) {x, y, 48, 48}, TABOS_GUI_LIGHT);
+                const uint16_t colors[] = {0xe986U, 0x34e8U, TABOS_GUI_ACCENT, 0xf6e8U};
+                for (int paint = 0; paint < 4; ++paint) {
+                    tabos_gui_fill(&desktop.canvas,
+                                   (tabos_gui_rect_t) {x + 6 + (paint % 2) * 20, y + 6 + (paint / 2) * 20, 16, 16},
+                                   colors[paint]);
+                }
+            }
+        }
+    }
     if (desktop.modal != 0) {
         size_t position = 0U;
         for (int line = 0; line < 4 && desktop.message[position] != '\0'; ++line) {
@@ -516,6 +553,11 @@ static void route_input(unsigned int slot, uint32_t kind, tabos_gui_packet_t* pa
     }
     packet->version = TABOS_GUI_PROTOCOL_VERSION;
     packet->serial  = window->serial;
+    if (window->input_sequence == UINT32_MAX) {
+        cancel_window((int) slot);
+        return;
+    }
+    packet->input_sequence = ++window->input_sequence;
     if (tabos_gui_send(window->channel, kind, packet, false) != 0) {
         if (kind == TABOS_GUI_POINTER && packet->data.pointer.type == TABOS_POINTER_MOVE) {
             return;
@@ -639,6 +681,10 @@ static void pointer_event(tabos_pointer_event_t event)
 
 static void keyboard_event(const tabos_input_event_t* event)
 {
+    if ((event->flags & TABOS_INPUT_EVENT_OVERFLOW) != 0U) {
+        cancel_window(desktop.model.focus);
+        tabos_gui_ui_cancel(&desktop.ui);
+    }
     if (desktop.modal != 0 || desktop.model.focus < 0) {
         const int action = tabos_gui_ui_keyboard(&desktop.ui, event);
         if (desktop.ui.changed) {
@@ -709,6 +755,10 @@ static void idle_wait(void)
     uint32_t count = 0U;
     items[count++] =
         (tabos_wait_item_t) {.source = tabos_ipc_wait_source(desktop.listener), .events = TABOS_WAIT_READABLE};
+    if (desktop.devices >= 0) {
+        items[count++] = (tabos_wait_item_t) {.source = tabos_device_subscription_wait_source(desktop.devices),
+                                              .events = TABOS_WAIT_READABLE};
+    }
     const tabos_wait_source_t keyboard = tabos_input_wait_source();
     if (keyboard >= 0) {
         items[count++] = (tabos_wait_item_t) {.source = keyboard, .events = TABOS_WAIT_READABLE};
@@ -736,6 +786,7 @@ int main(void)
 {
     desktop_model_init(&desktop.model);
     desktop.pointer      = -1;
+    desktop.devices      = -1;
     desktop.closing_slot = -1;
     desktop.force_slot   = -1;
     if (tabos_session_open() <= 0) {
@@ -761,8 +812,25 @@ int main(void)
     }
     (void) tabos_graphics_set_overlays(&desktop.graphics, TABOS_GRAPHICS_OVERLAY_NONE);
     open_pointer();
+    desktop.devices = tabos_device_subscribe();
     desktop.running = true;
     while (desktop.running) {
+        tabos_device_event_t device;
+        for (unsigned int count = 0U;
+             count < 16U && desktop.devices >= 0 && tabos_device_event_read(desktop.devices, &device) == 0; ++count) {
+            if ((device.flags & TABOS_DEVICE_EVENT_OVERFLOW) != 0U ||
+                device.device.device_class == TABOS_DEVICE_CLASS_KEYBOARD ||
+                device.device.device_class == TABOS_DEVICE_CLASS_POINTER) {
+                cancel_window(desktop.model.focus);
+                tabos_gui_ui_cancel(&desktop.ui);
+                (void) desktop_model_drag_end(&desktop.model, true);
+                memset(desktop.captures, 0, sizeof(desktop.captures));
+                if (device.device.device_class == TABOS_DEVICE_CLASS_POINTER) {
+                    open_pointer();
+                }
+                invalidate_all();
+            }
+        }
         receive_clients();
         reap_children();
         flush_controls();
@@ -788,6 +856,9 @@ int main(void)
     }
     (void) tabos_graphics_close(&desktop.graphics);
     (void) tabos_ipc_close(desktop.listener);
+    if (desktop.devices >= 0) {
+        (void) tabos_device_subscription_close(desktop.devices);
+    }
     free(desktop.canvas.pixels);
     free(desktop.scratch);
     return 0;

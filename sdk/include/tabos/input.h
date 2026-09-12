@@ -103,7 +103,8 @@ enum {
 };
 
 enum {
-    TABOS_INPUT_TEXT_MAX_BYTES = 9
+    TABOS_INPUT_TEXT_MAX_BYTES = 9,
+    TABOS_INPUT_EVENT_OVERFLOW = 1U
 };
 
 typedef struct {
@@ -112,6 +113,7 @@ typedef struct {
         uint8_t modifiers;
         bool repeat;
         char text[TABOS_INPUT_TEXT_MAX_BYTES + 1U];
+        uint32_t flags;
 } tabos_input_event_t;
 
 bool tabos_input_poll(tabos_input_event_t* event);

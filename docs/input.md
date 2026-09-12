@@ -41,8 +41,11 @@ cooked text input. Preserve unrelated TTY mode bits when changing policy.
 The queue holds 64 events and is protected for host-thread and FreeRTOS-task access by
 the platform mutex abstraction. Tab5 uses a priority-inheriting FreeRTOS mutex, so an
 application waiting for input cannot spin and starve the runtime task that owns the
-queue. If producers outrun consumers, the oldest event is discarded so current input
-remains responsive.
+queue. If producers fill the queue, queued input and repeat state are cleared; the
+new event carries `TABOS_INPUT_EVENT_OVERFLOW` in `flags`. Consumers must cancel
+their held-key state before processing that event. Generated repeats never evict
+queued physical events. The desktop forwards cancellation through a sequence fence,
+so priority control delivery cannot revive older queued presses.
 
 Held-key repeat uses an exact monotonic deadline: initial delay starts on key-down and
 matching key-up or input reset cancels it immediately. If runtime handles a repeat late,

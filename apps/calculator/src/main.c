@@ -20,12 +20,12 @@ static void draw(tabos_gui_t* gui)
     });
     (void) tabos_gui_ui_add(&gui->ui,
                             (tabos_gui_widget_t) {
-                                .id = 2, .kind = TABOS_GUI_BUTTON, .bounds = {12, 68, 96, 44},
+                                .id = 2, .kind = TABOS_GUI_BUTTON, .bounds = {12, 68, 104, 44},
                                         .label = "Clear"
     });
     (void) tabos_gui_ui_add(&gui->ui,
                             (tabos_gui_widget_t) {
-                                .id = 3, .kind = TABOS_GUI_BUTTON, .bounds = {120, 68, 96, 44},
+                                .id = 3, .kind = TABOS_GUI_BUTTON, .bounds = {124, 68, 104, 44},
                                         .label = "Erase"
     });
     const int key_width  = (width - 40) / 4;

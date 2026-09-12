@@ -115,6 +115,12 @@ If process 0 fails while graphics is active, the kernel immediately revokes full
 ownership and presents a plain, cursor-free terminal panic instead of retaining the last
 graphics frame.
 
+GUI clients use `<tabos/gui.h>` and committed RGB565 surfaces instead of opening
+fullscreen graphics. The optional desktop composes these surfaces through the same
+public graphics API. Fullscreen handoff parks clients with memory retained and
+reopens/repaints the desktop after the foreground child chain returns; see
+[Desktop and GUI Applications](gui.md).
+
 Run `graphics-demo` to exercise a 320×240 logical canvas automatically scaled 3× with
 pillarboxing; use E/A/S/D to move, R to rotate, Up/Down to cycle the 16-color VGA
 letterbox palette, and Q to exit. Run

@@ -15,6 +15,8 @@ typedef struct {
         tabos_surface_t surface;
         uint32_t serial;
         uint32_t requested_serial;
+        uint32_t input_sequence;
+        uint32_t cancelled_input_sequence;
         tabos_gui_rect_t bounds;
         tabos_gui_rect_t restored;
         tabos_gui_rect_t proposed;

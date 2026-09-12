@@ -78,7 +78,7 @@ static void draw(tabos_gui_t* gui)
                                           .id       = 5,
                                           .kind     = TABOS_GUI_BUTTON,
                                           .bounds   = {188, 68, 120, 48},
-                                          .label    = "Open/Run",
+                                          .label    = "Open",
                                           .disabled = selection < 0
     });
     (void) tabos_gui_ui_add(&gui->ui, (tabos_gui_widget_t) {

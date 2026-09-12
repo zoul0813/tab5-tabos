@@ -1,5 +1,10 @@
 # Directory Structure
 
+The optional GUI lives in `apps/desktop` with independent clients in `apps/files`,
+`apps/calculator`, `apps/editor` and `apps/canvas`. Portable widgets/client lifecycle
+live under `sdk/lib/gui*`; kernel IPC and surface ownership remain separate from
+desktop policy. See [Desktop and GUI Applications](gui.md).
+
 This document describes the current TabOS repository layout. It is authoritative for directory purpose and ownership. Update it whenever directories are added, removed, renamed, or given new responsibilities.
 
 ## Repository Layout

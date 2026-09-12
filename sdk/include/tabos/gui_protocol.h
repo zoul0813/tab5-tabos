@@ -6,7 +6,7 @@
 #include <tabos/surface.h>
 
 enum {
-    TABOS_GUI_PROTOCOL_VERSION = 1U,
+    TABOS_GUI_PROTOCOL_VERSION = 2U,
     TABOS_GUI_SCREEN_WIDTH     = 1280U,
     TABOS_GUI_SCREEN_HEIGHT    = 720U,
     TABOS_GUI_DOCK_HEIGHT      = 80U,
@@ -37,6 +37,7 @@ typedef enum {
 typedef struct {
         uint32_t version;
         uint32_t serial;
+        uint32_t input_sequence;
         union {
                 struct {
                         tabos_surface_t surface;

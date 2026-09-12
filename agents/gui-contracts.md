@@ -1,5 +1,11 @@
 # GUI Service Contracts
 
+GUI wire protocol version 2 carries independent geometry and input sequence numbers.
+Cancel records the latest issued input sequence at cancellation time; clients ignore
+events at or below that fence even when priority control overtakes queued data.
+Sequences never wrap. Device faults/removal and keyboard queue overflow cancel input;
+keyboard overflow clears old events and annotates the next event with the public flag.
+
 Status: implementation contracts, 2026-09-12. These specify the GUI successor to
 foreground-only execution; they do not claim that every service is implemented.
 Track implementation and evidence in [GUI tasks](apps/gui.md).

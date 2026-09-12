@@ -49,8 +49,9 @@ int main(void)
             return 1;
         }
     }
-    for (unsigned int index = 6U; index < 70U; ++index) {
-        if (!tabos_input_poll(&received) || received.modifiers != (uint8_t) index) {
+    for (unsigned int index = 64U; index < 70U; ++index) {
+        if (!tabos_input_poll(&received) || received.modifiers != (uint8_t) index ||
+            received.flags != (index == 64U ? TABOS_INPUT_EVENT_OVERFLOW : 0U)) {
             return 1;
         }
     }

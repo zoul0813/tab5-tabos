@@ -1995,3 +1995,10 @@ without launching `tabos_host`. It checks publication/resize/retained fullscreen
 pixels, editor Save and dirty close cancellation, all initial app launches and
 restoration of shell ownership. Physical touch and PSRAM/game measurements remain
 separate, pending user-permitted hardware validation.
+
+Set `TABOS_GUI_TEST_FULLSCREEN=build/apps/starfall/starfall` to repeat handoff with
+the actual Starfall image. For Doom, set that variable to `build/apps/doom/doom`
+and `TABOS_GUI_TEST_IWAD` to a locally available legal IWAD (tested with Freedoom2).
+The harness copies assets into its temporary root, sends normal quit controls and
+cleans up; it also forces desktop recovery during an active handoff. Set optional
+`TABOS_GUI_TEST_CAPTURE` to a PPM output path for framebuffer review.

@@ -216,6 +216,18 @@ static int test_overflow_recovery(void)
 
 int main(void)
 {
+    doom_tabos_input_t input;
+    doom_tabos_input_init(&input);
+    tabos_input_event_t event = key_event(TABOS_INPUT_KEY_DOWN, TABOS_KEY_W, 0U, false);
+    doom_tabos_input_feed(&input, &event);
+    if (!expect(&input, true, DOOM_KEY_UP)) {
+        return 5;
+    }
+    event.flags = TABOS_INPUT_EVENT_OVERFLOW;
+    doom_tabos_input_feed(&input, &event);
+    if (!expect(&input, false, DOOM_KEY_UP) || !expect_empty(&input)) {
+        return 6;
+    }
     if (test_mappings() != 0) {
         return 1;
     }

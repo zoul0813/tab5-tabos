@@ -1,9 +1,9 @@
 # GUI Implementation Tasks
 
-Status: implementation and validation in progress, 2026-09-12. Desktop, Files,
+Status: software implemented; release acceptance remains pending, 2026-09-12. Desktop, Files,
 Calculator, Text editor and Canvas are implemented as independent RV32 applications.
 Concurrent processes, session pause/restore, IPC, surfaces, launch inspection and
-GUI toolkit are integrated. Remaining gates include full recovery stress, native
+GUI toolkit are integrated. Remaining gates include exhaustive failure-injection coverage, native
 contention and physical touch/performance/memory acceptance under user restrictions.
 
 Direction and scope: [TabOS Retro Desktop milestone](../milestone-gui.md). This file tracks executable work packages; the milestone records agreed product behavior. Read [context](../TABOS_CONTEXT.md), [architecture](../architecture.md), [testing](../testing.md), and [roadmap](../roadmap.md) before implementation, plus [coding style](../coding-style.md) before C changes.
@@ -68,7 +68,7 @@ Exit gate: desktop switches between independent window clients with usable touch
 - [x] GUI-304: Implement persistent bottom launcher/switcher dock and maximized client work area above it. Open apps maximized; support restore, minimize, dock restore/switching, stacking, focus, and close.
 - [x] GUI-305: Implement movable restored windows and touch-accessible outline resize. Commit dimensions/redraw only on release; failed resize preserves old geometry and committed pixels. Cancelled drags preserve a usable window.
 - [x] GUI-306: Extend normalized pointer contract and SDL backend with mouse hover/wheel. Route pointer events in client coordinates; capture contacts through release/cancel. Touch navigation must work without hover, right-click, or double-click.
-- [ ] GUI-307: Route keyboard/text only to focused client; implement keyboard focus traversal/window switching. Cancel held keys/contacts on focus loss, device removal, overflow, close, and fullscreen transitions.
+- [x] GUI-307: Route keyboard/text only to focused client; implement keyboard focus traversal/window switching. Cancel held keys/contacts on focus loss, device removal, overflow, close, and fullscreen transitions.
 - [x] GUI-308: Add deterministic framebuffer and synthetic input tests for maximized bounds/dock occlusion, overlap/clipping, damage, stacking, move/outline resize, failed resize, capture cancellation, focus traversal, and exactly-once text routing.
 
 ## Phase 4 — GUI SDK, Discovery, and First Applications
@@ -89,7 +89,7 @@ Exit gate: all first-release apps run as independent RV32 clients and use toolki
 Exit gate: kernel-launched fullscreen programs return to the same usable GUI session; failures have bounded cleanup and clear ownership restoration.
 
 - [x] GUI-501: Implement desktop → pause clients → fullscreen child → restore desktop → resume clients state machine. Keep coordinator and core services available while GUI workloads are parked.
-- [ ] GUI-502: Pause the full GUI-client session, including descendants. Clients finish bounded work, release outstanding service leases, quiesce audio/capture, retain state, and acknowledge at toolkit safe points.
+- [x] GUI-502: Pause the full GUI-client session, including descendants. Clients finish bounded work, release outstanding service leases, quiesce audio/capture, retain state, and acknowledge at toolkit safe points.
 - [x] GUI-503: Enforce two-second acknowledgement deadline. On timeout, abort launch, resume acknowledged clients, and identify blockers. Handle client exit/disconnect and late acknowledgements without leaving processes parked or accepting stale transitions.
 - [x] GUI-504: Launch fullscreen child through normal kernel process services, outside GUI surface quotas. Check headroom and handle actual load/allocation failures with GUI resident; explain insufficient RAM and permit closing apps before retry. Do not unload/checkpoint GUI or promise game-memory reservation.
 - [x] GUI-505: Transfer display/input exclusively to fullscreen child and its nested foreground chain. On normal exit, failed launch, or recoverable fault, reclaim child resources, restore prior display owner, repaint retained windows, clear stale input, and resume GUI clients.
@@ -106,8 +106,8 @@ Exit gate: complete first-release experience, automated evidence, hardware resul
 - [ ] GUI-603: Validate large icons/targets and maximized/restored workflows on the actual 5-inch screen, including Tab5 keyboard text/modifiers and window navigation. Adjust spacing/targets from observed usability.
 - [ ] GUI-604: Record input latency, damage-composition time, idle behavior, process heap/stack, PSRAM peak, staging/surface usage, and fullscreen game headroom. Exercise near-limit windows and repeated open/resize/close/handoff cycles; reconcile limits with Phase 0 measurements.
 - [ ] GUI-605: Physically verify unsaved editor state survives repeated game/console launches, failed load returns usable desktop, orderly close can cancel, and force-close returns control without watchdog or resource leaks where the native fault boundary permits.
-- [ ] GUI-606: Add user-facing desktop/GUI SDK documentation under `docs/` and update relevant application/build/input/graphics references and documentation index. Explain launch markers, touch/keyboard controls, quotas, resident-memory limits, recovery, and deferred features.
-- [ ] GUI-607: Synchronize architecture/context/testing documents and roadmap after each implemented stage. Record commands, actual outcomes, platform coverage, measured limits, and remaining hardware gaps here or in linked validation records before marking delivery complete.
+- [x] GUI-606: Add user-facing desktop/GUI SDK documentation under `docs/` and update relevant application/build/input/graphics references and documentation index. Explain launch markers, touch/keyboard controls, quotas, resident-memory limits, recovery, and deferred features.
+- [x] GUI-607: Synchronize architecture/context/testing documents and roadmap after each implemented stage. Record commands, actual outcomes, platform coverage, measured limits, and remaining hardware gaps here or in linked validation records before marking delivery complete.
 
 ## Deferred Work
 
@@ -332,3 +332,43 @@ Discard after return. Two additional rounds terminate the actual desktop while
 clients run and while a fullscreen child is active; both restore root console,
 return the forced status and free all surfaces. The complete macOS Debug suite now
 passes 89/89 permitted cases (ASan/UBSan); real RV32 tester concurrency also passes.
+
+### Delivery Validation and Remaining Acceptance
+
+GUI protocol v2 fences cancelled input by issuance sequence, independently of
+geometry, so priority cancellation cannot be followed by stale queued presses.
+A deterministic client test queues old input, priority Cancel and new input; only
+new input reaches the client. Keyboard queue overflow clears old events/repeat state
+and exposes a public flag; desktop, Starfall and Doom cancel held input. Desktop
+also subscribes to keyboard/pointer lifecycle and overflow events. Controls were
+reviewed from an actual RV32 framebuffer; toolbar labels now fit and dock titles
+ellipsize. Home cards include large bitmap-style icons drawn through public graphics.
+
+Final macOS Debug and Release suites each pass all 89 permitted CTest cases.
+Debug uses ASan/UBSan. SDK applications, including Doom, rebuilt successfully.
+Tab5 Debug/Release compile successfully with 3744 / 106368 app-partition bytes free.
+The standalone real RV32 process tester passes three concurrent session rounds.
+GUI RV32 coverage includes desktop Exit cancellation, explicit dirty-client force
+close, and coordinator termination both during GUI use and a fullscreen handoff.
+
+Earlier stage evidence above is historical, not a claim that pending work was later
+skipped. Unchecked tasks remain acceptance work: measured buffering/resource choices,
+physical native contention/latency, exhaustive IPC/wait/allocation/fault injection,
+and physical display/controller usability and game headroom. Linux coverage is
+explicitly excluded by the user's instruction; no Linux builds/tests, Tab5 flashing,
+host simulator binary or UI automation were run. These limits prevent declaring
+all milestone release gates complete, despite the implemented software workflow.
+
+Real-game validation: dedicated Debug RV32 harness passed two normal Starfall
+handoffs and two Doom/Freedoom2 handoffs, one with dirty editor plus Canvas resident,
+followed by desktop-failure teardown during active handoff. Game exit status is
+explicitly asserted zero. An intermediate Starfall run overlapped the SDK rebuild
+and copied the old 87017-byte image, returning status 1; rerun after build completion
+used the matching 87041-byte image and passed. The harness now checks status as well
+as return ownership. Release GUI workflow also passes. These are automated emulation
+results, not native game performance or physical-memory measurements.
+
+The five GUI applications also pass their ordinary SDK `install` targets into the
+local `.local/rootfs/T/bin` directory. No mounted-device installation was requested
+or performed. Use matching rebuilt SDK binaries with matching firmware; pointer and
+keyboard structures changed under the existing mutable prerelease ABI policy.

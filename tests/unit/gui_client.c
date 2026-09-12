@@ -11,6 +11,15 @@
 const tabos_elf_api_t* tabos_runtime_api;
 static uint32_t owner = 1U;
 static bool fail_upload;
+static unsigned int input_events;
+static void input(tabos_gui_t* gui, const tabos_gui_packet_t* packet, uint32_t kind)
+{
+    (void) gui;
+    (void) packet;
+    if (kind == TABOS_GUI_POINTER || kind == TABOS_GUI_KEYBOARD) {
+        ++input_events;
+    }
+}
 
 static int ipc_gate(uint32_t operation, ipc_transport_packet_t* packet)
 {
@@ -70,7 +79,7 @@ int main(void)
     const tabos_ipc_channel_t listener = tabos_ipc_listen();
     assert(listener > 0);
     owner           = 2U;
-    tabos_gui_t gui = {.draw = draw, .closing = closing};
+    tabos_gui_t gui = {.draw = draw, .closing = closing, .input = input};
     assert(tabos_gui_open(&gui, "Test") == 0 && tabos_gui_step(&gui, 0U) == 1);
     const tabos_surface_t original    = gui.surface;
     owner                             = 1U;
@@ -108,6 +117,20 @@ int main(void)
     owner       = 1U;
     assert(tabos_gui_receive(channel, &kind, &packet, &sender) == 0 && kind == TABOS_GUI_ERROR && packet.serial == 2U);
     assert(tabos_surface_read(retained, 0U, 0U, 1U, 1U, &pixel) == 0 && pixel == 0x1234U);
+    packet = (tabos_gui_packet_t) {
+        .version        = TABOS_GUI_PROTOCOL_VERSION,
+        .serial         = gui.serial,
+        .input_sequence = 1U,
+        .data.pointer   = {.type = TABOS_POINTER_DOWN, .x = 12, .y = 12}
+    };
+    assert(tabos_gui_send(channel, TABOS_GUI_POINTER, &packet, false) == 0);
+    assert(tabos_gui_send(channel, TABOS_GUI_CANCEL_INPUT, &packet, true) == 0);
+    packet.input_sequence = 2U;
+    assert(tabos_gui_send(channel, TABOS_GUI_POINTER, &packet, false) == 0);
+    owner = 2U;
+    assert(tabos_gui_step(&gui, 0U) == 1 && input_events == 1U && gui.cancelled_input_sequence == 1U);
+    owner = 1U;
+    assert(tabos_gui_receive(channel, &kind, &packet, &sender) == 0 && kind == TABOS_GUI_FRAME);
     assert(tabos_gui_send(channel, TABOS_GUI_CLOSE, &packet, true) == 0);
     owner = 2U;
     assert(tabos_gui_step(&gui, 0U) == 1 && gui.close_pending);

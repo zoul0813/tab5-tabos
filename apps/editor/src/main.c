@@ -35,11 +35,11 @@ static void draw(tabos_gui_t* gui)
 {
     const int width = (int) gui->canvas.width, height = (int) gui->canvas.height;
     const bool modal = dialog != DIALOG_NONE;
-    button(gui, 7, 8, 8, 72, "File", modal);
-    button(gui, 2, 88, 8, 88, "Open", modal);
-    button(gui, 3, 184, 8, 88, "Save", modal);
-    if (width >= 400) {
-        button(gui, 4, 280, 8, 112, "Save as", modal);
+    button(gui, 7, 8, 8, 88, "File", modal);
+    button(gui, 2, 104, 8, 88, "Open", modal);
+    button(gui, 3, 200, 8, 88, "Save", modal);
+    if (width >= 448) {
+        button(gui, 4, 296, 8, 144, "Save as", modal);
     }
     (void) tabos_gui_ui_add(&gui->ui, (tabos_gui_widget_t) {
                                           .id        = 5,

@@ -347,6 +347,9 @@ Event tables contain:
 - `pressure`: integer 0..65535 when supplied by the device; otherwise absent/nil.
 
 Mouse movement delivers contact motion while a button is held and hover otherwise.
+
+Keyboard event tables include `overflow`; when true, clear held-key state before
+processing the event because the bounded input queue was reset.
 Multiple contacts retain separate IDs. Focus changes, queue overflow, and device
 loss cancel contacts through the SDK; handle `cancel` like a release, without
 assuming a final movement. Device loss can subsequently return an error. Always

@@ -316,6 +316,8 @@ static int poll(lua_State* L)
     lua_setfield(L, -2, "modifiers");
     lua_pushboolean(L, event->repeat);
     lua_setfield(L, -2, "repeat");
+    lua_pushboolean(L, (event->flags & TABOS_INPUT_EVENT_OVERFLOW) != 0U);
+    lua_setfield(L, -2, "overflow");
     rt->head = (rt->head + 1U) % LUA_TABOS_QUEUE_SIZE;
     --rt->count;
     return 1;

@@ -20,6 +20,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <dirent.h>
 
 static char storage_root[] = "/tmp/tabos-gui-rv32-XXXXXX";
 static tabos_app_context_t* parent_context;
@@ -182,6 +183,53 @@ static void close_shortcut(void)
     check(input_submit(&key), "close release");
 }
 
+static void finish_optional_game(void)
+{
+    if (getenv("TABOS_GUI_TEST_FULLSCREEN") == NULL) {
+        return;
+    }
+    const bool doom         = getenv("TABOS_GUI_TEST_IWAD") != NULL;
+    const uint64_t deadline = platform_time_ms() + (doom ? 5000U : 500U);
+    while (platform_time_ms() < deadline) {
+        pump();
+    }
+    tabos_input_event_t key = {.type = TABOS_INPUT_KEY_DOWN, .key = doom ? TABOS_KEY_F10 : TABOS_KEY_Q};
+    check(input_submit(&key), "game quit");
+    key.type = TABOS_INPUT_KEY_UP;
+    check(input_submit(&key), "game quit release");
+    if (doom) {
+        settle();
+        key.type = TABOS_INPUT_KEY_DOWN;
+        key.key  = TABOS_KEY_Y;
+        check(input_submit(&key), "Doom quit confirmation");
+        key.type = TABOS_INPUT_KEY_UP;
+        check(input_submit(&key), "Doom quit confirmation release");
+    }
+}
+
+static void remove_fixture_tree(const char* path)
+{
+    DIR* directory = opendir(path);
+    check(directory != NULL, "open fixture directory for cleanup");
+    struct dirent* entry;
+    while ((entry = readdir(directory)) != NULL) {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+        char child[1024];
+        const int length = snprintf(child, sizeof(child), "%s/%s", path, entry->d_name);
+        check(length > 0 && (size_t) length < sizeof(child), "fixture child path");
+        struct stat info;
+        check(lstat(child, &info) == 0, "fixture child metadata");
+        if (S_ISDIR(info.st_mode)) {
+            remove_fixture_tree(child);
+        } else {
+            check(unlink(child) == 0, "fixture file cleanup");
+        }
+    }
+    check(closedir(directory) == 0 && rmdir(path) == 0, "fixture directory cleanup");
+}
+
 int main(int argc, char** argv)
 {
     check(argc == 6, "pass SDK-built desktop, canvas, files, calculator and editor artifacts");
@@ -205,6 +253,19 @@ int main(int argc, char** argv)
     check(legacy != NULL && fwrite(loader_hello_elf, 1U, loader_hello_elf_size, legacy) == loader_hello_elf_size &&
               fclose(legacy) == 0,
           "legacy fullscreen fixture");
+    const char* game = getenv("TABOS_GUI_TEST_FULLSCREEN");
+    if (game != NULL) {
+        copy_file(game, hello);
+    }
+    const char* iwad = getenv("TABOS_GUI_TEST_IWAD");
+    char data[512], doom_data[512], wad[512];
+    (void) snprintf(data, sizeof(data), "%s/data", storage_root);
+    if (iwad != NULL) {
+        (void) snprintf(doom_data, sizeof(doom_data), "%s/data/doom", storage_root);
+        (void) snprintf(wad, sizeof(wad), "%s/data/doom/freedoom2.wad", storage_root);
+        check(mkdir(data, 0700) == 0 && mkdir(doom_data, 0700) == 0, "game fixture directory");
+        copy_file(iwad, wad);
+    }
     check(setenv("SDL_VIDEODRIVER", "dummy", 1) == 0, "headless test backend");
     check(kernel_runtime_init() && platform_init(true) && kernel_runtime_start(false), "runtime startup");
     check(application_registry_register(&parent) && tabos_app_launch(parent.name) == TABOS_APP_RESULT_OK,
@@ -232,8 +293,13 @@ int main(int argc, char** argv)
     tabos_process_info_t info;
     check(tabos_process_info(1U, &info) && info.state == TABOS_PROCESS_BLOCKED,
           "desktop retained below fullscreen child");
+    finish_optional_game();
     await_count(3U);
     await_pixel(400U, 300U, 0x1082U);
+    if (game != NULL) {
+        int game_status = -1;
+        check(tabos_app_last_exit_status(&game_status) && game_status == 0, "fullscreen game exited successfully");
+    }
     tabos_input_event_t key = {.type = TABOS_INPUT_KEY_DOWN, .key = TABOS_KEY_Q, .modifiers = TABOS_MODIFIER_CONTROL};
     check(input_submit(&key), "close client shortcut");
     key.type = TABOS_INPUT_KEY_UP;
@@ -271,13 +337,19 @@ int main(int argc, char** argv)
     click(428, 84);
     await_count(5U);
     check(surface_bytes() == 2U * 1280U * 592U * 2U, "dirty editor and canvas remain resident during handoff");
+    finish_optional_game();
     await_count(4U);
+    if (game != NULL) {
+        int game_status = -1;
+        check(tabos_app_last_exit_status(&game_status) && game_status == 0,
+              "second fullscreen game exited successfully");
+    }
     settle();
     close_shortcut();
     await_count(3U);
     click(196, 680);
     settle();
-    close_shortcut();
+    click(1208, 680);
     settle();
     capture_frame();
     click(640, 352);
@@ -304,6 +376,21 @@ int main(int argc, char** argv)
     settle();
     close_shortcut();
     await_count(2U);
+    await_pixel(1279U, 300U, 0x2b8dU);
+    click(770, 180);
+    await_count(3U);
+    await_pixel(8U, 112U, 0x632cU);
+    click(40, 150);
+    text = (tabos_input_event_t) {.type = TABOS_INPUT_TEXT, .text = "unsaved"};
+    check(input_submit(&text), "force-close dirty text");
+    settle();
+    close_shortcut();
+    settle();
+    click(1250, 24);
+    settle();
+    click(750, 448);
+    await_count(2U);
+    check(surface_bytes() == 0U, "explicit force close reclaims client surface");
     await_pixel(1279U, 300U, 0x2b8dU);
     click(1208, 680);
     await_count(1U);
@@ -341,6 +428,10 @@ int main(int argc, char** argv)
         check(unlink(extras[index]) == 0, "extra client cleanup");
     }
     check(unlink(note) == 0, "document fixture cleanup");
+    struct stat data_info;
+    if (stat(data, &data_info) == 0) {
+        remove_fixture_tree(data);
+    }
     check(unlink(executable) == 0 && unlink(canvas) == 0 && unlink(hello) == 0 && rmdir(directory) == 0 &&
               rmdir(storage_root) == 0,
           "fixture cleanup");

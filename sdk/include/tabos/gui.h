@@ -21,6 +21,7 @@ struct tabos_gui {
         tabos_surface_t surface;
         tabos_surface_t retired;
         uint32_t serial;
+        uint32_t cancelled_input_sequence;
         bool connected;
         bool running;
         bool dirty;

@@ -1,5 +1,12 @@
 # TabOS Codex Context
 
+GUI implementation update (2026-09-12): `apps/desktop` is an optional shell child;
+`apps/files`, `apps/calculator`, `apps/editor` and `apps/canvas` are independent
+marked RV32 clients. Public IPC/surfaces/session services provide retained windows
+and resident fullscreen pause/return. See [GUI tasks](apps/gui.md) for automated
+evidence and physical/native acceptance gaps; this does not supersede the native
+fault boundary or promise measured game headroom.
+
 > Status: project context distilled from TabOS planning discussions through 2026-08-10.
 > Purpose: give Codex a stable architectural baseline. Treat items marked **Decision** as the current direction, **Proposed** as a likely design that still needs validation, and **Open** as unresolved.
 
