@@ -1699,6 +1699,12 @@ Hardware-specific code:
     test on Tab5
 ```
 
+POSIX directory compatibility tests must exercise both build modes. Non-application
+coverage repeatedly opens a missing directory beyond the eight-entry wrapper capacity,
+then opens a real directory. Application-mode coverage must verify a missing runtime or
+directory-listing gate returns `ENOSYS`, releases the provisional wrapper entry, and
+allows a later gate-backed open.
+
 A developer working on the shell, filesystem, graphics model, UI, utilities, or application APIs should normally be able to work on a Mac or Linux machine without having the physical Tab5 attached.
 
 The real Tab5 remains the final source of truth for hardware behavior.

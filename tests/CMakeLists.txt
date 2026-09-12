@@ -57,6 +57,16 @@ tabos_enable_warnings(tabos_sdk_device)
 tabos_enable_sanitizers(tabos_sdk_device)
 add_test(NAME unit.sdk_device COMMAND tabos_sdk_device)
 
+add_executable(tabos_sdk_posix_filesystem
+    unit/sdk_posix_filesystem.c
+    "${TABOS_ROOT}/sdk/lib/posix_filesystem.c"
+)
+target_compile_definitions(tabos_sdk_posix_filesystem PRIVATE TABOS_APPLICATION=1)
+target_include_directories(tabos_sdk_posix_filesystem PRIVATE "${TABOS_ROOT}/sdk/include")
+tabos_enable_warnings(tabos_sdk_posix_filesystem)
+tabos_enable_sanitizers(tabos_sdk_posix_filesystem)
+add_test(NAME unit.sdk_posix_filesystem COMMAND tabos_sdk_posix_filesystem)
+
 add_executable(tabos_sdk_battery
     unit/sdk_battery.c
     "${TABOS_ROOT}/sdk/lib/battery.c"

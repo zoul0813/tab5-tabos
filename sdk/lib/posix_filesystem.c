@@ -117,16 +117,18 @@ tabos_posix_dir_t* tabos_posix_opendir(const char* path)
             const int result =
                 tabos_runtime_api->fs_list(path, directory_pool[index].listing, sizeof(directory_pool[index].listing));
             if (result < 0) {
-                directory_pool[index].allocated = false;
-                errno                           = -result;
-                return NULL;
+                errno = -result;
+            } else {
+                handle = 0;
             }
-            handle = 0;
+        } else {
+            errno = ENOSYS;
         }
 #else
             handle = tabos_fs_opendir(path);
 #endif
         if (handle < 0) {
+            directory_pool[index] = (tabos_posix_dir_t) {0};
             return NULL;
         }
         directory_pool[index].handle = handle;
@@ -175,6 +177,7 @@ void* tabos_posix_readdir(tabos_posix_dir_t* directory)
     memcpy(directory->entry.d_name, entry.name, strlen(entry.name) + 1U);
     return &directory->entry;
 #endif
+    return NULL;
 }
 
 int tabos_posix_closedir(tabos_posix_dir_t* directory)
