@@ -228,3 +228,13 @@ reader versus 500 committed frames. Real RV32 tester reads granted pixels while
 new pixels are staged and checks explicit plus leaked staging cleanup to baseline.
 macOS Debug and Tab5 Debug builds pass; Tab5 app-partition headroom is 6,016 bytes.
 No Linux build/test, flashing or simulator executable was run.
+
+### Shared Filesystem Concurrency
+
+Replaced the filesystem spinlock around storage operations with the platform mutex.
+Initialization/shutdown remain runtime lifecycle operations before/after application
+tasks. macOS filesystem tests now link the real SDL mutex; four threads each perform
+100 create/write/read/close/unlink rounds and verify thread-local errno isolation.
+Eight filesystem/process/boundary tests pass under ASan/UBSan; macOS Debug builds.
+The native service audit remains open for network cancellation ownership.
+Tab5 Debug build passes with 4,048 app-partition bytes free.

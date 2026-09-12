@@ -932,6 +932,10 @@ target_include_directories(tabos_coreutils_cp PRIVATE
     "${CMAKE_CURRENT_LIST_DIR}/fakes"
 )
 target_link_libraries(tabos_coreutils_cp PRIVATE tabos_core)
+foreach(filesystem_target tabos_filesystem tabos_posix_filesystem tabos_coreutils_cp)
+    target_sources(${filesystem_target} PRIVATE "${TABOS_ROOT}/platform/host/sdl/mutex.c")
+    target_link_libraries(${filesystem_target} PRIVATE SDL3::SDL3 Threads::Threads)
+endforeach()
 tabos_enable_warnings(tabos_coreutils_cp)
 tabos_enable_sanitizers(tabos_coreutils_cp)
 add_test(NAME component.coreutils_cp COMMAND tabos_coreutils_cp)

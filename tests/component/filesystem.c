@@ -11,6 +11,35 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <pthread.h>
+#include <assert.h>
+#include <sched.h>
+
+static void* concurrent_files(void* argument)
+{
+    const unsigned int id = *(const unsigned int*) argument;
+    char path[48];
+    (void) snprintf(path, sizeof(path), "A:/concurrent-%u", id);
+    for (unsigned int pass = 0U; pass < 100U; ++pass) {
+        uint8_t expected[128];
+        uint8_t actual[128];
+        memset(expected, (int) (id + pass), sizeof(expected));
+        const tabos_fd_t file = tabos_fs_open(path, TABOS_O_CREAT | TABOS_O_RDWR | TABOS_O_TRUNC, 0600U);
+        assert(file >= 0);
+        assert(tabos_fs_write(file, expected, sizeof(expected)) == sizeof(expected));
+        assert(tabos_fs_seek(file, 0, TABOS_SEEK_SET) == 0);
+        assert(tabos_fs_read(file, actual, sizeof(actual)) == sizeof(actual));
+        assert(memcmp(expected, actual, sizeof(actual)) == 0);
+        assert(tabos_fs_close(file) == 0);
+        tabos_stat_t info;
+        const bool missing_drive = (id & 1U) != 0U;
+        assert(tabos_fs_stat(missing_drive ? "Z:/missing" : "A:/missing", &info) == -1);
+        (void) sched_yield();
+        assert(*tabos_errno_location() == (missing_drive ? TABOS_ENODEV : TABOS_ENOENT));
+        assert(tabos_fs_unlink(path) == 0);
+    }
+    return NULL;
+}
 
 static bool has_entry(tabos_dir_t directory, const char* name)
 {
@@ -107,6 +136,15 @@ int main(void)
         return 1;
     }
 
+    pthread_t threads[4];
+    unsigned int identities[4];
+    for (unsigned int index = 0U; index < 4U; ++index) {
+        identities[index] = index;
+        assert(pthread_create(&threads[index], NULL, concurrent_files, &identities[index]) == 0);
+    }
+    for (unsigned int index = 0U; index < 4U; ++index) {
+        assert(pthread_join(threads[index], NULL) == 0);
+    }
     filesystem_shutdown();
     return 0;
 }

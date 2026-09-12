@@ -1619,3 +1619,8 @@ closed before the coordinator observes readiness. Fullscreen exec from a session
 requires all members parked; its descendants remain outside the GUI session.
 Forced blocked-coordinator teardown unwinds the active foreground chain first.
 Physical contention and complete desktop ownership restoration remain acceptance work.
+
+Filesystem descriptor tables and storage operations serialize through the platform
+mutex, allowing a waiting native app to yield while another task holds storage I/O.
+Filesystem initialization/shutdown occur outside the application-task lifetime;
+loader-owned CWD and descriptor maps stay per process, with thread-local errors.

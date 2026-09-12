@@ -3,8 +3,8 @@
 #include <tabos/config/filesystem.h>
 #include <tabos/internal/filesystem.h>
 #include <tabos/platform/storage.h>
+#include <tabos/platform/platform.h>
 
-#include <stdatomic.h>
 #include <string.h>
 
 typedef struct {
@@ -23,7 +23,7 @@ typedef struct {
 
 static file_slot_t files[TABOS_FILESYSTEM_MAX_FILES];
 static directory_slot_t directories[TABOS_FILESYSTEM_MAX_DIRECTORIES];
-static atomic_flag filesystem_lock = ATOMIC_FLAG_INIT;
+static platform_mutex_t* filesystem_lock;
 static _Thread_local int filesystem_errno;
 static bool filesystem_initialized;
 static bool filesystem_mounted;
@@ -31,12 +31,12 @@ static char working_directory[TABOS_FS_PATH_MAX] = "A:/";
 
 static void lock_filesystem(void)
 {
-    while (atomic_flag_test_and_set_explicit(&filesystem_lock, memory_order_acquire)) {}
+    platform_mutex_lock(filesystem_lock);
 }
 
 static void unlock_filesystem(void)
 {
-    atomic_flag_clear_explicit(&filesystem_lock, memory_order_release);
+    platform_mutex_unlock(filesystem_lock);
 }
 
 static int fail(int error)
@@ -159,6 +159,10 @@ bool filesystem_init(void)
     if (filesystem_initialized) {
         return true;
     }
+    filesystem_lock = platform_mutex_create();
+    if (filesystem_lock == NULL) {
+        return false;
+    }
     memset(files, 0, sizeof(files));
     memset(directories, 0, sizeof(directories));
     memcpy(working_directory, "A:/", 4U);
@@ -194,6 +198,8 @@ void filesystem_shutdown(void)
     filesystem_mounted     = false;
     filesystem_initialized = false;
     unlock_filesystem();
+    platform_mutex_destroy(filesystem_lock);
+    filesystem_lock = NULL;
 }
 
 bool filesystem_is_mounted(void)
