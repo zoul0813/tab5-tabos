@@ -2,6 +2,7 @@
 #include <tabos/internal/elf_api.h>
 
 #include <errno.h>
+#include <limits.h>
 #include <stddef.h>
 #include <stdlib.h>
 
@@ -180,30 +181,162 @@ int tabos_graphics_pixel(tabos_graphics_t* graphics, int32_t x, int32_t y, tabos
     return tabos_graphics_fill_rect(graphics, x, y, 1U, 1U, color);
 }
 
-int tabos_graphics_line(tabos_graphics_t* graphics, int32_t x0, int32_t y0, int32_t x1, int32_t y1, tabos_color_t color)
+enum {
+    LINE_CLIP_LEFT   = 1U << 0,
+    LINE_CLIP_RIGHT  = 1U << 1,
+    LINE_CLIP_TOP    = 1U << 2,
+    LINE_CLIP_BOTTOM = 1U << 3,
+};
+
+static uint32_t line_clip_code(int64_t x, int64_t y, int64_t maximum_x, int64_t maximum_y)
 {
-    int32_t dx    = x1 >= x0 ? x1 - x0 : x0 - x1;
-    int32_t sx    = x0 < x1 ? 1 : -1;
-    int32_t dy    = y1 >= y0 ? y0 - y1 : y1 - y0;
-    int32_t sy    = y0 < y1 ? 1 : -1;
-    int32_t error = dx + dy;
+    uint32_t code = 0U;
+    if (x < 0) {
+        code |= LINE_CLIP_LEFT;
+    } else if (x > maximum_x) {
+        code |= LINE_CLIP_RIGHT;
+    }
+    if (y < 0) {
+        code |= LINE_CLIP_TOP;
+    } else if (y > maximum_y) {
+        code |= LINE_CLIP_BOTTOM;
+    }
+    return code;
+}
+
+static uint64_t magnitude(int64_t value)
+{
+    return value < 0 ? (uint64_t) -value : (uint64_t) value;
+}
+
+static int64_t multiply_divide(int64_t value, int64_t numerator, int64_t denominator)
+{
+    const bool negative     = (value < 0) != (numerator < 0) != (denominator < 0);
+    const uint64_t quotient = magnitude(value) * magnitude(numerator) / magnitude(denominator);
+    return negative ? -(int64_t) quotient : (int64_t) quotient;
+}
+
+static bool clip_line(int64_t* x0, int64_t* y0, int64_t* x1, int64_t* y1, int64_t maximum_x, int64_t maximum_y)
+{
+    uint32_t code0 = line_clip_code(*x0, *y0, maximum_x, maximum_y);
+    uint32_t code1 = line_clip_code(*x1, *y1, maximum_x, maximum_y);
     for (;;) {
-        if (tabos_graphics_pixel(graphics, x0, y0, color) != 0) {
-            return -1;
+        if ((code0 | code1) == 0U) {
+            return true;
         }
-        if (x0 == x1 && y0 == y1) {
-            return 0;
+        if ((code0 & code1) != 0U) {
+            return false;
         }
-        const int32_t twice_error = error * 2;
-        if (twice_error >= dy) {
-            error += dy;
-            x0    += sx;
+
+        const uint32_t code = code0 != 0U ? code0 : code1;
+        int64_t x           = 0;
+        int64_t y           = 0;
+        if ((code & LINE_CLIP_TOP) != 0U) {
+            if (*y1 == *y0) {
+                return false;
+            }
+            x = *x0 + multiply_divide(*x1 - *x0, -*y0, *y1 - *y0);
+        } else if ((code & LINE_CLIP_BOTTOM) != 0U) {
+            if (*y1 == *y0) {
+                return false;
+            }
+            y = maximum_y;
+            x = *x0 + multiply_divide(*x1 - *x0, y - *y0, *y1 - *y0);
+        } else if ((code & LINE_CLIP_RIGHT) != 0U) {
+            if (*x1 == *x0) {
+                return false;
+            }
+            x = maximum_x;
+            y = *y0 + multiply_divide(*y1 - *y0, x - *x0, *x1 - *x0);
+        } else {
+            if (*x1 == *x0) {
+                return false;
+            }
+            y = *y0 + multiply_divide(*y1 - *y0, -*x0, *x1 - *x0);
         }
-        if (twice_error <= dx) {
-            error += dx;
-            y0    += sy;
+
+        if (code == code0) {
+            *x0   = x;
+            *y0   = y;
+            code0 = line_clip_code(x, y, maximum_x, maximum_y);
+        } else {
+            *x1   = x;
+            *y1   = y;
+            code1 = line_clip_code(x, y, maximum_x, maximum_y);
         }
     }
+}
+
+int tabos_graphics_line(tabos_graphics_t* graphics, int32_t x0, int32_t y0, int32_t x1, int32_t y1, tabos_color_t color)
+{
+    if (!valid(graphics)) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (graphics->width == 0U || graphics->height == 0U) {
+        return 0;
+    }
+
+    const int64_t maximum_x = graphics->width - 1U > (uint32_t) INT32_MAX ? INT32_MAX : graphics->width - 1U;
+    const int64_t maximum_y = graphics->height - 1U > (uint32_t) INT32_MAX ? INT32_MAX : graphics->height - 1U;
+    int64_t clipped_x0      = x0;
+    int64_t clipped_y0      = y0;
+    int64_t clipped_x1      = x1;
+    int64_t clipped_y1      = y1;
+    if (!clip_line(&clipped_x0, &clipped_y0, &clipped_x1, &clipped_y1, maximum_x, maximum_y)) {
+        return 0;
+    }
+
+    const int64_t dx = clipped_x1 >= clipped_x0 ? clipped_x1 - clipped_x0 : clipped_x0 - clipped_x1;
+    const int64_t sx = clipped_x0 < clipped_x1 ? 1 : -1;
+    const int64_t dy = clipped_y1 >= clipped_y0 ? clipped_y0 - clipped_y1 : clipped_y1 - clipped_y0;
+    const int64_t sy = clipped_y0 < clipped_y1 ? 1 : -1;
+    int64_t error    = dx + dy;
+    for (;;) {
+        if (tabos_graphics_pixel(graphics, (int32_t) clipped_x0, (int32_t) clipped_y0, color) != 0) {
+            return -1;
+        }
+        if (clipped_x0 == clipped_x1 && clipped_y0 == clipped_y1) {
+            return 0;
+        }
+        const int64_t twice_error = error * 2;
+        if (twice_error >= dy) {
+            error      += dy;
+            clipped_x0 += sx;
+        }
+        if (twice_error <= dx) {
+            error      += dx;
+            clipped_y0 += sy;
+        }
+    }
+}
+
+static int horizontal_edge(tabos_graphics_t* graphics, int64_t left, int64_t right, int64_t y, tabos_color_t color)
+{
+    if (y < 0 || y >= (int64_t) graphics->height || right < 0 || left >= (int64_t) graphics->width) {
+        return 0;
+    }
+    if (left < 0) {
+        left = 0;
+    }
+    if (right >= (int64_t) graphics->width) {
+        right = (int64_t) graphics->width - 1;
+    }
+    return tabos_graphics_fill_rect(graphics, (int32_t) left, (int32_t) y, (uint32_t) (right - left + 1), 1U, color);
+}
+
+static int vertical_edge(tabos_graphics_t* graphics, int64_t x, int64_t top, int64_t bottom, tabos_color_t color)
+{
+    if (x < 0 || x >= (int64_t) graphics->width || bottom < 0 || top >= (int64_t) graphics->height) {
+        return 0;
+    }
+    if (top < 0) {
+        top = 0;
+    }
+    if (bottom >= (int64_t) graphics->height) {
+        bottom = (int64_t) graphics->height - 1;
+    }
+    return tabos_graphics_fill_rect(graphics, (int32_t) x, (int32_t) top, 1U, (uint32_t) (bottom - top + 1), color);
 }
 
 int tabos_graphics_rect(tabos_graphics_t* graphics, int32_t x, int32_t y, uint32_t width, uint32_t height,
@@ -212,10 +345,18 @@ int tabos_graphics_rect(tabos_graphics_t* graphics, int32_t x, int32_t y, uint32
     if (width == 0U || height == 0U) {
         return 0;
     }
-    if (tabos_graphics_fill_rect(graphics, x, y, width, 1U, color) != 0 ||
-        tabos_graphics_fill_rect(graphics, x, y + (int32_t) height - 1, width, 1U, color) != 0 ||
-        tabos_graphics_fill_rect(graphics, x, y, 1U, height, color) != 0 ||
-        tabos_graphics_fill_rect(graphics, x + (int32_t) width - 1, y, 1U, height, color) != 0) {
+    if (!valid(graphics)) {
+        errno = EINVAL;
+        return -1;
+    }
+    const int64_t left   = x;
+    const int64_t top    = y;
+    const int64_t right  = left + width - 1U;
+    const int64_t bottom = top + height - 1U;
+    if (horizontal_edge(graphics, left, right, top, color) != 0 ||
+        horizontal_edge(graphics, left, right, bottom, color) != 0 ||
+        vertical_edge(graphics, left, top, bottom, color) != 0 ||
+        vertical_edge(graphics, right, top, bottom, color) != 0) {
         return -1;
     }
     return 0;
