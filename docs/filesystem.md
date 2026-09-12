@@ -85,7 +85,9 @@ same system-wide open-file capacity. It defaults to 32 and can be changed throug
 The corresponding `TABOS_FILESYSTEM_MAX_DIRECTORIES` setting controls the
 system-wide open-directory table on every target and defaults to 8. Each loaded
 application also has a separate eight-entry `DIR*` wrapper pool; this per-process SDK
-limit is independent of the shared kernel capacity.
+limit is independent of the shared kernel capacity. Failed directory opens release their
+wrapper entry immediately. A loaded application whose runtime does not provide the
+directory-listing ABI gate receives `ENOSYS` without consuming an entry.
 
 Disk format is FAT filesystem supported by Tab5 BSP. `A:` is unavailable until internal
 flash filesystem is implemented, then appears separately in boot diagnostics. Live

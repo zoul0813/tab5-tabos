@@ -721,6 +721,8 @@ but is not a substitute for this execution path.
 
 ## Maintenance and Technical Debt
 
+- [x] Release provisional POSIX `DIR*` wrapper entries after failed opens in both
+  application and non-application builds, including unavailable listing gates.
 - [x] Centralize Tab5 GPIO ISR-service ownership; touch attaches directly with checked
   errors instead of invoking component global installation. Failure/retry and shared
   consumer lifetime regression passes; physical boot verification remains above.

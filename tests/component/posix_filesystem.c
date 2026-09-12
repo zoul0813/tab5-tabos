@@ -10,7 +10,15 @@
 
 int main(void)
 {
-    if (!filesystem_init() || mkdir("/portable", 0755U) != 0) {
+    if (!filesystem_init()) {
+        return 1;
+    }
+    for (size_t attempt = 0U; attempt < 16U; ++attempt) {
+        if (opendir("/missing") != NULL || errno != ENOENT) {
+            return 1;
+        }
+    }
+    if (mkdir("/portable", 0755U) != 0) {
         return 1;
     }
     const int descriptor         = open("/portable/example.txt", O_CREAT | O_RDWR | O_TRUNC, 0644U);
