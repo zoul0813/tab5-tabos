@@ -113,6 +113,27 @@ static void socket_continuations(void)
 static SSL_CTX* server_context;
 static atomic_bool release_server;
 static atomic_bool server_ready;
+static atomic_bool reject_verified_connection;
+static atomic_int trust_store_failures;
+static atomic_uint trust_store_calls;
+
+int tabos_test_tls_set_default_verify_paths(SSL_CTX* context)
+{
+    atomic_fetch_add(&trust_store_calls, 1U);
+    if (atomic_load(&trust_store_failures) > 0) {
+        atomic_fetch_sub(&trust_store_failures, 1);
+        return 0;
+    }
+    return SSL_CTX_set_default_verify_paths(context);
+}
+
+long tabos_test_tls_get_verify_result(const SSL* native)
+{
+    if (atomic_load(&reject_verified_connection)) {
+        return X509_V_ERR_CERT_REJECTED;
+    }
+    return SSL_get_verify_result(native);
+}
 
 static void* tls_server(void* argument)
 {
@@ -121,6 +142,11 @@ static void* tls_server(void* argument)
     SSL* ssl = SSL_new(server_context);
     check(ssl != NULL && SSL_set_fd(ssl, fd) == 1 && SSL_accept(ssl) == 1, "TLS server handshake");
     atomic_store(&server_ready, true);
+    if (atomic_load(&reject_verified_connection)) {
+        SSL_free(ssl);
+        close(fd);
+        return NULL;
+    }
     while (!atomic_load(&release_server)) {
         pause_briefly();
     }
@@ -130,6 +156,21 @@ static void* tls_server(void* argument)
     SSL_free(ssl);
     close(fd);
     return NULL;
+}
+
+static int tls_connect_complete(const char* hostname, uint16_t port)
+{
+    host_io_scope_t scope = {0};
+    const uint64_t start  = now_ms();
+    int connection;
+    do {
+        host_io_enter(&scope);
+        connection = platform_tls_connect(hostname, port);
+        host_io_leave();
+        pause_briefly();
+    } while (scope.pending && now_ms() - start < 5000U);
+    check(!scope.pending, "TLS worker completes before timeout");
+    return connection;
 }
 
 static void tls_continuations(void)
@@ -167,24 +208,35 @@ static void tls_continuations(void)
           "TLS server identity");
     X509_free(certificate);
     EVP_PKEY_free(key);
+
+    atomic_store(&trust_store_failures, 2);
+    check(tls_connect_complete("localhost", 443U) == -TABOS_EIO, "first trust-store failure closes context");
+    check(tls_connect_complete("localhost", 443U) == -TABOS_EIO, "repeated trust-store failure retries setup");
+    check(atomic_load(&trust_store_calls) == 2U, "failed trust store is not retained");
+
     uint16_t port;
-    const int server = listener(&port);
+    int server = listener(&port);
     pthread_t thread;
+    atomic_store(&server_ready, false);
+    atomic_store(&reject_verified_connection, true);
     check(pthread_create(&thread, NULL, tls_server, (void*) &server) == 0, "start TLS peer");
-    host_io_scope_t scope = {0};
-    const uint64_t start  = now_ms();
-    int connection;
-    do {
-        host_io_enter(&scope);
-        connection = platform_tls_connect("localhost", port);
-        host_io_leave();
-        pause_briefly();
-    } while (scope.pending && now_ms() - start < 5000U);
+    check(tls_connect_complete("localhost", port) == -TABOS_EIO, "verification result rejects connection");
+    pthread_join(thread, NULL);
+    close(server);
+
+    server = listener(&port);
+    atomic_store(&server_ready, false);
+    atomic_store(&release_server, false);
+    atomic_store(&reject_verified_connection, false);
+    check(pthread_create(&thread, NULL, tls_server, (void*) &server) == 0, "restart TLS peer");
+    const int connection = tls_connect_complete("localhost", port);
     check(connection > 0, "TLS worker completes verified connection");
     while (!atomic_load(&server_ready)) {
         pause_briefly();
     }
     char byte = 0;
+    host_io_scope_t scope = {0};
+    const uint64_t start  = now_ms();
     host_io_enter(&scope);
     check(platform_tls_receive(connection, &byte, 1U) == -TABOS_EAGAIN && scope.pending, "TLS read suspends");
     host_io_leave();

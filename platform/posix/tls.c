@@ -275,6 +275,29 @@ typedef struct {
         SSL* native;
 } host_tls_connect_t;
 
+#if defined(TABOS_TEST_TLS_HOOKS)
+extern int tabos_test_tls_set_default_verify_paths(SSL_CTX* context);
+extern long tabos_test_tls_get_verify_result(const SSL* native);
+#endif
+
+static int tls_set_default_verify_paths(SSL_CTX* context)
+{
+#if defined(TABOS_TEST_TLS_HOOKS)
+    return tabos_test_tls_set_default_verify_paths(context);
+#else
+    return SSL_CTX_set_default_verify_paths(context);
+#endif
+}
+
+static long tls_get_verify_result(const SSL* native)
+{
+#if defined(TABOS_TEST_TLS_HOOKS)
+    return tabos_test_tls_get_verify_result(native);
+#else
+    return SSL_get_verify_result(native);
+#endif
+}
+
 static uint64_t tls_monotonic_ms(void)
 {
     struct timespec now;
@@ -289,7 +312,7 @@ static void host_tls_connect_work(void* data)
     if (context == NULL) {
         return;
     }
-    if (SSL_CTX_set_default_verify_paths(context) != 1) {
+    if (tls_set_default_verify_paths(context) != 1) {
         SSL_CTX_free(context);
         return;
     }
@@ -313,7 +336,7 @@ static void host_tls_connect_work(void* data)
     const uint64_t deadline = tls_monotonic_ms() + 10000U;
     for (;;) {
         if (BIO_do_connect(transport) > 0) {
-            if (SSL_get_verify_result(native) == X509_V_OK) {
+            if (tls_get_verify_result(native) == X509_V_OK) {
                 request->transport = transport;
                 request->native    = native;
                 return;

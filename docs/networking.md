@@ -153,7 +153,8 @@ socket coverage remains independent of Wi-Fi state.
 connection is process-owned, uses the system CA store on host builds and the
 ESP-IDF certificate bundle on Tab5, verifies both the certificate chain and the
 requested hostname, and is cleaned up when its application exits. It supports
-up to four bounded connections.
+up to four bounded connections. Host trust-store setup is fail-closed and retried
+with a fresh TLS context on every connection attempt after a setup failure.
 
 `tabos_tls_connect()`, `tabos_tls_send()`, `tabos_tls_receive()`, and
 `tabos_tls_close()` use the same `errno` convention as sockets. Send and receive
