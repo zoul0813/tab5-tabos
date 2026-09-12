@@ -130,6 +130,8 @@ expect_links(5 "application Makefile change")
 
 run_build("TABOS_APP_HEAP_BYTES=524288")
 expect_links(6 "heap setting change")
+execute_process(COMMAND "${CMAKE_COMMAND}" -E sleep 1)
+execute_process(COMMAND "${CMAKE_COMMAND}" -E touch_nocreate "${TABOS_TEST_DIR}/build/.tabos-build-config")
 run_build("TABOS_APP_HEAP_BYTES=524288")
 expect_links(6 "unchanged heap setting")
 run_build("TABOS_APP_HEAP_BYTES=524288" "TABOS_APP_STACK_BYTES=32768")

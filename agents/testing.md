@@ -246,8 +246,9 @@ checks disposal and normal delivery. `component.host_network_io` exercises suspe
 TCP accept/connect/receive, explicit EAGAIN, DNS, verified TLS connection setup and
 TLS read/write against an ephemeral local CA/server. It injects repeated trust-store
 initialization failures and a rejected final verification result, proving each attempt
-uses a newly configured context and never publishes a rejected connection. These tests
-use host sanitizers; loopback tests need permission to bind local ports. Closed-peer
+uses a newly configured context and never publishes a rejected connection. Host TLS
+initialization suppresses process-wide `SIGPIPE` before OpenSSL performs socket I/O. These
+tests use host sanitizers; loopback tests need permission to bind local ports. Closed-peer
 socket coverage runs in a subprocess with the default SIGPIPE action and requires repeated
 sends to return errors without terminating the process.
 
@@ -1816,7 +1817,8 @@ Delete, Left/Right, Home/End, history with draft restoration, long horizontal in
 Escape preserving input, the version banner, Ctrl-C/Ctrl-D exit from entered text,
 loops/coroutines/console reads, and Ctrl-U cancellation during continuation; terminal cells and restored
 parent status are checked. Ordinary CTest remains independent of application builds.
-Shared build tracking now checks `TABOS_LDLIBS` invalidation. Naming lint excludes the
+Shared build tracking checks `TABOS_LDLIBS` invalidation and verifies that an unchanged
+configuration does not relink even when its stamp has a newer timestamp. Naming lint excludes the
 pinned upstream Lua tree (which owns `tab_funcs`); local adapters remain checked.
 
 macOS Debug/Release and Tab5 Debug/Release builds passed. Linux builds/tests excluded

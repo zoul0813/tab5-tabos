@@ -90,6 +90,8 @@ $(TABOS_BUILD_CONFIG): tabos-force-build-config
 		'TABOS_BUILD_PREREQUISITES=$(TABOS_BUILD_PREREQUISITES)' > "$@.tmp"
 	@if [ -f "$@" ] && cmp -s "$@.tmp" "$@"; then \
 		rm -f "$@.tmp"; \
+		if [ -f "$(TABOS_DEPENDENCY_FILE)" ]; then touch -r "$(TABOS_DEPENDENCY_FILE)" "$@"; \
+		elif [ -f "$(UNSTRIPPED)" ]; then touch -r "$(UNSTRIPPED)" "$@"; fi; \
 	else \
 		mv "$@.tmp" "$@"; \
 		rm -f $(TABOS_CONFIG_INVALIDATES); \

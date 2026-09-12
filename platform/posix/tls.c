@@ -12,6 +12,7 @@
 #include <limits.h>
 #include <openssl/ssl.h>
 #include <poll.h>
+#include <signal.h>
 #include <time.h>
 #include "host_io.h"
 #endif
@@ -254,7 +255,7 @@ void platform_tls_operations_cancel(void)
 
 bool platform_tls_operations_init(void)
 {
-    return true;
+    return signal(SIGPIPE, SIG_IGN) != SIG_ERR;
 }
 
 void platform_tls_operations_shutdown(void)
@@ -366,6 +367,9 @@ int platform_tls_connect(const char* hostname, uint16_t port)
     if (hostname == NULL || hostname[0] == '\0' || port == 0U ||
         strnlen(hostname, TLS_HOSTNAME_MAX + 1U) > TLS_HOSTNAME_MAX) {
         return -TABOS_EINVAL;
+    }
+    if (!platform_tls_operations_init()) {
+        return tls_error();
     }
     host_tls_connect_t request = {.port = port};
     (void) snprintf(request.hostname, sizeof(request.hostname), "%s", hostname);
