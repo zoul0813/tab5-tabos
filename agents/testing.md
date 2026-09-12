@@ -1715,6 +1715,13 @@ then opens a real directory. Application-mode coverage must verify a missing run
 directory-listing gate returns `ENOSYS`, releases the provisional wrapper entry, and
 allows a later gate-backed open.
 
+The native production-source `fetch` regression runs with ASan/UBSan. It must exercise
+every first-read split through the HTTP header terminator, a header that fills the
+bounded accumulator without a terminator, successful length and close framing, error
+and redirect statuses, unsupported transfer coding, truncated advertised bodies, and
+receive, close, and rename failures. Failure cases must preserve an existing destination;
+close and rename injection must prove the output stream is closed exactly once.
+
 A developer working on the shell, filesystem, graphics model, UI, utilities, or application APIs should normally be able to work on a Mac or Linux machine without having the physical Tab5 attached.
 
 The real Tab5 remains the final source of truth for hardware behavior.

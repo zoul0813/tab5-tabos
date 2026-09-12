@@ -458,6 +458,12 @@
   Add RV32 SDL/input/shutdown, forced teardown, socket, and local TLS regressions.
 - [x] Resolve AUD-017: keep host TLS contexts attempt-local, free failed trust-store
   initialization, and reject connections whose final certificate result is not valid.
+- [x] Resolve AUD-018: give `fetch` output streams single-close ownership across close
+  and rename failures, with sanitizer-backed injected finalization regressions.
+- [x] Resolve AUD-019: accumulate bounded HTTP headers across TLS reads and preserve
+  body bytes received with the terminator, validating every first-read split point.
+- [x] Resolve AUD-020: require a 2xx response and valid supported body framing before
+  committing a download; preserve existing destinations on errors and truncation.
 - [x] Report illegal instructions and invalid guest memory accesses without crashing host.
 - [ ] Add optional instruction/register tracing for application debugging.
 - [ ] Evaluate GDB remote debugging after basic interpreter execution is stable.

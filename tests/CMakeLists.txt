@@ -843,6 +843,15 @@ tabos_enable_warnings(tabos_coreutils_wc)
 tabos_enable_sanitizers(tabos_coreutils_wc)
 add_test(NAME unit.coreutils_wc COMMAND tabos_coreutils_wc)
 
+add_executable(tabos_netutils_fetch unit/netutils_fetch.c)
+target_include_directories(tabos_netutils_fetch PRIVATE
+    "${TABOS_ROOT}"
+    "${TABOS_ROOT}/sdk/include"
+)
+tabos_enable_warnings(tabos_netutils_fetch)
+tabos_enable_sanitizers(tabos_netutils_fetch)
+add_test(NAME unit.netutils_fetch COMMAND tabos_netutils_fetch)
+
 add_test(NAME integration.host_smoke COMMAND tabos_host --smoke)
 set_tests_properties(integration.host_smoke PROPERTIES
     ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy"
