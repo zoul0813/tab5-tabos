@@ -209,6 +209,8 @@
 - [x] Preserve host invalid-memory fault containment and PID 0 panic behavior.
 - [x] Resolve AUD-009: revoke fullscreen graphics ownership and present a plain terminal
   panic surface for every retained process-0 failure path.
+- [x] Resolve AUD-010: serialize runtime terminal resize with console access and suppress
+  retained-terminal presentation while fullscreen graphics owns the framebuffer.
 - [x] Document that native Tab5 application faults remain device-fatal until a
   user-mode/PMP execution boundary and recoverable trap path are implemented.
 - [ ] Design and implement the Tab5 user-mode/PMP boundary and recoverable native-fault path.

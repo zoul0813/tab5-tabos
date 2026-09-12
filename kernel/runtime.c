@@ -631,12 +631,12 @@ bool tabos_terminal_set_scale(unsigned int scale)
         return true;
     }
 
-    if (!terminal_resize(&terminal, display_framebuffer(), scale)) {
+    const console_resize_result_t result = console_resize(display_framebuffer(), scale);
+    if (result == CONSOLE_RESIZE_FAILED) {
         return false;
     }
     terminal_scale = scale;
-    console_rebind(&terminal);
-    return display_present();
+    return result == CONSOLE_RESIZE_OK;
 }
 
 unsigned int tabos_terminal_get_scale(void)

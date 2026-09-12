@@ -60,12 +60,13 @@ void platform_raster_diagnostics(void)
 }
 
 #include <stddef.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 struct platform_mutex {
-        unsigned int unused;
+        atomic_flag locked;
 };
 
 static platform_pixel_t pixels[TABOS_DISPLAY_WIDTH * TABOS_DISPLAY_HEIGHT];
@@ -963,7 +964,11 @@ void test_platform_camera_error(int error)
 
 platform_mutex_t* platform_mutex_create(void)
 {
-    return calloc(1U, sizeof(platform_mutex_t));
+    platform_mutex_t* mutex = calloc(1U, sizeof(*mutex));
+    if (mutex != NULL) {
+        atomic_flag_clear_explicit(&mutex->locked, memory_order_release);
+    }
+    return mutex;
 }
 
 void platform_mutex_destroy(platform_mutex_t* mutex)
@@ -973,12 +978,16 @@ void platform_mutex_destroy(platform_mutex_t* mutex)
 
 void platform_mutex_lock(platform_mutex_t* mutex)
 {
-    (void) mutex;
+    if (mutex != NULL) {
+        while (atomic_flag_test_and_set_explicit(&mutex->locked, memory_order_acquire)) {}
+    }
 }
 
 void platform_mutex_unlock(platform_mutex_t* mutex)
 {
-    (void) mutex;
+    if (mutex != NULL) {
+        atomic_flag_clear_explicit(&mutex->locked, memory_order_release);
+    }
 }
 
 struct platform_signal {

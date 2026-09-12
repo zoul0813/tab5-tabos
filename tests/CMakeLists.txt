@@ -9,6 +9,7 @@ add_executable(tabos_core_smoke unit/core_smoke.c ${TABOS_TEST_PLATFORM_FAKES})
 # Tests keep assertions enabled, but the linked runtime retains its build mode.
 target_compile_definitions(tabos_core_smoke PRIVATE TABOS_TEST_RUNTIME_DIAGNOSTICS=$<CONFIG:Debug>)
 target_include_directories(tabos_core_smoke PRIVATE
+    "${TABOS_ROOT}/console/include"
     "${TABOS_ROOT}/graphics/include"
     "${TABOS_ROOT}/input/include"
     "${TABOS_ROOT}/kernel/include"
@@ -333,7 +334,7 @@ target_include_directories(tabos_console_service PRIVATE
     "${CMAKE_CURRENT_LIST_DIR}/fakes"
     "${TABOS_GENERATED_INCLUDE_DIR}"
 )
-target_link_libraries(tabos_console_service PRIVATE tabos_core)
+target_link_libraries(tabos_console_service PRIVATE tabos_core Threads::Threads)
 tabos_enable_warnings(tabos_console_service)
 tabos_enable_sanitizers(tabos_console_service)
 
