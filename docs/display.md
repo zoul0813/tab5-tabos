@@ -47,6 +47,12 @@ At boot, the platform detects and reports the installed display controller over 
 
 TabOS keeps its shared logical orientation at 1280×720. Before presenting, the Tab5 backend rotates that frame counter-clockwise into the panel's native 720×1280 layout, sends it to the LCD, and then enables the backlight at 75% brightness. The pure rotation operation is covered by a host unit test.
 
+Fullscreen graphics use native portrait double buffers. Battery and WiFi overlays are
+mapped into the active native back buffer before VSYNC submission while retaining the
+covered application pixels independently for both scanout buffers. Overlay changes and
+disablement therefore reveal the original application frame instead of terminal pixels
+or pixels left by an earlier overlay.
+
 The BSP integration deliberately excludes LVGL. UI composition remains owned by TabOS and will be designed separately.
 
 ## Validation

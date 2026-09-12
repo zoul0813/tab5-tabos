@@ -164,6 +164,9 @@ static bool present_with_overlay(bool graphics)
         (overlay_network.state == NETWORK_STATE_ONLINE || overlay_network.state == NETWORK_STATE_STARTING ||
          overlay_network.state == NETWORK_STATE_CONNECTING);
     if (!battery_visible && !wifi_visible) {
+        if (graphics && !platform_graphics_overlay(&framebuffer, NULL)) {
+            return false;
+        }
         return graphics ? platform_graphics_present(&framebuffer) : platform_display_present(&framebuffer);
     }
     const int left = (int) framebuffer.width - OVERLAY_MARGIN - OVERLAY_WIDTH;
@@ -194,7 +197,16 @@ static bool present_with_overlay(bool graphics)
             overlay_network.state == NETWORK_STATE_ONLINE ? white : TABOS_RGB565(112, 112, 112);
         (void) draw_wifi(x, top + 3, color);
     }
-    const bool result = graphics ? platform_graphics_present(&framebuffer) : platform_display_present(&framebuffer);
+    const platform_graphics_overlay_t overlay = {
+        .background = overlay_saved,
+        .x          = left,
+        .y          = top,
+        .width      = OVERLAY_WIDTH,
+        .height     = OVERLAY_HEIGHT,
+    };
+    const bool overlay_result = !graphics || platform_graphics_overlay(&framebuffer, &overlay);
+    const bool result =
+        overlay_result && (graphics ? platform_graphics_present(&framebuffer) : platform_display_present(&framebuffer));
     for (int row = 0; row < OVERLAY_HEIGHT; ++row) {
         memcpy(framebuffer.pixels + (size_t) (top + row) * framebuffer.stride_pixels + (size_t) left,
                overlay_saved + row * OVERLAY_WIDTH, sizeof(platform_pixel_t) * OVERLAY_WIDTH);

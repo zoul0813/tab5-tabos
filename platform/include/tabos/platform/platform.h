@@ -159,6 +159,14 @@ typedef struct {
 } platform_framebuffer_t;
 
 typedef struct {
+        const platform_pixel_t* background;
+        int32_t x;
+        int32_t y;
+        uint32_t width;
+        uint32_t height;
+} platform_graphics_overlay_t;
+
+typedef struct {
         const char* device_name;
         unsigned int cpu_cores;
         unsigned int cpu_frequency_mhz;
@@ -282,6 +290,7 @@ int platform_tls_receive(int connection, void* data, uint32_t capacity);
 uint32_t platform_graphics_capabilities(void);
 bool platform_graphics_begin(void);
 void platform_graphics_end(void);
+bool platform_graphics_overlay(platform_framebuffer_t* framebuffer, const platform_graphics_overlay_t* overlay);
 bool platform_graphics_present(platform_framebuffer_t* framebuffer);
 bool platform_graphics_fill(platform_framebuffer_t* framebuffer, int32_t x, int32_t y, uint32_t width, uint32_t height,
                             platform_pixel_t color);
