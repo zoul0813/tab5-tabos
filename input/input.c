@@ -31,6 +31,14 @@ static bool modifier_key(tabos_key_t key)
     return key >= TABOS_KEY_CTRL && key <= TABOS_KEY_SYM;
 }
 
+static void refresh_held_repeat(uint8_t modifiers)
+{
+    held_modifiers      = modifiers;
+    held_text_modifiers = modifiers;
+    held_text[0]        = '\0';
+    (void) input_text_from_hid((uint8_t) held_key, modifiers, held_text, sizeof(held_text));
+}
+
 static bool lock_queue(void)
 {
     if (queue_mutex == NULL) {
@@ -113,7 +121,7 @@ bool input_submit(const tabos_input_event_t* event)
         return false;
     }
     if (event->type == TABOS_INPUT_KEY_DOWN || event->type == TABOS_INPUT_KEY_UP) {
-        const bool down = event->type == TABOS_INPUT_KEY_DOWN;
+        const bool down        = event->type == TABOS_INPUT_KEY_DOWN;
         power_activity_pending = true;
         if (event->key > TABOS_KEY_UNKNOWN && event->key <= TABOS_KEY_SYM) {
             if (power_keys[(size_t) event->key] != down) {
@@ -142,6 +150,9 @@ bool input_submit(const tabos_input_event_t* event)
         held_text[0]        = '\0';
         held_text_modifiers = 0U;
         tabos_timer_cancel(&repeat_timer);
+    } else if ((event->type == TABOS_INPUT_KEY_DOWN || event->type == TABOS_INPUT_KEY_UP) && modifier_key(event->key) &&
+               held_key != TABOS_KEY_UNKNOWN) {
+        refresh_held_repeat(event->modifiers);
     } else if (event->type == TABOS_INPUT_TEXT && held_key != TABOS_KEY_UNKNOWN) {
         (void) strncpy(held_text, event->text, sizeof(held_text) - 1U);
         held_text[sizeof(held_text) - 1U] = '\0';

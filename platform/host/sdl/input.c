@@ -155,6 +155,7 @@ static void dispatch_event(const SDL_Event* event)
             tabos_input_event_t text_event = {
                 .type      = TABOS_INPUT_TEXT,
                 .modifiers = cooked_modifiers,
+                .repeat    = event->key.repeat,
             };
             if (input_text_from_hid((uint8_t) cooked_key, cooked_modifiers, text_event.text, sizeof(text_event.text)) >
                 0U) {
