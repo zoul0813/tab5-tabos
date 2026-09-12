@@ -34,7 +34,8 @@ typedef struct {
         uint8_t data[1024];
 } tls_response_t;
 
-static atomic_bool tls_cancel_requested;
+#include "../../platform/posix/native_cancel.h"
+static native_cancel_t tls_cancellation;
 static uint64_t milliseconds;
 static unsigned int cancel_after;
 static unsigned int delays;
@@ -52,7 +53,7 @@ static void vTaskDelay(unsigned int ticks)
     (void) ticks;
     milliseconds += 10U;
     if (++delays == cancel_after) {
-        atomic_store(&tls_cancel_requested, true);
+        native_cancel_request(&tls_cancellation, NULL);
     }
 }
 
@@ -106,7 +107,7 @@ static void reset(void)
     milliseconds = 0U;
     cancel_after = 2U;
     delays       = 0U;
-    atomic_store(&tls_cancel_requested, false);
+    native_cancel_begin(&tls_cancellation, NULL);
 }
 
 int main(void)

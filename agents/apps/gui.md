@@ -238,3 +238,19 @@ tasks. macOS filesystem tests now link the real SDL mutex; four threads each per
 Eight filesystem/process/boundary tests pass under ASan/UBSan; macOS Debug builds.
 The native service audit remains open for network cancellation ownership.
 Tab5 Debug build passes with 4,048 app-partition bytes free.
+
+### Native Cancellation Audit
+
+Native DNS/echo, socket and TLS worker requests publish their caller identity;
+process stop cancels only that owner. Worker mutex waiters check their own stop
+state, so stopping a queued caller does not interrupt another owner. Native socket
+cleanup relies on joined synchronous requests and no longer takes an unrelated
+workers mutex. TLS cleanup may still wait for another bounded TLS operation;
+physical contention/latency acceptance remains open. PID 0 panic now stops and
+reclaims background descendants while retaining the panicked root.
+
+Ten targeted process/native/network/boundary tests pass; eight focused panic and
+cancellation tests also pass after root cleanup changes. Native socket-loop tests
+verify foreign cancellation leaves accept/receive/infinite wait running, matching
+owner cancellation stops them, and late cancellation cannot affect the next owner.
+macOS Debug and Tab5 Debug builds pass. No simulator, Linux or flashing was used.

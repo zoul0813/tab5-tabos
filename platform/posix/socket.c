@@ -450,17 +450,14 @@ void platform_network_socket_interrupt(int socket)
 
 bool platform_network_socket_operations_suspend(void)
 {
-    if (!socket_worker_init()) {
-        return false;
-    }
-    return xSemaphoreTake(socket_mutex, portMAX_DELAY) == pdTRUE;
+    /* Native requests are synchronous and their caller has already stopped.
+     * No worker can still borrow this owner's socket. Other owners may remain
+     * blocked in unrelated operations; cleanup must not wait for their mutex. */
+    return true;
 }
 
 void platform_network_socket_operations_resume(void)
 {
-    if (socket_mutex != NULL) {
-        (void) xSemaphoreGive(socket_mutex);
-    }
 }
 
 void platform_network_socket_dispose(int socket)
@@ -474,11 +471,12 @@ static int submit_socket_request(const socket_request_t* request, socket_respons
         ESP_LOGE("tabos_socket", "worker initialization failed for operation %u", (unsigned int) request->operation);
         return -TABOS_EIO;
     }
-    if (xSemaphoreTake(socket_mutex, portMAX_DELAY) != pdTRUE) {
-        ESP_LOGE("tabos_socket", "worker mutex failed for operation %u", (unsigned int) request->operation);
-        return -TABOS_EIO;
+    while (xSemaphoreTake(socket_mutex, 1U) != pdTRUE) {
+        if (platform_riscv32_current_cancelled()) {
+            return -TABOS_ECANCELED;
+        }
     }
-    atomic_store_explicit(&socket_cancel_requested, false, memory_order_release);
+    native_cancel_begin(&socket_cancellation, platform_riscv32_current_user_data());
     if (platform_riscv32_current_cancelled() && request->operation != SOCKET_OPERATION_CLOSE) {
         (void) xSemaphoreGive(socket_mutex);
         return -TABOS_ECANCELED;
@@ -494,8 +492,9 @@ static int submit_socket_request(const socket_request_t* request, socket_respons
     return response->result;
 }
 #else
-void platform_network_socket_operations_cancel(void)
+void platform_network_socket_operations_cancel(const void* owner)
 {
+    (void) owner;
 }
 
 bool platform_network_socket_operations_init(void)

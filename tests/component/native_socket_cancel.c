@@ -40,7 +40,9 @@ static void* run_request(void* argument)
 
 static void cancel_request(socket_request_t request)
 {
-    atomic_store(&socket_cancel_requested, false);
+    int owner = 0;
+    int other = 0;
+    native_cancel_begin(&socket_cancellation, &owner);
     atomic_store(&completed, false);
     pending_request = request;
     pthread_t thread;
@@ -50,7 +52,12 @@ static void cancel_request(socket_request_t request)
         vTaskDelay(1U);
     }
     assert(!atomic_load(&completed));
-    platform_network_socket_operations_cancel();
+    platform_network_socket_operations_cancel(&other);
+    for (unsigned int index = 0U; index < 20U; ++index) {
+        vTaskDelay(1U);
+    }
+    assert(!atomic_load(&completed));
+    platform_network_socket_operations_cancel(&owner);
     pthread_join(thread, NULL);
     assert(pending_response.result == -TABOS_ECANCELED);
     assert(platform_time_ms() - started < 500U);
@@ -58,6 +65,14 @@ static void cancel_request(socket_request_t request)
 
 int main(void)
 {
+    int owner = 0;
+    int next  = 0;
+    native_cancel_begin(&socket_cancellation, &owner);
+    platform_network_socket_operations_cancel(&owner);
+    assert(native_cancel_pending(&socket_cancellation));
+    native_cancel_begin(&socket_cancellation, &next);
+    platform_network_socket_operations_cancel(&owner);
+    assert(!native_cancel_pending(&socket_cancellation));
     assert(platform_network_socket_operations_init());
     for (unsigned int round = 0U; round < 5U; ++round) {
         const int listener         = socket(AF_INET, SOCK_STREAM, 0);
@@ -74,14 +89,14 @@ int main(void)
                                            .wait_items = {{.socket = datagram, .events = TABOS_WAIT_READABLE}}});
         assert((fcntl(listener, F_GETFL, 0) & O_NONBLOCK) == 0);
         assert((fcntl(datagram, F_GETFL, 0) & O_NONBLOCK) == 0);
-        atomic_store(&socket_cancel_requested, false);
+        native_cancel_begin(&socket_cancellation, NULL);
         const socket_request_t poll = {.operation  = SOCKET_OPERATION_WAIT,
                                        .wait_count = 1U,
                                        .wait_items = {{.socket = datagram, .events = TABOS_WAIT_READABLE}}};
         socket_response_t response;
         execute_cancellable_socket_request(&poll, &response);
         assert(response.result == 0); /* No stale cancellation/reply reaches next request. */
-        platform_network_socket_operations_cancel();
+        platform_network_socket_operations_cancel(NULL);
         const socket_request_t cleanup = {.operation = SOCKET_OPERATION_CLOSE, .socket = datagram};
         execute_cancellable_socket_request(&cleanup, &response);
         assert(response.result == 0); /* Gate error cleanup must still release handles. */

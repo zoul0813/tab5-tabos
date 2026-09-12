@@ -1624,3 +1624,8 @@ Filesystem descriptor tables and storage operations serialize through the platfo
 mutex, allowing a waiting native app to yield while another task holds storage I/O.
 Filesystem initialization/shutdown occur outside the application-task lifetime;
 loader-owned CWD and descriptor maps stay per process, with thread-local errors.
+
+Native network-worker cancellation is scoped to the stopped application identity.
+Worker mutex acquisition yields and checks caller cancellation. Synchronous request
+completion precedes native owner cleanup; unrelated socket workers stay active.
+PID 0 panic stops background descendants before presenting the retained root panic.

@@ -1164,14 +1164,17 @@ bool platform_riscv32_current_cancelled(void)
     return false;
 }
 
-void platform_network_operations_cancel(void)
+void platform_network_operations_cancel(const void* owner)
 {
+    (void) owner;
 }
-void platform_network_socket_operations_cancel(void)
+void platform_network_socket_operations_cancel(const void* owner)
 {
+    (void) owner;
 }
-void platform_tls_operations_cancel(void)
+void platform_tls_operations_cancel(const void* owner)
 {
+    (void) owner;
 }
 
 static unsigned int activity_reports;

@@ -2642,9 +2642,9 @@ static void elf_cancel_execution(void* user_data)
     loader_elf_application_t* application = user_data;
     atomic_store_explicit(&application->wait_cancel_requested, true, memory_order_release);
     input_wake_waiter();
-    platform_network_operations_cancel();
-    platform_network_socket_operations_cancel();
-    platform_tls_operations_cancel();
+    platform_network_operations_cancel(application);
+    platform_network_socket_operations_cancel(application);
+    platform_tls_operations_cancel(application);
 }
 
 static void elf_release_resources(loader_elf_application_t* application)

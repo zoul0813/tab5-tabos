@@ -55,6 +55,7 @@ typedef struct {
 
 static kernel_child_snapshot_t child_snapshots[KERNEL_PROCESS_CAPACITY];
 static platform_mutex_t* child_snapshot_mutex;
+static void destroy_descendants(tabos_process_id_t parent_id);
 
 static void publish_children(void)
 {
@@ -104,6 +105,7 @@ static const char* termination_name(tabos_process_termination_t cause)
 
 static void panic_root_process(kernel_process_t* process)
 {
+    destroy_descendants(0U);
     char message[96];
     process->state                  = TABOS_PROCESS_PANICKED;
     process->context.exit_requested = false;

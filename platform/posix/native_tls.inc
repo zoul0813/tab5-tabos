@@ -9,8 +9,7 @@ static int tls_connect_direct(const char* hostname, uint16_t port)
     esp_tls_t* native      = esp_tls_init();
     int connected          = 0;
     const uint64_t started = platform_time_ms();
-    while (native != NULL && !atomic_load_explicit(&tls_cancel_requested, memory_order_acquire) &&
-           platform_time_ms() - started < 10000U) {
+    while (native != NULL && !native_cancel_pending(&tls_cancellation) && platform_time_ms() - started < 10000U) {
         connected = esp_tls_conn_new_async(hostname, (int) strlen(hostname), (int) port, &configuration, native);
         if (connected != 0) {
             break;
@@ -33,7 +32,7 @@ static int tls_connect_direct(const char* hostname, uint16_t port)
 static int tls_transfer_direct(native_tls_t native, tls_request_t* request, tls_response_t* response)
 {
     const uint64_t started = platform_time_ms();
-    while (!atomic_load_explicit(&tls_cancel_requested, memory_order_acquire)) {
+    while (!native_cancel_pending(&tls_cancellation)) {
         if (platform_time_ms() - started >= 10000U) {
             return tls_error();
         }

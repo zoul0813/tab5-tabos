@@ -1,9 +1,10 @@
 /* Native worker operations must return through the calling gate before teardown. */
-static atomic_bool socket_cancel_requested;
+#include "native_cancel.h"
+static native_cancel_t socket_cancellation;
 
-void platform_network_socket_operations_cancel(void)
+void platform_network_socket_operations_cancel(const void* owner)
 {
-    atomic_store_explicit(&socket_cancel_requested, true, memory_order_release);
+    native_cancel_request(&socket_cancellation, owner);
 }
 
 static void execute_cancellable_socket_request(const socket_request_t* request, socket_response_t* response)
@@ -29,7 +30,7 @@ static void execute_cancellable_socket_request(const socket_request_t* request, 
     bool connecting        = false;
     const uint64_t started = platform_time_ms();
     for (;;) {
-        if (atomic_load_explicit(&socket_cancel_requested, memory_order_acquire)) {
+        if (native_cancel_pending(&socket_cancellation)) {
             response->result = -TABOS_ECANCELED;
             break;
         }

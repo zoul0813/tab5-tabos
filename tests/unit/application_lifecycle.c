@@ -130,8 +130,13 @@ static void test_concurrent_processes(void)
         assert(kernel_process_reap(concurrent_root, children[index], &status) == 1 && status == (int) index);
     }
     assert(tabos_process_count() == 1U);
+    assert(kernel_process_spawn_descriptor(concurrent_root, &concurrent_child_app, NULL, NULL, &rejected) ==
+           TABOS_APP_RESULT_OK);
+    assert(kernel_process_force_terminate(0U, 41));
+    kernel_application_system_update();
+    assert(tabos_process_system_panicked() && tabos_process_count() == 1U && concurrent_cleanups == 19U);
     kernel_application_system_shutdown();
-    assert(concurrent_cleanups == 18U);
+    assert(concurrent_cleanups == 19U);
 }
 
 static unsigned int entry_calls;
