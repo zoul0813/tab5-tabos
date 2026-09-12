@@ -53,7 +53,7 @@ Terminal retains visible rows plus `TABOS_TERMINAL_SCROLLBACK_LINES` history row
 
 Oldest history row is discarded when ring fills. Any new console output automatically returns viewport to live end. Scrollback keyboard handling is process-owned and opt-in rather than a global kernel shortcut. The shell enables it: Page Up or Ctrl+Up moves up, Page Down or Ctrl+Down moves down, Home or Ctrl+Left moves to oldest history, and End or Ctrl+Right returns to live output. A child inherits its parent's mode, may disable it for raw keyboard use, and cannot change the retained parent's mode.
 
-Changing terminal scale rebuilds geometry, reflows retained hard and soft-wrapped lines, preserves colors and cursor, and redraws current viewport. Console content no longer falls back to boot-only redraw after scale change.
+Changing terminal scale rebuilds geometry, reflows retained hard and soft-wrapped lines, preserves colors and cursor, and redraws current viewport. Resize is serialized with console output and cursor updates. While fullscreen graphics owns the framebuffer, resizing retains terminal rendering state without modifying or presenting the graphics surface; leaving fullscreen redraws the resized console.
 
 ## Input
 

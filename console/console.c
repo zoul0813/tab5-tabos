@@ -70,14 +70,23 @@ bool console_init(terminal_t* terminal)
     return true;
 }
 
-void console_rebind(terminal_t* terminal)
+console_resize_result_t console_resize(platform_framebuffer_t* framebuffer, unsigned int scale)
 {
+    if (console_mutex == NULL) {
+        return CONSOLE_RESIZE_FAILED;
+    }
+
     lock_console();
-    active_terminal = terminal;
+    if (active_terminal == NULL || !terminal_resize(active_terminal, framebuffer, scale)) {
+        unlock_console();
+        return CONSOLE_RESIZE_FAILED;
+    }
     if (foreground_token != 0U) {
         restart_cursor_blink();
     }
+    const bool presented = present_console();
     unlock_console();
+    return presented ? CONSOLE_RESIZE_OK : CONSOLE_RESIZE_PRESENT_FAILED;
 }
 
 bool console_write_panic(const char* text)

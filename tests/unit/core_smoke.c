@@ -1,4 +1,6 @@
 #include <tabos/internal/runtime.h>
+#include <tabos/internal/console.h>
+#include <tabos/internal/display.h>
 #include <tabos/internal/input.h>
 #include <tabos/internal/device_registry.h>
 #include <tabos/internal/hardware_devices.h>
@@ -221,6 +223,24 @@ int main(void)
     if (!tabos_terminal_set_scale(4U) || tabos_terminal_get_scale() != 4U) {
         return 1;
     }
+
+    console_set_graphics_active(true);
+    platform_framebuffer_t* framebuffer = display_framebuffer();
+    const size_t pixel_count            = framebuffer->stride_pixels * framebuffer->height;
+    for (size_t index = 0U; index < pixel_count; ++index) {
+        framebuffer->pixels[index] = 0x1234U;
+    }
+    const unsigned int presents_before_scale = test_platform_display_present_calls();
+    if (!tabos_terminal_set_scale(2U) || tabos_terminal_get_scale() != 2U || !console_graphics_active() ||
+        test_platform_display_present_calls() != presents_before_scale) {
+        return 1;
+    }
+    for (size_t index = 0U; index < pixel_count; ++index) {
+        if (framebuffer->pixels[index] != 0x1234U) {
+            return 1;
+        }
+    }
+    console_set_graphics_active(false);
 
     kernel_runtime_shutdown();
     return 0;
