@@ -98,6 +98,7 @@ static uint32_t fake_audio_route;
 static unsigned int fake_audio_route_calls;
 static platform_runtime_events_t fake_runtime_events;
 static uint64_t fake_runtime_wait_deadline;
+static unsigned int fake_display_present_calls;
 
 bool platform_display_init(platform_framebuffer_t* framebuffer)
 {
@@ -116,7 +117,13 @@ bool platform_display_init(platform_framebuffer_t* framebuffer)
 
 bool platform_display_present(const platform_framebuffer_t* framebuffer)
 {
+    ++fake_display_present_calls;
     return framebuffer != NULL && framebuffer->pixels == pixels;
+}
+
+unsigned int test_platform_display_present_calls(void)
+{
+    return fake_display_present_calls;
 }
 
 void platform_display_shutdown(void)

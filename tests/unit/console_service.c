@@ -93,9 +93,9 @@ int main(void)
     memcpy(graphics_snapshot, framebuffer->pixels, framebuffer_bytes);
     console_set_graphics_active(true);
     if (!console_graphics_active() || !tabos_console_write(&foreground, "graphics-hidden") ||
-        tabos_console_page_up(&foreground) ||
-        memcmp(graphics_snapshot, framebuffer->pixels, framebuffer_bytes) != 0 || !input_submit(&submitted) ||
-        !tabos_console_poll(&foreground, &received) || console_next_deadline() != UINT64_MAX) {
+        tabos_console_page_up(&foreground) || memcmp(graphics_snapshot, framebuffer->pixels, framebuffer_bytes) != 0 ||
+        !input_submit(&submitted) || !tabos_console_poll(&foreground, &received) ||
+        console_next_deadline() != UINT64_MAX) {
         return 1;
     }
     test_platform_advance_time_ms(TABOS_CURSOR_BLINK_INTERVAL_MS);
@@ -103,6 +103,22 @@ int main(void)
     if (terminal.cursor_visible || !terminal.cursor_phase_visible) {
         return 1;
     }
+
+    for (size_t index = 0U; index < framebuffer->stride_pixels * framebuffer->height; ++index) {
+        framebuffer->pixels[index] = 0x1234U;
+    }
+    const unsigned int presents_before_panic = test_platform_display_present_calls();
+    if (!console_write_panic("KERNEL PANIC: fullscreen") || console_graphics_active() || !terminal.rendering_enabled ||
+        terminal.cursor_visible || test_platform_display_present_calls() != presents_before_panic + 1U ||
+        framebuffer->pixels[0] == 0x1234U) {
+        return 1;
+    }
+    if (terminal.cells[0].character != 'K' || terminal.cells[1].character != 'E' ||
+        terminal.cells[2].character != 'R' || terminal.cells[3].character != 'N' ||
+        terminal.cells[4].character != 'E' || terminal.cells[5].character != 'L') {
+        return 1;
+    }
+    console_set_graphics_active(true);
     console_set_graphics_active(false);
     if (console_graphics_active() ||
         console_next_deadline() != test_platform_time_ms() + TABOS_CURSOR_BLINK_INTERVAL_MS) {

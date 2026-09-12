@@ -107,6 +107,9 @@ cursor blinking, and TTY scrollback shortcuts. Keyboard events—including Ctrl+
 to the graphics application without requiring it to know about TTY modes. Terminal state
 remains retained but cannot overwrite or present over fullscreen graphics. Closing the
 graphics context—or exiting without closing it—redraws and restores the terminal once.
+If process 0 fails while graphics is active, the kernel immediately revokes fullscreen
+ownership and presents a plain, cursor-free terminal panic instead of retaining the last
+graphics frame.
 
 Run `graphics-demo` to exercise a 320×240 logical canvas automatically scaled 3× with
 pillarboxing; use E/A/S/D to move, R to rotate, Up/Down to cycle the 16-color VGA

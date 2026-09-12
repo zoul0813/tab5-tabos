@@ -183,7 +183,10 @@ exit request, execution fault, and forced termination must each enter kernel pan
 Tests must prove process 0 is neither unloaded nor restarted, panic does not attempt to
 resume nonexistent parent, and failure cause/exit status appears through both captured
 serial/log output and framebuffer console/terminal output. Panic rendering must work even
-when process-0 console session is stale or unavailable.
+when process-0 console session is stale or unavailable. Each termination cause must also
+be exercised after fullscreen graphics activation, proving panic revokes graphics
+ownership, restores terminal rendering with the cursor hidden, changes the graphics
+framebuffer to panic pixels/text, and presents that surface while retaining process 0.
 
 Deterministic lifecycle coverage exercises exit request, executable return, execution
 fault, and forced termination. Console tests build against the platform mutex contract;

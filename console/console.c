@@ -90,9 +90,21 @@ bool console_write_panic(const char* text)
         unlock_console();
         return false;
     }
+
+    const bool graphics_was_active = graphics_active;
+    graphics_active                = false;
+    terminal_set_rendering_enabled(active_terminal, true);
+    terminal_set_cursor_visible(active_terminal, false);
+    active_terminal->ansi_state = 0U;
+    active_terminal->reverse    = false;
+    terminal_set_colors(active_terminal, 0xffff, 0x0000);
+    terminal_clear(active_terminal);
     terminal_write_line(active_terminal, text);
     const bool presented = present_console();
     unlock_console();
+    if (graphics_was_active) {
+        platform_runtime_notify(PLATFORM_RUNTIME_EVENT_DEADLINE | PLATFORM_RUNTIME_EVENT_POWER);
+    }
     return presented;
 }
 

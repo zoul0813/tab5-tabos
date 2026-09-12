@@ -21,6 +21,7 @@ void test_platform_keyboard_set_status(bool ready, int error);
 unsigned int test_platform_keyboard_update_calls(void);
 unsigned int test_platform_pointer_update_calls(void);
 unsigned int test_platform_activity_reports(void);
+unsigned int test_platform_display_present_calls(void);
 void test_platform_rtc_set_status(bool ready, int error);
 void test_platform_battery_set_status(bool ready, int error);
 void test_platform_audio_render(int16_t* stereo, size_t frames);

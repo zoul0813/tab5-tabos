@@ -207,6 +207,8 @@
 - [x] Enforce bounded default per-process heap and stack limits.
 - [x] Extend the maintained tester with leaked-resource and nested-failure cases.
 - [x] Preserve host invalid-memory fault containment and PID 0 panic behavior.
+- [x] Resolve AUD-009: revoke fullscreen graphics ownership and present a plain terminal
+  panic surface for every retained process-0 failure path.
 - [x] Document that native Tab5 application faults remain device-fatal until a
   user-mode/PMP execution boundary and recoverable trap path are implemented.
 - [ ] Design and implement the Tab5 user-mode/PMP boundary and recoverable native-fault path.
