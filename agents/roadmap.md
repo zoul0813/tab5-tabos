@@ -22,6 +22,7 @@
 
 ### Lua CLI
 
+- [x] Fix physical Backspace; add cursor editing, Delete, session history, horizontal scrolling, Ctrl-C/Ctrl-D exit, and Ctrl-U input cancellation.
 - [x] Implement pinned Lua 5.5.1, source-only library profile, console broker, and small TabOS module.
 - [x] Validate native sanitizers, official UTF-8/string/math subsets, RV32 sessions and macOS/Tab5 Debug/Release builds.
 - [x] Verify ordinary application build/install, licenses/examples and trailing math-library build tracking.

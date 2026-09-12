@@ -10,6 +10,7 @@
 #define LUA_TABOS_MEMORY_LIMIT (3U * 1024U * 1024U)
 #define LUA_TABOS_LINE_SIZE    4096U
 #define LUA_TABOS_QUEUE_SIZE   128U
+#define LUA_TABOS_HISTORY_SIZE 16U
 typedef struct {
         size_t used, peak, limit, allocations, fail_after;
         uint64_t last_service;
@@ -18,9 +19,13 @@ typedef struct {
         tabos_input_event_t events[LUA_TABOS_QUEUE_SIZE];
         size_t head, count;
         bool overflow, interrupted, mode_changed, closing;
+        bool interactive_session, exit_requested, cancelled;
         int exit_status;
         char line[LUA_TABOS_LINE_SIZE];
         char chunk[LUA_TABOS_LINE_SIZE];
+        char history[LUA_TABOS_HISTORY_SIZE][LUA_TABOS_LINE_SIZE];
+        char draft[LUA_TABOS_LINE_SIZE];
+        size_t history_count;
 } lua_tabos_runtime_t;
 void* lua_tabos_alloc(void* ud, void* ptr, size_t old_size, size_t new_size);
 lua_tabos_runtime_t* lua_tabos_runtime(lua_State* L);

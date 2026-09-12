@@ -1772,7 +1772,11 @@ Optional `tabos_lua_rv32` accepts separately SDK-built shell and Lua artifacts. 
 temporary drives and a real terminal to check stdout, statuses, script args, nested
 source modules, binary file bytes, UTC/64-bit arithmetic, REPL continuation, OOM/error
 recovery, Ctrl-C in loops/coroutines/console reads, os.exit file cleanup, forced wait
-teardown and repeat launches. Ordinary CTest remains independent of application builds.
+teardown and repeat launches. REPL regression also injects physical Backspace,
+Delete, Left/Right, Home/End, history with draft restoration, long horizontal input,
+Escape preserving input, the version banner, Ctrl-C/Ctrl-D exit from entered text,
+loops/coroutines/console reads, and Ctrl-U cancellation during continuation; terminal cells and restored
+parent status are checked. Ordinary CTest remains independent of application builds.
 Shared build tracking now checks `TABOS_LDLIBS` invalidation. Naming lint excludes the
 pinned upstream Lua tree (which owns `tab_funcs`); local adapters remain checked.
 

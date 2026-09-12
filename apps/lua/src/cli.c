@@ -99,6 +99,15 @@ static int repl_step(lua_State* L)
             }
             lua_pop(L, 1);
             result = lua_tabos_readline(rt, ">> ");
+            if (result == 0 || result == -1) {
+                rt->exit_status = result == -1 ? 1 : 0;
+                lua_pushboolean(L, 0);
+                return 1;
+            }
+            if (result == -4) {
+                lua_pushboolean(L, 1);
+                return 1;
+            }
             if (result != 1) {
                 return luaL_error(L, "incomplete input discarded");
             }
@@ -185,10 +194,19 @@ static int run(lua_State* L)
         }
     }
     if (o->interactive || (o->script == 0 && !o->actions && !o->version)) {
+        if (!o->version) {
+            puts(LUA_COPYRIGHT);
+        }
+        lua_tabos_runtime_t* rt = lua_tabos_runtime(L);
+        rt->interactive_session = true;
         for (;;) {
             lua_settop(L, 0);
             lua_pushcfunction(L, repl_step);
-            if (lua_pcall(L, 0, 1, 0) != LUA_OK) {
+            int result = lua_pcall(L, 0, 1, 0);
+            if (rt->exit_requested) {
+                break;
+            }
+            if (result != LUA_OK) {
                 report(L);
                 lua_gc(L, LUA_GCCOLLECT);
                 continue;
@@ -207,7 +225,7 @@ int lua_tabos_main(int argc, char** argv)
 {
     if (argc == 2 && strcmp(argv[1], "--help") == 0) {
         puts("Usage: lua [-v] [-i] [-e code] [-l [global=]module] [--] [script [args]]\n"
-             "No arguments: REPL. Ctrl-C cancels; Ctrl-D exits an empty line.\n"
+             "No arguments: REPL. Ctrl-C/Ctrl-D exit; Ctrl-U cancels input.\n"
              "Source only; no stdin scripts, pipes, native modules, or host environment.\n"
              "64-bit integers/doubles; 3 MiB Lua heap; 4094-byte console lines/chunks.\n"
              "See docs/lua.md for the TabOS library profile.");

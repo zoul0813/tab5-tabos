@@ -49,21 +49,34 @@ The shell's existing argument-count and byte limits still apply.
 
 ## Prompt and cancellation
 
-Enter submits a line; Backspace edits it. Tab inserts one space. Incomplete Lua
+Interactive startup displays the bundled Lua version and copyright banner:
+
+```text
+Lua 5.5.1  Copyright (C) 1994-2026 Lua.org, PUC-Rio
+```
+
+Enter submits a line. Backspace removes the character before the cursor; Delete
+removes the character at it. Left/Right move the cursor, Home/End jump to the
+start/end, and Up/Down recall the last 16 input lines and restore the current draft.
+Long lines scroll horizontally while editing. Tab inserts one space. Incomplete Lua
 syntax gets a `>> ` continuation prompt. Expressions display their results;
-`=expression` is also accepted. Ctrl-D exits an empty input line. Ctrl-C discards
-current console input or raises an `interrupted` error in a running Lua chunk.
+`=expression` is also accepted. Ctrl-C and Ctrl-D exit the REPL and return to the parent shell, even with
+unfinished input or while an interactive chunk is running. `os.exit()` also exits.
+Ctrl-U discards the current input, including a pending multiline chunk, and starts
+a fresh prompt. Noninteractive scripts retain Ctrl-C interruption as a Lua error.
 Syntax/runtime errors and ordinary Lua allocation failures leave the prompt usable.
 Script failures print an error/traceback to stderr and return status 1.
 
 The application uses one cooked-event broker for REPL input, console reads and
 interruption. Aa/Sym translation stays enabled. Inherited scroll-key interception
 and raw mode are disabled while Lua owns the console, then the original mode is
-restored. Physical Enter/Backspace events are not echoed twice. Navigation/history
-editing is not implemented. Idle input blocks on the existing keyboard wait source.
+restored. Physical Backspace events edit input; Enter uses cooked text. History is
+session-local and is not saved to disk. Console `io.read` retains append/Backspace
+editing; navigation applies to REPL prompts. Idle input blocks on the
+existing keyboard wait source.
 
 The broker retains up to 128 non-release events while scripts run. On overflow it
-drops newest events, continues detecting Ctrl-C, and rejects the next input line
+drops newest events, continues detecting exit/cancel shortcuts, and rejects the next input line
 with a visible overflow error instead of executing truncated input. Console lines
 hold at most 4094 bytes; a continued chunk holds at most 4095 bytes total.
 Overlong input is discarded through Enter. File-based scripts are bounded by the
@@ -85,7 +98,7 @@ latency and hook overhead still require measurement.
 | `load`, `loadfile`, `dofile`, `require` | Text source only; binary chunks are rejected, including reader-function loads. No `luac` supplied. |
 | UTF-8 | Byte-processing library retained. Console/system text remains CP437; file data can contain arbitrary UTF-8 or binary bytes. |
 | Regular files | Standard `io.open`, read formats, write, seek, flush, close and file line iteration through newlib. NUL bytes in file contents are preserved. |
-| Console reads | `io.read`, `io.stdin:read`, default-input aliases and `io.lines()` support `l`/`*l` and `L`/`*L` only. Ctrl-D on an empty line returns nil. Other formats raise a Lua error before consuming input. |
+| Console reads | `io.read`, `io.stdin:read`, default-input aliases and `io.lines()` support `l`/`*l` and `L`/`*L` only. During the REPL, Ctrl-C/Ctrl-D exit even during a console read. Outside the REPL, Ctrl-D on an empty line returns nil. Ctrl-U clears pending console input. Other formats raise a Lua error before consuming input. |
 | `io.popen`, `io.tmpfile` | Raise unsupported-operation errors. |
 | `os.remove`, `os.rename` | Filesystem operations return Lua-style success or nil/message/error-code results. |
 | `os.getenv` | Always nil; no host environment is inherited. |

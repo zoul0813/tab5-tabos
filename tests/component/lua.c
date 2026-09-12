@@ -79,16 +79,65 @@ int main(void)
     assert(lua_tabos_readline(rt, "") == -3);
     test_lua_input("ab\bC\n");
     assert(lua_tabos_readline(rt, "") == 1 && strcmp(rt->line, "aC") == 0);
+    const tabos_input_event_t edits[] = {
+        {    .type = TABOS_INPUT_TEXT,              .text = "acX"},
+        {.type = TABOS_INPUT_KEY_DOWN, .key = TABOS_KEY_BACKSPACE},
+        {.type = TABOS_INPUT_KEY_DOWN,      .key = TABOS_KEY_LEFT},
+        {    .type = TABOS_INPUT_TEXT,                .text = "b"},
+        {.type = TABOS_INPUT_KEY_DOWN,      .key = TABOS_KEY_HOME},
+        {.type = TABOS_INPUT_KEY_DOWN,    .key = TABOS_KEY_DELETE},
+        {.type = TABOS_INPUT_KEY_DOWN,     .key = TABOS_KEY_RIGHT},
+        {.type = TABOS_INPUT_KEY_DOWN,    .key = TABOS_KEY_DELETE},
+        {.type = TABOS_INPUT_KEY_DOWN,       .key = TABOS_KEY_END},
+        {    .type = TABOS_INPUT_TEXT,              .text = "d\n"},
+    };
+    memcpy(rt->events, edits, sizeof(edits));
+    rt->head  = 0U;
+    rt->count = sizeof(edits) / sizeof(edits[0]);
+    assert(lua_tabos_readline(rt, "> ") == 1 && strcmp(rt->line, "bd") == 0);
+    rt->events[0] = (tabos_input_event_t) {.type = TABOS_INPUT_KEY_DOWN, .key = TABOS_KEY_UP};
+    rt->head      = 0U;
+    rt->count     = 1U;
+    test_lua_input("\n");
+    assert(lua_tabos_readline(rt, "> ") == 1 && strcmp(rt->line, "bd") == 0);
+    rt->events[0] = (tabos_input_event_t) {.type = TABOS_INPUT_KEY_DOWN, .key = TABOS_KEY_ESCAPE};
+    rt->head      = 0U;
+    rt->count     = 1U;
+    test_lua_input("kept\n");
+    assert(lua_tabos_readline(rt, ">> ") == 1 && strcmp(rt->line, "kept") == 0);
     test_lua_input("\3");
     assert(lua_tabos_readline(rt, "") == -2);
     test_lua_input("\4");
     assert(lua_tabos_readline(rt, "") == 0);
+    test_lua_input("discard\25");
+    assert(lua_tabos_readline(rt, ">> ") == -4);
+    test_lua_input("discard\4");
+    assert(lua_tabos_readline(rt, "> ") == 0);
+    test_lua_input("discard\3");
+    assert(lua_tabos_readline(rt, "> ") == 0);
+    rt->overflow = true;
+    rt->events[0] =
+        (tabos_input_event_t) {.type = TABOS_INPUT_KEY_DOWN, .key = TABOS_KEY_U, .modifiers = TABOS_MODIFIER_CONTROL};
+    rt->head  = 0U;
+    rt->count = 1U;
+    assert(lua_tabos_readline(rt, "> ") == -4 && !rt->overflow && rt->count == 0U);
     char long_line[LUA_TABOS_LINE_SIZE + 10U];
     memset(long_line, 'a', sizeof(long_line));
     long_line[sizeof(long_line) - 2U] = '\n';
     long_line[sizeof(long_line) - 1U] = 0;
     test_lua_input(long_line);
     assert(lua_tabos_readline(rt, "") == -3);
+    long_line[LUA_TABOS_LINE_SIZE - 2U] = '\n';
+    long_line[LUA_TABOS_LINE_SIZE - 1U] = '\0';
+    test_lua_input(long_line);
+    assert(lua_tabos_readline(rt, "> ") == 1 && strlen(rt->line) == LUA_TABOS_LINE_SIZE - 2U);
+    for (size_t i = 0U; i < LUA_TABOS_HISTORY_SIZE + 2U; ++i) {
+        char entry[32];
+        snprintf(entry, sizeof(entry), "%zu\n", i);
+        test_lua_input(entry);
+        assert(lua_tabos_readline(rt, "> ") == 1);
+    }
+    assert(rt->history_count == LUA_TABOS_HISTORY_SIZE && strcmp(rt->history[0], "2") == 0);
     test_lua_input("one\ntwo\nthree\n");
     execute(L, "assert(io.read() == 'one'); assert(io.stdin:read('L') == 'two\\n'); "
                "assert(io.lines()() == 'three'); assert(not pcall(io.read, 'a'))");
