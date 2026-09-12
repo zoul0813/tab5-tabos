@@ -1,0 +1,46 @@
+if(NOT DEFINED LUA_EXECUTABLE OR NOT DEFINED LUA_TEST_DIR)
+    message(FATAL_ERROR "Lua executable and temporary test directory required")
+endif()
+file(MAKE_DIRECTORY "${LUA_TEST_DIR}/nested")
+file(WRITE "${LUA_TEST_DIR}/nested/init.lua" "return {value=42}\n")
+file(WRITE "${LUA_TEST_DIR}/script.lua" [=[
+assert(arg[0] == 'script.lua' and arg[1] == 'first' and arg[2] == 'two words')
+local first, second = ...
+assert(first == arg[1] and second == arg[2])
+assert(arg[-1] == 'lua-cli')
+print('ARGS_OK')
+]=])
+file(WRITE "${LUA_TEST_DIR}/-file.lua" "print('DASH_OK')\n")
+file(WRITE "${LUA_TEST_DIR}/bad.lua" "this is not valid Lua @\n")
+function(lua_cli expected pattern)
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E env
+        "LUA_INIT=error('host init leaked')" "LUA_PATH=/absent/?.lua"
+        "LUA_PATH_5_5=/absent/?.lua" "LUA_CPATH=/absent/?.so" "TZ=Pacific/Honolulu"
+        "${LUA_EXECUTABLE}" ${ARGN}
+        WORKING_DIRECTORY "${LUA_TEST_DIR}" RESULT_VARIABLE status
+        OUTPUT_VARIABLE output ERROR_VARIABLE error TIMEOUT 10)
+    if(NOT status EQUAL expected OR NOT "${output}${error}" MATCHES "${pattern}")
+        message(FATAL_ERROR "Lua CLI: expected ${expected}/${pattern}, got ${status}: ${output}${error}")
+    endif()
+endfunction()
+lua_cli(0 "Lua 5.5.1" -v)
+lua_cli(0 "Usage: lua" --help)
+lua_cli(0 "ORDER_OK" -e "x=40" -e "assert(x==40)  x=x+2  print('ORDER_OK')")
+lua_cli(0 "MODULE_OK" -l n=nested -e "assert(n.value==42)  print('MODULE_OK')")
+lua_cli(0 "ARGS_OK" -e "arg[-1]='lua-cli'" script.lua first "two words")
+lua_cli(0 "DASH_OK" -- -file.lua)
+lua_cli(0 "1970-01-01" -e "assert(os.getenv('HOME')==nil)  print(os.date('%Y-%m-%d',0))")
+lua_cli(1 "requires an argument" -e)
+lua_cli(1 "unsupported option" -q)
+lua_cli(1 "unsupported" -)
+lua_cli(1 "unsupported" -- -)
+lua_cli(1 "bad.lua" bad.lua)
+lua_cli(1 "stack traceback" -e "error('expected')")
+lua_cli(7 "" -e "os.exit(7)")
+lua_cli(7 "" -e "g=setmetatable({}, {__gc=function() os.exit(5) end})  os.exit(7)")
+lua_cli(0 "" -e "g=setmetatable({}, {__gc=function() os.exit(5) end})")
+lua_cli(1 "" -e "os.exit(false)")
+lua_cli(0 "" -e "os.exit(true, false)")
+file(REMOVE "${LUA_TEST_DIR}/nested/init.lua" "${LUA_TEST_DIR}/script.lua"
+    "${LUA_TEST_DIR}/-file.lua" "${LUA_TEST_DIR}/bad.lua")
+file(REMOVE_RECURSE "${LUA_TEST_DIR}/nested")

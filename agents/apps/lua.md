@@ -1,6 +1,13 @@
 # Lua Implementation Plan
 
-Status: proposed implementation plan, 2026-09-07. Implementation has not started.
+Status: CLI implementation and automated validation completed 2026-09-12; physical Tab5 acceptance pending. Graphics/input/audio/process bindings remain gated on CLI acceptance. Linux builds/tests excluded by user direction for this implementation.
+
+Current implementation uses the proposed 5.5.1 baseline and resource budgets, with
+48-level C-call/pattern limits. Kilo's keyboard wait source is reused without a new
+public ABI. UTC table input validates rather than normalizes overflowing calendar
+fields; `os.exit` always closes the state and rejects recursive exit during finalization.
+See [user documentation](../../docs/lua.md), [provenance](../../apps/lua/UPSTREAM.md),
+and [validation](../../docs/validation/lua-cli-2026-09-12.md) for exact behavior and evidence.
 
 This expands the Lua candidate in [Application Port Candidates](../milestone-apps.md). Version selection, resource budgets, binding names, and staged feature choices below are recommendations, not new `[DECIDED]` architectural requirements.
 
@@ -198,14 +205,15 @@ Build through `./apps/build.sh` and shared Make rules with the pinned project to
 
 Suggested delivery sequence: pinned build and arithmetic proof; library/profile and module loading; bounded REPL/interruption; memory/error hardening and small TabOS module; cross-target acceptance and docs. Graphics/audio follow separately.
 
-- [ ] Pin upstream archive, verify checksum, retain license, and build the independent RV32 executable.
-- [ ] Implement and document supported CLI, standard libraries, source loading, and module paths.
-- [ ] Validate unified console input, idle waiting, coroutine interruption, and parent restoration.
-- [ ] Validate numeric semantics, memory limits, recursion, OOM handling, and file errors.
-- [ ] Add the small TabOS module and installable example scripts.
-- [ ] Pass native sanitizer tests, applicable upstream tests, and actual RV32 host integration.
-- [ ] Complete supported-target builds and separate physical Tab5 acceptance.
-- [ ] Write `docs/lua.md`; update `docs/README.md`, `docs/applications.md`, and any affected SDK/input documentation.
-- [ ] Update `agents/roadmap.md` when implementation starts and as validation completes; record accepted shared API changes in architecture/context/testing documents.
+- [x] Pin upstream archive, verify checksum, retain license, and build the independent RV32 executable.
+- [x] Implement and document supported CLI, standard libraries, source loading, and module paths.
+- [x] Validate unified console input, idle waiting, coroutine interruption, and parent restoration.
+- [x] Validate numeric semantics, memory limits, recursion, OOM handling, and file errors.
+- [x] Add the small TabOS module and installable example scripts.
+- [x] Pass native sanitizer tests, applicable upstream tests, and actual RV32 host integration.
+- [x] Complete macOS Debug/Release and Tab5 Debug/Release builds; Linux excluded by user direction.
+- [ ] Complete physical Tab5 acceptance, stack/heap measurements and performance/latency measurements.
+- [x] Write `docs/lua.md`; update `docs/README.md`, `docs/applications.md`, and any affected SDK/input documentation.
+- [x] Update `agents/roadmap.md` when implementation starts and as validation completes; record accepted shared API changes in architecture/context/testing documents.
 
 CLI completion means a user can run a script with arguments, read/write files, require a source module, interact at the prompt, recover from ordinary errors or memory exhaustion, interrupt a cooperative running chunk, and return to the shell on host and Tab5. Successful compilation alone is insufficient.

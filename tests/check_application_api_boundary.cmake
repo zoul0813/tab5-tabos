@@ -2,7 +2,7 @@ if(NOT DEFINED TABOS_SOURCE_DIR)
     message(FATAL_ERROR "TABOS_SOURCE_DIR is required")
 endif()
 
-set(APP_DIRECTORIES shell tester hello_elf coreutils)
+set(APP_DIRECTORIES shell tester hello_elf coreutils lua)
 foreach(directory IN LISTS APP_DIRECTORIES)
     file(GLOB_RECURSE sources "${TABOS_SOURCE_DIR}/apps/${directory}/*.c" "${TABOS_SOURCE_DIR}/apps/${directory}/*.h")
     foreach(source IN LISTS sources)

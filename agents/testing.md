@@ -1756,3 +1756,27 @@ capture, route, fault, wait, and shared-clock assertions remain mandatory. Healt
 must prove suspended deadlines disappear, no audit occurs while paused, and resume runs one
 overdue audit while advancing directly to the next future deadline. Cross-build real Tab5
 audio code; host fakes do not prove codec shutdown, jack routing, or electrical savings.
+
+## Lua CLI validation (2026-09-12)
+
+`component.lua` compiles the same Lua profile under host sanitizers with deterministic
+clock/input fakes, registration allocation failures, quota/shrink/free accounting,
+console line/typeahead handling, file/NUL errors, UTC dates, modules, recursion and
+coroutine cancellation. `component.lua_cli` runs argument ordering, script varargs,
+source-module loading, ignored workstation environment, error/status and exit-finalizer
+cases in isolated subprocesses. `component.lua_upstream_utf8`, `_strings`, and `_math`
+run unchanged official 5.5.1 files with `_U`, `_soft`, and `_port`; exclusions are recorded
+in `apps/lua/UPSTREAM.md`. The source manifest is shared with the application Makefile.
+
+Optional `tabos_lua_rv32` accepts separately SDK-built shell and Lua artifacts. It uses
+temporary drives and a real terminal to check stdout, statuses, script args, nested
+source modules, binary file bytes, UTC/64-bit arithmetic, REPL continuation, OOM/error
+recovery, Ctrl-C in loops/coroutines/console reads, os.exit file cleanup, forced wait
+teardown and repeat launches. Ordinary CTest remains independent of application builds.
+Shared build tracking now checks `TABOS_LDLIBS` invalidation. Naming lint excludes the
+pinned upstream Lua tree (which owns `tab_funcs`); local adapters remain checked.
+
+macOS Debug/Release and Tab5 Debug/Release builds passed. Linux builds/tests excluded
+by explicit user direction for this implementation. Physical Tab5 functional acceptance,
+stack/heap high-water, timing and service responsiveness remain separate required checks.
+Evidence and exact commands: `docs/validation/lua-cli-2026-09-12.md`.

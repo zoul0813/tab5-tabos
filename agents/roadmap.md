@@ -20,6 +20,14 @@
 
 ## Current Work
 
+### Lua CLI
+
+- [x] Implement pinned Lua 5.5.1, source-only library profile, console broker, and small TabOS module.
+- [x] Validate native sanitizers, official UTF-8/string/math subsets, RV32 sessions and macOS/Tab5 Debug/Release builds.
+- [x] Verify ordinary application build/install, licenses/examples and trailing math-library build tracking.
+- Linux builds/tests excluded by user direction; evidence: `docs/validation/lua-cli-2026-09-12.md`.
+- [ ] Complete physical Tab5 acceptance before follow-on graphics/input/audio/process bindings.
+
 ### Kilo Terminal Editor
 
 - [x] Implement terminal geometry, bounded ANSI controls, and keyboard readiness waits.

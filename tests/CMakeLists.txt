@@ -931,3 +931,57 @@ target_include_directories(tabos_gpio_interrupt PRIVATE
 tabos_enable_warnings(tabos_gpio_interrupt)
 tabos_enable_sanitizers(tabos_gpio_interrupt)
 add_test(NAME unit.gpio_interrupt COMMAND tabos_gpio_interrupt)
+
+# Use the same explicit source manifest and profile for native Lua tests.
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${TABOS_ROOT}/apps/lua/sources.mk")
+file(READ "${TABOS_ROOT}/apps/lua/sources.mk" lua_manifest)
+string(REGEX MATCHALL "[a-zA-Z0-9_/]+[.]c" lua_sources "${lua_manifest}")
+list(TRANSFORM lua_sources PREPEND "${TABOS_ROOT}/apps/lua/")
+add_library(tabos_lua_profile STATIC ${lua_sources})
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    foreach(lua_source IN LISTS lua_sources)
+        if(lua_source MATCHES "/apps/lua/src/")
+            set_property(SOURCE "${lua_source}" APPEND PROPERTY COMPILE_OPTIONS
+                -Wall -Wextra -Wpedantic -Wconversion -Wshadow)
+        endif()
+    endforeach()
+endif()
+target_include_directories(tabos_lua_profile PUBLIC "${TABOS_ROOT}/apps/lua/include"
+    "${TABOS_ROOT}/apps/lua/vendor/lua/src" "${TABOS_ROOT}/sdk/include")
+target_compile_options(tabos_lua_profile PUBLIC
+    -include "${TABOS_ROOT}/apps/lua/include/lua_tabos/config.h")
+tabos_enable_sanitizers(tabos_lua_profile)
+add_executable(tabos_lua_native "${TABOS_ROOT}/apps/lua/src/main.c" component/lua_fakes.c)
+target_link_libraries(tabos_lua_native PRIVATE tabos_lua_profile m)
+tabos_enable_sanitizers(tabos_lua_native)
+add_executable(tabos_lua component/lua.c component/lua_fakes.c)
+target_link_libraries(tabos_lua PRIVATE tabos_lua_profile m)
+tabos_enable_warnings(tabos_lua)
+tabos_enable_sanitizers(tabos_lua)
+add_test(NAME component.lua COMMAND tabos_lua)
+set_tests_properties(component.lua PROPERTIES TIMEOUT 30)
+add_executable(tabos_lua_rv32 component/lua_rv32.c)
+target_include_directories(tabos_lua_rv32 PRIVATE
+    "${TABOS_ROOT}/graphics/include" "${TABOS_ROOT}/console/include"
+    "${TABOS_ROOT}/kernel/include" "${TABOS_ROOT}/input/include" "${TABOS_ROOT}/platform/include")
+if(TABOS_TARGET STREQUAL "linux")
+    target_link_libraries(tabos_lua_rv32 PRIVATE
+        "-Wl,--start-group" tabos_core tabos_platform_host "-Wl,--end-group" SDL3::SDL3)
+else()
+    target_link_libraries(tabos_lua_rv32 PRIVATE tabos_core tabos_platform_host SDL3::SDL3)
+endif()
+tabos_enable_warnings(tabos_lua_rv32)
+tabos_enable_sanitizers(tabos_lua_rv32)
+
+foreach(lua_suite utf8 strings math)
+    add_test(NAME component.lua_upstream_${lua_suite}
+        COMMAND tabos_lua_native -e "_U=true; _soft=true; _port=true"
+            "${TABOS_ROOT}/apps/lua/tests/upstream/${lua_suite}.lua")
+    set_tests_properties(component.lua_upstream_${lua_suite} PROPERTIES TIMEOUT 30)
+endforeach()
+
+add_test(NAME component.lua_cli COMMAND "${CMAKE_COMMAND}"
+    "-DLUA_EXECUTABLE=$<TARGET_FILE:tabos_lua_native>"
+    "-DLUA_TEST_DIR=${CMAKE_CURRENT_BINARY_DIR}/lua-cli"
+    -P "${CMAKE_CURRENT_LIST_DIR}/check_lua_cli.cmake")
+set_tests_properties(component.lua_cli PROPERTIES TIMEOUT 30)

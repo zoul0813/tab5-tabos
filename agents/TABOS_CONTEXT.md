@@ -882,3 +882,14 @@ headphone attempts/errors, VSYNC and PPA completions with boot-lifetime lock-fre
 atomics; no new periodic task/deadline exists. Release compiles out updates; host does
 not manufacture physical peripheral measurements. These counts are not PM policy or
 synchronization state.
+
+## Lua CLI implementation (2026-09-12)
+
+Lua 5.5.1 is an independent RV32/newlib application under `apps/lua`, using only
+public SDK services. No public ABI change is required: the cooked-event console broker
+reuses Kilo's keyboard wait source. CLI, console I/O and count-hook cancellation share
+one consumer. Pure-source modules and explicit library registration omit desktop-only
+integration. Metadata requests 4 MiB heap/64 KiB stack, with a 3 MiB Lua allocation
+ceiling and 48-level C-call/pattern limits. Physical high-water and latency measurements
+remain pending. The shared Make rules accept tracked trailing `TABOS_LDLIBS`; Lua uses
+`-lm`. These application-specific budgets/profile choices do not alter general SDK limits.

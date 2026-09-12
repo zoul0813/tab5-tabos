@@ -36,7 +36,9 @@ foreach(directory IN LISTS PRODUCTION_DIRECTORIES)
         "${TABOS_SOURCE_DIR}/${directory}/*.S.in"
     )
     foreach(production_file IN LISTS production_files)
-        if(production_file MATCHES "/managed_components/")
+        # Vendored Lua owns its upstream tab_funcs symbol; TabOS adapters remain checked.
+        if(production_file MATCHES "/managed_components/" OR
+           production_file MATCHES "/apps/lua/vendor/lua/")
             continue()
         endif()
         file(READ "${production_file}" contents)

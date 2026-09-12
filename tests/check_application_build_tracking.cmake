@@ -151,3 +151,8 @@ run_build(
     "TABOS_APP_CAPABILITIES=3"
 )
 expect_links(10 "capability setting change")
+
+run_build("TABOS_LDLIBS=-lm")
+expect_links(11 "trailing application libraries change")
+run_build("TABOS_LDLIBS=-lm")
+expect_links(11 "unchanged trailing application libraries")
