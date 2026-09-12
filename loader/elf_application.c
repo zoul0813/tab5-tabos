@@ -768,7 +768,9 @@ static int elf_wall_time_get(tabos_elf_wall_time_t* time)
     if (writable_time == NULL) {
         return -TABOS_EINVAL;
     }
-    if (!platform_wall_clock_get(&seconds)) {
+    const bool success = platform_wall_clock_get(&seconds);
+    hardware_devices_health_changed(HARDWARE_DEVICE_HEALTH_RTC);
+    if (!success) {
         return -TABOS_EIO;
     }
     writable_time->seconds_low  = (uint32_t) seconds;
@@ -784,7 +786,9 @@ static int elf_wall_time_set(const tabos_elf_wall_time_t* time)
     }
     const int64_t seconds =
         (int64_t) ((uint64_t) readable_time->seconds_low | (uint64_t) (uint32_t) readable_time->seconds_high << 32U);
-    return platform_wall_clock_set(seconds) ? 0 : -TABOS_EIO;
+    const bool success = platform_wall_clock_set(seconds);
+    hardware_devices_health_changed(HARDWARE_DEVICE_HEALTH_RTC);
+    return success ? 0 : -TABOS_EIO;
 }
 
 static int elf_system_action(uint32_t action)
@@ -1869,11 +1873,11 @@ static int elf_battery_status(tabos_elf_battery_status_t* info)
     if (writable == NULL) {
         return -TABOS_EINVAL;
     }
-    if (!platform_battery_status(&source)) {
-        hardware_devices_update();
+    const bool success = platform_battery_status(&source);
+    hardware_devices_health_changed(HARDWARE_DEVICE_HEALTH_BATTERY);
+    if (!success) {
         return -TABOS_EIO;
     }
-    hardware_devices_update();
     *writable = (tabos_elf_battery_status_t) {
         .available              = source.available ? 1U : 0U,
         .external_power_present = source.external_power_present ? 1U : 0U,
@@ -1892,14 +1896,14 @@ static int elf_battery_status(tabos_elf_battery_status_t* info)
 static int elf_battery_set_charging(uint32_t enabled)
 {
     const bool success = platform_battery_set_charging(enabled != 0U);
-    hardware_devices_update();
+    hardware_devices_health_changed(HARDWARE_DEVICE_HEALTH_BATTERY);
     return success ? 0 : -TABOS_EIO;
 }
 
 static int elf_battery_set_fast_charging(uint32_t enabled)
 {
     const bool success = platform_battery_set_fast_charging(enabled != 0U);
-    hardware_devices_update();
+    hardware_devices_health_changed(HARDWARE_DEVICE_HEALTH_BATTERY);
     return success ? 0 : -TABOS_EIO;
 }
 
