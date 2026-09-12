@@ -1606,3 +1606,28 @@ Exit and shutdown supersede parking and use existing cleanup only after admissio
 This internal foundation is not yet connected to power-manager participant callbacks;
 service-wide admission, storage drain, preflight rechecks, and ordered resume must land
 before platform sleep is enabled. Public suspend controls remain deferred.
+
+Filesystem admission now linearizes freeze against every public storage operation,
+including drive information, reads, writes, metadata, close, and create/truncate opens.
+A single atomic word counts admitted operations and potential mutations; counts include
+callers queued on the filesystem mutex. The I/O lock is a platform mutex (priority
+inheritance on Tab5), not a spinlock. Short admission operations never span driver I/O.
+After drain, runtime starts a one-shot worker through `platform_work_*`; callback result
+and completion notification are published before completion is exposed to shutdown.
+The runtime never runs blocking fsync or waits for worker completion during dispatch.
+
+`filesystem_power_*` supplies copied state, counts, error, and a two-second absolute
+deadline. Drain timeout reopens admission without stopping I/O. A timed-out/aborted sync
+keeps admission frozen until completion because its worker borrows descriptors. No new
+transition can overlap it. Successful sync leaves storage frozen until explicit release.
+Shutdown drains callers and waits for the worker before close/unmount/mutex destruction.
+The barrier preserves descriptor generations, offsets, directory cursors, mount identity,
+and working directories. Maintenance skips storage probes while admission is frozen.
+
+The shared POSIX storage layer fsyncs retained writable descriptors, then requires each
+mounted backend's metadata barrier. Tab5 relies on pinned FatFs namespace operations'
+sync_fs and synchronous SDMMC writes, with a final card-status check; no unmount/reopen is
+used. Current host backends report ENOTSUP rather than equating per-file fsync with a
+volume-wide metadata barrier. This is a storage participant foundation, not yet wired to
+the system suspend graph. Other service admission/callback work and hardware validation
+remain prerequisites for sleep.

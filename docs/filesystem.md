@@ -118,6 +118,26 @@ disk through the host operating system before disconnecting it. A safe eject or
 USB disconnect ends storage mode and restarts the Tab5; normal boot then mounts
 the card as `T:` again. Internal flash is not exported.
 
+## Suspend-safety foundation
+
+Filesystem calls now use a scheduler-friendly mutex instead of spinning during disk
+I/O. An internal storage barrier can freeze new calls, drain every admitted operation
+(including callers waiting for that mutex), and synchronize retained writable files in a
+background worker. File and directory handles, offsets, generations, working directories,
+and mount identity remain intact. Mutation counts are separate from total in-flight work.
+
+The barrier is not exposed as an application command and is not triggered by idle display
+timeouts. Calls attempted during an internal freeze report `EBUSY`. A two-second drain
+timeout reopens admission without cancelling the original I/O. If synchronization itself
+is still running at timeout, admission stays closed until that worker finishes; descriptors
+must not be closed beneath it. Normal shutdown also waits before releasing storage.
+
+Tab5 uses retained-file `fsync` plus the pinned FAT/SDMMC backend contract for namespace
+metadata. Physical durability and suspend-cycle validation remain pending. The host backend
+currently reports `ENOTSUP` for the volume metadata barrier: flushing open files alone is
+not treated as proof that all namespace changes reached storage. Normal host filesystem
+operation is unchanged. CPU sleep and whole-system suspend remain disabled.
+
 ## Platform Diagnostic
 
 Select `filesystem-test` as startup application with:

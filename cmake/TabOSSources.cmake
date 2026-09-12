@@ -53,6 +53,7 @@ if(TABOS_ENABLE_FILESYSTEM_DIAGNOSTIC_APP)
 endif()
 
 set(TABOS_HOST_PLATFORM_SOURCES
+    "${TABOS_ROOT}/platform/common/work.c"
     "${TABOS_ROOT}/platform/posix/host_io.c"
     "${TABOS_ROOT}/platform/host/sdl/runtime.c"
     "${TABOS_ROOT}/platform/host/sdl/power.c"
@@ -72,6 +73,7 @@ set(TABOS_HOST_PLATFORM_SOURCES
 )
 
 set(TABOS_ESP32P4_PLATFORM_SOURCES
+    "${TABOS_ROOT}/platform/common/work.c"
     "${TABOS_ROOT}/platform/esp32p4/application_task.c"
     "${TABOS_ROOT}/platform/esp32p4/runtime.c"
     "${TABOS_ROOT}/platform/esp32p4/activity.c"

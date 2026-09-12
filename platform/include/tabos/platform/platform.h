@@ -25,6 +25,14 @@ bool platform_riscv32_power_parked(const platform_riscv32_context_t* context);
 void platform_riscv32_power_checkpoint(void);
 typedef struct platform_mutex platform_mutex_t;
 
+/* One-shot background work. The callback owns its argument until complete.
+ * Release only after completion; wait is for shutdown, never runtime dispatch. */
+typedef struct platform_work platform_work_t;
+platform_work_t* platform_work_start(void (*callback)(void*), void* argument);
+bool platform_work_complete(const platform_work_t* work);
+void platform_work_wait(platform_work_t* work);
+void platform_work_release(platform_work_t* work);
+
 typedef uint32_t platform_runtime_events_t;
 typedef void (*platform_update_fn)(platform_runtime_events_t events);
 typedef uint64_t (*platform_deadline_fn)(void);

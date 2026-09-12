@@ -4,6 +4,7 @@
 
 #include <tabos/device.h>
 #include <tabos/filesystem.h>
+#include <tabos/internal/filesystem.h>
 #include <tabos/internal/device_registry.h>
 #include <tabos/internal/network.h>
 #include <tabos/internal/pointer.h>
@@ -223,7 +224,7 @@ static void audit_unreported_health(void)
         (void) device_registry_set_state(battery_device, battery_ready ? TABOS_DEVICE_READY : TABOS_DEVICE_FAULT,
                                          battery_ready ? 0 : (battery_error != 0 ? battery_error : EIO));
     }
-    if (storage_device != TABOS_DEVICE_ID_INVALID) {
+    if (storage_device != TABOS_DEVICE_ID_INVALID && !filesystem_power_is_frozen()) {
         bool mounted       = false;
         const size_t count = tabos_fs_drive_count();
         for (size_t index = 0U; index < count; ++index) {

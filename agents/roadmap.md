@@ -135,6 +135,11 @@ out after two seconds. All nested processes retain state and ownership. This rem
 internal testable handshake, disconnected from sleep until service admission, drain, and
 ordered callbacks are implemented. No new display policy or CPU sleep behavior is enabled.
 
+- [x] Power Phase 5 storage slice: mutex-based I/O, atomic service admission/mutation
+  accounting, and asynchronous retained-handle drain/sync barrier.
+- [ ] Validate physical storage barriers, implement supported host-volume metadata sync,
+  remaining service callbacks, and ordered whole-system suspend integration.
+
 ### Hardware Services Phase 6 Validation
 
 - [x] Physical RAW8 capture writes 921,600 payload bytes to microSD (operator confirmed).

@@ -1821,3 +1821,23 @@ or automatic parking policy is enabled by this foundation.
 Local validation: macOS Debug and Release builds and full suites pass (72 tests each;
 Debug uses configured AddressSanitizer/UndefinedBehaviorSanitizer). Tab5 Debug and Release
 cross-builds pass. Linux and physical Tab5 parking were not exercised in this local run.
+
+## Power storage barrier
+
+`component.filesystem_power` uses real admission/mutexes, one-shot workers, and POSIX file
+fsync in isolated storage. Its namespace barrier is a test model, not proof of host volume
+durability. Repeated barriers retain writable descriptors, identity, offsets, directory
+cursors, and working directory. Freeze rejects close/create/rename work. Read/write stalls
+and queued metadata verify coherent operation/mutation counts and exact drain timeout
+without destruction. Injected sync failure, unsupported backend, slow-sync timeout, late
+success, recovery, and shutdown with a pending worker check ownership and reopening.
+
+Physical barrier/durability validation remains pending: original-handle I/O and directory
+iteration across diagnostic barriers, card integrity, and safe fault/shutdown recovery.
+No user-facing trigger exists yet. Ordinary file-operation and display-idle regression
+checks remain useful after flashing; they do not validate the new barrier or sleep/wake.
+
+Local validation: macOS Debug and Release builds and full suites pass (73 tests each;
+Debug uses configured AddressSanitizer/UndefinedBehaviorSanitizer). Final targeted storage,
+configuration, and core checks also pass in both configurations. Tab5 Debug and Release
+cross-builds pass. Linux and physical Tab5 storage-barrier validation were not run locally.

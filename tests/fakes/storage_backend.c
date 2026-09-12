@@ -34,6 +34,12 @@ bool platform_battery_set_fast_charging(bool enabled)
 
 static char storage_root[] = "/tmp/tabos-filesystem-test.XXXXXX";
 
+int storage_backend_sync(char letter)
+{
+    (void) letter;
+    return TABOS_ENOTSUP;
+}
+
 size_t storage_backend_drive_count(void)
 {
     return 1U;

@@ -127,6 +127,13 @@ static int run_process_fixture(int argc, char** argv)
 
 int main(int argc, char** argv)
 {
+    if (argc == 2 && strcmp(argv[1], "--filesystem") == 0) {
+        tester_context_t context = {.argc = argc, .argv = argv};
+        const tester_test_t test = {"Filesystem and working directory", tester_test_filesystem};
+        tester_run_test(&context, &test);
+        printf("Filesystem assertions: %u; failures: %u\n", context.assertions, context.failures);
+        return context.failures == 0U ? 0 : 1;
+    }
     if (argc == 2 && strcmp(argv[1], "--input") == 0) {
         tester_context_t context = {.argc = argc, .argv = argv};
         tester_test_input(&context);

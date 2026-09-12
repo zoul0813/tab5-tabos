@@ -30,6 +30,13 @@ bool platform_storage_init(void)
     return false;
 }
 
+int platform_storage_sync(const platform_file_t* files, size_t count)
+{
+    (void) files;
+    (void) count;
+    return TABOS_ENOTSUP;
+}
+
 void platform_storage_shutdown(void)
 {
 }

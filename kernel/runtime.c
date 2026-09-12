@@ -484,6 +484,7 @@ void kernel_runtime_update(platform_runtime_events_t events)
     const bool deadline_wake = (events & PLATFORM_RUNTIME_EVENT_DEADLINE) != 0U;
 
     const uint64_t now = platform_time_ms();
+    filesystem_power_update(now);
     if (power_initialized) {
         const power_state_t state = power_manager_status(&power_manager)->state;
         if (state == POWER_STATE_SUSPENDING || state == POWER_STATE_SUSPENDED || state == POWER_STATE_RESUMING) {
@@ -589,6 +590,7 @@ uint64_t kernel_runtime_next_deadline(void)
     deadline          = earliest_deadline(deadline, network_service_next_deadline());
     deadline          = earliest_deadline(deadline, hardware_devices_next_deadline());
     deadline          = earliest_deadline(deadline, kernel_application_system_next_deadline());
+    deadline          = earliest_deadline(deadline, filesystem_power_next_deadline());
     if (power_initialized) {
         deadline = earliest_deadline(deadline, power_manager_next_deadline(&power_manager));
     }

@@ -72,8 +72,15 @@ processes, and releases the freeze after a two-second timeout if an application 
 cooperate. Supported generic waits retain readiness and their original deadlines; parking
 does not cancel the wait or consume input. This is not connected to idle display policy
 or exposed as a suspend command. Services and hardware remain running. Storage/service
-drain, reversible display scanout shutdown, ordered resume, and hardware validation are
+integration, reversible display scanout shutdown, ordered resume, and hardware validation are
 still required before CPU sleep can be enabled. No additional current savings are claimed.
+
+Storage now has its own internal admission/drain/sync barrier. It uses a sleeping mutex
+and a one-shot synchronization worker, preserving open descriptors and directory cursors.
+A stalled drain aborts without destroying resources; a timed-out sync retains ownership
+until its worker completes. This storage slice is not yet connected to whole-system
+suspend. Other service callbacks, display quiescence, and hardware validation remain
+outstanding. See [filesystem suspend safety](filesystem.md#suspend-safety-foundation).
 
 Display policy defaults to three deadlines from the same last physical activity:
 

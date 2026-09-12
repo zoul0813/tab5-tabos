@@ -26,6 +26,10 @@ bool platform_storage_info(size_t index, platform_storage_info_t* info);
 bool platform_storage_has_drive(char letter);
 char platform_storage_default_drive(void);
 
+/* Blocking worker-only barrier: sync retained files and mounted-volume metadata.
+ * Caller must drain/freeze storage and retain all handles for the whole call. */
+int platform_storage_sync(const platform_file_t* files, size_t count);
+
 int platform_storage_open(char drive, const char* path, int flags, uint32_t mode, platform_file_t* file);
 int platform_storage_close(platform_file_t file);
 int platform_storage_read(platform_file_t file, void* buffer, size_t count, size_t* bytes_read);

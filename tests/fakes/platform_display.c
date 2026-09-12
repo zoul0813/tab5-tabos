@@ -1062,6 +1062,29 @@ void platform_riscv32_power_checkpoint(void)
 {
 }
 
+platform_work_t* platform_work_start(void (*callback)(void*), void* argument)
+{
+    (void) callback;
+    (void) argument;
+    return NULL;
+}
+
+bool platform_work_complete(const platform_work_t* work)
+{
+    (void) work;
+    return false;
+}
+
+void platform_work_wait(platform_work_t* work)
+{
+    (void) work;
+}
+
+void platform_work_release(platform_work_t* work)
+{
+    (void) work;
+}
+
 void platform_network_operations_cancel(void)
 {
 }

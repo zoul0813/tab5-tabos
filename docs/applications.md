@@ -4,6 +4,27 @@ The supported external application SDK and libc surface are documented in `docs/
 
 TabOS has portable application descriptors, built-in application registry, and single foreground application lifecycle. This foundation runs identically in host and Tab5 builds. Applications use public TabOS APIs and do not call SDL3, ESP-IDF, or FreeRTOS directly.
 
+## Filesystem regression checks
+
+Run the existing tester filesystem module on its own:
+
+```text
+tester --filesystem
+```
+
+It creates a temporary directory and file, changes/restores the working directory,
+writes and reads binary data, seeks, checks file metadata, closes, renames, deletes,
+and cleans up. Expect a PASS result and `failures: 0`; failures return a nonzero exit
+status. `T:/tabos-tester/` is reserved for this test: do not store personal files there.
+
+Run it after fresh boot, after dimming, after backlight-off, and after panel-off.
+Use the keyboard to restore the display and launch it at each stage. No manual test
+files are needed. Normal `tester` already includes the same filesystem checks plus
+the broader SDK tests. Neither command triggers a storage power barrier or CPU sleep.
+
+Only the tester application needs updating for this option; no firmware change is
+required on the existing compatible build.
+
 ## Building Applications
 
 Build and install every independently loaded application with:

@@ -15,6 +15,15 @@
 /* Host mirrors the currently supported Tab5 volume as the default drive. */
 static const char drive_letters[] = {'T', 'A'};
 
+int storage_backend_sync(char letter)
+{
+    (void) letter;
+    /* fsync of open files alone does not establish a volume metadata barrier.
+     * Keep host suspend unavailable until a scoped host-volume implementation
+     * is provided; never substitute global sync() or report false success. */
+    return TABOS_ENOTSUP;
+}
+
 static const char* storage_backend_rootfs(void)
 {
     const char* rootfs = getenv("TABOS_HOST_ROOTFS");

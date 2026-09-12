@@ -730,6 +730,27 @@ tabos_enable_sanitizers(tabos_elf_wait)
 add_test(NAME component.elf_wait COMMAND tabos_elf_wait)
 set_tests_properties(component.elf_wait PROPERTIES TIMEOUT 30)
 
+add_library(tabos_power_storage_backend OBJECT "${TABOS_ROOT}/platform/posix/storage.c")
+target_include_directories(tabos_power_storage_backend PRIVATE
+    "${TABOS_ROOT}/platform/include" "${TABOS_ROOT}/sdk/include")
+target_compile_definitions(tabos_power_storage_backend PRIVATE
+    platform_storage_read=power_storage_read platform_storage_write=power_storage_write)
+tabos_enable_warnings(tabos_power_storage_backend)
+tabos_enable_sanitizers(tabos_power_storage_backend)
+add_executable(tabos_filesystem_power component/filesystem_power.c $<TARGET_OBJECTS:tabos_power_storage_backend>)
+target_include_directories(tabos_filesystem_power PRIVATE
+    "${TABOS_ROOT}/fs/include" "${TABOS_ROOT}/platform/include")
+if(TABOS_TARGET STREQUAL "linux")
+    target_link_libraries(tabos_filesystem_power PRIVATE
+        "-Wl,--start-group" tabos_core tabos_platform_host "-Wl,--end-group" SDL3::SDL3 Threads::Threads)
+else()
+    target_link_libraries(tabos_filesystem_power PRIVATE tabos_core tabos_platform_host SDL3::SDL3 Threads::Threads)
+endif()
+tabos_enable_warnings(tabos_filesystem_power)
+tabos_enable_sanitizers(tabos_filesystem_power)
+add_test(NAME component.filesystem_power COMMAND tabos_filesystem_power)
+set_tests_properties(component.filesystem_power PROPERTIES TIMEOUT 20)
+
 add_executable(tabos_network_socket
     component/network_socket.c
     "${TABOS_ROOT}/platform/posix/socket.c"
@@ -795,6 +816,7 @@ tabos_enable_sanitizers(tabos_network_socket)
 add_test(NAME component.network_socket COMMAND tabos_network_socket)
 
 add_executable(tabos_filesystem
+    fakes/platform_display.c
     component/filesystem.c
     fakes/storage_backend.c
     "${TABOS_ROOT}/platform/posix/storage.c"
@@ -823,6 +845,7 @@ tabos_enable_warnings(tabos_posix_source)
 tabos_enable_sanitizers(tabos_posix_source)
 
 add_executable(tabos_posix_filesystem
+    fakes/platform_display.c
     $<TARGET_OBJECTS:tabos_posix_source>
     fakes/storage_backend.c
     "${TABOS_ROOT}/platform/posix/storage.c"
@@ -849,6 +872,7 @@ tabos_enable_warnings(tabos_coreutils_cp_program)
 tabos_enable_sanitizers(tabos_coreutils_cp_program)
 
 add_executable(tabos_coreutils_cp
+    fakes/platform_display.c
     component/coreutils_cp.c
     $<TARGET_OBJECTS:tabos_coreutils_cp_program>
     fakes/storage_backend.c

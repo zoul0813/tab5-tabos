@@ -20,6 +20,8 @@ The runnable image is `build/apps/tester/tester` and installs as
 
 Tester prints one result per module and returns zero only when every assertion passes.
 The filesystem module uses `T:/tabos-tester/` temporarily and removes it before return.
+Run only this module with `tester --filesystem`; see
+[filesystem regression checks](../../docs/applications.md#filesystem-regression-checks).
 The input module briefly enables nonblocking stdin and consumes any input already queued
 for the process.
 

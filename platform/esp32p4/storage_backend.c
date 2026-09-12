@@ -4,12 +4,27 @@
 #include <esp_err.h>
 #include <esp_log.h>
 #include <esp_vfs_fat.h>
+#include <sdmmc_cmd.h>
+#include <tabos/filesystem.h>
 #include <tabos/config/filesystem.h>
 
 #include <string.h>
 
 static const char* const TAG = "tabos_storage";
 static bool mounted;
+
+int storage_backend_sync(char letter)
+{
+    if (letter != 'T' || !mounted) {
+        return TABOS_ENODEV;
+    }
+    /* Pinned FatFs synchronizes namespace mutations through sync_fs; open-file
+     * data/metadata was flushed with VFS fsync before this call. SDMMC writes
+     * are synchronous (CTRL_SYNC has no pending driver queue). Check card status
+     * without unmounting, closing descriptors, or changing mount identity. */
+    sdmmc_card_t* card = bsp_sdcard_get_handle();
+    return card != NULL && sdmmc_get_status(card) == ESP_OK ? 0 : TABOS_EIO;
+}
 
 size_t storage_backend_drive_count(void)
 {

@@ -917,3 +917,15 @@ Timeout and lifecycle conflicts reopen admission, with copied state and blocker 
 Readiness, original wait deadlines, identities, stacks, and focus are retained. Shutdown
 and forced exit release the freeze before existing teardown. Service-wide admission and
 sleep orchestration remain future work; no automatic parking or hardware sleep is enabled.
+
+Power Phase 5 storage slice adds a reusable atomic service-admission counter with separate
+mutation counts, integrated across filesystem operations including metadata and close.
+The filesystem uses a platform mutex instead of holding a spinlock across disk I/O.
+Runtime-owned `filesystem_power_*` freezes admission, drains admitted/queued work, then
+starts a one-shot platform worker to fsync retained writable descriptors and synchronize
+backend metadata. Handles, offsets, directory position, working directory, and mounts are
+retained. Drain timeout releases freeze; sync timeout keeps borrowed handles protected
+until completion. Shutdown waits before destroying storage. Health audit does not label
+frozen storage offline. Host metadata barriers explicitly return ENOTSUP; Tab5 uses the
+pinned FatFs namespace-sync and synchronous SDMMC contract. Other services and the system
+dependency graph remain unintegrated; this does not enable CPU sleep.

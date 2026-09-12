@@ -259,6 +259,25 @@ int platform_storage_close(platform_file_t file)
     return close((int) file) == 0 ? 0 : map_error(errno);
 }
 
+int platform_storage_sync(const platform_file_t* files, size_t count)
+{
+    if (files == NULL && count != 0U) {
+        return TABOS_EINVAL;
+    }
+    for (size_t index = 0U; index < count; ++index) {
+        if (fsync((int) files[index]) != 0) {
+            return map_error(errno);
+        }
+    }
+    for (size_t index = 0U; index < storage_drive_count; ++index) {
+        const int error = storage_backend_sync(storage_drives[index].letter);
+        if (error != 0) {
+            return error;
+        }
+    }
+    return 0;
+}
+
 int platform_storage_read(platform_file_t file, void* buffer, size_t count, size_t* bytes_read)
 {
     if (bytes_read == NULL) {

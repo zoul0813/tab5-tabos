@@ -226,6 +226,9 @@ Application-parking software validation: macOS Debug/Release full suites pass (7
 each), including native scheduler-fake coverage. Tab5 Debug/Release cross-builds pass.
 Linux and physical parking validation were not run locally.
 
+Operator subsequently confirms normal-operation regression checks passed on Tab5 after
+the application-parking build. The internal parking handshake itself was not exercised.
+
 Initial blockers include:
 
 | Participant | Blocking condition |
@@ -244,13 +247,13 @@ Initial blockers include:
 
 ## Phase 5 — Filesystem safety and reversible service callbacks
 
-- [ ] Replace filesystem spinlock held across storage I/O with scheduler-friendly mutex synchronization.
-- [ ] Add admission and in-flight accounting covering reads, writes, metadata operations, descriptor close, and create/truncate opens.
-- [ ] Track mutations separately for diagnostics; drain all active storage I/O before platform sleep.
-- [ ] Add platform storage synchronization contract. Flush filesystem data and metadata without closing application descriptors or unmounting storage.
-- [ ] Preserve descriptor generations, directory positions, offsets, mount identity, and working directories.
-- [ ] Permit inactive open descriptors, including writable descriptors after successful synchronization. Open handle alone does not imply active mutation.
-- [ ] Do not destroy storage resources if drain deadline expires while I/O still runs. Abort transition; let operation complete normally.
+- [x] Replace filesystem spinlock held across storage I/O with scheduler-friendly mutex synchronization.
+- [x] Add admission and in-flight accounting covering reads, writes, metadata operations, descriptor close, and create/truncate opens.
+- [x] Track mutations separately for diagnostics; require all active storage I/O to drain before the storage barrier succeeds.
+- [x] Add platform storage synchronization contract. Flush filesystem data and metadata without closing application descriptors or unmounting storage; unsupported backends report unavailable.
+- [x] Preserve descriptor generations, directory positions, offsets, mount identity, and working directories.
+- [x] Permit inactive open descriptors, including writable descriptors after successful synchronization. Open handle alone does not imply active mutation.
+- [x] Do not destroy storage resources if drain deadline expires while I/O still runs. Abort transition; let operation complete normally.
 - [ ] Add reversible callbacks for audio/camera workers, display/backlight, input, health audit, networking, and storage.
 - [ ] Reuse existing low-level initialization helpers where safe; do not call public service shutdown paths that invalidate identities.
 - [ ] Suspend network admission, intentionally disconnect Wi-Fi, and quiesce C6 transport through supported component lifecycle.
@@ -259,6 +262,25 @@ Initial blockers include:
 - [ ] Keep unsupported C6 transport lifecycle as explicit blocker until validated.
 
 **Tests:** live descriptors across cycles, concurrent mutations, sync failure, stalled I/O, worker completion during freeze, disconnected Wi-Fi restoration, and unavailable AP.
+
+Storage slice implemented as internal `filesystem_power_*`, with atomic service admission,
+mutex-protected I/O, separate mutation counts, two-second drain/sync deadline, and one-shot
+platform work. Successful barriers retain handles and stay frozen until release. Sync
+timeout/abort retains admission until worker completion; shutdown waits before destruction.
+The health audit skips frozen storage probes. Other services and system graph remain open.
+
+Pinned-source evidence: ESP-IDF v5.4.4 `vfs_fat_fsync` calls `f_sync`; FatFs namespace
+unlink/mkdir/rename paths call `sync_fs`; SDMMC `CTRL_SYNC` has no queued work. Tab5 syncs
+retained writable files and checks card status without closing/unmounting. Actual card
+durability and physical barrier cycles remain unvalidated. Current host backends explicitly
+report ENOTSUP for volume metadata synchronization; per-file fsync alone is insufficient.
+The component test uses a deterministic namespace-barrier model with real POSIX file fsync.
+No CPU sleep or new current savings are claimed by this slice.
+
+Storage-slice software validation: macOS Debug/Release builds and full suites pass (73
+tests each), including blocked I/O, queued metadata, delayed sync completion, and shutdown
+ownership checks. Tab5 Debug/Release cross-builds pass. Linux and physical storage-barrier
+validation remain pending; this slice has not been flashed as part of implementation.
 
 ## Phase 6 — Ordered suspend, resume, and failure handling
 
