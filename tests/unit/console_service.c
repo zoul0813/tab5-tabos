@@ -91,6 +91,15 @@ int main(void)
     if (!tabos_console_get_cursor(&foreground, &column, &row) || column != 0U || row != 1U) {
         return 1;
     }
+    static const char embedded_nul[] = {'A', '\0', 'B'};
+    if (!tabos_console_write_bytes(&foreground, embedded_nul, sizeof(embedded_nul)) ||
+        !tabos_console_write_bytes(&foreground, embedded_nul, 2U) ||
+        !tabos_console_write_bytes(&foreground, embedded_nul + 2U, 1U) ||
+        terminal.cells[terminal.columns].character != 'A' || terminal.cells[terminal.columns + 1U].character != 'B' ||
+        terminal.cells[terminal.columns + 2U].character != 'A' ||
+        terminal.cells[terminal.columns + 3U].character != 'B') {
+        return 1;
+    }
 
     const tabos_input_event_t submitted = {
         .type = TABOS_INPUT_KEY_DOWN,

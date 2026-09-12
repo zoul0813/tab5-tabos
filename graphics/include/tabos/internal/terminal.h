@@ -53,6 +53,7 @@ void terminal_clear(terminal_t* terminal);
 void terminal_redraw(terminal_t* terminal);
 void terminal_set_rendering_enabled(terminal_t* terminal, bool enabled);
 void terminal_set_colors(terminal_t* terminal, platform_pixel_t foreground, platform_pixel_t background);
+void terminal_write_bytes(terminal_t* terminal, const void* data, size_t size);
 void terminal_write(terminal_t* terminal, const char* text);
 void terminal_write_line(terminal_t* terminal, const char* text);
 void terminal_set_cursor_visible(terminal_t* terminal, bool visible);

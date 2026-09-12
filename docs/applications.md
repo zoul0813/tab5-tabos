@@ -165,7 +165,9 @@ strings.
 Independently loaded C17 applications expose `main(argc, argv)`, not a kernel descriptor
 or raw ELF entry. SDK `crt0` and newlib stubs translate standard C/POSIX calls to the
 versioned TabOS ABI. Standard streams are console-backed: stdin is unbuffered, stdout is
-line-buffered, and stderr is unbuffered. Each process owns descriptors, errno, current
+line-buffered, and stderr is unbuffered. A short stdin read retains the unread suffix of a
+batched text event. Counted stdout and stderr writes retain bytes after embedded NUL;
+NUL itself has no terminal action. Each process owns descriptors, errno, current
 working directory, and a bounded heap; children inherit a copy of the parent's working
 directory. TTY input mode is also inherited by value. Applications can include
 `<sys/ioctl.h>` and `<tabos/tty.h>` to query or replace that mode. For example, a game

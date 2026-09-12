@@ -26,7 +26,7 @@ same synchronization.
 
 ## Output and Cursor Controls
 
-Terminal stores character, foreground color, and background color in a cell/history model. Framebuffer is rendered view, not only copy of terminal state. `tabos_console_write()` updates cells and presents changed framebuffer immediately. Normal writes and cursor changes redraw dirty cells only; clear, resize, and viewport movement perform full redraw. Supported controls are:
+Terminal stores character, foreground color, and background color in a cell/history model. Framebuffer is rendered view, not only copy of terminal state. `tabos_console_write()` updates cells and presents changed framebuffer immediately. `tabos_console_write_bytes()` accepts an explicit byte count, so embedded NUL bytes cannot truncate later output; NUL itself has no terminal action. Normal writes and cursor changes redraw dirty cells only; clear, resize, and viewport movement perform full redraw. Supported controls are:
 
 - `\n`: move to first column of next row.
 - `\r`: move to first column of current row.

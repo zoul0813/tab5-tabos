@@ -509,14 +509,21 @@ void terminal_set_rendering_enabled(terminal_t* terminal, bool enabled)
     }
 }
 
-void terminal_write(terminal_t* terminal, const char* text)
+void terminal_write_bytes(terminal_t* terminal, const void* data, size_t size)
 {
-    if (terminal == NULL || terminal->cells == NULL || text == NULL) {
+    if (terminal == NULL || terminal->cells == NULL || (data == NULL && size != 0U)) {
         return;
     }
+    const unsigned char* text = data;
     mark_cursor(terminal);
     terminal->cursor_phase_visible = true;
-    while (*text != '\0') {
+    while (size-- > 0U) {
+        /* NUL has no terminal action. It must not terminate a byte-counted
+         * write or disturb a partially received escape sequence. */
+        if (*text == '\0') {
+            ++text;
+            continue;
+        }
         if (terminal->ansi_state == 1U) {
             if (*text == '[') {
                 terminal->ansi_state = 2U;
@@ -570,7 +577,7 @@ void terminal_write(terminal_t* terminal, const char* text)
                 continue;
             }
             if (!terminal->ansi_invalid) {
-                ansi_command(terminal, *text);
+                ansi_command(terminal, (char) *text);
             }
             terminal->ansi_state = 0U;
             ++text;
@@ -590,13 +597,20 @@ void terminal_write(terminal_t* terminal, const char* text)
         } else if (*text == '\t') {
             tab(terminal);
         } else {
-            put_character(terminal, *text);
+            put_character(terminal, (char) *text);
         }
         ++text;
     }
     follow_live_output(terminal);
     mark_cursor(terminal);
     render(terminal);
+}
+
+void terminal_write(terminal_t* terminal, const char* text)
+{
+    if (text != NULL) {
+        terminal_write_bytes(terminal, text, strlen(text));
+    }
 }
 
 void terminal_write_line(terminal_t* terminal, const char* text)

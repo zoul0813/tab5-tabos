@@ -34,6 +34,10 @@ int main(void)
     check(terminal_init(&terminal, &framebuffer, 1U), "initialize");
 
     terminal_write(&terminal, "abc");
+    static const char embedded_nul[] = {'A', '\0', 'B'};
+    terminal_write_bytes(&terminal, embedded_nul, sizeof(embedded_nul));
+    check(cell(&terminal, 3U, 0U)->character == 'A' && cell(&terminal, 4U, 0U)->character == 'B',
+          "embedded NUL does not terminate byte write");
     terminal_write(&terminal, "\033[2J\033[H");
     check(cell(&terminal, 0U, 0U)->character == '\0', "clear screen");
     check(terminal.column == 0U, "home column");

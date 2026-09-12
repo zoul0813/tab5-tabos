@@ -2,6 +2,7 @@
 #define TABOS_INTERNAL_ELF_APPLICATION_H
 
 #include <tabos/application.h>
+#include <tabos/input.h>
 
 typedef struct loader_elf_application loader_elf_application_t;
 
@@ -13,6 +14,8 @@ const char* loader_elf_application_working_directory(const loader_elf_applicatio
 bool loader_elf_application_set_working_directory(loader_elf_application_t* application, const char* working_directory);
 uint32_t loader_elf_application_tty_mode(const loader_elf_application_t* application);
 bool loader_elf_application_set_tty_mode(loader_elf_application_t* application, uint32_t mode);
+bool loader_elf_application_queue_input_event(loader_elf_application_t* application, const tabos_input_event_t* event);
+int loader_elf_application_read_pending_input(loader_elf_application_t* application, void* buffer, uint32_t count);
 int loader_elf_application_list_directory(loader_elf_application_t* application, const char* path, char* buffer,
                                           uint32_t capacity);
 bool loader_elf_application_runtime_runnable(const tabos_app_descriptor_t* descriptor, const void* application_data);

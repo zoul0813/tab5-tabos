@@ -592,6 +592,9 @@ line-buffered stdout, unbuffered stderr/stdin, binary-transparent I/O, heap
 growth and limit failure, and deterministic cleanup after success and failure.
 Test blocking stdin plus `O_NONBLOCK`/`EAGAIN`. Text fixtures use raw CP437 bytes;
 host Unicode input outside CP437 must be rejected or explicitly substituted.
+ELF standard-stream regressions must read a multi-byte text event one byte at a time
+without loss and verify that embedded NUL, including at counted-write boundaries, does
+not suppress following terminal output.
 
 `component.coreutils_cp` builds the production `cp` source against SDK POSIX
 compatibility headers and the real portable/host storage path. It must reject an
@@ -1054,7 +1057,8 @@ per present, and matching logical output on host and Tab5.
 
 Foreground application stdin represents arrow-key presses and normalized repeats as ANSI
 CSI `A`, `B`, `C`, and `D` sequences. Reads smaller than a sequence must preserve and
-return its remaining bytes on later calls. Graphics-mode arrow keys must reach the active
+return its remaining bytes on later calls. The same bounded pending buffer preserves a
+multi-byte text event across short reads. Graphics-mode arrow keys must reach the active
 application rather than trigger inherited terminal scrollback policy.
 
 ---

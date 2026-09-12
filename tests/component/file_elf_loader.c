@@ -71,6 +71,21 @@ static bool large_directory_reports_overflow(loader_elf_application_t* applicati
     return valid;
 }
 
+static bool batched_text_survives_short_reads(loader_elf_application_t* application)
+{
+    const tabos_input_event_t event = {.type = TABOS_INPUT_TEXT, .text = "paste"};
+    char copied[sizeof("paste")]    = {0};
+    if (!loader_elf_application_queue_input_event(application, &event)) {
+        return false;
+    }
+    for (size_t index = 0U; index < sizeof("paste") - 1U; ++index) {
+        if (loader_elf_application_read_pending_input(application, &copied[index], 1U) != 1) {
+            return false;
+        }
+    }
+    return strcmp(copied, "paste") == 0 && loader_elf_application_read_pending_input(application, copied, 1U) == 0;
+}
+
 int main(void)
 {
     if (!filesystem_init()) {
@@ -103,6 +118,7 @@ int main(void)
                                     (uint32_t) (TABOS_TTY_MODE_SCROLL_KEYS | TABOS_TTY_MODE_RAW_INPUT) &&
                                 !loader_elf_application_set_tty_mode(application, UINT32_C(0x80000000));
     const bool directory_overflow = application != NULL && large_directory_reports_overflow(application);
+    const bool batched_text       = application != NULL && batched_text_survives_short_reads(application);
     loader_elf_application_destroy(application);
 
     static const unsigned char invalid_elf[] = {0U};
@@ -133,5 +149,5 @@ int main(void)
     (void) tabos_fs_unlink(path);
     (void) tabos_fs_rmdir("A:/bin");
     filesystem_shutdown();
-    return valid && missing_rejected && tty_mode_valid && directory_overflow && inherited_paths ? 0 : 1;
+    return valid && missing_rejected && tty_mode_valid && directory_overflow && batched_text && inherited_paths ? 0 : 1;
 }
