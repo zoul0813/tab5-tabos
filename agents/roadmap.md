@@ -721,6 +721,8 @@ but is not a substitute for this execution path.
 
 ## Maintenance and Technical Debt
 
+- [x] Make `wc` propagate open, read, and close failures through its process status,
+  with deterministic injected stream-error regression coverage.
 - [x] Release provisional POSIX `DIR*` wrapper entries after failed opens in both
   application and non-application builds, including unavailable listing gates.
 - [x] Centralize Tab5 GPIO ISR-service ownership; touch attaches directly with checked
