@@ -8,9 +8,10 @@ mono or stereo. Capture accepts one channel through the channel count reported b
 backend capabilities.
 
 The `audio0` device reports the available playback, capture, route, and AEC features.
-Tab5 uses ES8388 playback and ES7210 capture. The host uses SDL3 playback and recording;
-headless host tests use deterministic callback buffers. AEC is absent unless a platform
-backend explicitly reports working support.
+Tab5 uses ES8388 playback and ES7210 capture. The interactive host uses SDL3 playback and
+recording. The headless host runs a demand-started software audio clock: it drains playback,
+produces deterministic silent stereo capture, and wakes audio waits every 10 ms. AEC is
+absent unless a platform backend explicitly reports working support.
 
 Tab5 monitors the headphone-detect input on its PI4IOE5V6408 expander. Inserting headphones
 automatically disables the main speaker amplifier while leaving headphone playback active.

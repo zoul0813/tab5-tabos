@@ -1793,3 +1793,5 @@ capture, route, fault, wait, and shared-clock assertions remain mandatory. Healt
 must prove suspended deadlines disappear, no audit occurs while paused, and resume runs one
 overdue audit while advancing directly to the next future deadline. Cross-build real Tab5
 audio code; host fakes do not prove codec shutdown, jack routing, or electrical savings.
+The real headless host backend must also fill and drain a playback ring, produce capture PCM,
+and wake playback and capture waits without an SDL audio device.

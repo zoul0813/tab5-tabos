@@ -55,9 +55,9 @@ The resolved component lock is `targets/tab5/dependencies.lock`.
 | Host SDL/POSIX backend | SDL event wait, display/audio callbacks, host socket/TLS/DNS workers and camera completion worker; RV32 instruction slices while guest runnable. | Blocking for simulated suspend until deterministic manager model exists. Never use host process CPU or host power as Tab5 electrical evidence. |
 
 Known audit prerequisites remain separate repairs: native task quiescence, Wi-Fi
-partial-init unwind, headless audio progress and recoverable FAT replacement. Historical
-shutdown success or a passing host suite does not prove these paths safe. Refresh this
-inventory after integrating audit fixes, especially host worker and process lifetimes.
+partial-init unwind, and recoverable FAT replacement. Historical shutdown success or a
+passing host suite does not prove these paths safe. Refresh this inventory after integrating
+audit fixes, especially process lifetimes.
 
 ## Existing PM locks
 
