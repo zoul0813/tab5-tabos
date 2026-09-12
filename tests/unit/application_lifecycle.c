@@ -200,8 +200,9 @@ int main(void)
         return 1;
     }
 
+    platform_framebuffer_t* framebuffer = display_framebuffer();
     terminal_t terminal;
-    if (!terminal_init(&terminal, display_framebuffer(), 2U)) {
+    if (!terminal_init(&terminal, framebuffer, 2U)) {
         return 1;
     }
     if (!console_init(&terminal)) {
@@ -312,6 +313,12 @@ int main(void)
         return 1;
     }
 
+    const size_t pixel_count = framebuffer->stride_pixels * framebuffer->height;
+    for (size_t pixel = 0U; pixel < pixel_count; ++pixel) {
+        framebuffer->pixels[pixel] = 0x1234U;
+    }
+    console_set_graphics_active(true);
+    const unsigned int presents_before_exit_panic = test_platform_display_present_calls();
     kernel_application_system_update();
     tabos_process_termination_t panic_cause = TABOS_PROCESS_TERMINATION_NONE;
     if (tabos_app_is_running() || tabos_app_active() != &test_app || update_calls != 1U || cleanup_calls != 1U ||
@@ -320,6 +327,8 @@ int main(void)
         !tabos_process_panic_info(&panic_cause, &exit_status) ||
         panic_cause != TABOS_PROCESS_TERMINATION_EXIT_REQUEST || exit_status != 7 ||
         strstr(test_platform_last_log(), "exit request") == NULL || !terminal_contains(&terminal, "KERNEL PANIC") ||
+        console_graphics_active() || !terminal.rendering_enabled || terminal.cursor_visible ||
+        test_platform_display_present_calls() != presents_before_exit_panic + 1U || framebuffer->pixels[0] == 0x1234U ||
         tabos_console_acquire(&denied)) {
         return 1;
     }
@@ -341,7 +350,12 @@ int main(void)
         if (!application_registry_register(&panic_app) || tabos_app_launch("panic-test") != TABOS_APP_RESULT_OK) {
             return 1;
         }
-        requested_panic_cause = panic_causes[index];
+        for (size_t pixel = 0U; pixel < pixel_count; ++pixel) {
+            framebuffer->pixels[pixel] = 0x1234U;
+        }
+        console_set_graphics_active(true);
+        const unsigned int presents_before_panic = test_platform_display_present_calls();
+        requested_panic_cause                    = panic_causes[index];
         test_platform_clear_log();
         if (requested_panic_cause == TABOS_PROCESS_TERMINATION_FORCED) {
             if (!kernel_process_force_terminate(0U, 41)) {
@@ -350,7 +364,10 @@ int main(void)
         }
         kernel_application_system_update();
         if (!tabos_process_panic_info(&panic_cause, &exit_status) || panic_cause != requested_panic_cause ||
-            exit_status != 41 || tabos_process_count() != 1U || strlen(test_platform_last_log()) == 0U) {
+            exit_status != 41 || tabos_process_count() != 1U || strlen(test_platform_last_log()) == 0U ||
+            console_graphics_active() || !terminal.rendering_enabled || terminal.cursor_visible ||
+            test_platform_display_present_calls() != presents_before_panic + 1U ||
+            !terminal_contains(&terminal, "KERNEL PANIC") || framebuffer->pixels[0] == 0x1234U) {
             return 1;
         }
         kernel_application_system_shutdown();
