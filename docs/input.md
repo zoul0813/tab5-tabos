@@ -47,7 +47,9 @@ remains responsive.
 Held-key repeat uses an exact monotonic deadline: initial delay starts on key-down and
 matching key-up or input reset cancels it immediately. If runtime handles a repeat late,
 it emits one repeat and schedules the next future interval instead of replaying missed
-events in a burst.
+events in a burst. Modifier presses and releases refresh the held key's repeat modifiers
+and translated text, so changing Shift while a key remains down changes subsequent repeats.
+Backend-generated repeat events are discarded in favor of this single portable stream.
 
 ## Host Backend
 

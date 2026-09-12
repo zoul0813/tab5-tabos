@@ -125,6 +125,61 @@ int main(void)
     if (tabos_input_poll(&received) || !input_submit(&held) || input_next_deadline() == UINT64_MAX) {
         return 1;
     }
+
+    if (!input_init()) {
+        return 1;
+    }
+    const tabos_input_event_t shifted_a = {
+        .type      = TABOS_INPUT_KEY_DOWN,
+        .key       = TABOS_KEY_A,
+        .modifiers = TABOS_MODIFIER_SHIFT,
+    };
+    const tabos_input_event_t shifted_text = {
+        .type      = TABOS_INPUT_TEXT,
+        .modifiers = TABOS_MODIFIER_SHIFT,
+        .text      = "A",
+    };
+    const tabos_input_event_t backend_repeat = {
+        .type      = TABOS_INPUT_TEXT,
+        .modifiers = TABOS_MODIFIER_SHIFT | TABOS_MODIFIER_SYM,
+        .repeat    = true,
+        .text      = "?",
+    };
+    if (!input_submit(&shifted_a) || !tabos_input_poll(&received) || !input_submit(&backend_repeat) ||
+        tabos_input_poll(&received) || !input_submit(&shifted_text) || !tabos_input_poll(&received)) {
+        return 1;
+    }
+    const tabos_input_event_t shift_up = {
+        .type = TABOS_INPUT_KEY_UP,
+        .key  = TABOS_KEY_SHIFT,
+    };
+    if (!input_submit(&shift_up) || !tabos_input_poll(&received)) {
+        return 1;
+    }
+    test_platform_advance_time_ms(TABOS_KEY_REPEAT_DELAY_MS);
+    input_update();
+    if (!tabos_input_poll(&received) || received.type != TABOS_INPUT_KEY_DOWN || received.key != TABOS_KEY_A ||
+        received.modifiers != 0U || !received.repeat || !tabos_input_poll(&received) ||
+        received.type != TABOS_INPUT_TEXT || received.modifiers != 0U || strcmp(received.text, "a") != 0 ||
+        !received.repeat || tabos_input_poll(&received)) {
+        return 1;
+    }
+    const tabos_input_event_t shift_down = {
+        .type      = TABOS_INPUT_KEY_DOWN,
+        .key       = TABOS_KEY_SHIFT,
+        .modifiers = TABOS_MODIFIER_SHIFT,
+    };
+    if (!input_submit(&shift_down) || !tabos_input_poll(&received)) {
+        return 1;
+    }
+    test_platform_advance_time_ms(TABOS_KEY_REPEAT_INTERVAL_MS);
+    input_update();
+    if (!tabos_input_poll(&received) || received.type != TABOS_INPUT_KEY_DOWN || received.key != TABOS_KEY_A ||
+        received.modifiers != TABOS_MODIFIER_SHIFT || !received.repeat || !tabos_input_poll(&received) ||
+        received.type != TABOS_INPUT_TEXT || received.modifiers != TABOS_MODIFIER_SHIFT ||
+        strcmp(received.text, "A") != 0 || !received.repeat || tabos_input_poll(&received)) {
+        return 1;
+    }
     if (!input_init() || input_next_deadline() != UINT64_MAX) {
         return 1;
     }
