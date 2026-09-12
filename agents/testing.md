@@ -1003,6 +1003,10 @@ rectangles on every side, extreme coordinates, and zero-sized rectangles must le
 the framebuffer and surrounding canaries unchanged; partially clipped fills must
 still produce the expected pixels.
 
+`unit.sdk_graphics` clips line and rectangle-outline geometry before dispatch. It must
+cover opposite `INT32` endpoint extremes, wholly invisible primitives, in-bounds fill
+gate arguments, and call counts bounded by the visible canvas rather than input span.
+
 Fullscreen graphics tests must verify terminal writes, redraws, cursor timers, and
 scrollback navigation cannot alter or present the graphics framebuffer. TTY navigation
 keys must reach the graphics application regardless of its inherited TTY mode. Closing

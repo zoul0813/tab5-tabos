@@ -2,6 +2,7 @@
 #include <tabos/internal/elf_api.h>
 
 #include <errno.h>
+#include <limits.h>
 #include <stddef.h>
 
 static unsigned int close_count;
@@ -17,6 +18,12 @@ static uint32_t expected_output_width;
 static uint32_t expected_output_height;
 static uint32_t overlay_flags;
 static unsigned int blit_count;
+static unsigned int fill_count;
+static bool fill_bounds_valid;
+static int32_t first_fill_x;
+static int32_t first_fill_y;
+static int32_t last_fill_x;
+static int32_t last_fill_y;
 
 static int graphics_open(uint32_t* width, uint32_t* height)
 {
@@ -41,6 +48,23 @@ static int graphics_clear(uint32_t color)
 {
     ++clear_count;
     cleared_color = (tabos_color_t) color;
+    return 0;
+}
+
+static int graphics_fill_rect(int32_t x, int32_t y, uint32_t width, uint32_t height, uint32_t color)
+{
+    (void) color;
+    if (fill_count == 0U) {
+        first_fill_x = x;
+        first_fill_y = y;
+    }
+    last_fill_x = x;
+    last_fill_y = y;
+    ++fill_count;
+    if (x < 0 || y < 0 || width == 0U || height == 0U || (uint64_t) (uint32_t) x + width > 1280U ||
+        (uint64_t) (uint32_t) y + height > 720U) {
+        fill_bounds_valid = false;
+    }
     return 0;
 }
 
@@ -80,6 +104,7 @@ static const tabos_elf_api_t api = {
     .abi_version           = TABOS_ELF_API_VERSION,
     .graphics_open         = graphics_open,
     .graphics_clear        = graphics_clear,
+    .graphics_fill_rect    = graphics_fill_rect,
     .graphics_present      = graphics_present,
     .graphics_close        = graphics_close,
     .graphics_capabilities = graphics_capabilities,
@@ -155,11 +180,42 @@ int main(void)
 
     graphics = (tabos_graphics_t) {0};
     if (tabos_graphics_open(&graphics) != 0 || graphics.width != 1280U || graphics.height != 720U ||
-        graphics.scale != 1U || graphics.pixels != NULL ||
-        tabos_graphics_blit(&graphics, 0, 0, 0U, 1U, sprite) != -1 || errno != EINVAL || blit_count != 0U ||
-        tabos_graphics_blit(&graphics, 0, 0, 1U, 0U, sprite) != -1 || errno != EINVAL || blit_count != 0U ||
-        tabos_graphics_blit(&graphics, 0, 0, 1U, 1U, sprite) != 0 || blit_count != 1U ||
-        tabos_graphics_close(&graphics) != 0 || close_count != 3U) {
+        graphics.scale != 1U || graphics.pixels != NULL || tabos_graphics_blit(&graphics, 0, 0, 0U, 1U, sprite) != -1 ||
+        errno != EINVAL || blit_count != 0U || tabos_graphics_blit(&graphics, 0, 0, 1U, 0U, sprite) != -1 ||
+        errno != EINVAL || blit_count != 0U || tabos_graphics_blit(&graphics, 0, 0, 1U, 1U, sprite) != 0 ||
+        blit_count != 1U) {
+        return 1;
+    }
+
+    fill_bounds_valid = true;
+    fill_count        = 0U;
+    if (tabos_graphics_line(&graphics, INT32_MIN, 100, INT32_MAX, 100, red) != 0 || !fill_bounds_valid ||
+        fill_count != 1280U || first_fill_x != 0 || first_fill_y != 100 || last_fill_x != 1279 || last_fill_y != 100) {
+        return 1;
+    }
+    fill_count = 0U;
+    if (tabos_graphics_line(&graphics, INT32_MIN, INT32_MIN, INT32_MAX, INT32_MAX, red) != 0 || !fill_bounds_valid ||
+        fill_count != 720U || first_fill_x != 0 || first_fill_y != 0 || last_fill_x != 719 || last_fill_y != 719) {
+        return 1;
+    }
+    fill_count = 0U;
+    if (tabos_graphics_line(&graphics, INT32_MIN, INT32_MIN, INT32_MAX, INT32_MIN, red) != 0 || fill_count != 0U ||
+        tabos_graphics_line(&graphics, INT32_MAX, 0, INT32_MAX, 719, red) != 0 || fill_count != 0U) {
+        return 1;
+    }
+    if (tabos_graphics_rect(&graphics, INT32_MAX, INT32_MIN, UINT32_MAX, UINT32_MAX, red) != 0 || fill_count != 0U) {
+        return 1;
+    }
+    if (tabos_graphics_rect(&graphics, 10, INT32_MIN, 2U, UINT32_MAX, red) != 0 || !fill_bounds_valid ||
+        fill_count != 2U || first_fill_x != 10 || first_fill_y != 0 || last_fill_x != 11 || last_fill_y != 0) {
+        return 1;
+    }
+    fill_count = 0U;
+    if (tabos_graphics_rect(&graphics, INT32_MIN, 10, UINT32_MAX, 2U, red) != 0 || !fill_bounds_valid ||
+        fill_count != 2U || first_fill_x != 0 || first_fill_y != 10 || last_fill_x != 0 || last_fill_y != 11) {
+        return 1;
+    }
+    if (tabos_graphics_close(&graphics) != 0 || close_count != 3U) {
         return 1;
     }
     return 0;
