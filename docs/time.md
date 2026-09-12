@@ -74,4 +74,4 @@ from the workstation clock. Setting time in the host simulator changes only an
 in-process offset; it never changes the workstation clock. RTC absence or invalid
 calendar data is nonfatal and wall-clock calls fail with `errno` set. Detected RTC
 hardware appears as `rtc0` in the device registry. Read/write or calendar-data failures
-move it to `fault`; a later successful operation restores `ready`.
+move it to `fault` immediately; a later successful operation immediately restores `ready`.

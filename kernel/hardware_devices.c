@@ -237,6 +237,24 @@ static void audit_unreported_health(void)
     }
 }
 
+void hardware_devices_health_changed(hardware_device_health_t health)
+{
+    if (!initialized) {
+        return;
+    }
+    if (health == HARDWARE_DEVICE_HEALTH_RTC && rtc_device != TABOS_DEVICE_ID_INVALID) {
+        int rtc_error        = 0;
+        const bool rtc_ready = platform_wall_clock_status(&rtc_error);
+        (void) device_registry_set_state(rtc_device, rtc_ready ? TABOS_DEVICE_READY : TABOS_DEVICE_FAULT,
+                                         rtc_ready ? 0 : (rtc_error != 0 ? rtc_error : EIO));
+    } else if (health == HARDWARE_DEVICE_HEALTH_BATTERY && battery_device != TABOS_DEVICE_ID_INVALID) {
+        int battery_error        = 0;
+        const bool battery_ready = platform_battery_health(&battery_error);
+        (void) device_registry_set_state(battery_device, battery_ready ? TABOS_DEVICE_READY : TABOS_DEVICE_FAULT,
+                                         battery_ready ? 0 : (battery_error != 0 ? battery_error : EIO));
+    }
+}
+
 void hardware_devices_update(void)
 {
     if (!initialized) {

@@ -70,6 +70,19 @@ bool console_init(terminal_t* terminal)
     return true;
 }
 
+void console_rebind(terminal_t* terminal)
+{
+    if (console_mutex == NULL || terminal == NULL) {
+        return;
+    }
+    lock_console();
+    active_terminal = terminal;
+    if (foreground_token != 0U) {
+        restart_cursor_blink();
+    }
+    unlock_console();
+}
+
 console_resize_result_t console_resize(platform_framebuffer_t* framebuffer, unsigned int scale)
 {
     if (console_mutex == NULL) {

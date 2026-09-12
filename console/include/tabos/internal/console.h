@@ -15,6 +15,7 @@ typedef enum {
 
 bool console_get_size(const tabos_console_session_t* session, tabos_tty_size_t* size);
 bool console_init(terminal_t* terminal);
+void console_rebind(terminal_t* terminal);
 console_resize_result_t console_resize(platform_framebuffer_t* framebuffer, unsigned int scale);
 bool console_write_panic(const char* text);
 void console_shutdown(void);
