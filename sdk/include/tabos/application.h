@@ -25,6 +25,7 @@ typedef enum {
     TABOS_PROCESS_RUNNING = 0,
     TABOS_PROCESS_BLOCKED,
     TABOS_PROCESS_PANICKED,
+    TABOS_PROCESS_EXITED,
 } tabos_process_state_t;
 
 typedef enum {
@@ -39,7 +40,7 @@ typedef struct {
         tabos_process_id_t id;
         tabos_process_id_t parent_id;
         tabos_process_state_t state;
-        const char* name;
+        const char* name; /* NULL for an exited child whose image has been released. */
 } tabos_process_info_t;
 
 typedef bool (*tabos_app_entry_fn)(tabos_app_context_t* context);

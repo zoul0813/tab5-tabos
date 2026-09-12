@@ -10,6 +10,121 @@
 #include "platform_test.h"
 
 #include <string.h>
+#include <assert.h>
+
+static tabos_app_context_t* concurrent_root;
+static tabos_app_context_t* concurrent_contexts[32];
+static unsigned int concurrent_progress[32];
+static unsigned int concurrent_cleanups;
+
+static bool concurrent_root_entry(tabos_app_context_t* context)
+{
+    concurrent_root = context;
+    return tabos_app_console(context) != NULL;
+}
+
+static bool concurrent_entry(tabos_app_context_t* context)
+{
+    const tabos_process_id_t id = tabos_app_process_id(context);
+    assert(id > 0U && id < 32U);
+    assert(tabos_app_console(context) == NULL);
+    concurrent_contexts[id] = context;
+    return true;
+}
+
+static void concurrent_update(tabos_app_context_t* context)
+{
+    const tabos_process_id_t id = tabos_app_process_id(context);
+    assert(id > 0U && id < 32U);
+    ++concurrent_progress[id];
+}
+
+static void concurrent_cleanup(tabos_app_context_t* context, int status)
+{
+    (void) context;
+    (void) status;
+    ++concurrent_cleanups;
+}
+
+static const tabos_app_descriptor_t concurrent_root_app = {
+    .abi_version  = TABOS_APPLICATION_ABI_VERSION,
+    .name         = "concurrent-root",
+    .version      = "1.0.0",
+    .capabilities = TABOS_APP_CAPABILITY_CONSOLE,
+    .entry        = concurrent_root_entry,
+};
+
+static const tabos_app_descriptor_t concurrent_child_app = {
+    .abi_version = TABOS_APPLICATION_ABI_VERSION,
+    .name        = "concurrent-child",
+    .version     = "1.0.0",
+    .entry       = concurrent_entry,
+    .update      = concurrent_update,
+    .cleanup     = concurrent_cleanup,
+};
+
+static void test_concurrent_processes(void)
+{
+    kernel_application_system_init();
+    assert(application_registry_register(&concurrent_root_app));
+    assert(tabos_app_launch("concurrent-root") == TABOS_APP_RESULT_OK);
+    tabos_process_id_t first  = TABOS_PROCESS_ID_INVALID;
+    tabos_process_id_t second = TABOS_PROCESS_ID_INVALID;
+    assert(kernel_process_spawn_descriptor(concurrent_root, &concurrent_child_app, NULL, NULL, &first) ==
+           TABOS_APP_RESULT_OK);
+    assert(kernel_process_spawn_descriptor(concurrent_root, &concurrent_child_app, NULL, NULL, &second) ==
+           TABOS_APP_RESULT_OK);
+    assert(first != second);
+    assert(tabos_app_active() == &concurrent_root_app);
+    for (unsigned int pass = 0U; pass < 5U; ++pass) {
+        kernel_application_system_update();
+    }
+    assert(concurrent_progress[first] == 5U && concurrent_progress[second] == 5U);
+    int status = 123;
+    assert(kernel_process_reap(concurrent_root, first, &status) == 0 && status == 123);
+    assert(kernel_process_reap(concurrent_contexts[second], first, &status) == -1);
+    tabos_app_request_exit(concurrent_contexts[first], 42);
+    kernel_application_system_update();
+    assert(concurrent_cleanups == 1U);
+    assert(concurrent_progress[first] == 5U && concurrent_progress[second] == 6U);
+    tabos_process_info_t info;
+    assert(tabos_process_info(first, &info) && info.state == TABOS_PROCESS_EXITED && info.name == NULL);
+    assert(kernel_process_reap(concurrent_root, first, &status) == 1 && status == 42);
+    assert(kernel_process_reap(concurrent_root, first, &status) == -1);
+    assert(concurrent_cleanups == 1U);
+
+    tabos_process_id_t grandchild;
+    assert(kernel_process_spawn_descriptor(concurrent_contexts[second], &concurrent_child_app, NULL, NULL,
+                                           &grandchild) == TABOS_APP_RESULT_OK);
+    assert(grandchild != first && grandchild != second);
+    assert(tabos_process_info(grandchild, &info) && info.parent_id == second);
+    assert(kernel_process_force_terminate(second, 9));
+    kernel_application_system_update();
+    assert(!tabos_process_info(grandchild, &info));
+    assert(concurrent_cleanups == 3U);
+    assert(kernel_process_reap(concurrent_root, second, &status) == 1 && status == 9);
+    assert(tabos_process_count() == 1U);
+
+    /* Unreaped exits consume slots, but their execution/resources are gone. */
+    tabos_process_id_t children[15];
+    for (size_t index = 0U; index < 15U; ++index) {
+        assert(kernel_process_spawn_descriptor(concurrent_root, &concurrent_child_app, NULL, NULL, &children[index]) ==
+               TABOS_APP_RESULT_OK);
+        tabos_app_request_exit(concurrent_contexts[children[index]], (int) index);
+    }
+    kernel_application_system_update();
+    assert(tabos_process_count() == 16U && concurrent_cleanups == 18U);
+    tabos_process_id_t rejected = TABOS_PROCESS_ID_INVALID;
+    assert(kernel_process_spawn_descriptor(concurrent_root, &concurrent_child_app, NULL, NULL, &rejected) ==
+           TABOS_APP_RESULT_START_FAILED);
+    assert(rejected == TABOS_PROCESS_ID_INVALID);
+    for (size_t index = 0U; index < 15U; ++index) {
+        assert(kernel_process_reap(concurrent_root, children[index], &status) == 1 && status == (int) index);
+    }
+    assert(tabos_process_count() == 1U);
+    kernel_application_system_shutdown();
+    assert(concurrent_cleanups == 18U);
+}
 
 static unsigned int entry_calls;
 static unsigned int update_calls;
@@ -372,6 +487,8 @@ int main(void)
         }
         kernel_application_system_shutdown();
     }
+
+    test_concurrent_processes();
 
     console_shutdown();
     terminal_shutdown(&terminal);

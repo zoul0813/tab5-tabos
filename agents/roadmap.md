@@ -1,5 +1,10 @@
 # TabOS Implementation Roadmap
 
+GUI implementation is in progress; see [GUI tasks](apps/gui.md). The initial
+internal process foundation separates asynchronous runnable children from the
+foreground stack and retains resource-free exit records for single reaping.
+Public concurrent SDK launch, GUI services and desktop remain pending.
+
 > Status: living agent work tracker.
 >
 > Audience: coding agents. This is not user or contributor documentation.

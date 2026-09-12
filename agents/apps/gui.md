@@ -1,6 +1,8 @@
 # GUI Implementation Tasks
 
-Status: planned, 2026-09-12. No implementation or validation is claimed by this checklist.
+Status: implementation in progress, 2026-09-12. Contracts and the initial internal
+process scheduling foundation are implemented; desktop and public concurrent SDK
+launch are not yet available. Evidence below is scoped to completed work.
 
 Direction and scope: [TabOS Retro Desktop milestone](../milestone-gui.md). This file tracks executable work packages; the milestone records agreed product behavior. Read [context](../TABOS_CONTEXT.md), [architecture](../architecture.md), [testing](../testing.md), and [roadmap](../roadmap.md) before implementation, plus [coding style](../coding-style.md) before C changes.
 
@@ -12,13 +14,19 @@ Direction and scope: [TabOS Retro Desktop milestone](../milestone-gui.md). This 
 - Keep full release scope. An early compositor demo is an internal milestone, not the completed desktop.
 - Resource quotas, staging strategy, and low-level protocol details need concrete specifications and measurements in Phase 0. These are explicit tasks, not already settled numerical contracts.
 
+Current user restrictions: no Linux builds/tests, Tab5 flashing, host simulator
+launch or UI automation. macOS and Tab5 builds and macOS automated suites are
+allowed. Exclude `integration.host_smoke`, which launches the simulator binary.
+Physical gates remain pending. Foundational work may proceed from recorded
+contracts without claiming measured hardware acceptance.
+
 ## Phase 0 — Contracts and Resource Feasibility
 
 Exit gate: ownership/lifecycle contracts are recorded and measured memory feasibility supports maximized independent clients before committing to the surface implementation.
 
-- [ ] GUI-001: Audit current process manager, SDK spawn/wait wrappers, host RV32 scheduling, native task guards, input ownership, graphics close, loader metadata, and build integration. Record relevant entry points and stale documentation in this task file.
-- [ ] GUI-002: Specify concurrent spawn, actual PID return, copied launch arguments, child-exit readiness, wait/reap, process-table exhaustion, and parent-exit cleanup. Preserve synchronous `tabos_exec()` and define the shell migration from the existing spawn wrapper.
-- [ ] GUI-003: Specify GUI-session membership, inherited membership for GUI-client descendants, exclusive display/input grants, and ownership restoration. Keep fullscreen handoff descendants outside the paused GUI-client set; prevent launches from escaping a pause/shutdown already in progress.
+- [x] GUI-001: Audit current process manager, SDK spawn/wait wrappers, host RV32 scheduling, native task guards, input ownership, graphics close, loader metadata, and build integration. Record relevant entry points and stale documentation in this task file.
+- [x] GUI-002: Specify concurrent spawn, actual PID return, copied launch arguments, child-exit readiness, wait/reap, process-table exhaustion, and parent-exit cleanup. Preserve synchronous `tabos_exec()` and define the shell migration from the existing spawn wrapper.
+- [x] GUI-003: Specify GUI-session membership, inherited membership for GUI-client descendants, exclusive display/input grants, and ownership restoration. Keep fullscreen handoff descendants outside the paused GUI-client set; prevent launches from escaping a pause/shutdown already in progress.
 - [ ] GUI-004: Specify public copied IPC operations, endpoint discovery/grant handoff, queue/message limits, stale-handle behavior, generic waits, and disconnect semantics. Reserve bounded lifecycle/control delivery so data/input saturation cannot prevent pause, close, or recovery.
 - [ ] GUI-005: Specify surface create/upload/commit/read-grant/release semantics, bounded staging, atomic visibility, damage bounds, read/commit synchronization, and abort/failure cleanup. Choose buffering from measurements rather than assuming two full buffers per client.
 - [ ] GUI-006: Measure representative maximized RGB565 client memory on Tab5, including client canvas/heap, staging, retained surface, compositor, scanout, executable, and OS allocations. Measure prototype upload/composition time and existing Starfall/DOOM requirements; record peak/headroom and choose initial configurable resource limits. Do not promise a reserved game budget.
@@ -104,3 +112,25 @@ Exit gate: complete first-release experience, automated evidence, hardware resul
 - Desktop auto-start, independent terminal windows, clipboard, drag-and-drop, full app manifests, transparency, and third-party GUI framework integration.
 - GUI checkpoint/unload, switching away from a running fullscreen game, and arbitrary native crash recovery.
 - USB HID backends and controller navigation mapping; these may later feed normalized input services and do not block the initial desktop.
+
+## Implementation Evidence — Process Foundation
+
+Contracts and audited entry points: [GUI service contracts](../gui-contracts.md).
+GUI-004/005/007 remain open for precise protocol encoding, capacities and measured
+buffering selection. GUI-006 physical measurements remain unavailable under the
+current execution restrictions.
+
+GUI-101/103/106 are partially implemented: process manager supports internal
+asynchronous descriptor launch without foreground transfer, rotating bounded
+snapshot dispatch, retained exit records, single reaping and descendant cleanup.
+Public SDK spawn, ELF background launch and GUI sessions remain pending, so these
+whole tasks are not checked complete.
+
+macOS Debug build passed. ASan/UBSan tests passed: `unit.application_lifecycle`,
+`unit.core_smoke`, `component.file_elf_loader`, `component.rv32_execution`,
+`component.elf_graphics_cleanup`, `unit.native_task` and four architecture checks.
+The lifecycle test covers two progressing children, foreground preservation,
+foreign/repeated reaping, exit-before-wait, forced descendant cleanup, slot reuse,
+unreaped table exhaustion and all existing nested/PID-0 cases. No simulator binary
+was run. `./tools/tabos tab5 debug build` also passed; firmware has 12,016
+bytes of app-partition headroom. No flashing or physical validation was performed.

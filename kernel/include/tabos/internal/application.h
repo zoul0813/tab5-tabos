@@ -30,5 +30,12 @@ void application_report_diagnostic_result(tabos_app_context_t* context, int stat
 tabos_app_result_t kernel_process_launch_child(tabos_app_context_t* parent, const char* name);
 void kernel_process_fail(tabos_app_context_t* context, tabos_process_termination_t cause, int exit_status);
 bool kernel_process_force_terminate(tabos_process_id_t process_id, int exit_status);
+/* Runtime-thread only. Spawn consumes application_data on success and failure. */
+tabos_app_result_t kernel_process_spawn_descriptor(tabos_app_context_t* parent,
+                                                   const tabos_app_descriptor_t* descriptor, void* application_data,
+                                                   void (*application_data_destroy)(void*),
+                                                   tabos_process_id_t* child_id);
+/* 1: reaped, 0: still running, -1: not an asynchronous child of this parent. */
+int kernel_process_reap(tabos_app_context_t* parent, tabos_process_id_t child_id, int* status);
 
 #endif

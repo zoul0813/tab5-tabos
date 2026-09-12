@@ -169,6 +169,15 @@ Host builds are especially useful for:
 
 ### Persistent foreground-process validation
 
+GUI concurrency extends, rather than removes, the synchronous scenarios below.
+`unit.application_lifecycle` also checks internal independent children, unchanged
+foreground ownership, foreign/repeated reaping, retained exit status, descendant
+cleanup, slot reuse and capacity occupied by unreaped exits. This is a process
+manager test, not proof of public SDK concurrency or physical native contention.
+For GUI implementation the user excludes Linux, Tab5 flashing and host simulator
+launch/control. Run macOS suites without `integration.host_smoke`; retain hardware
+acceptance as pending.
+
 [DECIDED] Process tests must model persistent nested execution rather than restarting
 caller after each command. Minimum scenario is shell process 0 executing child, child
 executing grandchild, then deterministic reverse-order unwind. Tests must prove:

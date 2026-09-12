@@ -242,3 +242,13 @@ Loader reads ELF with debug sections removed and static relocations retained thr
 TabOS filesystem API and maps its entry into this
 lifecycle without making ELF details part of normal application source API. See
 [ELF Loader Experiment](elf-loader.md).
+# Concurrent Process Foundation
+
+The internal process manager supports background descriptor children without
+transferring foreground ownership. An exited asynchronous child releases execution
+resources and remains in process inspection as `TABOS_PROCESS_EXITED` until its
+parent reaps its status; its `name` is then `NULL`. Unreaped records count toward
+the 16-process capacity. Parent teardown removes descendants.
+
+This is infrastructure for the GUI. Independently loaded applications still use
+the existing synchronous SDK execution path until concurrent ELF transport lands.

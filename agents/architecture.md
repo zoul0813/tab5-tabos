@@ -319,6 +319,14 @@ A compositor or display task may become high priority, but it remains part of th
 
 ### 4.2 Application Execution
 
+[DECIDED] The GUI milestone extends the initial foreground-only model below with
+concurrently runnable children while retaining synchronous nested exec. Execution
+state does not imply console, raw input or display ownership. See
+[GUI contracts](gui-contracts.md) for lifecycle and admission rules. The first
+implementation provides runtime-owned asynchronous descriptor launch, rotating
+snapshot dispatch and resource-free exit records retained until parent reaping.
+Public SDK/ELF asynchronous launch and GUI ownership are still pending.
+
 The intended application model is:
 
 ```text

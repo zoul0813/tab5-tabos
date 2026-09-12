@@ -7,6 +7,7 @@
 
 #include <stddef.h>
 #include <stdio.h>
+#include <limits.h>
 
 enum {
     KERNEL_PROCESS_CAPACITY = 16
@@ -19,6 +20,8 @@ typedef struct {
         tabos_process_state_t state;
         tabos_app_context_t context;
         void (*application_data_destroy)(void* data);
+        bool asynchronous;
+        bool resources_released;
 } kernel_process_t;
 
 static kernel_process_t processes[KERNEL_PROCESS_CAPACITY];
@@ -28,6 +31,7 @@ static tabos_process_id_t next_process_id;
 static kernel_process_t* foreground_process;
 static bool last_exit_valid;
 static int last_exit_status;
+static size_t scheduler_cursor;
 
 static const char* termination_name(tabos_process_termination_t cause)
 {
@@ -75,9 +79,19 @@ static kernel_process_t* free_process_slot(void)
     return NULL;
 }
 
-static void destroy_process(kernel_process_t* process)
+static kernel_process_t* process_from_context(const tabos_app_context_t* context)
 {
-    if (process == NULL || !process->occupied) {
+    for (size_t index = 0U; index < KERNEL_PROCESS_CAPACITY; ++index) {
+        if (processes[index].occupied && &processes[index].context == context) {
+            return &processes[index];
+        }
+    }
+    return NULL;
+}
+
+static void release_process_resources(kernel_process_t* process)
+{
+    if (process == NULL || !process->occupied || process->resources_released) {
         return;
     }
 
@@ -93,10 +107,30 @@ static void destroy_process(kernel_process_t* process)
     if (process->application_data_destroy != NULL) {
         process->application_data_destroy(context->application_data);
     }
+    context->application_data   = NULL;
+    context->descriptor         = NULL;
+    context->console_owned      = false;
+    process->resources_released = true;
+    last_exit_status            = status;
+    last_exit_valid             = true;
+}
 
-    *process         = (kernel_process_t) {0};
-    last_exit_status = status;
-    last_exit_valid  = true;
+static void destroy_process(kernel_process_t* process)
+{
+    release_process_resources(process);
+    *process = (kernel_process_t) {0};
+}
+
+static void destroy_descendants(tabos_process_id_t parent_id)
+{
+    for (size_t index = 0U; index < KERNEL_PROCESS_CAPACITY; ++index) {
+        kernel_process_t* child = &processes[index];
+        if (child->occupied && child->parent_id == parent_id) {
+            destroy_descendants(child->id);
+            child->context.exit_status = -1;
+            destroy_process(child);
+        }
+    }
 }
 
 static bool acquire_process_console(kernel_process_t* process)
@@ -122,6 +156,14 @@ static void release_process_console(kernel_process_t* process)
 static void finish_child_process(kernel_process_t* child)
 {
     const int status = child->context.exit_status;
+    destroy_descendants(child->id);
+    if (child->asynchronous) {
+        release_process_resources(child);
+        child->state                  = TABOS_PROCESS_EXITED;
+        child->context.exit_requested = false;
+        platform_runtime_notify(PLATFORM_RUNTIME_EVENT_APPLICATION);
+        return;
+    }
     pointer_service_set_foreground_owner(NULL);
     release_process_console(child);
     destroy_process(child);
@@ -157,51 +199,83 @@ void kernel_application_system_init(void)
     next_process_id    = 0U;
     last_exit_valid    = false;
     last_exit_status   = 0;
+    scheduler_cursor   = 0U;
     application_registry_reset();
 }
 
 void kernel_application_system_update(void)
 {
-    if (foreground_process == NULL) {
+    if (foreground_process == NULL || tabos_process_system_panicked()) {
         return;
     }
-    tabos_app_context_t* context = &foreground_process->context;
-    if (foreground_process->state == TABOS_PROCESS_RUNNING && !context->exit_requested &&
-        context->descriptor->update != NULL) {
-        context->descriptor->update(context);
+    tabos_process_id_t ready[KERNEL_PROCESS_CAPACITY];
+    size_t count = 0U;
+    for (size_t offset = 0U; offset < KERNEL_PROCESS_CAPACITY; ++offset) {
+        const kernel_process_t* process = &processes[(scheduler_cursor + offset) % KERNEL_PROCESS_CAPACITY];
+        if (process->occupied && process->state == TABOS_PROCESS_RUNNING) {
+            ready[count++] = process->id;
+        }
     }
-    if (context->exit_requested) {
-        if (foreground_process->id == 0U) {
-            panic_root_process(foreground_process);
-        } else {
-            finish_child_process(foreground_process);
+    scheduler_cursor = (scheduler_cursor + 1U) % KERNEL_PROCESS_CAPACITY;
+    for (size_t index = 0U; index < count; ++index) {
+        kernel_process_t* process = find_process(ready[index]);
+        if (process == NULL || process->state != TABOS_PROCESS_RUNNING) {
+            continue;
+        }
+        tabos_app_context_t* context = &process->context;
+        if (!context->exit_requested && context->descriptor->update != NULL) {
+            context->descriptor->update(context);
+        }
+        if (context->exit_requested) {
+            if (process->id == 0U) {
+                panic_root_process(process);
+                return;
+            } else {
+                finish_child_process(process);
+            }
         }
     }
 }
 
 bool kernel_application_system_runnable(void)
 {
-    if (foreground_process == NULL || foreground_process->state != TABOS_PROCESS_RUNNING ||
-        foreground_process->context.exit_requested) {
+    if (tabos_process_system_panicked()) {
         return false;
     }
-    return loader_elf_application_runtime_runnable(foreground_process->context.descriptor,
-                                                   foreground_process->context.application_data);
+    for (size_t index = 0U; index < KERNEL_PROCESS_CAPACITY; ++index) {
+        const kernel_process_t* process = &processes[index];
+        if (process->occupied && process->state == TABOS_PROCESS_RUNNING &&
+            (process->context.exit_requested ||
+             loader_elf_application_runtime_runnable(process->context.descriptor, process->context.application_data))) {
+            return true;
+        }
+    }
+    return false;
 }
 
 uint64_t kernel_application_system_next_deadline(void)
 {
-    if (foreground_process == NULL || foreground_process->state != TABOS_PROCESS_RUNNING ||
-        foreground_process->context.exit_requested) {
+    if (tabos_process_system_panicked()) {
         return PLATFORM_RUNTIME_DEADLINE_NONE;
     }
-    return loader_elf_application_next_deadline(foreground_process->context.descriptor,
-                                                foreground_process->context.application_data);
+    uint64_t deadline = PLATFORM_RUNTIME_DEADLINE_NONE;
+    for (size_t index = 0U; index < KERNEL_PROCESS_CAPACITY; ++index) {
+        const kernel_process_t* process = &processes[index];
+        if (process->occupied && process->state == TABOS_PROCESS_RUNNING) {
+            const uint64_t candidate =
+                loader_elf_application_next_deadline(process->context.descriptor, process->context.application_data);
+            if (candidate < deadline) {
+                deadline = candidate;
+            }
+        }
+    }
+    return deadline;
 }
 
 void kernel_application_system_shutdown(void)
 {
     pointer_service_set_foreground_owner(NULL);
+    destroy_descendants(0U);
     for (size_t index = KERNEL_PROCESS_CAPACITY; index > 0U; --index) {
         if (processes[index - 1U].occupied) {
             destroy_process(&processes[index - 1U]);
@@ -329,7 +403,7 @@ static tabos_app_result_t launch_child_descriptor(tabos_app_context_t* parent, c
         return TABOS_APP_RESULT_BUSY;
     }
     kernel_process_t* child = free_process_slot();
-    if (child == NULL || foreground_depth >= KERNEL_PROCESS_CAPACITY) {
+    if (child == NULL || foreground_depth >= KERNEL_PROCESS_CAPACITY || next_process_id >= INT_MAX) {
         if (application_data_destroy != NULL) {
             application_data_destroy(application_data);
         }
@@ -367,6 +441,70 @@ static tabos_app_result_t launch_child_descriptor(tabos_app_context_t* parent, c
         platform_runtime_notify(PLATFORM_RUNTIME_EVENT_APPLICATION);
     }
     return TABOS_APP_RESULT_OK;
+}
+
+tabos_app_result_t kernel_process_spawn_descriptor(tabos_app_context_t* parent,
+                                                   const tabos_app_descriptor_t* descriptor, void* application_data,
+                                                   void (*application_data_destroy)(void*),
+                                                   tabos_process_id_t* child_id)
+{
+    kernel_process_t* owner   = process_from_context(parent);
+    tabos_app_result_t result = TABOS_APP_RESULT_INVALID;
+    if (owner != NULL && descriptor != NULL && descriptor->entry != NULL && child_id != NULL) {
+        result = TABOS_APP_RESULT_BUSY;
+        if (owner->state == TABOS_PROCESS_RUNNING && !parent->exit_requested && !tabos_process_system_panicked()) {
+            kernel_process_t* child = free_process_slot();
+            result                  = TABOS_APP_RESULT_START_FAILED;
+            if (child != NULL && next_process_id < INT_MAX) {
+                const tabos_process_id_t id = next_process_id++;
+                *child                      = (kernel_process_t) {
+                                         .occupied  = true,
+                                         .id        = id,
+                                         .parent_id = owner->id,
+                                         .state     = TABOS_PROCESS_RUNNING,
+                                         .context =
+                        {
+                                  .descriptor       = descriptor,
+                                  .process_id       = id,
+                                  .application_data = application_data,
+                                  },
+                                         .application_data_destroy = application_data_destroy,
+                                         .asynchronous             = true,
+                };
+                if (!descriptor->entry(&child->context)) {
+                    destroy_descendants(id);
+                    child->context.exit_status = -1;
+                    destroy_process(child);
+                    return TABOS_APP_RESULT_START_FAILED;
+                }
+                *child_id = id;
+                if (child->context.exit_requested) {
+                    finish_child_process(child);
+                }
+                platform_runtime_notify(PLATFORM_RUNTIME_EVENT_APPLICATION);
+                return TABOS_APP_RESULT_OK;
+            }
+        }
+    }
+    if (application_data_destroy != NULL) {
+        application_data_destroy(application_data);
+    }
+    return result;
+}
+
+int kernel_process_reap(tabos_app_context_t* parent, tabos_process_id_t child_id, int* status)
+{
+    const kernel_process_t* owner = process_from_context(parent);
+    kernel_process_t* child       = find_process(child_id);
+    if (owner == NULL || child == NULL || !child->asynchronous || child->parent_id != owner->id || status == NULL) {
+        return -1;
+    }
+    if (child->state != TABOS_PROCESS_EXITED) {
+        return 0;
+    }
+    *status = child->context.exit_status;
+    destroy_process(child);
+    return 1;
 }
 
 tabos_app_result_t kernel_process_launch_child(tabos_app_context_t* parent, const char* name)
@@ -436,7 +574,8 @@ const tabos_app_descriptor_t* tabos_app_active(void)
 
 void tabos_app_request_exit(tabos_app_context_t* context, int exit_status)
 {
-    if (foreground_process != NULL && context == &foreground_process->context) {
+    kernel_process_t* process = process_from_context(context);
+    if (process != NULL && process->state == TABOS_PROCESS_RUNNING) {
         if (context->termination_cause == TABOS_PROCESS_TERMINATION_NONE) {
             context->termination_cause = TABOS_PROCESS_TERMINATION_EXIT_REQUEST;
         }
@@ -448,8 +587,8 @@ void tabos_app_request_exit(tabos_app_context_t* context, int exit_status)
 
 void kernel_process_fail(tabos_app_context_t* context, tabos_process_termination_t cause, int exit_status)
 {
-    if (foreground_process == NULL || context != &foreground_process->context ||
-        cause == TABOS_PROCESS_TERMINATION_NONE) {
+    kernel_process_t* process = process_from_context(context);
+    if (process == NULL || process->state != TABOS_PROCESS_RUNNING || cause == TABOS_PROCESS_TERMINATION_NONE) {
         return;
     }
     context->termination_cause = cause;
@@ -461,7 +600,7 @@ void kernel_process_fail(tabos_app_context_t* context, tabos_process_termination
 bool kernel_process_force_terminate(tabos_process_id_t process_id, int exit_status)
 {
     kernel_process_t* process = find_process(process_id);
-    if (process == NULL || process != foreground_process) {
+    if (process == NULL || process->state != TABOS_PROCESS_RUNNING) {
         return false;
     }
     kernel_process_fail(&process->context, TABOS_PROCESS_TERMINATION_FORCED, exit_status);
@@ -477,8 +616,8 @@ const tabos_console_session_t* tabos_app_console(const tabos_app_context_t* cont
 
 tabos_process_id_t tabos_app_process_id(const tabos_app_context_t* context)
 {
-    return foreground_process != NULL && context == &foreground_process->context ? context->process_id :
-                                                                                   TABOS_PROCESS_ID_INVALID;
+    const kernel_process_t* process = process_from_context(context);
+    return process != NULL ? process->id : TABOS_PROCESS_ID_INVALID;
 }
 
 size_t tabos_process_count(void)
@@ -504,7 +643,7 @@ bool tabos_process_info(tabos_process_id_t id, tabos_process_info_t* info)
                 .id        = process->id,
                 .parent_id = process->parent_id,
                 .state     = process->state,
-                .name      = process->context.descriptor->name,
+                .name      = process->context.descriptor != NULL ? process->context.descriptor->name : NULL,
             };
             return true;
         }
@@ -514,7 +653,8 @@ bool tabos_process_info(tabos_process_id_t id, tabos_process_info_t* info)
 
 bool tabos_process_system_panicked(void)
 {
-    return foreground_process != NULL && foreground_process->state == TABOS_PROCESS_PANICKED;
+    const kernel_process_t* root = find_process(0U);
+    return root != NULL && root->state == TABOS_PROCESS_PANICKED;
 }
 
 bool tabos_process_panic_info(tabos_process_termination_t* cause, int* exit_status)
@@ -522,8 +662,9 @@ bool tabos_process_panic_info(tabos_process_termination_t* cause, int* exit_stat
     if (!tabos_process_system_panicked() || cause == NULL || exit_status == NULL) {
         return false;
     }
-    *cause       = foreground_process->context.termination_cause;
-    *exit_status = foreground_process->context.exit_status;
+    const kernel_process_t* root = find_process(0U);
+    *cause                       = root->context.termination_cause;
+    *exit_status                 = root->context.exit_status;
     return true;
 }
 
