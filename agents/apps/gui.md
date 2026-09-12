@@ -1,10 +1,10 @@
 # GUI Implementation Tasks
 
-Status: implementation in progress, 2026-09-12. Contracts and the initial internal
-process scheduling foundation and public concurrent SDK/ELF spawn/wait are
-implemented. Session control, IPC, retained surfaces, executable inspection and the
-initial GUI client SDK are available; desktop and GUI applications remain in progress.
-Evidence below is scoped to completed work.
+Status: implementation and validation in progress, 2026-09-12. Desktop, Files,
+Calculator, Text editor and Canvas are implemented as independent RV32 applications.
+Concurrent processes, session pause/restore, IPC, surfaces, launch inspection and
+GUI toolkit are integrated. Remaining gates include full recovery stress, native
+contention and physical touch/performance/memory acceptance under user restrictions.
 
 Direction and scope: [TabOS Retro Desktop milestone](../milestone-gui.md). This file tracks executable work packages; the milestone records agreed product behavior. Read [context](../TABOS_CONTEXT.md), [architecture](../architecture.md), [testing](../testing.md), and [roadmap](../roadmap.md) before implementation, plus [coding style](../coding-style.md) before C changes.
 
@@ -43,8 +43,8 @@ Exit gate: independent real RV32 clients progress on host and native tasks remai
 - [x] GUI-102: Implement asynchronous `tabos_spawn()`, child-owned launch data, actual PIDs, child-exit wait sources, status retention, and single reaping. Preserve synchronous `tabos_exec()`; update shell launch/wait handling.
 - [x] GUI-103: Schedule all runnable host RV32 contexts in bounded round-robin slices. Suspend blocked call gates without starving clients or service/runtime work; wake from existing readiness/deadline mechanisms.
 - [ ] GUI-104: Extend managed Tab5 task lifecycle to concurrent processes. Audit caller identity, per-process libc/filesystem state, locking, cancellable waits, and stop-before-resource-release across multiple service callers.
-- [ ] GUI-105: Implement session membership and owner-exit cleanup from GUI-003. Launch desktop as shell child with shell retained; reject unauthorized raw input/display access from background clients.
-- [ ] GUI-106: Add deterministic process/session tests for two progressing clients, blocked waits, exit before wait, repeated reaping attempts, capacity failures, descendant cleanup, slot reuse, and cancellation during service calls. Retain nested shell/child/grandchild and PID 0 panic coverage.
+- [x] GUI-105: Implement session membership and owner-exit cleanup from GUI-003. Launch desktop as shell child with shell retained; reject unauthorized raw input/display access from background clients.
+- [x] GUI-106: Add deterministic process/session tests for two progressing clients, blocked waits, exit before wait, repeated reaping attempts, capacity failures, descendant cleanup, slot reuse, and cancellation during service calls. Retain nested shell/child/grandchild and PID 0 panic coverage.
 - [ ] GUI-107: Extend maintained `tester` with concurrent RV32 child progress, wait/status, ownership, and repeated cleanup cases. Validate native task/service contention on physical Tab5 separately.
 
 ## Phase 2 — IPC and Retained Surfaces
@@ -55,46 +55,46 @@ Exit gate: separate RV32 clients publish coherent retained images through public
 - [ ] GUI-202: Connect IPC readiness to generic waits on host and Tab5; cover lost-wakeup races, finite deadlines, cancellation, and stale handles.
 - [x] GUI-203: Implement OS-owned RGB565 surfaces, clipped/bounded rectangle uploads, staged commits, compositor read grants, and explicit release using GUI-005's contract.
 - [ ] GUI-204: Enforce measured process/aggregate surface and staging limits. Preserve the last committed image on failed upload/commit; release endpoints, staging, surfaces, and grants during stopped-process teardown.
-- [ ] GUI-205: Add public SDK wrappers and private native/host gates consistently; rebuild bundled apps under the current pre-release ABI policy.
+- [x] GUI-205: Add public SDK wrappers and private native/host gates consistently; rebuild bundled apps under the current pre-release ABI policy.
 - [ ] GUI-206: Add sanitizer-backed IPC/surface tests for saturation, lifecycle delivery under saturation, foreign/stale handles, invalid dimensions/rectangles, atomic visibility, reader/commit races, exit during commit, allocation failures, and repeated cleanup. Add real RV32 `tester` coverage.
 
 ## Phase 3 — Desktop, Dock, and Input Routing
 
 Exit gate: desktop switches between independent window clients with usable touch controls and deterministic repaint/focus behavior.
 
-- [ ] GUI-301: Build independent `desktop` application through the ordinary SDK/build/install path. Acquire session display/input through public services; draw decorations in desktop and content in clients.
-- [ ] GUI-302: Implement opaque damage-based composition, clipped surface blits, and retained repaint using existing portable acceleration. Wait when idle; do not introduce a periodic idle repaint loop.
+- [x] GUI-301: Build independent `desktop` application through the ordinary SDK/build/install path. Acquire session display/input through public services; draw decorations in desktop and content in clients.
+- [x] GUI-302: Implement opaque damage-based composition, clipped surface blits, and retained repaint using existing portable acceleration. Wait when idle; do not introduce a periodic idle repaint loop.
 - [ ] GUI-303: Define and implement the 1280×720 touch layout: retro bitmap/beveled styling, large icons, generous spacing, and roughly 44-pixel minimum primary touch targets. Use modern phone/tablet layout cues without copying dense historical desktop layouts.
-- [ ] GUI-304: Implement persistent bottom launcher/switcher dock and maximized client work area above it. Open apps maximized; support restore, minimize, dock restore/switching, stacking, focus, and close.
-- [ ] GUI-305: Implement movable restored windows and touch-accessible outline resize. Commit dimensions/redraw only on release; failed resize preserves old geometry and committed pixels. Cancelled drags preserve a usable window.
-- [ ] GUI-306: Extend normalized pointer contract and SDL backend with mouse hover/wheel. Route pointer events in client coordinates; capture contacts through release/cancel. Touch navigation must work without hover, right-click, or double-click.
+- [x] GUI-304: Implement persistent bottom launcher/switcher dock and maximized client work area above it. Open apps maximized; support restore, minimize, dock restore/switching, stacking, focus, and close.
+- [x] GUI-305: Implement movable restored windows and touch-accessible outline resize. Commit dimensions/redraw only on release; failed resize preserves old geometry and committed pixels. Cancelled drags preserve a usable window.
+- [x] GUI-306: Extend normalized pointer contract and SDL backend with mouse hover/wheel. Route pointer events in client coordinates; capture contacts through release/cancel. Touch navigation must work without hover, right-click, or double-click.
 - [ ] GUI-307: Route keyboard/text only to focused client; implement keyboard focus traversal/window switching. Cancel held keys/contacts on focus loss, device removal, overflow, close, and fullscreen transitions.
-- [ ] GUI-308: Add deterministic framebuffer and synthetic input tests for maximized bounds/dock occlusion, overlap/clipping, damage, stacking, move/outline resize, failed resize, capture cancellation, focus traversal, and exactly-once text routing.
+- [x] GUI-308: Add deterministic framebuffer and synthetic input tests for maximized bounds/dock occlusion, overlap/clipping, damage, stacking, move/outline resize, failed resize, capture cancellation, focus traversal, and exactly-once text routing.
 
 ## Phase 4 — GUI SDK, Discovery, and First Applications
 
 Exit gate: all first-release apps run as independent RV32 clients and use toolkit lifecycle/pause support rather than privileged shortcuts.
 
-- [ ] GUI-401: Add portable C GUI SDK with connection/window lifecycle, bounded event loop, layout, invalidation, custom RGB565 canvas, and safe-point hooks for pause/resume and close. Keep application work bounded so control events can be handled promptly.
-- [ ] GUI-402: Implement labels, buttons, checkboxes, menus, text fields, scrollbars, lists, and dialogs with shared touch/focus behavior. Use CP437 and physical-keyboard text entry; no on-screen keyboard dependency.
-- [ ] GUI-403: Emit and query the minimal ELF GUI marker. Enumerate extensionless executables under `T:/bin`; generic icon and filename suffice. Marked apps use GUI launch; unmarked programs use fullscreen handoff after Phase 5.
-- [ ] GUI-404: Implement launcher/file browser with directory navigation, explicit executable launch, and visible filesystem/launch errors. Keep file associations and full manifests deferred.
-- [ ] GUI-405: Implement independent calculator with touch buttons and keyboard input, including clear error handling for invalid arithmetic.
-- [ ] GUI-406: Implement independent small text editor with Open/Save, unsaved-change tracking, save/discard/cancel close flow, and retained document state across pause. Failed open/save preserves existing document and dirty state; reuse verified filesystem save patterns where appropriate.
-- [ ] GUI-407: Ship standalone custom-canvas client demonstrating drawing beyond stock widgets, invalidation, resize, close, and pause/resume.
-- [ ] GUI-408: Add toolkit/app tests covering focus/touch activation, bounded event processing, text routing, calculator errors, editor failed I/O and close cancellation, allocation failures, and repeated client launch/exit. Verify marker routing with marked and legacy unmarked RV32 fixtures.
+- [x] GUI-401: Add portable C GUI SDK with connection/window lifecycle, bounded event loop, layout, invalidation, custom RGB565 canvas, and safe-point hooks for pause/resume and close. Keep application work bounded so control events can be handled promptly.
+- [x] GUI-402: Implement labels, buttons, checkboxes, menus, text fields, scrollbars, lists, and dialogs with shared touch/focus behavior. Use CP437 and physical-keyboard text entry; no on-screen keyboard dependency.
+- [x] GUI-403: Emit and query the minimal ELF GUI marker. Enumerate extensionless executables under `T:/bin`; generic icon and filename suffice. Marked apps use GUI launch; unmarked programs use fullscreen handoff after Phase 5.
+- [x] GUI-404: Implement launcher/file browser with directory navigation, explicit executable launch, and visible filesystem/launch errors. Keep file associations and full manifests deferred.
+- [x] GUI-405: Implement independent calculator with touch buttons and keyboard input, including clear error handling for invalid arithmetic.
+- [x] GUI-406: Implement independent small text editor with Open/Save, unsaved-change tracking, save/discard/cancel close flow, and retained document state across pause. Failed open/save preserves existing document and dirty state; reuse verified filesystem save patterns where appropriate.
+- [x] GUI-407: Ship standalone custom-canvas client demonstrating drawing beyond stock widgets, invalidation, resize, close, and pause/resume.
+- [x] GUI-408: Add toolkit/app tests covering focus/touch activation, bounded event processing, text routing, calculator errors, editor failed I/O and close cancellation, allocation failures, and repeated client launch/exit. Verify marker routing with marked and legacy unmarked RV32 fixtures.
 
 ## Phase 5 — Fullscreen Handoff and Recovery
 
 Exit gate: kernel-launched fullscreen programs return to the same usable GUI session; failures have bounded cleanup and clear ownership restoration.
 
-- [ ] GUI-501: Implement desktop → pause clients → fullscreen child → restore desktop → resume clients state machine. Keep coordinator and core services available while GUI workloads are parked.
+- [x] GUI-501: Implement desktop → pause clients → fullscreen child → restore desktop → resume clients state machine. Keep coordinator and core services available while GUI workloads are parked.
 - [ ] GUI-502: Pause the full GUI-client session, including descendants. Clients finish bounded work, release outstanding service leases, quiesce audio/capture, retain state, and acknowledge at toolkit safe points.
-- [ ] GUI-503: Enforce two-second acknowledgement deadline. On timeout, abort launch, resume acknowledged clients, and identify blockers. Handle client exit/disconnect and late acknowledgements without leaving processes parked or accepting stale transitions.
-- [ ] GUI-504: Launch fullscreen child through normal kernel process services, outside GUI surface quotas. Check headroom and handle actual load/allocation failures with GUI resident; explain insufficient RAM and permit closing apps before retry. Do not unload/checkpoint GUI or promise game-memory reservation.
-- [ ] GUI-505: Transfer display/input exclusively to fullscreen child and its nested foreground chain. On normal exit, failed launch, or recoverable fault, reclaim child resources, restore prior display owner, repaint retained windows, clear stale input, and resume GUI clients.
-- [ ] GUI-506: Implement orderly desktop exit honoring unsaved-work cancellation. Add explicit force-close with unsaved-data warning for hung clients; stop execution before reclaiming resources and include descendants in cleanup.
-- [ ] GUI-507: Handle recoverable desktop failure by tearing down remaining GUI-session processes and any active handoff chain, restoring terminal ownership, and resuming shell. Keep PID 0 panic and arbitrary Tab5 native fault limitations explicit.
+- [x] GUI-503: Enforce two-second acknowledgement deadline. On timeout, abort launch, resume acknowledged clients, and identify blockers. Handle client exit/disconnect and late acknowledgements without leaving processes parked or accepting stale transitions.
+- [x] GUI-504: Launch fullscreen child through normal kernel process services, outside GUI surface quotas. Check headroom and handle actual load/allocation failures with GUI resident; explain insufficient RAM and permit closing apps before retry. Do not unload/checkpoint GUI or promise game-memory reservation.
+- [x] GUI-505: Transfer display/input exclusively to fullscreen child and its nested foreground chain. On normal exit, failed launch, or recoverable fault, reclaim child resources, restore prior display owner, repaint retained windows, clear stale input, and resume GUI clients.
+- [x] GUI-506: Implement orderly desktop exit honoring unsaved-work cancellation. Add explicit force-close with unsaved-data warning for hung clients; stop execution before reclaiming resources and include descendants in cleanup.
+- [x] GUI-507: Handle recoverable desktop failure by tearing down remaining GUI-session processes and any active handoff chain, restoring terminal ownership, and resuming shell. Keep PID 0 panic and arbitrary Tab5 native fault limitations explicit.
 - [ ] GUI-508: Test repeated Starfall/DOOM and console-app handoffs with unsaved editor text and retained window positions. Inject pause timeout, late acknowledgement, saturated IPC, failed load, insufficient memory, recoverable child fault, client force-close, and desktop failure both during GUI operation and fullscreen handoff.
 
 ## Phase 6 — Delivery and Physical Acceptance
@@ -296,3 +296,39 @@ desktop is blocked and its surface retained, restoration of exact drawing pixels
 client cleanup and desktop exit to the persistent root. Desktop model tests cover
 stacking, bounds, resize adoption/failure and drag cancellation. Physical touch,
 layout and memory acceptance remain pending; Files/calculator/editor remain next.
+
+### GUI Applications, Input and Save Safety
+
+Files, Calculator and Text editor now join Canvas as independent GUI clients. Files
+uses public directory listing and executable query; Calculator has bounded arithmetic
+with precedence and invalid-result errors. Editor uses a retained 32767-byte document,
+Open/Save/Save as, menu and dirty Save/Cancel/Discard flows. Saves stage the full file,
+move an existing destination to a backup for FAT compatibility, and roll back failed
+replacement; rollback failure preserves recovery copies and identifies suffixes.
+
+Toolkit now includes popup menus, modal panels, visible caret, multiline wrapping,
+vertical navigation, touch caret placement and list keyboard/wheel navigation.
+Normalized hover/wheel events reach public SDK and Lua clients. Minimum restored
+window size is provisionally 320x400, keeping touch controls visible. Desktop cancels
+input on modal/focus transitions and suppresses error dialogs after explicit force-close.
+
+Automated evidence: renderer tests verify overlap, dock coverage, precise damage and
+guard pixels; menu/text tests cover activation and multiline navigation. Editor tests
+inject read, write, close and rename failure, partial writes, rollback, binary/oversized
+Open and arithmetic errors. Dedicated real RV32 GUI harness verifies all four client
+launches, editor Save and dirty-close Cancel/Discard in addition to Canvas resize and
+fullscreen retention. Further recovery cases are being added.
+
+macOS Release passed all 89 permitted CTest cases. Debug passed 88/89 initially;
+build.application_tracking failed because its synthetic SDK omitted new source files.
+Updated that fixture and added GUI-marker rebuild/no-rebuild checks; focused rerun
+passed all three build/application tests. All bundled apps, including Doom, cross-built.
+Tab5 Debug/Release builds pass with 3776 / 106416 partition bytes free. No physical
+validation, Linux build/test, flashing or host simulator execution was performed.
+
+Recovery increment: real RV32 tests now retain dirty editor text while a second
+Canvas client launches an unmarked fullscreen executable, then verify Cancel and
+Discard after return. Two additional rounds terminate the actual desktop while
+clients run and while a fullscreen child is active; both restore root console,
+return the forced status and free all surfaces. The complete macOS Debug suite now
+passes 89/89 permitted cases (ASan/UBSan); real RV32 tester concurrency also passes.

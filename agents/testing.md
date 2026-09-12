@@ -1974,3 +1974,24 @@ of a coordinator blocked below a nested fullscreen chain. Keyboard queue/repeat
 state clears at session handoff. The real RV32 tester pauses two live clients with
 retained surfaces, resumes them and verifies statuses/cleanup across three rounds.
 These automated checks do not establish physical native service contention.
+
+## Desktop and GUI Client Coverage
+
+`unit.gui_draw` exercises clipped CP437 drawing, capture/focus, menus, caret and
+multiline navigation. `unit.gui_client` uses production IPC/surfaces with fake gates
+to inject resize failure and control saturation. `unit.desktop_model` verifies
+stacking, outline resize, rollback, damage clipping, overlap and dock pixels.
+`unit.gui_apps` checks arithmetic and editor partial/failing I/O with replacement
+rollback and retained dirty text.
+
+After building SDK applications, run the dedicated headless component executable:
+
+```sh
+build/macos-debug/tests/tabos_gui_rv32 build/apps/desktop/desktop build/apps/canvas/canvas build/apps/files/files build/apps/calculator/calculator build/apps/editor/editor
+```
+
+This runs actual RV32 applications with temporary storage and synthetic events,
+without launching `tabos_host`. It checks publication/resize/retained fullscreen
+pixels, editor Save and dirty close cancellation, all initial app launches and
+restoration of shell ownership. Physical touch and PSRAM/game measurements remain
+separate, pending user-permitted hardware validation.

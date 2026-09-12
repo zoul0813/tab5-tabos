@@ -392,7 +392,7 @@ static int pointer_poll(lua_State* L)
     lua_Integer y = canvas_coordinate(event.y, graphics->output_y, graphics->scale);
     bool inside   = x >= 0 && y >= 0 && x < graphics->width && y < graphics->height;
     lua_createtable(L, 0, 10);
-    static const char* const types[] = {"down", "move", "up", "cancel"};
+    static const char* const types[] = {"down", "move", "up", "cancel", "hover", "wheel"};
     lua_pushstring(L, types[event.type]);
     lua_setfield(L, -2, "type");
     lua_pushinteger(L, x);
@@ -411,6 +411,12 @@ static int pointer_poll(lua_State* L)
     lua_setfield(L, -2, "contact_id");
     lua_pushinteger(L, event.buttons);
     lua_setfield(L, -2, "buttons");
+    if (event.type == TABOS_POINTER_WHEEL) {
+        lua_pushinteger(L, event.wheel_x);
+        lua_setfield(L, -2, "wheel_x");
+        lua_pushinteger(L, event.wheel_y);
+        lua_setfield(L, -2, "wheel_y");
+    }
     if ((event.flags & TABOS_POINTER_EVENT_HAS_PRESSURE) != 0U) {
         lua_pushinteger(L, event.pressure);
         lua_setfield(L, -2, "pressure");

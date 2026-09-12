@@ -2,7 +2,9 @@
 
 ## Summary
 
-Status: agreed milestone direction, updated 2026-09-12; implementation remains pending. Work checklist: [GUI implementation tasks](apps/gui.md).
+Status: implementation and automated validation in progress, updated 2026-09-12.
+Desktop and all four initial clients are implemented; physical acceptance remains
+pending. Work checklist and scoped evidence: [GUI implementation tasks](apps/gui.md).
 
 Build optional desktop launched from shell, with independently loaded GUI programs and a touch-first interface for the 5-inch screen. Combine 80s/90s OS character, bitmap artwork, and beveled controls with modern iOS/Android-inspired layouts, large icons, and generous spacing. Touch handles navigation; physical keyboard handles text.
 
@@ -10,7 +12,7 @@ Apps open maximized above a persistent bottom launcher/switcher dock. Restored w
 
 **Core work needed first: concurrent app execution, IPC, window surfaces, input routing, and safe fullscreen handoff.** Existing graphics, audio, filesystem, pointer streams, and RV32 loader provide strong base. USB HID need not block GUI.
 
-Current implementation has two relevant limits:
+Original baseline (superseded by the concurrent/session implementation):
 
 - Only foreground user process runs; parents remain loaded but blocked. Existing `tabos_spawn()` still wraps nested execution.
 - Graphics targets fullscreen display; closing graphics restores terminal. No general window compositor or desktop restoration contract yet.

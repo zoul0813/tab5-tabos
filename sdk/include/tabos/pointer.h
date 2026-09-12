@@ -26,6 +26,8 @@ typedef enum {
     TABOS_POINTER_MOVE,
     TABOS_POINTER_UP,
     TABOS_POINTER_CANCEL,
+    TABOS_POINTER_HOVER,
+    TABOS_POINTER_WHEEL,
     TABOS_POINTER_EVENT_TYPE_COUNT,
 } tabos_pointer_event_type_t;
 
@@ -38,6 +40,9 @@ typedef struct {
         uint32_t buttons;
         uint32_t pressure;
         uint32_t flags;
+        /* Signed wheel steps, positive right/down. Zero for other events. */
+        int32_t wheel_x;
+        int32_t wheel_y;
 } tabos_pointer_event_t;
 
 tabos_pointer_stream_t tabos_pointer_open(tabos_device_id_t device_id);

@@ -334,7 +334,8 @@ use `tabos.sleep_ms` between updates.
 
 Event tables contain:
 
-- `type`: `"down"`, `"move"`, `"up"`, or `"cancel"`.
+- `type`: `"down"`, `"move"`, `"up"`, `"cancel"`, `"hover"` or `"wheel"`.
+- Wheel events include `wheel_x` and `wheel_y` steps, positive right/down.
 - `x`, `y`: zero-based integer canvas coordinates, accounting for integer scaling
   and letterboxing. Coordinates outside the canvas remain unclamped; `inside`
   says whether the position is within its bounds. Negative coordinates use floor
@@ -345,7 +346,7 @@ Event tables contain:
 - `buttons`: bitmask; primary = 1, secondary = 2, middle = 4.
 - `pressure`: integer 0..65535 when supplied by the device; otherwise absent/nil.
 
-Mouse movement delivers contacts while a button is held, without hover events.
+Mouse movement delivers contact motion while a button is held and hover otherwise.
 Multiple contacts retain separate IDs. Focus changes, queue overflow, and device
 loss cancel contacts through the SDK; handle `cancel` like a release, without
 assuming a final movement. Device loss can subsequently return an error. Always

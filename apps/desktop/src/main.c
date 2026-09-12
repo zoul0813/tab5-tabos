@@ -25,6 +25,7 @@ enum {
 typedef struct {
         int pid;
         tabos_wait_source_t source;
+        bool forced;
 } desktop_child_t;
 typedef struct {
         bool active;
@@ -59,6 +60,7 @@ typedef struct {
 } desktop_t;
 
 static desktop_t desktop;
+static void cancel_window(int slot);
 static const char* const launch_paths[] = {"T:/bin/files", "T:/bin/calculator", "T:/bin/editor", "T:/bin/canvas"};
 static const char* const launch_names[] = {"Files", "Calculator", "Text editor", "Canvas"};
 
@@ -69,6 +71,9 @@ static void invalidate_all(void)
 
 static void notify(const char* message)
 {
+    cancel_window(desktop.model.focus);
+    tabos_gui_ui_cancel(&desktop.ui);
+    (void) desktop_model_drag_end(&desktop.model, true);
     (void) snprintf(desktop.message, sizeof(desktop.message), "%s", message);
     desktop.modal = 1;
     invalidate_all();
@@ -312,6 +317,7 @@ static void receive_clients(void)
         }
         int slot = find_pid((int) sender);
         if (slot < 0 && kind == TABOS_GUI_HELLO) {
+            cancel_window(desktop.model.focus);
             slot = desktop_model_add(&desktop.model, (int) sender, "Application");
         }
         if (slot >= 0 && kind == TABOS_GUI_HELLO && desktop.model.windows[slot].channel <= 0 &&
@@ -376,8 +382,9 @@ static void reap_children(void)
             remove_window((unsigned int) slot);
         }
         (void) tabos_waitpid(child->pid, &status);
-        *child = (desktop_child_t) {0};
-        if (status != 0 && !desktop.quitting) {
+        const bool forced = child->forced;
+        *child            = (desktop_child_t) {0};
+        if (status != 0 && !desktop.quitting && !forced) {
             notify("An application exited with an error. Other windows remain available.");
         }
     }
@@ -433,7 +440,14 @@ static void ui_action(int id)
     } else if (id == 3001 && desktop.modal == 2) {
         const int slot = desktop.force_slot;
         if (slot >= 0 && desktop.model.windows[slot].occupied) {
-            (void) tabos_session_control(TABOS_SESSION_FORCE_CLOSE, 0U, (uint32_t) desktop.model.windows[slot].pid);
+            const int pid = desktop.model.windows[slot].pid;
+            if (tabos_session_control(TABOS_SESSION_FORCE_CLOSE, 0U, (uint32_t) pid) == 0) {
+                for (size_t index = 0U; index < TABOS_GUI_WINDOW_MAX; ++index) {
+                    if (desktop.children[index].pid == pid) {
+                        desktop.children[index].forced = true;
+                    }
+                }
+            }
         }
         desktop.modal = 0;
         invalidate_all();
@@ -513,6 +527,16 @@ static void route_input(unsigned int slot, uint32_t kind, tabos_gui_packet_t* pa
 
 static void pointer_event(tabos_pointer_event_t event)
 {
+    if (event.type == TABOS_POINTER_HOVER || event.type == TABOS_POINTER_WHEEL) {
+        const int slot = desktop_model_hit(&desktop.model, event.x, event.y);
+        if (desktop.modal == 0 && slot >= 0 && event.y >= desktop.model.windows[slot].bounds.y + 48) {
+            tabos_gui_packet_t packet  = {.data.pointer = event};
+            packet.data.pointer.x     -= desktop.model.windows[slot].bounds.x;
+            packet.data.pointer.y     -= desktop.model.windows[slot].bounds.y + 48;
+            route_input((unsigned int) slot, TABOS_GUI_POINTER, &packet);
+        }
+        return;
+    }
     desktop_capture_t* capture = NULL;
     for (size_t index = 0U; index < TABOS_POINTER_MAX_CONTACTS; ++index) {
         if (desktop.captures[index].active && desktop.captures[index].contact == event.contact_id &&
@@ -548,10 +572,18 @@ static void pointer_event(tabos_pointer_event_t event)
                     capture->control = control;
                     capture->bounds  = (tabos_gui_rect_t) {box.x + box.width - (control + 1) * 48, box.y, 48, 48};
                 } else {
+                    if (desktop.model.dragging) {
+                        capture->active = false;
+                        return;
+                    }
                     capture->mode = CAPTURE_DRAG;
                     desktop_model_drag_begin(&desktop.model, (unsigned int) slot, event.x, event.y, false);
                 }
             } else if (!window->maximized && event.x >= box.x + box.width - 44 && event.y >= box.y + box.height - 44) {
+                if (desktop.model.dragging) {
+                    capture->active = false;
+                    return;
+                }
                 capture->mode = CAPTURE_DRAG;
                 desktop_model_drag_begin(&desktop.model, (unsigned int) slot, event.x, event.y, true);
             } else {
@@ -617,7 +649,7 @@ static void keyboard_event(const tabos_input_event_t* event)
         }
         return;
     }
-    if (event->type == TABOS_INPUT_KEY_DOWN && (event->modifiers & TABOS_MODIFIER_CONTROL) != 0U) {
+    if (event->type == TABOS_INPUT_KEY_DOWN && !event->repeat && (event->modifiers & TABOS_MODIFIER_CONTROL) != 0U) {
         if (event->key == TABOS_KEY_TAB && desktop.model.count > 0U) {
             focus_window(desktop.model.stack[0]);
             return;

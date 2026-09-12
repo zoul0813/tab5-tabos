@@ -209,3 +209,10 @@ Restored windows move by their title bar and resize using the lower-right grip.
 Ctrl+Tab cycles windows, Ctrl+Q requests close and Ctrl+Escape opens Files (when
 installed). Exit returns to the persistent shell after client close confirmations.
 Canvas preserves its drawing across resize and its Run hello fullscreen handoff.
+
+See [Desktop and GUI applications](gui.md) for all bundled clients and controls.
+`tabos_gui_ui_menu()` composes popup rows; disable background widgets while a
+menu/dialog is active. Text fields render a caret and scroll to its visual line.
+Applications receive actions for actual text mutations, not mere field taps or
+cursor movement. Pointer events now include hover and signed wheel steps; rebuild
+applications with matching firmware because the private prerelease ABI is mutable.

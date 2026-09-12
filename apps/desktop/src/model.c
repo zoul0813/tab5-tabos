@@ -158,7 +158,7 @@ bool desktop_model_configure(desktop_model_t* model, unsigned int slot, tabos_gu
         return false;
     }
     desktop_window_t* window = &model->windows[slot];
-    if (window->pending || window->requested_serial == UINT32_MAX || bounds.width < 320 || bounds.height < 240 ||
+    if (window->pending || window->requested_serial == UINT32_MAX || bounds.width < 320 || bounds.height < 400 ||
         bounds.width > 1280 || bounds.height > 640 || bounds.x < 0 || bounds.y < 0 || bounds.x > 1280 - bounds.width ||
         bounds.y > 640 - bounds.height) {
         return false;
@@ -247,7 +247,7 @@ void desktop_model_drag_move(desktop_model_t* model, int32_t x, int32_t y)
     const int64_t dy = (int64_t) y - model->drag_y;
     if (model->resizing) {
         model->outline.width  = clamp((int64_t) model->drag_origin.width + dx, 320, 1280 - model->outline.x);
-        model->outline.height = clamp((int64_t) model->drag_origin.height + dy, 240, 640 - model->outline.y);
+        model->outline.height = clamp((int64_t) model->drag_origin.height + dy, 400, 640 - model->outline.y);
         desktop_model_damage(model, model->outline);
     } else {
         window->bounds.x = clamp((int64_t) model->drag_origin.x + dx, 0, 1280 - window->bounds.width);

@@ -19,6 +19,11 @@ set(runtime_sources
     crt/metadata.S
     libc/syscalls.c
     lib/process.c
+    lib/ipc.c
+    lib/surface.c
+    lib/gui.c
+    lib/gui_draw.c
+    lib/gui_font.c
     lib/graphics.c
     lib/input.c
     lib/network.c
@@ -156,3 +161,7 @@ run_build("TABOS_LDLIBS=-lm")
 expect_links(11 "trailing application libraries change")
 run_build("TABOS_LDLIBS=-lm")
 expect_links(11 "unchanged trailing application libraries")
+run_build("TABOS_LDLIBS=-lm" "TABOS_APP_GUI=1")
+expect_links(12 "GUI marker setting change")
+run_build("TABOS_LDLIBS=-lm" "TABOS_APP_GUI=1")
+expect_links(12 "unchanged GUI marker")

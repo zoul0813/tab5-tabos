@@ -16,6 +16,8 @@ static const char* event_name(tabos_pointer_event_type_t type)
         case TABOS_POINTER_MOVE: return "move";
         case TABOS_POINTER_UP: return "up";
         case TABOS_POINTER_CANCEL: return "cancel";
+        case TABOS_POINTER_HOVER: return "hover";
+        case TABOS_POINTER_WHEEL: return "wheel";
         case TABOS_POINTER_EVENT_TYPE_COUNT: break;
     }
     return "unknown";

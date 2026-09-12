@@ -116,7 +116,10 @@ static void input(tabos_gui_t* gui, const tabos_gui_packet_t* packet, uint32_t k
         return;
     }
     const tabos_pointer_event_t* event = &packet->data.pointer;
-    const tabos_gui_rect_t paper       = {16, 72, (int32_t) gui->canvas.width - 32, (int32_t) gui->canvas.height - 88};
+    if (event->type == TABOS_POINTER_HOVER || event->type == TABOS_POINTER_WHEEL) {
+        return;
+    }
+    const tabos_gui_rect_t paper = {16, 72, (int32_t) gui->canvas.width - 32, (int32_t) gui->canvas.height - 88};
     if (event->type == TABOS_POINTER_DOWN && tabos_gui_contains(paper, event->x, event->y) && !sketch->drawing) {
         sketch->drawing = true;
         sketch->contact = event->contact_id;

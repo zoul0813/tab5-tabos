@@ -72,6 +72,10 @@ void tabos_gui_text(tabos_gui_canvas_t* canvas, int32_t x, int32_t y, const char
 void tabos_gui_bevel(tabos_gui_canvas_t* canvas, tabos_gui_rect_t rectangle, bool sunken);
 void tabos_gui_ui_begin(tabos_gui_ui_t* ui);
 bool tabos_gui_ui_add(tabos_gui_ui_t* ui, tabos_gui_widget_t widget);
+/* Add a popup panel and 48-pixel menu rows. Caller disables background widgets
+ * while open and handles returned IDs first_id ... first_id+count-1. */
+bool tabos_gui_ui_menu(tabos_gui_ui_t* ui, int first_id, int32_t x, int32_t y, int32_t width, const char* const* items,
+                       size_t count);
 void tabos_gui_ui_draw(tabos_gui_ui_t* ui, tabos_gui_canvas_t* canvas);
 int tabos_gui_ui_pointer(tabos_gui_ui_t* ui, const tabos_pointer_event_t* event);
 int tabos_gui_ui_keyboard(tabos_gui_ui_t* ui, const tabos_input_event_t* event);

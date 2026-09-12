@@ -1160,6 +1160,7 @@ add_test(NAME unit.gui_client COMMAND tabos_gui_client)
 
 add_executable(tabos_desktop_model unit/desktop_model.c
     "${TABOS_ROOT}/apps/desktop/src/model.c"
+    "${TABOS_ROOT}/apps/desktop/src/render.c"
     "${TABOS_ROOT}/sdk/lib/gui_draw.c"
     "${TABOS_ROOT}/sdk/lib/gui_font.c")
 target_include_directories(tabos_desktop_model PRIVATE
@@ -1167,6 +1168,13 @@ target_include_directories(tabos_desktop_model PRIVATE
 tabos_enable_warnings(tabos_desktop_model)
 tabos_enable_sanitizers(tabos_desktop_model)
 add_test(NAME unit.desktop_model COMMAND tabos_desktop_model)
+
+add_executable(tabos_gui_apps unit/gui_apps.c "${TABOS_ROOT}/apps/calculator/src/calculate.c")
+target_include_directories(tabos_gui_apps PRIVATE "${TABOS_ROOT}/sdk/include"
+    "${TABOS_ROOT}/apps/editor/include" "${TABOS_ROOT}/apps/calculator/include")
+tabos_enable_warnings(tabos_gui_apps)
+tabos_enable_sanitizers(tabos_gui_apps)
+add_test(NAME unit.gui_apps COMMAND tabos_gui_apps)
 
 add_executable(tabos_gui_rv32 component/gui_rv32.c fixtures/elf/hello_elf.c)
 target_include_directories(tabos_gui_rv32 PRIVATE

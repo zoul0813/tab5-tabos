@@ -59,6 +59,27 @@ int main(void)
                event.contact_id == 1U,
            "touch up retains contact ID");
 
+    SDL_Event mouse_up = mouse_down;
+    mouse_up.type      = SDL_EVENT_MOUSE_BUTTON_UP;
+    expect(host_pointer_event(&mouse_up), "mouse release");
+    expect(pointer_service_read(&owner, stream, &event) == 0 && event.type == TABOS_POINTER_UP, "mouse released");
+    SDL_Event hover    = {.type = SDL_EVENT_MOUSE_MOTION};
+    hover.motion.which = 1U;
+    hover.motion.x     = 80.0F;
+    hover.motion.y     = 90.0F;
+    expect(host_pointer_event(&hover), "hover consumed");
+    expect(pointer_service_read(&owner, stream, &event) == 0 && event.type == TABOS_POINTER_HOVER && event.x == 80,
+           "hover without held contact");
+    SDL_Event wheel     = {.type = SDL_EVENT_MOUSE_WHEEL};
+    wheel.wheel.which   = 1U;
+    wheel.wheel.mouse_x = 80.0F;
+    wheel.wheel.mouse_y = 90.0F;
+    wheel.wheel.y       = -2.0F;
+    expect(host_pointer_event(&wheel), "wheel consumed");
+    expect(pointer_service_read(&owner, stream, &event) == 0 && event.type == TABOS_POINTER_WHEEL && event.wheel_y == 2,
+           "wheel positive down");
+    pointer_service_set_foreground_owner(NULL);
+    expect(pointer_service_read(&owner, stream, &event) < 0, "hover and wheel create no held contact to cancel");
     (void) pointer_service_close(&owner, stream);
     pointer_service_shutdown();
     return failures == 0 ? 0 : 1;

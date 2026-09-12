@@ -138,33 +138,128 @@ bool tabos_gui_ui_add(tabos_gui_ui_t* ui, tabos_gui_widget_t widget)
     return true;
 }
 
-static void field_draw(tabos_gui_canvas_t* canvas, const tabos_gui_widget_t* widget)
+bool tabos_gui_ui_menu(tabos_gui_ui_t* ui, int first_id, int32_t x, int32_t y, int32_t width, const char* const* items,
+                       size_t count)
+{
+    if (ui == NULL || items == NULL || count == 0U || count > 12U || count + 1U > TABOS_GUI_WIDGET_MAX - ui->count ||
+        first_id <= 1 || first_id > INT_MAX - (int) count) {
+        return false;
+    }
+    const size_t previous = ui->count;
+    if (!tabos_gui_ui_add(ui, (tabos_gui_widget_t) {
+                                  .id       = first_id - 1,
+                                  .kind     = TABOS_GUI_PANEL,
+                                  .bounds   = {x, y, width, (int32_t) count * 48 + 8},
+                                  .disabled = true
+    })) {
+        return false;
+    }
+    for (size_t index = 0U; index < count; ++index) {
+        if (!tabos_gui_ui_add(ui, (tabos_gui_widget_t) {
+                                      .id     = first_id + (int) index,
+                                      .kind   = TABOS_GUI_BUTTON,
+                                      .bounds = {x + 4, y + 4 + (int32_t) index * 48, width - 8, 48},
+                                      .label  = items[index]
+        })) {
+            ui->count = previous;
+            return false;
+        }
+    }
+    return true;
+}
+
+static size_t field_columns(const tabos_gui_widget_t* widget)
+{
+    return widget->bounds.width > 32 ? (size_t) (widget->bounds.width - 16) / 16U : 1U;
+}
+
+static void field_position(const tabos_gui_widget_t* widget, size_t offset, size_t* row, size_t* column)
+{
+    const size_t columns = field_columns(widget);
+    *row                 = 0U;
+    *column              = 0U;
+    for (size_t index = 0U; index < offset && widget->text[index] != '\0'; ++index) {
+        if (widget->text[index] == '\n' || ++*column == columns) {
+            ++*row;
+            *column = 0U;
+        }
+    }
+}
+
+static size_t field_offset(const tabos_gui_widget_t* widget, size_t row, size_t column)
+{
+    const size_t columns = field_columns(widget);
+    size_t current_row = 0U, current_column = 0U, index = 0U;
+    for (; widget->text[index] != '\0'; ++index) {
+        if (current_row == row && (current_column >= column || widget->text[index] == '\n')) {
+            break;
+        }
+        if (widget->text[index] == '\n' || ++current_column == columns) {
+            if (current_row == row) {
+                break;
+            }
+            ++current_row;
+            current_column = 0U;
+        }
+    }
+    return index;
+}
+
+static size_t field_first_row(const tabos_gui_widget_t* widget)
+{
+    size_t row, column;
+    field_position(widget, widget->cursor, &row, &column);
+    const size_t rows = widget->bounds.height > 36 ? (size_t) (widget->bounds.height - 8) / 28U : 1U;
+    return row >= rows ? row - rows + 1U : 0U;
+}
+
+static void field_draw(tabos_gui_canvas_t* canvas, const tabos_gui_widget_t* widget, bool focused)
 {
     if (widget->text == NULL || widget->capacity == 0U || widget->bounds.width < 24 || widget->bounds.height < 28) {
         return;
     }
-    const size_t columns = (size_t) (widget->bounds.width - 16) / 16U;
+    const tabos_gui_rect_t previous = canvas->clip;
+    tabos_gui_rect_t clip           = {widget->bounds.x + 4, widget->bounds.y + 4, widget->bounds.width - 8,
+                                       widget->bounds.height - 8};
+    if (previous.width > 0 && previous.height > 0 && !tabos_gui_intersect(clip, previous, &clip)) {
+        return;
+    }
+    canvas->clip         = clip;
+    const size_t columns = field_columns(widget);
     const size_t rows    = widget->multiline ? (size_t) (widget->bounds.height - 8) / 28U : 1U;
     size_t line          = 0U;
     size_t column        = 0U;
     size_t start         = 0U;
+    const size_t first   = widget->multiline ? field_first_row(widget) : 0U;
     if (!widget->multiline && widget->cursor >= columns) {
         start = widget->cursor - columns + 1U;
     }
-    for (size_t index = start; widget->text[index] != '\0' && index < widget->capacity && line < rows; ++index) {
+    for (size_t index = start; index < widget->capacity && line < first + rows; ++index) {
+        if (focused && index == widget->cursor && line >= first) {
+            tabos_gui_fill(canvas,
+                           (tabos_gui_rect_t) {widget->bounds.x + 8 + (int32_t) column * 16,
+                                               widget->bounds.y + 4 + (int32_t) (line - first) * 28, 2, 24},
+                           TABOS_GUI_ACCENT);
+        }
+        if (widget->text[index] == '\0') {
+            break;
+        }
         const char character[2] = {widget->text[index], '\0'};
         if (character[0] == '\n') {
             ++line;
             column = 0U;
             continue;
         }
-        tabos_gui_text(canvas, widget->bounds.x + 8 + (int32_t) column * 16, widget->bounds.y + 4 + (int32_t) line * 28,
-                       character, TABOS_GUI_INK, 2U);
+        if (line >= first) {
+            tabos_gui_text(canvas, widget->bounds.x + 8 + (int32_t) column * 16,
+                           widget->bounds.y + 4 + (int32_t) (line - first) * 28, character, TABOS_GUI_INK, 2U);
+        }
         if (++column == columns) {
             column = 0U;
             ++line;
         }
     }
+    canvas->clip = previous;
 }
 
 static void draw_label(tabos_gui_canvas_t* canvas, int32_t x, int32_t y, int32_t width, const char* text,
@@ -203,7 +298,7 @@ void tabos_gui_ui_draw(tabos_gui_ui_t* ui, tabos_gui_canvas_t* canvas)
                            TABOS_GUI_ACCENT);
         }
         if (widget->kind == TABOS_GUI_TEXT_FIELD) {
-            field_draw(canvas, widget);
+            field_draw(canvas, widget, ui->focus == widget->id && !widget->disabled);
         } else if (widget->kind == TABOS_GUI_SCROLLBAR) {
             const int travel  = box.height > 44 ? box.height - 44 : 0;
             const int maximum = widget->maximum > 0 ? widget->maximum : 1;
@@ -255,6 +350,38 @@ int tabos_gui_ui_pointer(tabos_gui_ui_t* ui, const tabos_pointer_event_t* event)
         return 0;
     }
     ui->changed = false;
+    if (event->type == TABOS_POINTER_HOVER) {
+        return 0;
+    }
+    if (event->type == TABOS_POINTER_WHEEL) {
+        for (size_t index = ui->count; index > 0U; --index) {
+            tabos_gui_widget_t* widget = &ui->widgets[index - 1U];
+            if (widget->disabled || !tabos_gui_contains(widget->bounds, event->x, event->y)) {
+                continue;
+            }
+            if (widget->kind == TABOS_GUI_LIST && widget->item_count > 0U) {
+                int64_t first = (int64_t) widget->first_item + event->wheel_y;
+                if (first < 0) {
+                    first = 0;
+                }
+                if ((uint64_t) first >= widget->item_count) {
+                    first = (int64_t) widget->item_count - 1;
+                }
+                widget->first_item = (size_t) first;
+                ui->changed        = true;
+                return widget->id;
+            }
+            if (widget->kind == TABOS_GUI_TEXT_FIELD && widget->multiline && widget->text != NULL) {
+                size_t row, column;
+                field_position(widget, widget->cursor, &row, &column);
+                const int64_t target = (int64_t) row + event->wheel_y;
+                widget->cursor       = field_offset(widget, (size_t) (target < 0 ? 0 : target), column);
+                ui->changed          = true;
+            }
+            return 0;
+        }
+        return 0;
+    }
     if (event->type == TABOS_POINTER_CANCEL) {
         if (event->contact_id == ui->contact && event->device_id == ui->device) {
             tabos_gui_ui_cancel(ui);
@@ -271,6 +398,22 @@ int tabos_gui_ui_pointer(tabos_gui_ui_t* ui, const tabos_pointer_event_t* event)
                 ui->contact = event->contact_id;
                 ui->device  = event->device_id;
                 ui->changed = true;
+                if (widget->kind == TABOS_GUI_TEXT_FIELD && widget->text != NULL) {
+                    const size_t column =
+                        (size_t) (event->x - widget->bounds.x > 8 ? event->x - widget->bounds.x - 8 : 0) / 16U;
+                    if (widget->multiline) {
+                        const size_t row =
+                            (size_t) (event->y - widget->bounds.y > 4 ? event->y - widget->bounds.y - 4 : 0) / 28U;
+                        widget->cursor = field_offset(widget, field_first_row(widget) + row, column);
+                    } else {
+                        const size_t columns = field_columns(widget);
+                        const size_t start   = widget->cursor >= columns ? widget->cursor - columns + 1U : 0U;
+                        widget->cursor       = start + column;
+                        if (widget->cursor > strlen(widget->text)) {
+                            widget->cursor = strlen(widget->text);
+                        }
+                    }
+                }
                 break;
             }
         }
@@ -318,7 +461,7 @@ int tabos_gui_ui_pointer(tabos_gui_ui_t* ui, const tabos_pointer_event_t* event)
         }
         widget->value = (int) item;
     }
-    return widget->id;
+    return widget->kind == TABOS_GUI_TEXT_FIELD ? 0 : widget->id;
 }
 
 int tabos_gui_ui_keyboard(tabos_gui_ui_t* ui, const tabos_input_event_t* event)
@@ -355,6 +498,29 @@ int tabos_gui_ui_keyboard(tabos_gui_ui_t* ui, const tabos_input_event_t* event)
         return 0;
     }
     if (widget->kind != TABOS_GUI_TEXT_FIELD) {
+        if (event->type == TABOS_INPUT_KEY_DOWN && widget->kind == TABOS_GUI_LIST && widget->item_count > 0U) {
+            int value = widget->value;
+            if (event->key == TABOS_KEY_UP && value > 0) {
+                --value;
+            } else if (event->key == TABOS_KEY_DOWN && value < (int) widget->item_count - 1) {
+                ++value;
+            } else if (event->key == TABOS_KEY_HOME) {
+                value = 0;
+            } else if (event->key == TABOS_KEY_END) {
+                value = (int) widget->item_count - 1;
+            }
+            if (value != widget->value) {
+                widget->value     = value;
+                const size_t rows = widget->bounds.height > 52 ? (size_t) (widget->bounds.height - 8) / 44U : 1U;
+                if ((size_t) value < widget->first_item) {
+                    widget->first_item = (size_t) value;
+                } else if ((size_t) value >= widget->first_item + rows) {
+                    widget->first_item = (size_t) value - rows + 1U;
+                }
+                ui->changed = true;
+                return widget->id;
+            }
+        }
         if (event->type == TABOS_INPUT_KEY_DOWN && !event->repeat &&
             (event->key == TABOS_KEY_ENTER || event->key == TABOS_KEY_SPACE)) {
             if (widget->kind == TABOS_GUI_CHECKBOX) {
@@ -399,12 +565,34 @@ int tabos_gui_ui_keyboard(tabos_gui_ui_t* ui, const tabos_input_event_t* event)
         } else if (event->key == TABOS_KEY_RIGHT && widget->cursor < length) {
             ++widget->cursor;
             ui->changed = true;
+        } else if (widget->multiline && (event->key == TABOS_KEY_UP || event->key == TABOS_KEY_DOWN)) {
+            size_t row, column;
+            field_position(widget, widget->cursor, &row, &column);
+            if (event->key == TABOS_KEY_DOWN) {
+                ++row;
+            } else if (row > 0U) {
+                --row;
+            }
+            widget->cursor = field_offset(widget, row, column);
+            ui->changed    = true;
         } else if (event->key == TABOS_KEY_HOME) {
-            widget->cursor = 0U;
-            ui->changed    = true;
+            if (widget->multiline && (event->modifiers & TABOS_MODIFIER_CONTROL) == 0U) {
+                while (widget->cursor > 0U && widget->text[widget->cursor - 1U] != '\n') {
+                    --widget->cursor;
+                }
+            } else {
+                widget->cursor = 0U;
+            }
+            ui->changed = true;
         } else if (event->key == TABOS_KEY_END) {
-            widget->cursor = length;
-            ui->changed    = true;
+            if (widget->multiline && (event->modifiers & TABOS_MODIFIER_CONTROL) == 0U) {
+                while (widget->cursor < length && widget->text[widget->cursor] != '\n') {
+                    ++widget->cursor;
+                }
+            } else {
+                widget->cursor = length;
+            }
+            ui->changed = true;
         } else if (event->key == TABOS_KEY_ENTER && widget->multiline) {
             insertion[0] = '\n';
         }

@@ -88,5 +88,39 @@ int main(void)
     assert(tabos_gui_ui_keyboard(&ui, &key) == 0 && strcmp(text, "abcdef") == 0);
     tabos_gui_ui_draw(&ui, &canvas);
     assert(guarded[0] == 0x1234U && guarded[64U * 64U + 1U] == 0x1234U);
+    ui                       = (tabos_gui_ui_t) {0};
+    const char* const menu[] = {"Open", "Save", "Cancel"};
+    assert(tabos_gui_ui_menu(&ui, 10, 0, 0, 200, menu, 3U) && ui.count == 4U);
+    pointer = (tabos_pointer_event_t) {.type = TABOS_POINTER_DOWN, .x = 20, .y = 70, .device_id = 1U};
+    assert(tabos_gui_ui_pointer(&ui, &pointer) == 0);
+    pointer.type = TABOS_POINTER_UP;
+    assert(tabos_gui_ui_pointer(&ui, &pointer) == 11);
+    ui                 = (tabos_gui_ui_t) {0};
+    char multiline[64] = "one\ntwo\nthree\nfour";
+    assert(tabos_gui_ui_add(&ui, (tabos_gui_widget_t) {
+                                     .id        = 1,
+                                     .kind      = TABOS_GUI_TEXT_FIELD,
+                                     .bounds    = {0, 0, 200, 64},
+                                     .multiline = true,
+                                     .text      = multiline,
+                                     .capacity  = sizeof(multiline)
+    }));
+    ui.focus             = 1;
+    ui.widgets[0].cursor = 2U;
+    key                  = (tabos_input_event_t) {.type = TABOS_INPUT_KEY_DOWN, .key = TABOS_KEY_DOWN};
+    assert(tabos_gui_ui_keyboard(&ui, &key) == 0 && ui.widgets[0].cursor == 6U);
+    key.key = TABOS_KEY_END;
+    assert(tabos_gui_ui_keyboard(&ui, &key) == 0 && ui.widgets[0].cursor == 7U);
+    key.key = TABOS_KEY_HOME;
+    assert(tabos_gui_ui_keyboard(&ui, &key) == 0 && ui.widgets[0].cursor == 4U);
+    pointer = (tabos_pointer_event_t) {.type = TABOS_POINTER_DOWN, .x = 12, .y = 8, .device_id = 1U};
+    assert(tabos_gui_ui_pointer(&ui, &pointer) == 0);
+    pointer.type = TABOS_POINTER_UP;
+    assert(tabos_gui_ui_pointer(&ui, &pointer) == 0);
+    pointer.type    = TABOS_POINTER_WHEEL;
+    pointer.wheel_y = 3;
+    assert(tabos_gui_ui_pointer(&ui, &pointer) == 0 && ui.widgets[0].cursor == 14U);
+    tabos_gui_ui_draw(&ui, &canvas);
+    assert(guarded[0] == 0x1234U && guarded[64U * 64U + 1U] == 0x1234U);
     return 0;
 }

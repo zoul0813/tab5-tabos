@@ -1,8 +1,49 @@
 #include <desktop/model.h>
 #include <assert.h>
+#include <stdlib.h>
+
+static int read_color(void* user, tabos_surface_t surface, uint32_t width, uint32_t height, uint16_t* pixels)
+{
+    (void) user;
+    for (size_t index = 0U; index < (size_t) width * height; ++index) {
+        pixels[index] = (uint16_t) surface;
+    }
+    return 0;
+}
+
+static void render_test(void)
+{
+    desktop_model_t model;
+    desktop_model_init(&model);
+    assert(desktop_model_add(&model, 1, "Bottom") == 0);
+    assert(desktop_model_adopt(&model, 0U, 0U, 10, 1280U, 592U));
+    assert(desktop_model_add(&model, 2, "Top") == 1);
+    assert(desktop_model_configure(&model, 1U, (tabos_gui_rect_t) {100, 80, 800, 480}, false));
+    assert(desktop_model_adopt(&model, 1U, 1U, 20, 800U, 432U));
+    uint16_t* pixels  = calloc(1280U * 720U + 2U, sizeof(uint16_t));
+    uint16_t* scratch = calloc(1280U * 592U, sizeof(uint16_t));
+    assert(pixels != NULL && scratch != NULL);
+    pixels[0] = pixels[1280U * 720U + 1U] = 0xdeadU;
+    tabos_gui_canvas_t canvas             = {.pixels = pixels + 1, .width = 1280U, .height = 720U};
+    assert(desktop_render(&model, &canvas, scratch, 1280U * 592U, read_color, NULL));
+    assert(canvas.pixels[200U * 1280U + 50U] == 10U && canvas.pixels[200U * 1280U + 200U] == 20U);
+    assert(canvas.pixels[680U * 1280U + 100U] == TABOS_GUI_FACE);
+    model.damaged            = false;
+    model.windows[1].surface = 30;
+    desktop_model_damage(&model, (tabos_gui_rect_t) {200, 200, 8, 8});
+    assert(desktop_render(&model, &canvas, scratch, 1280U * 592U, read_color, NULL));
+    assert(canvas.pixels[200U * 1280U + 200U] == 30U && canvas.pixels[200U * 1280U + 208U] == 20U);
+    desktop_model_minimize(&model, 1U);
+    assert(desktop_render(&model, &canvas, scratch, 1280U * 592U, read_color, NULL));
+    assert(canvas.pixels[200U * 1280U + 200U] == 10U);
+    assert(pixels[0] == 0xdeadU && pixels[1280U * 720U + 1U] == 0xdeadU);
+    free(scratch);
+    free(pixels);
+}
 
 int main(void)
 {
+    render_test();
     desktop_model_t model;
     desktop_model_init(&model);
     const int first  = desktop_model_add(&model, 2, "First");

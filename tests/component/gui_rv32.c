@@ -107,6 +107,9 @@ static void await_pixel(unsigned int x, unsigned int y, uint16_t color)
     while (pixel_at(x, y) != color && platform_time_ms() < deadline) {
         pump();
     }
+    if (pixel_at(x, y) != color) {
+        fprintf(stderr, "pixel (%u,%u): got %04x expected %04x\n", x, y, pixel_at(x, y), color);
+    }
     check(pixel_at(x, y) == color, "expected composed pixel");
 }
 
@@ -142,9 +145,46 @@ static uint32_t surface_bytes(void)
     return packet.stats.used_bytes;
 }
 
+static void settle(void)
+{
+    const uint64_t deadline = platform_time_ms() + 500U;
+    while (platform_time_ms() < deadline) {
+        pump();
+    }
+}
+
+static void capture_frame(void)
+{
+    const char* path = getenv("TABOS_GUI_TEST_CAPTURE");
+    if (path == NULL) {
+        return;
+    }
+    FILE* file = fopen(path, "wb");
+    check(file != NULL, "open optional framebuffer capture");
+    (void) fprintf(file, "P6\n1280 720\n255\n");
+    for (unsigned int y = 0U; y < 720U; ++y) {
+        for (unsigned int x = 0U; x < 1280U; ++x) {
+            const uint16_t color       = pixel_at(x, y);
+            const unsigned char rgb[3] = {(unsigned char) (((color >> 11U) & 31U) * 255U / 31U),
+                                          (unsigned char) (((color >> 5U) & 63U) * 255U / 63U),
+                                          (unsigned char) ((color & 31U) * 255U / 31U)};
+            check(fwrite(rgb, 1U, 3U, file) == 3U, "write framebuffer capture");
+        }
+    }
+    check(fclose(file) == 0, "close framebuffer capture");
+}
+
+static void close_shortcut(void)
+{
+    tabos_input_event_t key = {.type = TABOS_INPUT_KEY_DOWN, .key = TABOS_KEY_Q, .modifiers = TABOS_MODIFIER_CONTROL};
+    check(input_submit(&key), "close shortcut");
+    key.type = TABOS_INPUT_KEY_UP;
+    check(input_submit(&key), "close release");
+}
+
 int main(int argc, char** argv)
 {
-    check(argc == 3, "pass SDK-built desktop and canvas artifacts");
+    check(argc == 6, "pass SDK-built desktop, canvas, files, calculator and editor artifacts");
     check(mkdtemp(storage_root) != NULL, "temporary storage");
     char directory[512], executable[512], canvas[512], hello[512];
     (void) snprintf(directory, sizeof(directory), "%s/bin", storage_root);
@@ -154,6 +194,13 @@ int main(int argc, char** argv)
     check(mkdir(directory, 0700) == 0, "bin directory");
     copy_file(argv[1], executable);
     copy_file(argv[2], canvas);
+    const char* extra_names[] = {"files", "calculator", "editor"};
+    char extras[3][512], note[512];
+    for (size_t index = 0U; index < 3U; ++index) {
+        (void) snprintf(extras[index], sizeof(extras[index]), "%s/bin/%s", storage_root, extra_names[index]);
+        copy_file(argv[index + 3U], extras[index]);
+    }
+    (void) snprintf(note, sizeof(note), "%s/notes.txt", storage_root);
     FILE* legacy = fopen(hello, "wb");
     check(legacy != NULL && fwrite(loader_hello_elf, 1U, loader_hello_elf_size, legacy) == loader_hello_elf_size &&
               fclose(legacy) == 0,
@@ -194,14 +241,106 @@ int main(int argc, char** argv)
     await_count(2U);
     check(surface_bytes() == 0U, "client surface cleanup");
     await_pixel(1279U, 300U, 0x2b8dU);
+    click(770, 180);
+    await_count(3U);
+    await_pixel(8U, 112U, 0x632cU);
+    click(40, 150);
+    tabos_input_event_t text = {.type = TABOS_INPUT_TEXT, .text = "retained"};
+    check(input_submit(&text), "editor text");
+    settle();
+    click(220, 80);
+    settle();
+    click(390, 352);
+    const uint64_t save_deadline = platform_time_ms() + 20000U;
+    struct stat saved;
+    while (stat(note, &saved) != 0 && platform_time_ms() < save_deadline) {
+        pump();
+    }
+    check(stat(note, &saved) == 0 && saved.st_size == 8, "editor save through real public filesystem");
+    settle();
+    click(160, 150);
+    text.text[0] = '!';
+    text.text[1] = '\0';
+    check(input_submit(&text), "dirty editor text");
+    settle();
+    click(1160, 24);
+    await_pixel(1279U, 300U, 0x2b8dU);
+    click(1060, 180);
+    await_count(4U);
+    await_pixel(100U, 200U, 0xffffU);
+    click(428, 84);
+    await_count(5U);
+    check(surface_bytes() == 2U * 1280U * 592U * 2U, "dirty editor and canvas remain resident during handoff");
+    await_count(4U);
+    settle();
+    close_shortcut();
+    await_count(3U);
+    click(196, 680);
+    settle();
+    close_shortcut();
+    settle();
+    capture_frame();
+    click(640, 352);
+    settle();
+    check(tabos_process_count() == 3U, "dirty close cancellation retains editor");
+    close_shortcut();
+    settle();
+    click(900, 352);
+    await_count(2U);
+    FILE* saved_file    = fopen(note, "rb");
+    char saved_text[16] = {0};
+    check(saved_file != NULL && fread(saved_text, 1U, sizeof(saved_text), saved_file) == 8U &&
+              fclose(saved_file) == 0 && strcmp(saved_text, "retained") == 0,
+          "discard leaves saved file unchanged");
+    await_pixel(1279U, 300U, 0x2b8dU);
+    click(480, 180);
+    await_count(3U);
+    settle();
+    close_shortcut();
+    await_count(2U);
+    await_pixel(1279U, 300U, 0x2b8dU);
+    click(180, 180);
+    await_count(3U);
+    settle();
+    close_shortcut();
+    await_count(2U);
+    await_pixel(1279U, 300U, 0x2b8dU);
     click(1208, 680);
     await_count(1U);
     int status = -1;
     check(tabos_app_take_child_status(parent_context, &status) && status == 0 && !tabos_process_system_panicked(),
           "desktop exits to persistent root");
     check(tabos_app_console(parent_context) != NULL, "root owns console again");
+    for (unsigned int failure = 0U; failure < 2U; ++failure) {
+        check(tabos_app_exec(parent_context, "T:/bin/desktop") == TABOS_APP_RESULT_OK, "relaunch desktop for recovery");
+        await_pixel(1279U, 300U, 0x2b8dU);
+        tabos_process_id_t desktop_pid = 0U;
+        for (tabos_process_id_t id = 1U; id < 64U; ++id) {
+            if (tabos_process_info(id, &info) && info.parent_id == 0U) {
+                desktop_pid = id;
+                break;
+            }
+        }
+        check(desktop_pid != 0U, "desktop recovery identity");
+        click(1060, 180);
+        await_count(3U);
+        await_pixel(100U, 200U, 0xffffU);
+        if (failure != 0U) {
+            click(428, 84);
+            await_count(4U);
+        }
+        check(kernel_process_force_terminate(desktop_pid, 77), "recoverable desktop termination");
+        await_count(1U);
+        check(tabos_app_take_child_status(parent_context, &status) && status == 77 && surface_bytes() == 0U &&
+                  tabos_app_console(parent_context) != NULL,
+              "desktop recovery tears down GUI and fullscreen descendants");
+    }
     kernel_runtime_shutdown();
     platform_shutdown();
+    for (size_t index = 0U; index < 3U; ++index) {
+        check(unlink(extras[index]) == 0, "extra client cleanup");
+    }
+    check(unlink(note) == 0, "document fixture cleanup");
     check(unlink(executable) == 0 && unlink(canvas) == 0 && unlink(hello) == 0 && rmdir(directory) == 0 &&
               rmdir(storage_root) == 0,
           "fixture cleanup");

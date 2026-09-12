@@ -6,7 +6,10 @@ the process-owned `<tabos/pointer.h>` API; SDL and ESP-IDF touch handles remain 
 ## Events and Coordinates
 
 Pointer streams deliver `TABOS_POINTER_DOWN`, `TABOS_POINTER_MOVE`,
-`TABOS_POINTER_UP`, and `TABOS_POINTER_CANCEL`. Every event contains the boot-local
+`TABOS_POINTER_UP`, `TABOS_POINTER_CANCEL`, `TABOS_POINTER_HOVER` and
+`TABOS_POINTER_WHEEL`. Hover/wheel do not create held contacts. Wheel fields
+`wheel_x`/`wheel_y` contain signed steps, positive right/down; other events use zero.
+Every event contains the boot-local
 device ID, stable contact ID, logical 1280x720 coordinates, button mask, and optional
 normalized pressure from 0 through `TABOS_POINTER_PRESSURE_MAX`.
 

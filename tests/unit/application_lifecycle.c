@@ -188,6 +188,14 @@ static void test_session_lifecycle(void)
     assert(kernel_process_session_control(owner, TABOS_SESSION_STATUS, (uint32_t) next, 0U) == 0);
     assert(kernel_process_session_control(owner, TABOS_SESSION_FORCE_CLOSE, 0U, 0U) == -TABOS_EPERM);
     assert(kernel_process_session_control(owner, TABOS_SESSION_RESUME, (uint32_t) next, 0U) == 0);
+    const int shutdown = kernel_process_session_control(owner, TABOS_SESSION_SHUTDOWN_BEGIN, 0U, 0U);
+    assert(shutdown > next);
+    assert(kernel_process_spawn_descriptor(owner, &concurrent_child_app, NULL, NULL, &rejected) ==
+           TABOS_APP_RESULT_BUSY);
+    assert(kernel_process_session_control(concurrent_contexts[child], TABOS_SESSION_CHECKPOINT, 0U, 0U) == 0);
+    assert(kernel_process_session_control(concurrent_contexts[child], TABOS_SESSION_ACKNOWLEDGE, (uint32_t) shutdown,
+                                          0U) == 0);
+    assert(kernel_process_session_control(owner, TABOS_SESSION_RESUME, (uint32_t) shutdown, 0U) == 0);
     assert(kernel_process_session_control(concurrent_contexts[child], TABOS_SESSION_ACKNOWLEDGE, (uint32_t) next, 0U) ==
            0);
     assert(kernel_process_session_control(owner, TABOS_SESSION_FORCE_CLOSE, 0U, child) == 0);

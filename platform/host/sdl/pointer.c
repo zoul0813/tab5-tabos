@@ -82,6 +82,22 @@ static int contact_for_finger(SDL_FingerID finger, bool create)
 
 static bool mouse_event(const SDL_Event* event)
 {
+    if (event->type == SDL_EVENT_MOUSE_WHEEL) {
+        if (event->wheel.which == SDL_TOUCH_MOUSEID) {
+            return true;
+        }
+        int32_t x, y;
+        if (logical_coordinates(event->wheel.mouse_x, event->wheel.mouse_y, &x, &y)) {
+            const int direction               = event->wheel.direction == SDL_MOUSEWHEEL_FLIPPED ? -1 : 1;
+            const tabos_pointer_event_t wheel = {.type    = TABOS_POINTER_WHEEL,
+                                                 .x       = x,
+                                                 .y       = y,
+                                                 .wheel_x = (int32_t) event->wheel.x * direction,
+                                                 .wheel_y = -(int32_t) event->wheel.y * direction};
+            pointer_service_submit(&wheel);
+        }
+        return true;
+    }
     if (event->type != SDL_EVENT_MOUSE_MOTION && event->type != SDL_EVENT_MOUSE_BUTTON_DOWN &&
         event->type != SDL_EVENT_MOUSE_BUTTON_UP) {
         return false;
@@ -129,8 +145,7 @@ static bool mouse_event(const SDL_Event* event)
     mouse_x      = x;
     mouse_y      = y;
     if (type == TABOS_POINTER_MOVE && !mouse_active && previous_buttons == 0U) {
-        pointer_service_record_movement();
-        return true;
+        type = TABOS_POINTER_HOVER;
     }
     const tabos_pointer_event_t pointer = {
         .type       = type,

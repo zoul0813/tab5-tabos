@@ -4,8 +4,10 @@ GUI implementation is in progress; see [GUI tasks](apps/gui.md). The initial
 internal process foundation separates asynchronous runnable children from the
 foreground stack and retains resource-free exit records for single reaping.
 Public concurrent SDK/ELF spawn and wait, inherited session IDs and bounded paired
-IPC channels and retained-surface prototype are implemented. GUI desktop and
-handoff remain pending; surface budgets require physical validation.
+IPC channels and retained surfaces are implemented. Desktop, Files, Calculator,
+Text editor, Canvas and resident fullscreen handoff are integrated. Automated
+validation is in progress; surface budgets, native contention, touch layout and
+game performance require physical validation. See scoped evidence in GUI tasks.
 
 > Status: living agent work tracker.
 >

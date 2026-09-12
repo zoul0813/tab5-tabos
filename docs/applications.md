@@ -1,5 +1,9 @@
 # Application Lifecycle
 
+The optional [desktop](gui.md) launches from the retained shell and coordinates
+independent GUI clients through public IPC, surfaces and session control. GUI clients
+remain resident during ordinary fullscreen execution and resume when it returns.
+
 The supported external application SDK and libc surface are documented in `docs/sdk.md`.
 
 TabOS has portable application descriptors, built-in application registry, and single foreground application lifecycle. This foundation runs identically in host and Tab5 builds. Applications use public TabOS APIs and do not call SDL3, ESP-IDF, or FreeRTOS directly.

@@ -348,7 +348,7 @@ void pointer_service_submit(const tabos_pointer_event_t* event)
             stream->contacts[event->contact_id]  = true;
             stream->contact_x[event->contact_id] = event->x;
             stream->contact_y[event->contact_id] = event->y;
-        } else {
+        } else if (event->type == TABOS_POINTER_UP || event->type == TABOS_POINTER_CANCEL) {
             stream->contacts[event->contact_id] = false;
         }
     }
