@@ -470,7 +470,7 @@ target_include_directories(tabos_network_service PRIVATE
     "${TABOS_ROOT}/sdk/include"
     "${CMAKE_CURRENT_LIST_DIR}/fakes"
 )
-target_link_libraries(tabos_network_service PRIVATE tabos_core)
+target_link_libraries(tabos_network_service PRIVATE tabos_core Threads::Threads)
 tabos_enable_warnings(tabos_network_service)
 tabos_enable_sanitizers(tabos_network_service)
 add_test(NAME unit.network_service COMMAND tabos_network_service)

@@ -52,6 +52,10 @@ Failed autoconnect attempts use an exact monotonic retry deadline. Disconnecting
 starting an explicit connection cancels pending retry immediately; retry never fires
 before its configured delay.
 
+Status, connect, disconnect, and retry-deadline operations are safe when runtime and
+native application tasks call them concurrently. Status always returns one complete
+snapshot; backend connection work does not hold the portable state lock.
+
 Interactive credential entry, scanning, and forgetting credentials are not
 implemented yet.
 

@@ -131,6 +131,10 @@ compatibility deadline remains.
 Network-service tests count platform status reads and prove idle runtime updates perform
 none; one coalesced backend transition causes one copied status read. Core smoke tests
 advance fake monotonic time to exercise the 60-second hardware-health audit explicitly.
+Network-service concurrency coverage runs status copies and deadline reads against repeated
+connect, disconnect, and runtime updates from separate host threads. It must validate whole
+status strings and bounded attempt/deadline state while backend operations remain serialized
+outside the portable state mutex.
 
 Deadline-service tests use fake monotonic time and must prove exact key-repeat, cursor,
 network-retry, and finite-wait deadlines; no firing one millisecond early; immediate
