@@ -1,5 +1,7 @@
 #include <tabos/internal/runtime.h>
 #include <tabos/internal/input.h>
+#include <tabos/internal/pointer.h>
+#include <tabos/internal/application.h>
 #include <tabos/internal/device_registry.h>
 #include <tabos/internal/hardware_devices.h>
 
@@ -15,6 +17,21 @@
 
 #include <errno.h>
 #include <string.h>
+
+static bool panic_requested;
+
+static bool power_test_entry(tabos_app_context_t* context)
+{
+    (void) context;
+    return true;
+}
+
+static void power_test_update(tabos_app_context_t* context)
+{
+    if (panic_requested) {
+        tabos_app_request_exit(context, 1);
+    }
+}
 
 int main(void)
 {
@@ -144,7 +161,6 @@ int main(void)
         device.last_error != 0) {
         return 1;
     }
-
     test_platform_battery_set_status(false, EIO);
     test_platform_advance_time_ms(60000U);
     kernel_runtime_update(PLATFORM_RUNTIME_EVENT_DEADLINE);
@@ -221,7 +237,96 @@ int main(void)
     if (!tabos_terminal_set_scale(4U) || tabos_terminal_get_scale() != 4U) {
         return 1;
     }
-
+    kernel_runtime_shutdown();
+    /* Isolate power checks from optional diagnostic startup applications. */
+    if (!kernel_runtime_init() || !kernel_runtime_start(false)) {
+        return 1;
+    }
+    test_platform_advance_time_ms(60000U);
+    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_DEADLINE);
+    if (test_platform_brightness() != 20U) {
+        return 1;
+    }
+    test_platform_advance_time_ms(120000U);
+    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_DEADLINE);
+    if (test_platform_brightness() != 0U) {
+        return 1;
+    }
+    /* The normal health audit still detects faults while the screen is off. */
+    test_platform_rtc_set_status(false, EIO);
+    test_platform_advance_time_ms(60000U);
+    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_DEADLINE);
+    if (test_platform_brightness() != 0U || !device_registry_find(TABOS_DEVICE_NAME_RTC, &device) ||
+        device.state != TABOS_DEVICE_FAULT) {
+        return 1;
+    }
+    test_platform_rtc_set_status(true, 0);
+    /* Physical touch activity restores output even without an open pointer stream. */
+    tabos_pointer_event_t touch = {.type = TABOS_POINTER_DOWN, .contact_id = 0U, .x = 10, .y = 20};
+    pointer_service_submit(&touch);
+    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_POINTER);
+    if (test_platform_brightness() != 75U) {
+        return 1;
+    }
+    test_platform_advance_time_ms(180000U);
+    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_DEADLINE);
+    if (test_platform_brightness() != 75U) {
+        return 1;
+    }
+    touch.type = TABOS_POINTER_MOVE;
+    touch.x    = 11;
+    pointer_service_submit(&touch);
+    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_POINTER);
+    touch.type = TABOS_POINTER_UP;
+    pointer_service_submit(&touch);
+    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_POINTER);
+    test_platform_advance_time_ms(60000U);
+    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_DEADLINE);
+    if (test_platform_brightness() != 20U) {
+        return 1;
+    }
+    test_platform_advance_time_ms(120000U);
+    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_DEADLINE);
+    if (test_platform_brightness() != 0U) {
+        return 1;
+    }
+    const tabos_input_event_t wake_key = {.type = TABOS_INPUT_KEY_DOWN, .key = TABOS_KEY_A};
+    if (!input_submit(&wake_key)) {
+        return 1;
+    }
+    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_INPUT);
+    if (test_platform_brightness() != 75U) {
+        return 1;
+    }
+    kernel_runtime_shutdown();
+    /* A root-process panic while off must become visible and stay visible. */
+    if (!kernel_runtime_init() || !kernel_runtime_start(false)) {
+        return 1;
+    }
+    const tabos_app_descriptor_t app = {.abi_version  = TABOS_APPLICATION_ABI_VERSION,
+                                        .name         = "power-panic",
+                                        .version      = "1",
+                                        .capabilities = TABOS_APP_CAPABILITY_CONSOLE,
+                                        .entry        = power_test_entry,
+                                        .update       = power_test_update};
+    if (!application_registry_register(&app) || tabos_app_launch(app.name) != TABOS_APP_RESULT_OK) {
+        return 1;
+    }
+    test_platform_advance_time_ms(180000U);
+    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_DEADLINE);
+    if (test_platform_brightness() != 0U) {
+        return 1;
+    }
+    panic_requested = true;
+    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_APPLICATION);
+    if (!tabos_process_system_panicked() || test_platform_brightness() != 75U) {
+        return 1;
+    }
+    test_platform_advance_time_ms(180000U);
+    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_DEADLINE);
+    if (test_platform_brightness() != 75U) {
+        return 1;
+    }
     kernel_runtime_shutdown();
     return 0;
 }

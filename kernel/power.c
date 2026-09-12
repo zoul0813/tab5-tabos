@@ -28,7 +28,8 @@ static void failure(power_manager_t* manager, power_failure_code_t code, const c
 
 static bool policy_ok(power_policy_t policy)
 {
-    return policy.active_brightness <= 100U && policy.idle_brightness <= 100U;
+    return policy.active_brightness <= 100U && policy.idle_brightness <= 100U &&
+           (policy.screen_off_ms == 0U || policy.screen_off_ms >= policy.idle_ms);
 }
 
 static uint8_t idle_brightness(power_policy_t policy)
@@ -47,6 +48,9 @@ static const char* inhibitor_name(uint32_t inhibitors)
     if ((inhibitors & POWER_INHIBITOR_FULLSCREEN) != 0U) {
         return "fullscreen";
     }
+    if ((inhibitors & POWER_INHIBITOR_PANIC) != 0U) {
+        return "panic";
+    }
     return "media";
 }
 
@@ -57,12 +61,27 @@ static bool set_brightness(power_manager_t* manager, uint8_t brightness)
         return true;
     }
     if (!platform_power_set_brightness(brightness)) {
+        manager->status.brightness_valid = false;
         failure(manager, POWER_FAILURE_BRIGHTNESS, NULL);
         return false;
     }
     manager->status.effective_brightness = brightness;
     manager->status.brightness_valid     = true;
     return true;
+}
+
+static void restore_display(power_manager_t* manager)
+{
+    manager->status.screen_off_requested = false;
+    (void) set_brightness(manager, manager->status.policy.active_brightness);
+}
+
+static void apply_idle_display(power_manager_t* manager, uint64_t now_ms)
+{
+    const power_policy_t policy = manager->status.policy;
+    manager->status.screen_off_requested =
+        policy.screen_off_ms != 0U && now_ms >= add(manager->status.last_activity_ms, policy.screen_off_ms);
+    (void) set_brightness(manager, manager->status.screen_off_requested ? 0U : idle_brightness(policy));
 }
 
 bool power_manager_init(power_manager_t* manager, power_policy_t policy, uint64_t now_ms)
@@ -210,7 +229,7 @@ bool power_manager_set_policy(power_manager_t* manager, power_policy_t policy, u
     }
     manager->status.policy = policy;
     if (manager->status.dim_inhibitors != 0U) {
-        (void) set_brightness(manager, policy.active_brightness);
+        restore_display(manager);
         return true;
     }
     const uint64_t idle_deadline = add(manager->status.last_activity_ms, policy.idle_ms);
@@ -219,11 +238,11 @@ bool power_manager_set_policy(power_manager_t* manager, power_policy_t policy, u
         manager->status.state            = POWER_STATE_IDLE;
         manager->status.reason           = POWER_REASON_INACTIVITY;
         manager->status.state_changed_ms = now_ms;
-        (void) set_brightness(manager, idle_brightness(policy));
+        apply_idle_display(manager, now_ms);
     } else if (manager->status.state == POWER_STATE_ACTIVE || manager->status.state == POWER_STATE_IDLE) {
         manager->status.state            = POWER_STATE_ACTIVE;
         manager->status.state_changed_ms = now_ms;
-        (void) set_brightness(manager, policy.active_brightness);
+        restore_display(manager);
     }
     return true;
 }
@@ -241,7 +260,7 @@ void power_manager_set_dim_inhibitors(power_manager_t* manager, uint32_t inhibit
             manager->status.reason           = POWER_REASON_ACTIVITY;
             manager->status.state_changed_ms = now_ms;
         }
-        (void) set_brightness(manager, manager->status.policy.active_brightness);
+        restore_display(manager);
     } else if (previous != 0U) {
         manager->status.last_activity_ms = now_ms;
         if (manager->status.state == POWER_STATE_IDLE) {
@@ -320,7 +339,7 @@ static void finish(power_manager_t* manager, uint64_t now_ms)
     manager->cursor                    = 0U;
     manager->suspended_count           = 0U;
     manager->platform_prepared         = false;
-    (void) set_brightness(manager, manager->status.policy.active_brightness);
+    restore_display(manager);
 }
 
 static void drive(power_manager_t* manager, uint64_t now_ms)
@@ -467,7 +486,9 @@ void power_manager_update(power_manager_t* manager, platform_runtime_events_t ev
             manager->status.state            = POWER_STATE_ACTIVE;
             manager->status.reason           = POWER_REASON_ACTIVITY;
             manager->status.state_changed_ms = now_ms;
-            (void) set_brightness(manager, manager->status.policy.active_brightness);
+        }
+        if (manager->status.state == POWER_STATE_ACTIVE) {
+            restore_display(manager);
         }
     }
     if ((events & PLATFORM_RUNTIME_EVENT_DEADLINE) != 0U && now_ms >= power_manager_next_deadline(manager)) {
@@ -475,8 +496,14 @@ void power_manager_update(power_manager_t* manager, platform_runtime_events_t ev
             manager->status.state            = POWER_STATE_IDLE;
             manager->status.reason           = POWER_REASON_INACTIVITY;
             manager->status.state_changed_ms = now_ms;
-            (void) set_brightness(manager, idle_brightness(manager->status.policy));
-        } else if (manager->status.state == POWER_STATE_IDLE) {
+            apply_idle_display(manager, now_ms);
+        } else if (manager->status.state == POWER_STATE_IDLE && !manager->status.screen_off_requested &&
+                   manager->status.policy.screen_off_ms != 0U &&
+                   now_ms >= add(manager->status.last_activity_ms, manager->status.policy.screen_off_ms)) {
+            apply_idle_display(manager, now_ms);
+        }
+        if (manager->status.state == POWER_STATE_IDLE && manager->status.policy.automatic_suspend &&
+            now_ms >= add(manager->status.last_activity_ms, manager->status.policy.suspend_ms)) {
             request = true;
         }
     }
@@ -508,8 +535,18 @@ uint64_t power_manager_next_deadline(const power_manager_t* manager)
     if (manager->status.state == POWER_STATE_ACTIVE) {
         return add(manager->status.last_activity_ms, manager->status.policy.idle_ms);
     }
-    if (manager->status.state == POWER_STATE_IDLE && manager->status.policy.automatic_suspend) {
-        return add(manager->status.last_activity_ms, manager->status.policy.suspend_ms);
+    if (manager->status.state == POWER_STATE_IDLE) {
+        uint64_t deadline = PLATFORM_RUNTIME_DEADLINE_NONE;
+        if (!manager->status.screen_off_requested && manager->status.policy.screen_off_ms != 0U) {
+            deadline = add(manager->status.last_activity_ms, manager->status.policy.screen_off_ms);
+        }
+        if (manager->status.policy.automatic_suspend) {
+            const uint64_t suspend_deadline = add(manager->status.last_activity_ms, manager->status.policy.suspend_ms);
+            if (suspend_deadline < deadline) {
+                deadline = suspend_deadline;
+            }
+        }
+        return deadline;
     }
     return PLATFORM_RUNTIME_DEADLINE_NONE;
 }

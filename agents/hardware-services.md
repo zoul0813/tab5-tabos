@@ -347,6 +347,11 @@ sleep entry, time accounting, and measurement rather than repeating that convers
 
 - [ ] Define active, idle, suspending, suspended, resuming, and shutting-down states.
 - [ ] Add idle display dimming and reduced driver polling before attempting suspend.
+
+  Display-only implementation now includes 60-second dimming and 180-second screen-off,
+  with CPU/services and touch input retained. Audio transport is demand-driven. Dimming
+  and audio functional checks have physical evidence; screen-off/restoration and separate
+  optimization measurements remain pending. DMA/VSYNC quiescence remains open.
 - [ ] Add wake-source registration for RTC alarm, power button, keyboard, and BMI270 motion.
 - [ ] Define suspend blockers for active filesystem writes, media streams, network operations,
   and unreleased camera frames.

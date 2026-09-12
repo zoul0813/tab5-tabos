@@ -1763,3 +1763,14 @@ capture, route, fault, wait, and shared-clock assertions remain mandatory. Healt
 must prove suspended deadlines disappear, no audit occurs while paused, and resume runs one
 overdue audit while advancing directly to the next future deadline. Cross-build real Tab5
 audio code; host fakes do not prove codec shutdown, jack routing, or electrical savings.
+
+Screen-off coverage extends `unit.power_manager` with exact 180-second total-inactivity
+timing, late dispatch, simultaneous activity, all display inhibitors, immediate policy
+changes, disabled screen-off, failure status/recovery, repeated cycles, and separate
+automatic-suspend deadlines. `unit.core_smoke` checks real runtime default policy,
+health-service progress while off, touch down/move/up and keyboard restoration, and
+panic visibility while off. `unit.host_power_model` preserves framebuffer pixels across
+off/present/restore. Hardware validation must confirm zero backlight/no image at 180
+seconds, retained touch responsiveness, restoration and repeated cycles on ILI9881C,
+ST7123, and ST7121 separately. Measure screen-off savings separately from dimming;
+continued DMA/VSYNC is expected until retained-buffer scanout quiescence is implemented.

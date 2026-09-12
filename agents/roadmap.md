@@ -99,6 +99,13 @@
   counters, last-close idle-timer restart, and subsequent dimming.
 - [ ] Power Phase 3 display slice: add retained-buffer MIPI-DPI scanout quiescence when
   pinned ESP-IDF exposes or TabOS supplies a safe reversible driver operation.
+- [x] Add 180-second display-only screen-off after 60-second dimming, touch/keyboard
+  restoration, retained CPU/service progress, failure recovery, and visible panic output.
+  macOS Debug/Release suites pass (69 tests each), with final targeted regression checks;
+  Tab5 Debug/Release builds pass. Operator reports firmware flashed; physical validation
+  and power measurements remain pending.
+- [ ] Physically validate screen-off/restoration on each panel revision and measure
+  incremental savings; controller display-off still leaves DMA/VSYNC running.
 - [ ] Physically measure unused-audio shutdown and headphone-monitor removal separately.
 - [x] Capture coarse measurement setup: generic inline USB-C meter at 5.12 V, no battery,
   charging off, keyboard/SD attached, USB-A connected to unpowered host, Wi-Fi connected,

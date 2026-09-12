@@ -60,11 +60,34 @@ restores `ready`.
 
 ## Power-management development
 
-Automatic idle dimming is enabled; transparent suspend is not yet available. The
+Automatic idle dimming and screen-off are enabled; transparent suspend is not yet available. The
 [power baseline](power-baseline.md) records initialized services, suspend blockers,
 GPIO interrupt ownership, pinned-SDK restrictions, unverified wake paths, and the
 repeatable measurement worksheet. Functional sleep/wake and instrumented power
 measurements remain separate validation gates.
+
+Display policy turns the screen off after
+180 seconds of total inactivity (120 seconds after dimming). Backlight is off and no
+image is visible, while the CPU, applications, networking, and timers continue running.
+Touch and keyboard activity restore the screen and previous active brightness during
+runtime input dispatch. Touch circuitry remains operational while the screen is off.
+Dimming and screen-off are display power savings, separate from system sleep; actual
+system sleep will also require the screen to be off. Fullscreen graphics, open audio/camera
+streams, and held keys/contacts inhibit both dimming and screen-off. Releasing the final
+inhibitor restarts both inactivity deadlines. Kernel panic restores the display and inhibits
+idle blanking so failure output stays visible.
+
+Tab5 screen-off sets backlight brightness to zero and sends the controller display-off
+command. It retains panel/touch power rails, framebuffer allocations, and continuous
+DMA/VSYNC scanout. This is not scanout quiescence or controller sleep. On restoration,
+the controller is enabled before the backlight. SDL presents black using zero texture
+brightness; framebuffer and screenshot pixels remain intact. Background rendering does
+not turn the screen back on.
+
+Failed display operations invalidate effective-brightness status and retain the last
+successful value for diagnostics. There is no periodic off retry; later activity or a
+policy change can retry restoration. Physical screen-off/touch restoration and incremental
+current savings still require validation on each supported display revision.
 
 TabOS now contains an internal portable power-state manager and deterministic host
 simulation used for development tests. After 60 seconds without physical keyboard or
@@ -73,7 +96,7 @@ is below 20%, dimming never raises it. Physical key presses/releases, active poi
 held keys, and active contacts restore or hold active brightness. Software key repeat,
 cursor blink, background output, and service completions do not reset idle time.
 
-Fullscreen graphics and open audio or camera streams inhibit dimming and suspend. Brightness
+Fullscreen graphics and open audio or camera streams inhibit dimming, screen-off, and suspend. Brightness
 restores when inhibitor begins; final inhibitor release starts fresh 60-second interval.
 Framebuffer pixels, terminal contents, display ownership, and input ordering remain intact.
 Host SDL applies dimming only while presenting texture, so framebuffer and screenshots retain

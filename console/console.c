@@ -91,8 +91,7 @@ bool console_write_panic(const char* text)
         return false;
     }
 
-    const bool graphics_was_active = graphics_active;
-    graphics_active                = false;
+    graphics_active = false;
     terminal_set_rendering_enabled(active_terminal, true);
     terminal_set_cursor_visible(active_terminal, false);
     active_terminal->ansi_state = 0U;
@@ -102,9 +101,7 @@ bool console_write_panic(const char* text)
     terminal_write_line(active_terminal, text);
     const bool presented = present_console();
     unlock_console();
-    if (graphics_was_active) {
-        platform_runtime_notify(PLATFORM_RUNTIME_EVENT_DEADLINE | PLATFORM_RUNTIME_EVENT_POWER);
-    }
+    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_DEADLINE | PLATFORM_RUNTIME_EVENT_POWER);
     return presented;
 }
 

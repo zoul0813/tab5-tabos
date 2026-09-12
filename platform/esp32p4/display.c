@@ -902,8 +902,31 @@ bool platform_power_set_brightness(uint8_t percent)
     if (!display_created || percent > 100U) {
         return false;
     }
-    const esp_err_t result = bsp_display_brightness_set(percent);
+    /* Do not reset the panel, remove shared rails, or enter controller sleep:
+     * the touch controller must remain responsive while only the screen is off.
+     * Scanout continues, so ordinary presentation and VSYNC waits remain valid.
+     */
+    esp_err_t result;
+    if (percent == 0U) {
+        result = bsp_display_brightness_set(0);
+        if (result != ESP_OK) {
+            ESP_LOGE(TAG, "Could not disable backlight: %s", esp_err_to_name(result));
+            return false;
+        }
+        backlight_initialized = true;
+        backlight_enabled     = false;
+    }
+    result = esp_lcd_panel_disp_on_off(display_handles.panel, percent != 0U);
     if (result != ESP_OK) {
+        ESP_LOGE(TAG, "Could not %s display: %s", percent != 0U ? "enable" : "blank", esp_err_to_name(result));
+        return false;
+    }
+    if (percent == 0U) {
+        return true;
+    }
+    result = bsp_display_brightness_set(percent);
+    if (result != ESP_OK) {
+        ESP_LOGE(TAG, "Could not set backlight brightness: %s", esp_err_to_name(result));
         return false;
     }
     backlight_initialized = true;

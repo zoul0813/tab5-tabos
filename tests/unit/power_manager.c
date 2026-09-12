@@ -218,6 +218,115 @@ static void test_policy_and_brightness_failures(void)
     power_manager_shutdown(&manager);
 }
 
+static void test_screen_off(void)
+{
+    power_manager_t manager;
+    power_policy_t display_policy = policy();
+    display_policy.idle_ms        = 60000U;
+    display_policy.screen_off_ms  = 180000U;
+    assert(power_manager_init(&manager, display_policy, 10U));
+    assert(power_manager_finalize(&manager));
+    power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_DEADLINE, 60010U);
+    assert(test_platform_brightness() == 20U);
+    assert(power_manager_next_deadline(&manager) == 180010U);
+    power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_DEADLINE, 180009U);
+    assert(test_platform_brightness() == 20U);
+    power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_DEADLINE, 180010U);
+    assert(test_platform_brightness() == 0U);
+    assert(manager.status.screen_off_requested);
+    assert(manager.status.state == POWER_STATE_IDLE);
+    assert(manager.status.generation == 0U);
+    assert(power_manager_next_deadline(&manager) == PLATFORM_RUNTIME_DEADLINE_NONE);
+    power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_DEADLINE, 600010U);
+    assert(manager.status.state == POWER_STATE_IDLE);
+    assert(test_platform_brightness() == 0U);
+
+    /* Repeated activity restores the active setting and restarts both deadlines. */
+    for (uint64_t cycle = 1U; cycle <= 20U; ++cycle) {
+        const uint64_t now = cycle * 1000000U;
+        power_manager_request_activity(&manager, now);
+        power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_POWER, now);
+        assert(test_platform_brightness() == 75U);
+        assert(!manager.status.screen_off_requested);
+        assert(power_manager_next_deadline(&manager) == now + 60000U);
+        /* A delayed dispatch must go directly to off. */
+        power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_DEADLINE, now + 180000U);
+        assert(test_platform_brightness() == 0U);
+        assert(manager.status.state == POWER_STATE_IDLE);
+    }
+    power_manager_shutdown(&manager);
+}
+
+static void test_screen_off_races_policy_and_failures(void)
+{
+    power_manager_t manager;
+    power_policy_t configured = policy();
+    configured.screen_off_ms  = 300U;
+    assert(power_manager_init(&manager, configured, 0U));
+    assert(power_manager_finalize(&manager));
+    power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_DEADLINE, 100U);
+    power_manager_request_activity(&manager, 300U);
+    power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_POWER | PLATFORM_RUNTIME_EVENT_DEADLINE, 300U);
+    assert(test_platform_brightness() == 75U);
+    assert(manager.status.last_activity_ms == 300U);
+    power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_DEADLINE, 600U);
+    assert(test_platform_brightness() == 0U);
+
+    const uint32_t inhibitors[] = {POWER_INHIBITOR_KEYBOARD, POWER_INHIBITOR_POINTER, POWER_INHIBITOR_FULLSCREEN,
+                                   POWER_INHIBITOR_MEDIA};
+    for (size_t i = 0U; i < sizeof(inhibitors) / sizeof(inhibitors[0]); ++i) {
+        const uint64_t now = 1000U + i * 1000U;
+        power_manager_set_dim_inhibitors(&manager, inhibitors[i], now);
+        assert(test_platform_brightness() == 75U);
+        assert(!manager.status.screen_off_requested);
+        power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_DEADLINE, now + 500U);
+        assert(test_platform_brightness() == 75U);
+        assert(power_manager_next_deadline(&manager) == PLATFORM_RUNTIME_DEADLINE_NONE);
+        power_manager_set_dim_inhibitors(&manager, 0U, now + 500U);
+        assert(power_manager_next_deadline(&manager) == now + 600U);
+        power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_DEADLINE, now + 800U);
+        assert(test_platform_brightness() == 0U);
+    }
+
+    configured.screen_off_ms = 0U;
+    assert(power_manager_set_policy(&manager, configured, 4800U));
+    assert(test_platform_brightness() == 20U);
+    assert(!manager.status.screen_off_requested);
+    assert(power_manager_next_deadline(&manager) == PLATFORM_RUNTIME_DEADLINE_NONE);
+    configured.screen_off_ms = 50U;
+    assert(!power_manager_set_policy(&manager, configured, 4800U));
+    assert(manager.status.policy.screen_off_ms == 0U);
+    configured.screen_off_ms = 300U;
+    test_platform_fail_brightness_once();
+    assert(power_manager_set_policy(&manager, configured, 4800U));
+    assert(manager.status.desired_brightness == 0U);
+    assert(!manager.status.brightness_valid);
+    assert(manager.status.failure.code == POWER_FAILURE_BRIGHTNESS);
+    assert(power_manager_next_deadline(&manager) == PLATFORM_RUNTIME_DEADLINE_NONE);
+    power_manager_request_activity(&manager, 4801U);
+    power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_POWER, 4801U);
+    assert(test_platform_brightness() == 75U);
+    power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_DEADLINE, 5101U);
+    assert(test_platform_brightness() == 0U);
+    test_platform_fail_brightness_once();
+    power_manager_request_activity(&manager, 5102U);
+    power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_POWER, 5102U);
+    assert(!manager.status.brightness_valid);
+    assert(test_platform_brightness() == 0U);
+    /* Retry on next real activity, including when policy state is already active. */
+    power_manager_request_activity(&manager, 5103U);
+    power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_POWER, 5103U);
+    assert(manager.status.brightness_valid);
+    assert(test_platform_brightness() == 75U);
+    configured.automatic_suspend = true;
+    configured.suspend_ms        = 500U;
+    assert(power_manager_set_policy(&manager, configured, 5103U));
+    power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_DEADLINE, 5403U);
+    assert(manager.status.state == POWER_STATE_IDLE);
+    assert(power_manager_next_deadline(&manager) == 5603U);
+    power_manager_shutdown(&manager);
+}
+
 static void test_registration_failures(void)
 {
     power_manager_t manager;
@@ -268,6 +377,8 @@ int main(void)
     test_idle_activity_and_shutdown();
     test_activity_race_and_inhibitors();
     test_policy_and_brightness_failures();
+    test_screen_off();
+    test_screen_off_races_policy_and_failures();
     test_registration_failures();
     return 0;
 }

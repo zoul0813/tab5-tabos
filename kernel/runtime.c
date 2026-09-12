@@ -413,6 +413,7 @@ bool kernel_runtime_start(bool launch_startup_application)
         return false;
     }
     const power_policy_t power_policy = {.idle_ms           = 60000U,
+                                         .screen_off_ms     = 180000U,
                                          .suspend_ms        = 600000U,
                                          .active_brightness = 75U,
                                          .idle_brightness   = 20U,
@@ -497,14 +498,15 @@ void kernel_runtime_update(platform_runtime_events_t events)
         platform_pointer_update();
     }
     if (power_initialized) {
-        bool key_held       = false;
-        bool contact_active = false;
-        const bool input_activity   = input_take_power_activity(&key_held);
-        const bool pointer_activity = pointer_service_take_power_activity(&contact_active);
-        const bool activity         = input_activity || pointer_activity;
-        uint32_t inhibitors  = key_held ? POWER_INHIBITOR_KEYBOARD : 0U;
-        inhibitors          |= contact_active ? POWER_INHIBITOR_POINTER : 0U;
-        inhibitors          |= console_graphics_active() ? POWER_INHIBITOR_FULLSCREEN : 0U;
+        bool key_held                = false;
+        bool contact_active          = false;
+        const bool input_activity    = input_take_power_activity(&key_held);
+        const bool pointer_activity  = pointer_service_take_power_activity(&contact_active);
+        const bool activity          = input_activity || pointer_activity;
+        uint32_t inhibitors          = key_held ? POWER_INHIBITOR_KEYBOARD : 0U;
+        inhibitors                  |= contact_active ? POWER_INHIBITOR_POINTER : 0U;
+        inhibitors                  |= console_graphics_active() ? POWER_INHIBITOR_FULLSCREEN : 0U;
+        inhibitors                  |= tabos_process_system_panicked() ? POWER_INHIBITOR_PANIC : 0U;
         inhibitors |= audio_service_power_inhibited() || camera_service_power_inhibited() ? POWER_INHIBITOR_MEDIA : 0U;
         power_manager_set_dim_inhibitors(&power_manager, inhibitors, now);
         if (activity) {
@@ -556,6 +558,10 @@ void kernel_runtime_update(platform_runtime_events_t events)
 #ifndef NDEBUG
         ++wake_counts.application_slice;
 #endif
+    }
+    if (power_initialized && tabos_process_system_panicked()) {
+        power_manager_set_dim_inhibitors(
+            &power_manager, power_manager_status(&power_manager)->dim_inhibitors | POWER_INHIBITOR_PANIC, now);
     }
 #ifndef NDEBUG
     if (health_deadline_ready) {

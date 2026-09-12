@@ -1560,3 +1560,13 @@ audio streams only while TabOS streams exist. Backend-start failure updates devi
 remains retryable after no stream was admitted. Maintenance audit supports suppressed deadlines
 and one overdue resume pass. Pinned ESP-IDF v5.4.4 exposes no public retained-buffer MIPI-DPI
 pause; controller display-off is not treated as scanout quiescence.
+
+[DECIDED] Display-only idle policy dims at 60 seconds and blanks at 180 seconds of
+total inactivity while CPU, applications, networking, and deadlines continue normally.
+Screen-off is a requested display condition within idle, not a system-suspend state.
+The brightness contract maps zero to backlight-off plus panel display-off; nonzero
+enables panel output before restoring backlight. Retain shared touch supplies and
+scanout buffers. Touch/keyboard restore output through normal runtime activity handling;
+held input, fullscreen/media ownership, and panic inhibit idle blanking. No off retry
+deadline is added after failure; invalidate effective brightness and retry on activity
+or policy updates. DMA/VSYNC quiescence remains a separate driver lifecycle requirement.

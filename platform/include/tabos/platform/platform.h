@@ -203,6 +203,10 @@ void platform_log(const char* message);
 /* Debug diagnostics only; called by existing health audit, creates no timer. */
 void platform_runtime_log_activity(void);
 uint64_t platform_time_ms(void);
+/* Zero blanks the panel and disables its backlight, retaining pixels and touch input.
+ * Nonzero restores visible output. This does not suspend the CPU or promise DMA quiescence.
+ * Failure may leave partial hardware state; callers must invalidate cached brightness.
+ */
 bool platform_power_set_brightness(uint8_t percent);
 bool platform_power_prepare_sleep(void);
 void platform_power_abort_sleep(void);

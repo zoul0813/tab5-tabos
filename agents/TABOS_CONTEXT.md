@@ -876,6 +876,14 @@ Failed starts fault audio state but a later first-open retries cleanly. Health a
 deadline-suppressing suspend/resume hooks with one overdue audit on resume. Retained-buffer
 MIPI-DPI scanout pause remains unavailable in pinned ESP-IDF and therefore still blocks sleep.
 
+Display-only screen-off now follows dimming at 180 seconds total inactivity. The CPU,
+applications, networking, and maintenance continue running. Tab5 sets backlight to zero
+and sends panel display-off without resetting touch, removing shared supplies, or freeing
+framebuffers. DMA/VSYNC continues. Touch/keyboard activity restores display output;
+existing dim inhibitors also inhibit screen-off. Panic restores brightness and prevents
+idle blanking. SDL uses zero texture brightness. Physical off/restore and incremental
+current measurements remain pending; this does not enable system sleep.
+
 Debug peripheral activity uses a narrow `platform_runtime_log_activity()` diagnostic
 hook beside the existing health-audit wake report. Tab5 counts codec pairs/frames/errors,
 headphone attempts/errors, VSYNC and PPA completions with boot-lifetime lock-free unsigned

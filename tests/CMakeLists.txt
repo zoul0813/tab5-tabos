@@ -11,6 +11,7 @@ target_compile_definitions(tabos_core_smoke PRIVATE TABOS_TEST_RUNTIME_DIAGNOSTI
 target_include_directories(tabos_core_smoke PRIVATE
     "${TABOS_ROOT}/graphics/include"
     "${TABOS_ROOT}/input/include"
+    "${TABOS_ROOT}/pointer/include"
     "${TABOS_ROOT}/kernel/include"
     "${TABOS_ROOT}/platform/include"
     "${TABOS_GENERATED_INCLUDE_DIR}"
