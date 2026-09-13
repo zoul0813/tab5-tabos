@@ -634,6 +634,7 @@ tabos_enable_sanitizers(tabos_shell_rv32)
 
 add_executable(tabos_surface unit/surface.c ${TABOS_TEST_PLATFORM_FAKES})
 target_include_directories(tabos_surface PRIVATE
+    "${TABOS_GENERATED_INCLUDE_DIR}"
     "${TABOS_ROOT}/console/include"
     "${TABOS_ROOT}/graphics/include"
     "${TABOS_ROOT}/input/include"

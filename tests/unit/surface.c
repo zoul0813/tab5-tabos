@@ -5,6 +5,52 @@
 #include <string.h>
 #include <pthread.h>
 #include <stdatomic.h>
+#include <stdlib.h>
+
+static bool fail_allocation;
+static unsigned int live_allocations;
+
+static void* failing_calloc(size_t count, size_t size)
+{
+    if (fail_allocation) {
+        return NULL;
+    }
+    void* result = calloc(count, size);
+    if (result != NULL) {
+        ++live_allocations;
+    }
+    return result;
+}
+
+static void* failing_malloc(size_t size)
+{
+    if (fail_allocation) {
+        return NULL;
+    }
+    void* result = malloc(size);
+    if (result != NULL) {
+        ++live_allocations;
+    }
+    return result;
+}
+
+static void tracked_free(void* allocation)
+{
+    if (allocation != NULL) {
+        assert(live_allocations > 0U);
+        --live_allocations;
+    }
+    free(allocation);
+}
+
+/* Inject surface buffers only; IPC and platform allocations remain unchanged. */
+#define calloc failing_calloc
+#define malloc failing_malloc
+#define free   tracked_free
+#include "../../kernel/surface.c"
+#undef free
+#undef malloc
+#undef calloc
 
 static int concurrent_surface;
 static atomic_bool writer_done;
@@ -31,8 +77,55 @@ static int operation(uint32_t owner, uint32_t op, int surface)
     return surface_service_request(owner, op, &packet, NULL, 0U);
 }
 
+static void allocation_failures(void)
+{
+    assert(surface_service_init());
+    for (unsigned int round = 0U; round < 100U; ++round) {
+        surface_transport_packet_t packet = {.width = 2U, .height = 2U};
+        fail_allocation                   = true;
+        assert(surface_service_request(2U, SURFACE_TRANSPORT_CREATE, &packet, NULL, 0U) == -TABOS_ENOMEM);
+        assert(live_allocations == 0U);
+        assert(surface_service_request(2U, SURFACE_TRANSPORT_STATS, &packet, NULL, 0U) == 0);
+        assert(packet.stats.used_bytes == 0U);
+        fail_allocation  = false;
+        const int handle = surface_service_request(2U, SURFACE_TRANSPORT_CREATE, &packet, NULL, 0U);
+        assert(handle > 0 && live_allocations == 1U);
+        packet.surface          = handle;
+        uint16_t original[4]    = {1U, 2U, 3U, 4U};
+        uint16_t replacement[4] = {5U, 6U, 7U, 8U};
+        uint16_t copied[4]      = {0U};
+        assert(surface_service_request(2U, SURFACE_TRANSPORT_UPLOAD, &packet, original, sizeof(original)) == 0);
+        assert(operation(2U, SURFACE_TRANSPORT_COMMIT, handle) == 0);
+        fail_allocation = true;
+        assert(surface_service_request(2U, SURFACE_TRANSPORT_UPLOAD, &packet, replacement, sizeof(replacement)) ==
+               -TABOS_ENOMEM);
+        assert(operation(2U, SURFACE_TRANSPORT_COMMIT, handle) == 0);
+        assert(surface_service_request(2U, SURFACE_TRANSPORT_READ, &packet, copied, sizeof(copied)) == 0);
+        assert(memcmp(copied, original, sizeof(original)) == 0);
+        assert(surface_service_request(2U, SURFACE_TRANSPORT_INFO, &packet, NULL, 0U) == 0);
+        assert(packet.info.revision == 1U);
+        assert(surface_service_request(2U, SURFACE_TRANSPORT_STATS, &packet, NULL, 0U) == 0);
+        assert(packet.stats.used_bytes == sizeof(original) && live_allocations == 1U);
+        fail_allocation = false;
+        assert(surface_service_request(2U, SURFACE_TRANSPORT_UPLOAD, &packet, replacement, sizeof(replacement)) == 0);
+        assert(operation(2U, SURFACE_TRANSPORT_COMMIT, handle) == 0);
+        assert(surface_service_request(2U, SURFACE_TRANSPORT_READ, &packet, copied, sizeof(copied)) == 0);
+        assert(memcmp(copied, replacement, sizeof(replacement)) == 0);
+        /* Teardown must reclaim both a retained frame and an unfinished upload. */
+        assert(surface_service_request(2U, SURFACE_TRANSPORT_UPLOAD, &packet, original, sizeof(original)) == 0);
+        assert(live_allocations == 2U);
+        surface_service_close_owner(2U);
+        assert(live_allocations == 0U);
+        assert(operation(2U, SURFACE_TRANSPORT_COMMIT, handle) == -TABOS_EBADF);
+        assert(surface_service_request(2U, SURFACE_TRANSPORT_STATS, &packet, NULL, 0U) == 0);
+        assert(packet.stats.used_bytes == 0U);
+    }
+    surface_service_shutdown();
+}
+
 int main(void)
 {
+    allocation_failures();
     assert(ipc_service_init() && surface_service_init());
     surface_transport_packet_t packet = {.width = 4U, .height = 3U};
     const int surface                 = surface_service_request(2U, SURFACE_TRANSPORT_CREATE, &packet, NULL, 0U);
@@ -124,5 +217,6 @@ int main(void)
     surface_service_close_owner(2U);
     ipc_service_shutdown();
     surface_service_shutdown();
+    assert(live_allocations == 0U);
     return 0;
 }

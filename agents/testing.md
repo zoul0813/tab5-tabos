@@ -2002,3 +2002,16 @@ and `TABOS_GUI_TEST_IWAD` to a locally available legal IWAD (tested with Freedoo
 The harness copies assets into its temporary root, sends normal quit controls and
 cleans up; it also forces desktop recovery during an active handoff. Set optional
 `TABOS_GUI_TEST_CAPTURE` to a PPM output path for framebuffer review.
+
+### GUI Allocation Failure Coverage
+
+`unit.ipc` and `unit.surface` compile their respective production service source
+inside the fixture with scoped allocator interception. Other service/platform
+allocations retain their normal behavior. IPC checks both connection allocation
+failures, partial-pair rollback under endpoint exhaustion, retry, stale handles and
+readable/writable/hangup transitions. Surface checks committed-buffer and staging
+allocation failure, unchanged pixels/revision/accounting, successful retry and
+owner teardown with unfinished staging. Each allocation-failure workflow repeats
+100 times and asserts zero remaining tracked allocations. Both tests pass in
+macOS Debug with ASan/UBSan and in macOS Release. Generic-wait race/cancellation
+and physical contention acceptance remain separate pending GUI tasks.

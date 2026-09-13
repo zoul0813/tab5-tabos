@@ -399,3 +399,19 @@ local installed outputs. The affected macOS Debug test targets rebuild; desktop
 model/input, GUI apps, application build tracking and public API boundary checks
 pass (five tests). Shell syntax and Git whitespace checks pass. No Linux tests,
 host simulator launch/control, MSC copy or hardware flashing was performed.
+
+## Follow-up: IPC and Surface Failure Injection
+
+- [x] GUI-206: Inject failure of each IPC connection queue allocation; verify partial connection rollback, empty accept readiness, successful retry and zero leaked queues across 100 rounds.
+- [x] GUI-206: Exhaust the endpoint table with one slot remaining, repeat failed pair creation and prove the remaining slot is reusable; reject stale listener handles after shutdown/reinitialization.
+- [x] GUI-202/206: Verify writable readiness stays blocked while only control messages drain, returns when data capacity frees, and queued control/data remain readable with hangup until drained after peer teardown.
+- [x] GUI-206: Inject committed-surface and staging allocation failures across 100 rounds; preserve committed pixels/revision/accounting, retry successfully and reclaim retained plus unfinished staging buffers during owner teardown.
+- [ ] GUI-202/206: Complete generic-wait lost-wakeup, deadline and cancellation interleavings and real RV32 tester failure cases.
+- [ ] GUI-206: Complete concurrent teardown/commit and remaining invalid-input failure coverage.
+
+Both `unit.ipc` and `unit.surface` pass in macOS Debug (ASan/UBSan) and Release.
+Allocation interception is local to the test translation units; production services
+and public ABI are unchanged. The surface fixture uses the build's generated GUI
+quota configuration. These checks narrow the remaining work without completing
+GUI-202 or GUI-206. No Linux builds/tests, simulator launch/control or Tab5 flashing
+were performed. Kilo launcher changes remain deferred by user request.
