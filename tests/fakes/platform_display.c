@@ -317,16 +317,39 @@ void test_platform_fail_panel_once(void)
 {
     fail_panel_once = true;
 }
+static unsigned int power_failure_stage;
+static unsigned int sleep_calls;
+
+void test_platform_power_fail_once(unsigned int stage)
+{
+    power_failure_stage = stage;
+}
+
+unsigned int test_platform_sleep_calls(void)
+{
+    return sleep_calls;
+}
+
+static bool power_stage(unsigned int stage)
+{
+    if (power_failure_stage == stage) {
+        power_failure_stage = 0U;
+        return false;
+    }
+    return true;
+}
+
 bool platform_power_prepare_sleep(void)
 {
-    return true;
+    return power_stage(1U);
 }
 void platform_power_abort_sleep(void)
 {
 }
 bool platform_power_enter_light_sleep(void)
 {
-    return true;
+    ++sleep_calls;
+    return power_stage(2U);
 }
 platform_power_wake_cause_t platform_power_collect_wake_causes(void)
 {
@@ -334,7 +357,7 @@ platform_power_wake_cause_t platform_power_collect_wake_causes(void)
 }
 bool platform_power_restore(void)
 {
-    return true;
+    return power_stage(3U);
 }
 
 bool platform_wall_clock_get(int64_t* seconds)
@@ -1112,27 +1135,56 @@ void platform_riscv32_power_checkpoint(void)
 {
 }
 
+struct platform_work {
+        void (*callback)(void*);
+        void* argument;
+        bool complete;
+};
+static bool work_enabled;
+static platform_work_t fake_work;
+static bool work_live;
+
+void test_platform_work_enable(bool enabled)
+{
+    work_enabled = enabled;
+}
+
+void test_platform_work_finish(void)
+{
+    if (work_live && !fake_work.complete) {
+        fake_work.callback(fake_work.argument);
+        fake_work.complete = true;
+        platform_runtime_notify(PLATFORM_RUNTIME_EVENT_POWER);
+    }
+}
+
 platform_work_t* platform_work_start(void (*callback)(void*), void* argument)
 {
-    (void) callback;
-    (void) argument;
-    return NULL;
+    if (!work_enabled || work_live) {
+        return NULL;
+    }
+    fake_work = (platform_work_t) {.callback = callback, .argument = argument};
+    work_live = true;
+    return &fake_work;
 }
 
 bool platform_work_complete(const platform_work_t* work)
 {
-    (void) work;
-    return false;
+    return work != NULL && work->complete;
 }
 
 void platform_work_wait(platform_work_t* work)
 {
-    (void) work;
+    if (work != NULL) {
+        test_platform_work_finish();
+    }
 }
 
 void platform_work_release(platform_work_t* work)
 {
-    (void) work;
+    if (work != NULL) {
+        work_live = false;
+    }
 }
 
 void platform_network_operations_cancel(void)

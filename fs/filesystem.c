@@ -302,6 +302,14 @@ void filesystem_power_update(uint64_t now_ms)
     }
 }
 
+void filesystem_power_finish_for_shutdown(void)
+{
+    filesystem_power_abort();
+    platform_work_wait(sync_work);
+    filesystem_power_update(platform_time_ms());
+    filesystem_power_abort();
+}
+
 bool filesystem_init(void)
 {
     if (filesystem_initialized) {

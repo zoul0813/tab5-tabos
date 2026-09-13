@@ -118,6 +118,14 @@ static void apply_idle_display(power_manager_t* manager, uint64_t now_ms)
                 !manager->status.panel_off_requested);
 }
 
+bool power_manager_restore_active_display(power_manager_t* manager)
+{
+    manager->status.panel_valid      = false;
+    manager->status.brightness_valid = false;
+    restore_display(manager);
+    return manager->status.panel_valid && manager->status.brightness_valid;
+}
+
 bool power_manager_init(power_manager_t* manager, power_policy_t policy, uint64_t now_ms)
 {
     if (manager == NULL || !policy_ok(policy)) {
@@ -261,7 +269,8 @@ bool power_manager_set_policy(power_manager_t* manager, power_policy_t policy, u
         manager->status.state == POWER_STATE_SHUTTING_DOWN) {
         return false;
     }
-    manager->status.policy = policy;
+    manager->status.policy     = policy;
+    manager->automatic_blocked = false;
     if (manager->status.dim_inhibitors != 0U) {
         restore_display(manager);
         return true;
@@ -288,6 +297,15 @@ void power_manager_set_dim_inhibitors(power_manager_t* manager, uint32_t inhibit
     }
     const uint32_t previous        = manager->status.dim_inhibitors;
     manager->status.dim_inhibitors = inhibitors;
+    if (previous != inhibitors) {
+        manager->automatic_blocked = false;
+    }
+    if (manager->status.state != POWER_STATE_ACTIVE && manager->status.state != POWER_STATE_IDLE) {
+        if (inhibitors != 0U && manager->status.state == POWER_STATE_SUSPENDING) {
+            manager->cancel_requested = true;
+        }
+        return;
+    }
     if (inhibitors != 0U) {
         if (manager->status.state == POWER_STATE_IDLE) {
             manager->status.state            = POWER_STATE_ACTIVE;
@@ -338,6 +356,9 @@ static void begin_resume(power_manager_t* manager, uint64_t now_ms, power_reason
 static void rollback(power_manager_t* manager, uint64_t now_ms, power_failure_code_t code, const char* name)
 {
     failure(manager, code, name);
+    if (code != POWER_FAILURE_NONE && code != POWER_FAILURE_BLOCKED) {
+        manager->status.policy.automatic_suspend = false;
+    }
     if (manager->platform_prepared) {
         platform_power_abort_sleep();
     }
@@ -366,18 +387,33 @@ static void expect_completion(power_manager_t* manager, power_completion_token_t
 
 static void finish(power_manager_t* manager, uint64_t now_ms)
 {
-    manager->status.state              = POWER_STATE_ACTIVE;
+    manager->status.state              = manager->shutdown_requested ? POWER_STATE_SHUTTING_DOWN : POWER_STATE_ACTIVE;
     manager->status.state_changed_ms   = now_ms;
     manager->status.resume_duration_ms = now_ms - manager->status.resume_started_ms;
     manager->phase                     = POWER_PHASE_NONE;
     manager->cursor                    = 0U;
     manager->suspended_count           = 0U;
     manager->platform_prepared         = false;
-    restore_display(manager);
+    manager->status.last_activity_ms   = now_ms;
+    if (!manager->shutdown_requested) {
+        restore_display(manager);
+    }
+}
+
+static void resume_failed(power_manager_t* manager, power_failure_code_t code, const char* name)
+{
+    failure(manager, code, name);
+    manager->status.resume_failed            = true;
+    manager->status.policy.automatic_suspend = false;
+    manager->phase                           = POWER_PHASE_NONE;
+    manager->status.state                    = POWER_STATE_RESUMING;
 }
 
 static void drive(power_manager_t* manager, uint64_t now_ms)
 {
+    if (manager->status.resume_failed) {
+        return;
+    }
     for (size_t step = 0U; step < POWER_PARTICIPANT_CAPACITY * 2U + 8U; ++step) {
         if (manager->phase == POWER_PHASE_WAIT_SUSPEND || manager->phase == POWER_PHASE_WAIT_RESUME) {
             power_callback_result_t result;
@@ -390,11 +426,11 @@ static void drive(power_manager_t* manager, uint64_t now_ms)
                     rollback(manager, now_ms, POWER_FAILURE_CALLBACK, p->name);
                     continue;
                 }
-                failure(manager, POWER_FAILURE_CALLBACK, p->name);
+                resume_failed(manager, POWER_FAILURE_CALLBACK, p->name);
+                return;
             }
             if (manager->phase == POWER_PHASE_WAIT_SUSPEND) {
-                manager->suspended[manager->suspended_count++] = manager->expected.participant;
-                manager->phase                                 = POWER_PHASE_SUSPEND;
+                manager->phase = POWER_PHASE_SUSPEND;
             } else {
                 manager->phase = POWER_PHASE_RESUME;
             }
@@ -402,12 +438,28 @@ static void drive(power_manager_t* manager, uint64_t now_ms)
             continue;
         }
         if (manager->phase == POWER_PHASE_SUSPEND) {
+            platform_mutex_lock(manager->mutex);
+            const bool activity = manager->activity_requested;
+            platform_mutex_unlock(manager->mutex);
+            if (manager->cancel_requested || activity || manager->shutdown_requested) {
+                rollback(manager, now_ms, POWER_FAILURE_NONE, NULL);
+                continue;
+            }
             if (manager->cursor == manager->participant_count) {
+                /* Preparation may partially acquire wake/platform resources. */
+                manager->platform_prepared = true;
                 if (!platform_power_prepare_sleep()) {
                     rollback(manager, now_ms, POWER_FAILURE_PLATFORM_PREPARE, NULL);
                     continue;
                 }
-                manager->platform_prepared          = true;
+                manager->platform_prepared = true;
+                platform_mutex_lock(manager->mutex);
+                const bool late_activity = manager->activity_requested;
+                platform_mutex_unlock(manager->mutex);
+                if (late_activity) {
+                    rollback(manager, now_ms, POWER_FAILURE_NONE, NULL);
+                    continue;
+                }
                 manager->status.state               = POWER_STATE_SUSPENDED;
                 manager->status.state_changed_ms    = now_ms;
                 manager->status.suspend_duration_ms = now_ms - manager->status.suspend_started_ms;
@@ -424,7 +476,9 @@ static void drive(power_manager_t* manager, uint64_t now_ms)
                                                     POWER_OPERATION_SUSPEND};
             expect_completion(manager, token);
             trace(manager, p, POWER_OPERATION_SUSPEND);
-            power_callback_result_t result = p->suspend(p->context, token);
+            /* Even failure/pending may own partial work. Resume must be idempotent. */
+            manager->suspended[manager->suspended_count++] = index;
+            power_callback_result_t result                 = p->suspend(p->context, token);
             if (result == POWER_CALLBACK_PENDING) {
                 manager->phase = POWER_PHASE_WAIT_SUSPEND;
                 return;
@@ -433,7 +487,6 @@ static void drive(power_manager_t* manager, uint64_t now_ms)
                 rollback(manager, now_ms, POWER_FAILURE_CALLBACK, p->name);
                 continue;
             }
-            manager->suspended[manager->suspended_count++] = index;
             manager->cursor++;
             continue;
         }
@@ -454,7 +507,8 @@ static void drive(power_manager_t* manager, uint64_t now_ms)
                 return;
             }
             if (result == POWER_CALLBACK_FAILURE) {
-                failure(manager, POWER_FAILURE_CALLBACK, p->name);
+                resume_failed(manager, POWER_FAILURE_CALLBACK, p->name);
+                return;
             }
             manager->cursor++;
             continue;
@@ -465,6 +519,7 @@ static void drive(power_manager_t* manager, uint64_t now_ms)
 
 static void start(power_manager_t* manager, uint64_t now_ms)
 {
+    manager->automatic_blocked    = true;
     manager->status.blocker_count = 0U;
     if (!manager->status.suspend_available) {
         failure(manager, POWER_FAILURE_REGISTRATION, NULL);
@@ -499,6 +554,8 @@ static void start(power_manager_t* manager, uint64_t now_ms)
     manager->phase                     = POWER_PHASE_SUSPEND;
     manager->cursor                    = 0U;
     manager->suspended_count           = 0U;
+    manager->cancel_requested          = false;
+    manager->trace_count               = 0U;
     drive(manager, now_ms);
 }
 
@@ -515,7 +572,11 @@ void power_manager_update(power_manager_t* manager, platform_runtime_events_t ev
     manager->activity_requested = false;
     platform_mutex_unlock(manager->mutex);
     if (activity) {
+        manager->automatic_blocked       = false;
         manager->status.last_activity_ms = activity_ms;
+        if (manager->status.state == POWER_STATE_SUSPENDING) {
+            manager->cancel_requested = true;
+        }
         if (manager->status.state == POWER_STATE_IDLE) {
             manager->status.state            = POWER_STATE_ACTIVE;
             manager->status.reason           = POWER_REASON_ACTIVITY;
@@ -535,6 +596,7 @@ void power_manager_update(power_manager_t* manager, platform_runtime_events_t ev
             apply_idle_display(manager, now_ms);
         }
         if (manager->status.state == POWER_STATE_IDLE && manager->status.policy.automatic_suspend &&
+            !manager->automatic_blocked &&
             now_ms >= add(manager->status.last_activity_ms, manager->status.policy.suspend_ms)) {
             request = true;
         }
@@ -544,7 +606,8 @@ void power_manager_update(power_manager_t* manager, platform_runtime_events_t ev
         if (causes != PLATFORM_POWER_WAKE_NONE) {
             manager->status.wake_causes = causes;
             if (!platform_power_restore()) {
-                failure(manager, POWER_FAILURE_PLATFORM_RESTORE, NULL);
+                resume_failed(manager, POWER_FAILURE_PLATFORM_RESTORE, NULL);
+                return;
             }
             begin_resume(manager, now_ms, POWER_REASON_WAKE);
         }
@@ -578,7 +641,7 @@ uint64_t power_manager_next_deadline(const power_manager_t* manager)
                 deadline = panel_deadline;
             }
         }
-        if (manager->status.policy.automatic_suspend) {
+        if (manager->status.policy.automatic_suspend && !manager->automatic_blocked) {
             const uint64_t suspend_deadline = add(manager->status.last_activity_ms, manager->status.policy.suspend_ms);
             if (suspend_deadline < deadline) {
                 deadline = suspend_deadline;
@@ -591,10 +654,23 @@ uint64_t power_manager_next_deadline(const power_manager_t* manager)
 void power_manager_begin_shutdown(power_manager_t* manager, uint64_t now_ms)
 {
     if (manager != NULL && manager->finalized) {
-        manager->status.state            = POWER_STATE_SHUTTING_DOWN;
-        manager->status.reason           = POWER_REASON_SYSTEM_ACTION;
-        manager->status.state_changed_ms = now_ms;
-        manager->phase                   = POWER_PHASE_NONE;
+        manager->shutdown_requested = true;
+        manager->cancel_requested   = true;
+        manager->status.reason      = POWER_REASON_SYSTEM_ACTION;
+        if (manager->status.state == POWER_STATE_SUSPENDED) {
+            platform_power_abort_sleep();
+            if (!platform_power_restore()) {
+                resume_failed(manager, POWER_FAILURE_PLATFORM_RESTORE, NULL);
+                return;
+            }
+            begin_resume(manager, now_ms, POWER_REASON_SYSTEM_ACTION);
+        }
+        if (manager->status.state == POWER_STATE_ACTIVE || manager->status.state == POWER_STATE_IDLE) {
+            manager->status.state            = POWER_STATE_SHUTTING_DOWN;
+            manager->status.state_changed_ms = now_ms;
+        } else {
+            drive(manager, now_ms);
+        }
     }
 }
 const power_status_t* power_manager_status(const power_manager_t* manager)

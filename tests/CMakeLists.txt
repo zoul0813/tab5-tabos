@@ -15,6 +15,23 @@ tabos_enable_warnings(tabos_service_power)
 tabos_enable_sanitizers(tabos_service_power)
 add_test(NAME unit.service_power COMMAND tabos_service_power)
 
+add_executable(tabos_power_services component/power_services.c fakes/platform_display.c
+    "${TABOS_ROOT}/platform/posix/storage.c")
+target_include_directories(tabos_power_services PRIVATE
+    "${TABOS_ROOT}/audio/include" "${TABOS_ROOT}/camera/include"
+    "${TABOS_ROOT}/graphics/include" "${TABOS_ROOT}/input/include"
+    "${TABOS_ROOT}/pointer/include" "${TABOS_ROOT}/net/include"
+    "${TABOS_ROOT}/fs/include" "${TABOS_ROOT}/kernel/include"
+    "${TABOS_ROOT}/platform/include" "${TABOS_ROOT}/sdk/include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/fakes"
+)
+target_link_libraries(tabos_power_services PRIVATE tabos_core)
+target_compile_options(tabos_power_services PRIVATE -UNDEBUG)
+tabos_enable_warnings(tabos_power_services)
+tabos_enable_sanitizers(tabos_power_services)
+add_test(NAME component.power_services COMMAND tabos_power_services)
+set_tests_properties(component.power_services PROPERTIES TIMEOUT 30)
+
 # Test assertions must keep evaluating checks and setup calls in optimized builds.
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     add_compile_options($<$<COMPILE_LANGUAGE:C>:-UNDEBUG>)

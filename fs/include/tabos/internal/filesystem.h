@@ -26,6 +26,8 @@ typedef struct {
 bool filesystem_power_begin(uint64_t now_ms);
 void filesystem_power_update(uint64_t now_ms);
 void filesystem_power_abort(void);
+/* Teardown only: join borrowed sync work and reopen storage before app cleanup. */
+void filesystem_power_finish_for_shutdown(void);
 filesystem_power_status_t filesystem_power_status(void);
 uint64_t filesystem_power_next_deadline(void);
 bool filesystem_power_is_frozen(void);

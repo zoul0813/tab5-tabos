@@ -4,6 +4,10 @@
 #include <stdint.h>
 #include <tabos/platform/platform.h>
 void test_platform_network_power_errors(int suspend_error, int resume_error);
+void test_platform_work_enable(bool enabled);
+void test_platform_work_finish(void);
+void test_platform_power_fail_once(unsigned int stage); /* 1 prepare, 2 entry, 3 restore. */
+unsigned int test_platform_sleep_calls(void);
 
 void test_platform_set_time_ms(uint64_t time_ms);
 void test_platform_advance_time_ms(uint64_t elapsed_ms);

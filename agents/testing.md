@@ -1876,3 +1876,22 @@ Local validation: macOS Debug and Release builds and full suites pass (74 tests 
 with Debug ASan/UBSan enabled. Final targeted callback/host lifecycle checks also pass.
 Tab5 Debug/Release cross-builds pass. Linux and physical callback testing were not run;
 no firmware flash, application ABI change, or additional power savings is claimed.
+
+## Ordered power coordinator
+
+`component.power_services` uses the production coordinator, runtime dispatcher, and retained
+services with deterministic platform/work completion and a temporary POSIX filesystem. Its
+namespace sync is a model, not a production host-volume durability guarantee. One thousand
+cycles retain app entry/state, framebuffer allocation/pixels, file identity/offset, and
+directory cursor. Checks cover exact callback order, frozen admission, ordinary deadline
+suppression, deferred network events, partial display rollback, unsupported transport/storage,
+platform prepare/entry failure, cancellation during delayed sync, late completion ownership,
+resume-failure panic with parked apps, and shutdown joining work without executing apps.
+`unit.power_manager` additionally injects synchronous/asynchronous suspend and resume failure
+at every node of a nine-node dependency chain. Existing native parking, threaded storage,
+service concurrency, and actual RV32 wait tests remain required; the coordinator model does
+not replace them or hardware validation. No public/manual suspend command was added.
+
+Local coordinator validation: macOS Debug/Release full suites pass, 76/76 each; Debug
+uses configured ASan/UBSan. Tab5 Debug/Release cross-builds pass. Linux execution and
+physical coordinated transitions were not run, and no firmware was flashed.

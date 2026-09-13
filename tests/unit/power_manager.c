@@ -118,7 +118,8 @@ static void test_deadline_blocker_and_failure(void)
     power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_POWER, 6U);
     assert(power_manager_status(&manager)->state == POWER_STATE_ACTIVE);
     assert(power_manager_status(&manager)->failure.code == POWER_FAILURE_CALLBACK);
-    assert(strcmp(power_manager_trace_entry(&manager, 2U), "second:up") == 0);
+    assert(strcmp(power_manager_trace_entry(&manager, 2U), "first:up") == 0);
+    assert(strcmp(power_manager_trace_entry(&manager, 3U), "second:up") == 0);
     power_manager_shutdown(&manager);
 }
 
@@ -481,6 +482,53 @@ static void test_registration_failures(void)
     power_manager_shutdown(&manager);
 }
 
+static void test_each_failure_boundary(void)
+{
+    for (unsigned int failed = 0U; failed < 9U; ++failed) {
+        for (unsigned int asynchronous = 0U; asynchronous < 2U; ++asynchronous) {
+            power_manager_t manager;
+            participant_context_t participants[9] = {0};
+            assert(power_manager_init(&manager, policy(), 0U));
+            for (unsigned int index = 0U; index < 9U; ++index) {
+                char name[16];
+                char dependency[16];
+                (void) snprintf(name, sizeof(name), "node-%u", index);
+                (void) snprintf(dependency, sizeof(dependency), "node-%u", index - 1U);
+                register_participant(&manager, name, index == 0U ? NULL : dependency, &participants[index]);
+            }
+            assert(power_manager_finalize(&manager));
+            participants[failed].suspend_result = asynchronous != 0U ? POWER_CALLBACK_PENDING : POWER_CALLBACK_FAILURE;
+            assert(power_manager_request_suspend(&manager));
+            power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_POWER, 1U);
+            if (asynchronous != 0U) {
+                assert(manager.status.state == POWER_STATE_SUSPENDING);
+                power_manager_complete(&manager, participants[failed].token, POWER_CALLBACK_FAILURE);
+                power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_POWER, 2U);
+            }
+            assert(manager.status.state == POWER_STATE_ACTIVE && manager.status.failure.code == POWER_FAILURE_CALLBACK);
+            assert(manager.trace_count == 2U * (9U - failed));
+            assert(participants[failed].token.operation == POWER_OPERATION_RESUME);
+            assert(participants[8].token.operation == POWER_OPERATION_RESUME);
+
+            participants[failed].suspend_result = POWER_CALLBACK_SUCCESS;
+            participants[failed].resume_result  = asynchronous != 0U ? POWER_CALLBACK_PENDING : POWER_CALLBACK_FAILURE;
+            assert(power_manager_request_suspend(&manager));
+            power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_POWER, 3U);
+            assert(manager.status.state == POWER_STATE_SUSPENDED);
+            power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_POWER, 4U);
+            if (asynchronous != 0U) {
+                power_manager_complete(&manager, participants[failed].token, POWER_CALLBACK_FAILURE);
+                power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_POWER, 5U);
+            }
+            assert(manager.status.resume_failed && manager.status.state == POWER_STATE_RESUMING);
+            assert(manager.trace_count == 9U + failed + 1U);
+            power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_POWER | PLATFORM_RUNTIME_EVENT_DEADLINE, 10000U);
+            assert(manager.trace_count == 9U + failed + 1U);
+            power_manager_shutdown(&manager);
+        }
+    }
+}
+
 int main(void)
 {
     test_order_async_and_wake();
@@ -493,5 +541,6 @@ int main(void)
     test_three_stage_display();
     test_panel_policy_and_failures();
     test_registration_failures();
+    test_each_failure_boundary();
     return 0;
 }

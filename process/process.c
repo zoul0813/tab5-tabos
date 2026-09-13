@@ -318,7 +318,6 @@ uint64_t kernel_application_system_next_deadline(void)
 
 void kernel_application_system_shutdown(void)
 {
-    kernel_application_power_end();
     pointer_service_set_foreground_owner(NULL);
     for (size_t index = KERNEL_PROCESS_CAPACITY; index > 0U; --index) {
         if (processes[index - 1U].occupied) {
@@ -327,6 +326,9 @@ void kernel_application_system_shutdown(void)
     }
     foreground_process = NULL;
     foreground_depth   = 0U;
+    /* Destroy parked execution directly; never briefly release native guests
+     * into already-quiesced services during system shutdown. */
+    kernel_application_power_end();
     application_registry_reset();
 }
 

@@ -116,6 +116,7 @@ typedef struct {
         bool panel_enabled;
         bool panel_valid;
         bool suspend_available;
+        bool resume_failed; /* Terminal fault: keep dependents, especially applications, parked. */
 } power_status_t;
 typedef struct {
         char name[POWER_NAME_CAPACITY];
@@ -152,6 +153,9 @@ typedef struct {
         bool completion_ready;
         power_callback_result_t completion_result;
         bool platform_prepared;
+        bool cancel_requested;
+        bool shutdown_requested;
+        bool automatic_blocked;
         char trace[POWER_TRACE_CAPACITY][POWER_NAME_CAPACITY + 8];
         size_t trace_count;
 } power_manager_t;
@@ -168,6 +172,8 @@ void power_manager_complete(power_manager_t* manager, power_completion_token_t t
 void power_manager_update(power_manager_t* manager, platform_runtime_events_t events, uint64_t now_ms);
 uint64_t power_manager_next_deadline(const power_manager_t* manager);
 void power_manager_begin_shutdown(power_manager_t* manager, uint64_t now_ms);
+/* Runtime-owned coordinator calls this after display restoration, before unpark. */
+bool power_manager_restore_active_display(power_manager_t* manager);
 const power_status_t* power_manager_status(const power_manager_t* manager);
 const char* power_manager_ordered_name(const power_manager_t* manager, size_t index);
 size_t power_manager_trace_count(const power_manager_t* manager);

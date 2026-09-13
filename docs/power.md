@@ -71,16 +71,18 @@ new application calls and launches, waits for cooperative safe points across all
 processes, and releases the freeze after a two-second timeout if an application does not
 cooperate. Supported generic waits retain readiness and their original deadlines; parking
 does not cancel the wait or consume input. This is not connected to idle display policy
-or exposed as a suspend command. Services and hardware remain running. Storage/service
-integration, reversible display scanout shutdown, ordered resume, and hardware validation are
-still required before CPU sleep can be enabled. No additional current savings are claimed.
+or exposed as a suspend command. Services and hardware remain running during ordinary use.
+An internal ordered coordinator now connects parking to retained service preparation in
+host tests. Reversible native display/transport shutdown, wake preparation, and hardware
+validation are still required before CPU sleep can be enabled. No additional current
+savings are claimed.
 
 Storage now has its own internal admission/drain/sync barrier. It uses a sleeping mutex
 and a one-shot synchronization worker, preserving open descriptors and directory cursors.
 A stalled drain aborts without destroying resources; a timed-out sync retains ownership
-until its worker completes. This storage slice is not yet connected to whole-system
-suspend. Other service callbacks, display quiescence, and hardware validation remain
-outstanding. See [filesystem suspend safety](filesystem.md#suspend-safety-foundation).
+until its worker completes. The internal coordinator now includes this barrier; native
+display quiescence and hardware validation remain outstanding. See
+[filesystem suspend safety](filesystem.md#suspend-safety-foundation).
 
 Display policy defaults to three deadlines from the same last physical activity:
 
@@ -246,8 +248,16 @@ or panel-off, and do not enable CPU sleep or add an application API.
 
 Tab5 display quiescence and C6 transport suspension still return unsupported. Panel-off
 does not stop DMA/VSYNC; Wi-Fi disconnect does not stop ESP-Hosted transport workers.
-Neither is advertised as safe hardware suspension. The whole-system dependency graph,
-platform wake preparation, and physical callback validation remain pending.
+Neither is advertised as safe hardware suspension. Platform wake preparation, shared-bus
+integration, and physical callback validation remain pending.
+
+An internal coordinator now orders application parking, health/media/network preparation,
+storage synchronization, input, and display before the platform sleep boundary. Resume
+reverses that order and restores active brightness before applications run. Failed
+preparation rolls back partially completed steps; failed restoration reports a power panic
+and keeps applications parked for explicit reset/reboot. Outstanding storage work remains
+owned until completion, including during shutdown. Automated host tests exercise 1,000
+retained-state cycles and injected failures; these are not physical light-sleep results.
 
 After flashing, normal `tester`, audio, camera, network, and display-stage checks remain
 regression tests only. They do not invoke these internal hooks. Automated host tests

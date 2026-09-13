@@ -941,3 +941,12 @@ physical callback validation, and CPU sleep remain open. Portable network state 
 short platform mutex, with serialized control transactions outside the lock and responsive
 status/deadline reads. Shutdown drains admitted calls before destroying synchronization.
 AUD-015 is addressed; Tab5 partial Wi-Fi initialization cleanup (AUD-042) remains open.
+
+Power Phase 6 first coordinator slice now registers applications, health audit, media,
+networking, storage, input, and display in dependency order. Existing platform sleep
+preparation remains the final boundary and stays unsupported on Tab5. Parking/storage
+callbacks complete asynchronously; ordinary runtime work/deadlines wait for restoration.
+Rollback includes partially failed steps. Resume failure reports a power panic and keeps
+applications parked. Shutdown joins borrowed storage work and destroys parked execution
+without unpark. Host tests cover 1,000 retained-state cycles, failures, and runtime dispatch;
+physical cycles, wake controllers/shared buses, and CPU sleep remain unvalidated/disabled.

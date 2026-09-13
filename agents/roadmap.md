@@ -143,8 +143,12 @@ ordered callbacks are implemented. No new display policy or CPU sleep behavior i
 - [x] Add reversible idle audio/camera admission and retained keyboard/pointer/display
   hooks, plus network configuration/reconnect preservation and backend resource guards.
 - [ ] Validate Tab5 C6 retained transport lifecycle and display DMA/VSYNC quiescence;
-  both remain explicit ENOTSUP blockers. Register service hooks in the ordered graph only
-  after its process parking, lifecycle-race, and rollback prerequisites are satisfied.
+  both remain explicit ENOTSUP blockers.
+- [x] Power Phase 6 first coordinator slice: register retained service hooks, bridge parking
+  and storage completions, reverse partial-step rollback, stop on resume failure, and
+  retain application/storage ownership during shutdown. Host graph runs 1,000 cycles.
+- [ ] Complete wake-controller/shared-bus integration, final wake-line race closure,
+  pointer cancellation ordering, and physical coordinated cycles before enabling Tab5 sleep.
 
 ### Hardware Services Phase 6 Validation
 

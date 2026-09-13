@@ -1653,7 +1653,8 @@ socket-teardown mutex acquisition. Host transport suspension freezes acquisition
 disconnects without resetting configuration or registry identity. Resume restores transport
 before scheduling the existing bounded connection retries; transport failure keeps admission
 frozen. Tab5 returns ENOTSUP without disconnecting until ESP-Hosted retained lifecycle is
-validated. This slice does not register the whole-system graph.
+validated. The retained service graph is now registered by the coordinator described below;
+real wake-controller/shared-bus lifecycle integration remains pending.
 
 Portable network state and retry timers use a short platform mutex. Control transactions
 reserve a busy slot and release that mutex before backend connect/disconnect/status calls;
@@ -1663,3 +1664,15 @@ when the slot is released, without periodic polling. DNS/echo also release the s
 for backend work. Admission covers entered and queued calls; runtime-owned shutdown freezes
 entry and drains them through a retained signal before destroying synchronization objects.
 Init, shutdown, and power lifecycle operations remain serialized by the runtime owner.
+
+Power Phase 6's first coordinator lives in `kernel/power_services.c` and registers a fixed
+dependency chain of display, pointer, keyboard, storage, network, camera, audio, health
+audit, and applications (resume order). Platform preparation/entry remains the manager's
+final suspend boundary. Parking/storage are asynchronous adapters using existing deadlines
+and completion tokens. Dispatcher defers ordinary events while the coordinator owns the
+transition; only coordinator deadlines remain runnable. Application execution resumes last,
+after active display restoration. Partial failing suspend steps retain rollback ownership;
+resume failure terminates traversal with a power panic, never reopening applications.
+System shutdown joins retained storage work without relying on a stopped runtime loop and
+destroys parked native tasks without an intermediate unpark. These internal integration
+surfaces add no SDK transport, public suspend command, or enabled Tab5 sleep path.

@@ -254,7 +254,7 @@ Initial blockers include:
 - [x] Preserve descriptor generations, directory positions, offsets, mount identity, and working directories.
 - [x] Permit inactive open descriptors, including writable descriptors after successful synchronization. Open handle alone does not imply active mutation.
 - [x] Do not destroy storage resources if drain deadline expires while I/O still runs. Abort transition; let operation complete normally.
-- [ ] Add reversible callbacks for audio/camera workers, display/backlight, input, health audit, networking, and storage.
+- [x] Add reversible callbacks for audio/camera workers, display/backlight, input, health audit, networking, and storage. Unsupported native hardware quiescence remains a blocker.
 - [x] Add internal idle media admission, retained input/display lifecycle, and network
   reconnect preparation hooks with deterministic callback tests; retain explicit native
   display/C6 blockers. These hooks are not yet registered in the system graph.
@@ -311,6 +311,11 @@ validation remain pending; this slice has not been flashed as part of implementa
 ## Phase 6 — Ordered suspend, resume, and failure handling
 
 - [ ] Instantiate dependency graph covering process execution, service workers, storage, input/wake controllers, display, shared buses, and platform sleep.
+- [x] Register existing retained service hooks in the runtime manager: applications,
+  health audit, audio, camera, networking, storage, keyboard, pointer, and display;
+  retain the platform prepare/entry/restore boundary without enabling Tab5 sleep.
+- [x] Validate the first coordinator slice with whole-graph host cycles, retained state,
+  partial-step rollback, asynchronous storage ownership, and stopped application execution.
 - [ ] Suspend dependents first; resume dependencies first. Foreground execution resumes last.
 - [ ] Use order: freeze/park applications → quiesce media/network → drain/sync storage → prepare input/wake → blank/quiesce display → prepare platform → sleep.
 - [ ] Keep shared I2C available until all dependent peripherals and wake controllers finish preparation.
@@ -325,6 +330,37 @@ validation remain pending; this slice has not been flashed as part of implementa
 - [ ] Disable further automatic suspend after callback failure until policy re-enabled or reboot. Ordinary blockers retry only when blocker state changes; no retry polling loop.
 
 **Tests:** failure before/after every callback, partial failure cleanup, repeated rollback, shutdown at every transition boundary, and restoration failure panic.
+
+First coordinator slice implements `kernel/power_services.c`. Suspend order is applications
+→ health audit → audio → camera → network → storage → keyboard → pointer → display →
+existing platform preparation/entry. Resume reverses this order; active display brightness
+is reconciled before application admission reopens. Shared buses remain powered; real wake
+controller and bus lifecycle integration is not claimed. Native C6/display hooks and Tab5
+platform sleep preparation still reject unsupported operation.
+
+Application parking and storage completion use existing events/deadlines, not blocking
+dispatcher waits. Runtime defers ordinary service events and suppresses ordinary deadlines
+during the transition, then dispatches retained work after restoration. Input ingress can
+cancel preparation; cancellation waits for an outstanding callback to relinquish borrowed
+state. Failed suspend callbacks are included in rollback even when only partially complete.
+Any resume failure stops the dependency walk, reports a terminal power panic through surviving
+diagnostics, and leaves applications parked for explicit reset/reboot. Shutdown joins owned
+storage work directly (the platform runtime wake target may already be gone) and destroys
+parked processes without first resuming their native execution.
+
+`component.power_services` exercises the real service graph and dispatcher, 1,000 successful
+cycles with retained application state, framebuffer, file identity/offset, and directory
+cursor, plus storage timeout, cancellation, unsupported transport, partial display failure,
+platform failures, resume fault containment, and shutdown during sync. Manager tests inject
+synchronous/asynchronous suspend and resume failures at every node of a nine-node graph.
+The test storage namespace barrier is a model; production host-volume durability, native
+whole-graph cycles, wake-line rechecks/arming, pointer cancellation semantics, and the rest
+of Phase 6 remain separate gates. No public suspend command, SDK change, automatic suspend,
+hardware flash, or additional current savings is delivered by this slice.
+
+Coordinator software validation: macOS Debug/Release full suites pass (76/76 each),
+including the new graph test; Tab5 Debug/Release cross-builds pass. Debug uses configured
+ASan/UBSan. Linux execution and physical coordinated transitions were not run locally.
 
 ## Phase 7 — Tab5 light sleep and time semantics
 
