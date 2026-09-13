@@ -114,10 +114,18 @@ static int load_entries(const char* path, bool load_metadata, ls_entry_t** resul
         }
         memcpy(name, entry->d_name, name_length + 1U);
         entries[count] = (ls_entry_t) {
-            .name      = name,
-            .directory = entry->d_type == DT_DIR,
+            .name = name,
         };
-        if (load_metadata) {
+        bool needs_stat = load_metadata;
+#ifdef DT_DIR
+        entries[count].directory = entry->d_type == DT_DIR;
+#ifdef DT_UNKNOWN
+        needs_stat = needs_stat || entry->d_type == DT_UNKNOWN;
+#endif
+#else
+        needs_stat = true;
+#endif
+        if (needs_stat) {
             char full_path[TABOS_FS_PATH_MAX];
             struct stat metadata;
             if (!entry_path(path, entry->d_name, full_path)) {
@@ -127,10 +135,12 @@ static int load_entries(const char* path, bool load_metadata, ls_entry_t** resul
                 fprintf(stderr, "ls: cannot stat %s (errno %d)\n", entry->d_name, errno);
                 status = 1;
             } else {
-                entries[count].size           = (uint64_t) metadata.st_size;
-                entries[count].modified_time  = metadata.st_mtime;
-                entries[count].directory      = S_ISDIR(metadata.st_mode);
-                entries[count].metadata_valid = true;
+                entries[count].directory = S_ISDIR(metadata.st_mode);
+                if (load_metadata) {
+                    entries[count].size           = (uint64_t) metadata.st_size;
+                    entries[count].modified_time  = metadata.st_mtime;
+                    entries[count].metadata_valid = true;
+                }
             }
         }
         if (entries[count].directory) {

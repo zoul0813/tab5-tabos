@@ -67,17 +67,14 @@ TABOS_DEPENDENCY_FILE := $(BUILD_DIR)/.tabos-dependencies.mk
 TABOS_CONFIG_INVALIDATES ?= $(UNSTRIPPED) $(OUTPUT) $(TABOS_DEPENDENCY_FILE)
 
 .PHONY: all build clean install stage-assets install-assets size metadata tabos-list-outputs tabos-list-runtime-assets
-.PHONY: tabos-force-build-config
 
 all: install
 
 build: $(OUTPUT) stage-assets
 
-tabos-force-build-config:
-
-$(TABOS_BUILD_CONFIG): tabos-force-build-config
-	@mkdir -p $(dir $@)
-	@printf '%s\n' \
+define tabos_update_build_config
+	mkdir -p "$(dir $(TABOS_BUILD_CONFIG))"; \
+	printf '%s\n' \
 		'APP_NAME=$(APP_NAME)' \
 		'CC=$(CC)' \
 		'STRIP=$(STRIP)' \
@@ -87,19 +84,32 @@ $(TABOS_BUILD_CONFIG): tabos-force-build-config
 		'TABOS_LDLIBS=$(TABOS_LDLIBS)' \
 		'SOURCES=$(SOURCES)' \
 		'TABOS_RUNTIME_SOURCES=$(TABOS_RUNTIME_SOURCES)' \
-		'TABOS_BUILD_PREREQUISITES=$(TABOS_BUILD_PREREQUISITES)' > "$@.tmp"
-	@if [ -f "$@" ] && cmp -s "$@.tmp" "$@"; then \
-		rm -f "$@.tmp"; \
-		if [ -f "$(UNSTRIPPED)" ]; then touch -r "$(UNSTRIPPED)" "$@"; \
-		elif [ -f "$(TABOS_DEPENDENCY_FILE)" ]; then touch -r "$(TABOS_DEPENDENCY_FILE)" "$@"; fi; \
+		'TABOS_BUILD_PREREQUISITES=$(TABOS_BUILD_PREREQUISITES)' > "$(TABOS_BUILD_CONFIG).tmp"; \
+	if [ -f "$(TABOS_BUILD_CONFIG)" ] && cmp -s "$(TABOS_BUILD_CONFIG).tmp" "$(TABOS_BUILD_CONFIG)"; then \
+		rm -f "$(TABOS_BUILD_CONFIG).tmp"; \
+		if [ -f "$(UNSTRIPPED)" ]; then touch -r "$(UNSTRIPPED)" "$(TABOS_BUILD_CONFIG)"; \
+		elif [ -f "$(TABOS_DEPENDENCY_FILE)" ]; then \
+			touch -r "$(TABOS_DEPENDENCY_FILE)" "$(TABOS_BUILD_CONFIG)"; \
+		fi; \
 	else \
-		mv "$@.tmp" "$@"; \
+		mv "$(TABOS_BUILD_CONFIG).tmp" "$(TABOS_BUILD_CONFIG)"; \
 		rm -f $(TABOS_CONFIG_INVALIDATES); \
 	fi
+endef
+
+# Check configuration while parsing, before Make caches target timestamps. A
+# changed configuration can then remove stale outputs before dependency checks;
+# an unchanged configuration keeps the stamp timestamp stable.
+ifeq ($(filter clean tabos-list-outputs tabos-list-runtime-assets,$(MAKECMDGOALS)),)
+TABOS_BUILD_CONFIG_RESULT := $(shell set -e; $(tabos_update_build_config); printf '%s' ok)
+ifneq ($(TABOS_BUILD_CONFIG_RESULT),ok)
+$(error failed to update $(TABOS_BUILD_CONFIG))
+endif
+endif
+
+$(TABOS_BUILD_CONFIG):
 
 ifndef TABOS_CUSTOM_BUILD
-# Keep the included dependency file independent of the always-checked config stamp.
-# Otherwise GNU Make may remake it and restart solely because the stamp was touched.
 $(TABOS_DEPENDENCY_FILE): $(SOURCES) $(TABOS_RUNTIME_SOURCES) $(TABOS_BUILD_PREREQUISITES) $(TABOS_APPLICATION_MAKEFILES)
 	@mkdir -p $(dir $@)
 	@$(CC) $(TABOS_CPPFLAGS) $(TABOS_CFLAGS) -MM -MP -MT "$(UNSTRIPPED)" -MT "$@" \
@@ -108,12 +118,8 @@ $(TABOS_DEPENDENCY_FILE): $(SOURCES) $(TABOS_RUNTIME_SOURCES) $(TABOS_BUILD_PRER
 
 $(UNSTRIPPED): $(TABOS_BUILD_CONFIG) $(TABOS_DEPENDENCY_FILE) $(TABOS_APPLICATION_MAKEFILES)
 
-# A config change can remove the dependency file after Make parsed it, so refresh it before linking.
 $(UNSTRIPPED): $(SOURCES) $(TABOS_RUNTIME_SOURCES) $(TABOS_BUILD_PREREQUISITES) $(SDK_ROOT)/linker/app-riscv32.ld $(TABOS_APPLICATION_MAKEFILE)
 	@mkdir -p $(dir $@)
-	@$(CC) $(TABOS_CPPFLAGS) $(TABOS_CFLAGS) -MM -MP -MT "$(UNSTRIPPED)" -MT "$(TABOS_DEPENDENCY_FILE)" \
-		$(TABOS_RUNTIME_SOURCES) $(SOURCES) > "$(TABOS_DEPENDENCY_FILE).tmp"
-	@mv "$(TABOS_DEPENDENCY_FILE).tmp" "$(TABOS_DEPENDENCY_FILE)"
 	$(CC) $(TABOS_CPPFLAGS) $(TABOS_CFLAGS) $(TABOS_LDFLAGS) -o "$@" $(TABOS_RUNTIME_SOURCES) $(SOURCES) $(TABOS_LDLIBS)
 
 clean:
