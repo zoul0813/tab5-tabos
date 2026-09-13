@@ -1748,6 +1748,10 @@ of an existing destination across finalization failures. The Tab5 build cross-co
 these consumers and the FatFs replacement fallback; physical power-loss behavior is not
 claimed.
 
+`unit.coreutils_ls` compiles the production utility and verifies option parsing,
+alphabetical sorting, terminal-width column packing, narrow one-column fallback, and
+aligned long-format type/size/UTC timestamp output under ASan/UBSan.
+
 The native production-source `fetch` regression runs with ASan/UBSan. It must exercise
 every first-read split through the HTTP header terminator, a header that fills the
 bounded accumulator without a terminator, successful length and close framing, error

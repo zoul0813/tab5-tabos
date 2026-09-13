@@ -943,6 +943,12 @@ tabos_enable_warnings(tabos_coreutils_wc)
 tabos_enable_sanitizers(tabos_coreutils_wc)
 add_test(NAME unit.coreutils_wc COMMAND tabos_coreutils_wc)
 
+add_executable(tabos_coreutils_ls unit/coreutils_ls.c)
+target_include_directories(tabos_coreutils_ls PRIVATE "${TABOS_ROOT}" "${TABOS_ROOT}/sdk/include")
+tabos_enable_warnings(tabos_coreutils_ls)
+tabos_enable_sanitizers(tabos_coreutils_ls)
+add_test(NAME unit.coreutils_ls COMMAND tabos_coreutils_ls)
+
 add_executable(tabos_netutils_fetch unit/netutils_fetch.c)
 target_include_directories(tabos_netutils_fetch PRIVATE
     "${TABOS_ROOT}"
