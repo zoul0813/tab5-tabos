@@ -15,6 +15,12 @@ shutdown
 Both actions stop applications, close open descriptors, unmount storage, and stop
 system services before the platform action. They do not support delayed execution.
 
+During internal coordinated suspend/resume, accepted actions are checked between
+service callbacks and before reopening application execution. An observed action stops
+sleep preparation and leaves parked applications for teardown; outstanding storage work
+is joined before resources are released. This remains host-tested development machinery,
+not an enabled Tab5 sleep path or proof of atomic hardware entry coordination.
+
 Applications use the Linux-style API from `<sys/reboot.h>`:
 
 ```c
@@ -124,6 +130,11 @@ For the backlight-only trial at 180 seconds, the operator reports a predominantl
 value and observed range, not a sampled mean. The operator confirms that tapping the
 screen restores it from backlight-only off. The typical reading is 0.01 A above the earlier panel-off
 reading, but meter resolution and uncontrolled variation limit the comparison.
+
+On 2026-09-13 the operator reported full `tester` passing after a fresh Tab5 restart
+and `tester --filesystem` passing after dim, backlight-off, and panel-off, with unchanged
+power readings. No new measurement samples were supplied. These checks validate ordinary
+operation after display transitions, not the internal suspend callbacks or storage barrier.
 
 ## Display configuration
 

@@ -130,11 +130,19 @@ static power_callback_result_t resume_service(void* context, power_completion_to
         case SERVICE_AUDIO: audio_service_power_resume(); break;
         case SERVICE_HEALTH: hardware_devices_resume_audit(); break;
         case SERVICE_APPLICATIONS:
+            if (service->owner->manager->shutdown_pending != NULL && service->owner->manager->shutdown_pending()) {
+                service->owner->manager->shutdown_requested = true;
+            }
             if (!service->owner->manager->shutdown_requested) {
                 if (!power_manager_restore_active_display(service->owner->manager)) {
                     return POWER_CALLBACK_FAILURE;
                 }
-                kernel_application_power_end();
+                /* Display restoration may itself have accepted a system action. */
+                if (service->owner->manager->shutdown_pending != NULL && service->owner->manager->shutdown_pending()) {
+                    service->owner->manager->shutdown_requested = true;
+                } else {
+                    kernel_application_power_end();
+                }
             }
             break;
         default: return POWER_CALLBACK_FAILURE;
@@ -177,7 +185,12 @@ bool power_services_transitioning(const power_services_t* services)
 
 void power_services_update(power_services_t* services, platform_runtime_events_t events, uint64_t now_ms)
 {
-    if (services->pending) {
+    const bool system_action = services->manager->shutdown_pending != NULL && services->manager->shutdown_pending();
+    if (system_action) {
+        /* Do not run parking timeout/lifecycle recovery, which would unfreeze
+         * native gates. Destructive shutdown will join pending work directly. */
+        power_manager_begin_shutdown(services->manager, now_ms);
+    } else if (services->pending) {
         power_callback_result_t result = POWER_CALLBACK_PENDING;
         if (services->pending_kind == SERVICE_APPLICATIONS) {
             kernel_application_power_update(now_ms);
@@ -203,7 +216,9 @@ void power_services_update(power_services_t* services, platform_runtime_events_t
             power_manager_complete(services->manager, services->pending_token, result);
         }
     }
-    power_manager_update(services->manager, events, now_ms);
+    if (!system_action) {
+        power_manager_update(services->manager, events, now_ms);
+    }
     if (services->manager->status.resume_failed && !services->panic_reported) {
         services->panic_reported = true;
         char message[128];

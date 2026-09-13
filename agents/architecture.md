@@ -1700,3 +1700,10 @@ callbacks complete and dependencies restore. Residual logical pointer contacts u
 separate bounded cancellation prefix that cannot be overwritten by later ingress overflow;
 held physical contacts still block entry. Hardware notification/arming and the atomic
 check-to-sleep boundary remain platform work, not guarantees of this software probe.
+
+The runtime exposes a non-consuming atomic system-action probe to the power manager.
+Callback boundaries latch accepted shutdown requests; application restoration rechecks
+after display work before reopening gates. Pending system actions suppress ordinary
+dispatch and parking-timeout recovery, leaving teardown to join owned work. The platform
+loop retains consumption of the first accepted reboot/power-off request. This boundary
+check does not establish atomic native sleep-entry or unpark exclusion.

@@ -33,6 +33,27 @@ static tabos_pointer_stream_t pointer_stream;
 static bool inject_pointer;
 static bool expect_input;
 static power_callback_fn saved_suspend;
+static power_callback_fn saved_boundary_callback;
+static platform_system_action_t boundary_action;
+static bool action_before_callback;
+
+static void request_boundary_action(void)
+{
+    assert(kernel_runtime_request_system_action(boundary_action));
+    assert(!kernel_runtime_request_system_action(boundary_action));
+}
+
+static power_callback_result_t callback_with_system_action(void* context, power_completion_token_t token)
+{
+    if (action_before_callback) {
+        request_boundary_action();
+    }
+    const power_callback_result_t result = saved_boundary_callback(context, token);
+    if (!action_before_callback) {
+        request_boundary_action();
+    }
+    return result;
+}
 
 static void inject_activity(void)
 {
@@ -116,6 +137,7 @@ static bool app_entry(tabos_app_context_t* context)
 static void app_update(tabos_app_context_t* context)
 {
     (void) context;
+    assert(!kernel_runtime_system_action_pending());
     assert(!filesystem_power_is_frozen());
     assert(test_platform_panel_enabled() && test_platform_brightness() == 75U);
     if (expect_input) {
@@ -189,7 +211,150 @@ static void reset_manager(void)
     power_manager_shutdown(&manager);
     assert(power_manager_init(&manager, power_config_defaults(), platform_time_ms()));
     assert(power_services_register(&services, &manager));
+    manager.shutdown_pending = kernel_runtime_system_action_pending;
     assert(power_manager_finalize(&manager));
+}
+
+static void shutdown_boundaries(void)
+{
+    const platform_system_action_t actions[] = {PLATFORM_SYSTEM_ACTION_REBOOT, PLATFORM_SYSTEM_ACTION_POWER_OFF};
+    for (size_t action = 0U; action < 2U; ++action) {
+        boundary_action = actions[action];
+        /* Both sides of each callback, plus platform preparation and suspended state. */
+        for (unsigned int operation = 0U; operation < 2U; ++operation) {
+            for (unsigned int before = 0U; before < 2U; ++before) {
+                for (size_t index = 0U; index <= POWER_SERVICE_COUNT; ++index) {
+                    app_entries = 0U;
+                    app_cleanups = 0U;
+                    assert(kernel_runtime_init() && kernel_runtime_start(false));
+                    assert(application_registry_register(&app));
+                    assert(tabos_app_launch(app.name) == TABOS_APP_RESULT_OK);
+                    reset_manager();
+                    action_before_callback = before != 0U;
+                    if (index < POWER_SERVICE_COUNT) {
+                        power_callback_fn* callback = operation == 0U ? &manager.participants[index].suspend :
+                                                                       &manager.participants[index].resume;
+                        saved_boundary_callback = *callback;
+                        *callback = callback_with_system_action;
+                    } else if (operation == 0U) {
+                        test_platform_power_prepare_hook(request_boundary_action);
+                    }
+                    const unsigned int updates = app_updates;
+                    const unsigned int sleeps = test_platform_sleep_calls();
+                    assert(power_manager_request_suspend(&manager));
+                    for (unsigned int pass = 0U; pass < 8U && !kernel_runtime_system_action_pending(); ++pass) {
+                        if (filesystem_power_status().state == FILESYSTEM_POWER_SYNCING) {
+                            test_platform_work_finish();
+                        }
+                        dispatch();
+                        if (operation != 0U && index == POWER_SERVICE_COUNT &&
+                            manager.status.state == POWER_STATE_SUSPENDED) {
+                            request_boundary_action();
+                        }
+                    }
+                    assert(kernel_runtime_system_action_pending());
+                    assert(!kernel_runtime_request_suspend());
+                    if (operation == 0U) {
+                        assert(test_platform_sleep_calls() == sleeps);
+                    }
+                    /* A queued action must bypass ordinary dispatch and parking
+                     * timeout recovery, even after its deadline has expired. */
+                    test_platform_advance_time_ms(3000U);
+                    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_APPLICATION | PLATFORM_RUNTIME_EVENT_DEADLINE);
+                    dispatch();
+                    assert(kernel_runtime_next_deadline() == PLATFORM_RUNTIME_DEADLINE_NONE);
+                    assert(app_updates == updates && app_entries == 1U && app_cleanups == 0U);
+                    power_services_shutdown(&services);
+                    assert(manager.status.state == POWER_STATE_SHUTTING_DOWN);
+                    assert(!filesystem_power_is_frozen());
+                    /* Only a request after the final application-resume callback
+                     * may find execution already reopened. No app update occurs. */
+                    if (!(operation != 0U && index == POWER_SERVICE_COUNT - 1U && before == 0U)) {
+                        assert(kernel_application_power_status().state != APPLICATION_POWER_ACTIVE);
+                    }
+                    assert(kernel_runtime_take_system_action() == boundary_action);
+                    assert(kernel_runtime_take_system_action() == PLATFORM_SYSTEM_ACTION_NONE);
+                    power_manager_shutdown(&manager);
+                    kernel_runtime_shutdown();
+                    assert(app_cleanups == 1U && app_updates == updates);
+                }
+            }
+        }
+    }
+}
+
+static void runtime_shutdown_requests(void)
+{
+    const platform_system_action_t actions[] = {PLATFORM_SYSTEM_ACTION_REBOOT, PLATFORM_SYSTEM_ACTION_POWER_OFF};
+    for (size_t action = 0U; action < 2U; ++action) {
+        for (unsigned int during_sync = 0U; during_sync < 2U; ++during_sync) {
+            app_entries = 0U;
+            app_cleanups = 0U;
+            assert(kernel_runtime_init() && kernel_runtime_start(false));
+            assert(application_registry_register(&app));
+            assert(tabos_app_launch(app.name) == TABOS_APP_RESULT_OK);
+            boundary_action = actions[action];
+            if (during_sync == 0U) {
+                test_platform_power_prepare_hook(request_boundary_action);
+            }
+            const unsigned int updates = app_updates;
+            const unsigned int sleeps = test_platform_sleep_calls();
+            assert(kernel_runtime_request_suspend());
+            kernel_runtime_update(PLATFORM_RUNTIME_EVENT_POWER);
+            kernel_runtime_update(PLATFORM_RUNTIME_EVENT_POWER);
+            kernel_runtime_update(PLATFORM_RUNTIME_EVENT_POWER);
+            assert(filesystem_power_status().state == FILESYSTEM_POWER_SYNCING);
+            if (during_sync != 0U) {
+                request_boundary_action();
+            } else {
+                test_platform_work_finish();
+            }
+            kernel_runtime_update(PLATFORM_RUNTIME_EVENT_POWER | PLATFORM_RUNTIME_EVENT_APPLICATION);
+            assert(kernel_runtime_system_action_pending());
+            assert(test_platform_sleep_calls() == sleeps && app_updates == updates);
+            assert(kernel_application_power_status().state == APPLICATION_POWER_PARKED);
+            assert(kernel_runtime_take_system_action() == boundary_action);
+            kernel_runtime_shutdown();
+            assert(app_cleanups == 1U && app_updates == updates);
+        }
+    }
+}
+
+static void shutdown_restore_failures(void)
+{
+    const platform_system_action_t actions[] = {PLATFORM_SYSTEM_ACTION_REBOOT, PLATFORM_SYSTEM_ACTION_POWER_OFF};
+    for (size_t action = 0U; action < 2U; ++action) {
+        for (unsigned int fault = 0U; fault < 3U; ++fault) {
+            app_entries = 0U;
+            app_cleanups = 0U;
+            assert(kernel_runtime_init() && kernel_runtime_start(false));
+            assert(application_registry_register(&app));
+            assert(tabos_app_launch(app.name) == TABOS_APP_RESULT_OK);
+            reset_manager();
+            begin_storage();
+            finish_storage();
+            if (fault == 0U) {
+                test_platform_power_fail_once(3U);
+            } else if (fault == 1U) {
+                test_platform_fail_panel_once();
+            } else {
+                test_platform_network_power_errors(0, -TABOS_EIO);
+            }
+            boundary_action = actions[action];
+            request_boundary_action();
+            const unsigned int updates = app_updates;
+            power_services_shutdown(&services);
+            assert(manager.status.resume_failed && services.panic_reported);
+            assert(strstr(test_platform_last_log(), "KERNEL PANIC: power restore failed") != NULL);
+            assert(kernel_application_power_status().state == APPLICATION_POWER_PARKED);
+            assert(app_updates == updates);
+            assert(kernel_runtime_take_system_action() == boundary_action);
+            power_manager_shutdown(&manager);
+            kernel_runtime_shutdown();
+            assert(app_cleanups == 1U && app_updates == updates);
+            test_platform_network_power_errors(0, 0);
+        }
+    }
 }
 
 static void activity_boundaries(void)
@@ -428,6 +593,9 @@ int main(void)
     power_manager_shutdown(&manager);
     kernel_runtime_shutdown();
     assert(app_cleanups == 1U && app_entries == 1U);
+    shutdown_boundaries();
+    runtime_shutdown_requests();
+    shutdown_restore_failures();
     assert(rmdir(root) == 0);
     return 0;
 }

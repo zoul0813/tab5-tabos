@@ -328,6 +328,8 @@ validation remain pending; this slice has not been flashed as part of implementa
 - [ ] Require idempotent restoration and bounded completion. A timed-out worker remains owned until completion/cancellation acknowledged.
 - [ ] Restore platform/buses, essential services, display/brightness, retained input, and finally application execution.
 - [ ] Make reboot/power-off supersede transition. Restore only resources needed for safe shutdown; do not briefly resume application execution.
+- [x] Observe accepted system actions at retained callback boundaries, suppress parking
+  timeout recovery, and validate shutdown ownership plus restoration-failure containment.
 - [ ] On unrecoverable essential restoration failure, enter kernel panic outside normal power-state progression, keep applications parked, and report through surviving diagnostics.
 - [ ] Disable further automatic suspend after callback failure until policy re-enabled or reboot. Ordinary blockers retry only when blocker state changes; no retry polling loop.
 
@@ -382,6 +384,33 @@ verify no sleep entry, retained input, restored brightness, and application-last
 Input-continuation validation: macOS Debug/Release full suites pass (76/76 each), plus
 final targeted service/coordinator checks; Tab5 Debug/Release cross-builds pass. Linux
 and physical transitions were not run; no firmware was flashed.
+
+Phase 6 shutdown continuation checks the runtime's accepted system action without
+consuming it, between callbacks and after platform preparation. Application resume
+also rechecks after brightness restoration. An observed reboot/power-off request
+prevents further sleep preparation or reopening parked application execution.
+Ordinary dispatch and parking-timeout recovery stop once the action is pending;
+destructive shutdown joins outstanding storage work before releasing its resources.
+Tests cover both actions on both sides of all nine callbacks, platform preparation,
+suspended state, and success/failure completion of pending callbacks at every node.
+The final cross-core check-to-entry/unpark race is not an atomic exclusion guarantee;
+platform entry coordination and unified kernel panic integration remain open. This
+slice does not enable hardware sleep or alter display-only policy.
+
+Operator regression report (2026-09-13): full `tester` passes after a fresh Tab5 restart;
+`tester --filesystem` passes after dim, backlight-off, and panel-off. Current readings
+are reported unchanged, without new sample values or measurement metadata. These are
+normal-operation regressions, not physical barrier/callback/sleep validation.
+
+Shutdown-continuation validation: macOS Debug/Release full suites pass (93/93 each),
+with final targeted checks (11/11 each) after the shutdown diagnostic regression fix.
+Debug uses configured ASan/UBSan. Tab5 Debug/Release cross-builds pass. Linux and physical
+coordinated transitions were not run, and no hardware was flashed.
+
+After flashing independently, the operator reports the suggested normal-operation,
+reboot, and shutdown checks "seems to work" (2026-09-13). Record this as basic hardware
+regression acceptance; individual cases and internal transition faults were not reported
+separately, and coordinated suspend remains untested on hardware.
 
 ## Phase 7 — Tab5 light sleep and time semantics
 

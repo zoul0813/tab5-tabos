@@ -411,6 +411,9 @@ static void resume_failed(power_manager_t* manager, power_failure_code_t code, c
 
 static bool preparation_cancelled(power_manager_t* manager)
 {
+    if (manager->shutdown_pending != NULL && manager->shutdown_pending()) {
+        manager->shutdown_requested = true;
+    }
     platform_mutex_lock(manager->mutex);
     const bool activity = manager->activity_requested;
     platform_mutex_unlock(manager->mutex);
@@ -424,6 +427,9 @@ static void drive(power_manager_t* manager, uint64_t now_ms)
         return;
     }
     for (size_t step = 0U; step < POWER_PARTICIPANT_CAPACITY * 2U + 8U; ++step) {
+        if (manager->shutdown_pending != NULL && manager->shutdown_pending()) {
+            manager->shutdown_requested = true;
+        }
         if (manager->phase == POWER_PHASE_WAIT_SUSPEND || manager->phase == POWER_PHASE_WAIT_RESUME) {
             power_callback_result_t result;
             if (!completion(manager, &result)) {
@@ -564,6 +570,10 @@ static void start(power_manager_t* manager, uint64_t now_ms)
 void power_manager_update(power_manager_t* manager, platform_runtime_events_t events, uint64_t now_ms)
 {
     if (manager == NULL || !manager->finalized || manager->status.state == POWER_STATE_SHUTTING_DOWN) {
+        return;
+    }
+    if (manager->shutdown_pending != NULL && manager->shutdown_pending()) {
+        power_manager_begin_shutdown(manager, now_ms);
         return;
     }
     platform_mutex_lock(manager->mutex);

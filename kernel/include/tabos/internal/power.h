@@ -159,6 +159,8 @@ typedef struct {
         /* Runtime-owned, non-consuming probe; invoked outside the manager mutex.
          * Does not replace platform atomic wake arming / final entry checks. */
         bool (*activity_pending)(void);
+        /* Non-consuming system-action probe; runtime retains the accepted action. */
+        bool (*shutdown_pending)(void);
         char trace[POWER_TRACE_CAPACITY][POWER_NAME_CAPACITY + 8];
         size_t trace_count;
 } power_manager_t;

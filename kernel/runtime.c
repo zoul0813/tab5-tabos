@@ -231,6 +231,11 @@ bool kernel_runtime_request_system_action(platform_system_action_t action)
     return true;
 }
 
+bool kernel_runtime_system_action_pending(void)
+{
+    return atomic_load_explicit(&requested_system_action, memory_order_acquire) != PLATFORM_SYSTEM_ACTION_NONE;
+}
+
 platform_system_action_t kernel_runtime_take_system_action(void)
 {
     return (platform_system_action_t) atomic_exchange_explicit(&requested_system_action, PLATFORM_SYSTEM_ACTION_NONE,
@@ -439,6 +444,7 @@ bool kernel_runtime_start(bool launch_startup_application)
         return false;
     }
     (void) power_services_register(&power_services, &power_manager);
+    power_manager.shutdown_pending = kernel_runtime_system_action_pending;
     (void) power_manager_finalize(&power_manager);
     deferred_power_events = 0U;
     power_initialized     = true;
@@ -476,7 +482,8 @@ bool kernel_runtime_start(bool launch_startup_application)
 
 bool kernel_runtime_request_suspend(void)
 {
-    return runtime_started && power_initialized && power_manager_request_suspend(&power_manager);
+    return runtime_started && power_initialized && !kernel_runtime_system_action_pending() &&
+           power_manager_request_suspend(&power_manager);
 }
 
 const power_status_t* kernel_runtime_power_status(void)
@@ -486,7 +493,7 @@ const power_status_t* kernel_runtime_power_status(void)
 
 void kernel_runtime_update(platform_runtime_events_t events)
 {
-    if (!runtime_started) {
+    if (!runtime_started || kernel_runtime_system_action_pending()) {
         return;
     }
 #ifndef NDEBUG
@@ -519,6 +526,9 @@ void kernel_runtime_update(platform_runtime_events_t events)
             power_manager_request_activity(&power_manager, now);
         }
         power_services_update(&power_services, events, now);
+        if (kernel_runtime_system_action_pending() || power_manager.shutdown_requested) {
+            return;
+        }
         if (power_services_transitioning(&power_services)) {
             deferred_power_events |= events;
             return;
@@ -586,7 +596,7 @@ void kernel_runtime_update(platform_runtime_events_t events)
 
 uint64_t kernel_runtime_next_deadline(void)
 {
-    if (!runtime_started) {
+    if (!runtime_started || kernel_runtime_system_action_pending()) {
         return PLATFORM_RUNTIME_DEADLINE_NONE;
     }
     if (power_initialized && power_services_transitioning(&power_services)) {

@@ -166,6 +166,15 @@ ordered callbacks are implemented. No new display policy or CPU sleep behavior i
   retain application/storage ownership during shutdown. Host graph runs 1,000 cycles.
 - [x] Power Phase 6 input continuation: recheck normalized activity between callbacks,
   retain input through cancellation, and order residual pointer cancellations before wake reports.
+- [x] Power Phase 6 shutdown continuation: validate accepted system actions at callback
+  boundaries, suppress dispatcher/parking-timeout work, and retain borrowed work until teardown.
+  macOS Debug/Release full suites pass (93/93 each), final targeted checks pass (11/11
+  each), and Tab5 Debug/Release builds pass. Unified panic integration remains next.
+  Operator reports post-flash checks "seems to work" (2026-09-13): basic hardware
+  regression acceptance, not individual fault-injection or coordinated-suspend proof.
+- [x] Operator regression report (2026-09-13): full `tester` passes after fresh Tab5
+  restart; `tester --filesystem` passes after dim, backlight-off, and panel-off.
+  Reported power measurements are unchanged. This does not exercise coordinated suspend.
 - [ ] Complete wake-controller/shared-bus integration, final wake-line race closure,
   and physical coordinated cycles before enabling Tab5 sleep.
 

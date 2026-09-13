@@ -968,3 +968,10 @@ restores display before applications, and preserves keyboard/text/pointer orderi
 Residual logical pointer cancellations precede later reports even across queue overflow;
 held physical input remains a blocker. Raw pending IRQ/event checks and atomic hardware
 wake arming remain separate prerequisites; normal display-idle behavior is unchanged.
+
+Phase 6 shutdown continuation observes accepted reboot/power-off requests without
+consuming them at service boundaries and before application unpark. Pending actions
+suppress normal dispatch and parking-timeout recovery; teardown joins borrowed storage
+work and destroys parked execution. Boundary tests cover both actions and asynchronous
+completion failures. Native atomic entry/unpark exclusion and unified kernel panic
+integration remain open; no CPU sleep or new display policy is enabled.

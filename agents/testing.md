@@ -2087,3 +2087,20 @@ Input-continuation validation: macOS Debug/Release full suites pass (76/76 each)
 final targeted input/coordinator checks after extending runtime wake coverage. Debug
 uses configured ASan/UBSan. Tab5 Debug/Release cross-builds pass; Linux and physical
 coordinated transitions were not run. No hardware was flashed.
+
+Shutdown continuation adds 80 coordinator boundary cases: reboot and power-off before
+and after each suspend/resume callback, platform preparation, and suspended state.
+Four actual-dispatcher cases check actions during platform preparation and pending
+storage sync. Tests require retained first-request-wins action, no new application
+updates, no sleep entry after an observed preparation-time request, no parking-timeout
+unfreeze, joined storage ownership, exactly-once cleanup, and successful reinitialization.
+Manager coverage adds 36 pending-callback cases across nine nodes, suspend/resume, and
+successful/failed completion. Shutdown must await completion; failed resume stays contained.
+These deterministic boundaries do not prove atomic native check-to-entry/unpark exclusion.
+Six additional cases inject platform, display, and network restoration failure during
+each system action, requiring surviving panic diagnostics, parked apps, and safe teardown.
+
+Local shutdown-continuation validation: macOS Debug/Release full suites pass (93/93 each);
+final targeted power, runtime, process, native-task, and reboot checks pass (11/11 each).
+Debug uses configured ASan/UBSan. Tab5 Debug/Release builds pass. Linux and physical
+coordinated transitions were not exercised; no flash or SDK/application changes occurred.

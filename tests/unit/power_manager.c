@@ -529,6 +529,55 @@ static void test_each_failure_boundary(void)
     }
 }
 
+static void test_shutdown_with_pending_callbacks(void)
+{
+    for (unsigned int operation = 0U; operation < 2U; ++operation) {
+        for (unsigned int failed = 0U; failed < 2U; ++failed) {
+            for (unsigned int boundary = 0U; boundary < 9U; ++boundary) {
+                power_manager_t manager;
+                participant_context_t participants[9] = {0};
+                assert(power_manager_init(&manager, policy(), 0U));
+                for (unsigned int index = 0U; index < 9U; ++index) {
+                    char name[16];
+                    char dependency[16];
+                    (void) snprintf(name, sizeof(name), "node-%u", index);
+                    (void) snprintf(dependency, sizeof(dependency), "node-%u", index - 1U);
+                    register_participant(&manager, name, index == 0U ? NULL : dependency, &participants[index]);
+                }
+                assert(power_manager_finalize(&manager));
+                if (operation == 0U) {
+                    participants[boundary].suspend_result = POWER_CALLBACK_PENDING;
+                } else {
+                    participants[boundary].resume_result = POWER_CALLBACK_PENDING;
+                }
+                assert(power_manager_request_suspend(&manager));
+                power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_POWER, 1U);
+                if (operation != 0U) {
+                    power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_POWER, 2U);
+                }
+                const size_t count = manager.trace_count;
+                power_manager_begin_shutdown(&manager, 3U);
+                assert(manager.trace_count == count);
+                assert(manager.phase == (operation == 0U ? POWER_PHASE_WAIT_SUSPEND : POWER_PHASE_WAIT_RESUME));
+                /* Shutdown cannot manufacture completion or forget borrowed work. */
+                power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_POWER | PLATFORM_RUNTIME_EVENT_DEADLINE, 10000U);
+                assert(manager.trace_count == count);
+                power_manager_complete(&manager, participants[boundary].token,
+                                       failed != 0U ? POWER_CALLBACK_FAILURE : POWER_CALLBACK_SUCCESS);
+                power_manager_update(&manager, PLATFORM_RUNTIME_EVENT_POWER, 10001U);
+                if (operation != 0U && failed != 0U) {
+                    assert(manager.status.resume_failed && manager.trace_count == count);
+                } else {
+                    assert(manager.status.state == POWER_STATE_SHUTTING_DOWN);
+                    assert(manager.trace_count == (operation == 0U ? 2U * (9U - boundary) : 18U));
+                }
+                assert(power_manager_next_deadline(&manager) == PLATFORM_RUNTIME_DEADLINE_NONE);
+                power_manager_shutdown(&manager);
+            }
+        }
+    }
+}
+
 int main(void)
 {
     test_order_async_and_wake();
@@ -542,5 +591,6 @@ int main(void)
     test_panel_policy_and_failures();
     test_registration_failures();
     test_each_failure_boundary();
+    test_shutdown_with_pending_callbacks();
     return 0;
 }
