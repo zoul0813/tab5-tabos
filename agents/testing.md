@@ -1841,3 +1841,25 @@ Local validation: macOS Debug and Release builds and full suites pass (73 tests 
 Debug uses configured AddressSanitizer/UndefinedBehaviorSanitizer). Final targeted storage,
 configuration, and core checks also pass in both configurations. Tab5 Debug and Release
 cross-builds pass. Linux and physical Tab5 storage-barrier validation were not run locally.
+
+## Reversible service hooks
+
+`unit.service_power` directly exercises 100 cycles of idle media admission, retained
+camera device IDs, blocked live audio buffers/frame leases, retained keyboard/pointer
+events and handles, display pixels/brightness, partial display rollback, network
+configuration/intent, transport failure, and bounded retries with an absent AP.
+`unit.host_power_model` exercises real host display retention and socket/TLS admission
+freeze. `component.host_network_io` verifies live socket/TLS blockers preserve usable
+connections. `unit.host_io` checks abandoned jobs remain busy; camera concurrency tests
+reenter the suspend check during backend start/stop/capacity work without waiting on its
+pipeline mutex. Existing service, native cancellation, and runtime tests remain required.
+
+These are individual callback tests, not a coordinated sleep test. Tab5 display/C6 hooks
+still report ENOTSUP, and no new manual diagnostic or SDK entry point exists. Physical
+regression after flashing should exercise tester plus media/network/display functions;
+actual hook/rollback validation must wait for an in-scope transition trigger.
+
+Local validation: macOS Debug and Release builds and full suites pass (74 tests each),
+with Debug ASan/UBSan enabled. Final targeted callback/host lifecycle checks also pass.
+Tab5 Debug/Release cross-builds pass. Linux and physical callback testing were not run;
+no firmware flash, application ABI change, or additional power savings is claimed.

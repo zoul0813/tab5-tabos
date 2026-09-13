@@ -43,6 +43,7 @@ static bool reconfiguring;
 static bool hardware_active;
 static bool platform_initialized;
 static bool initialized;
+static bool power_suspended;
 static bool streams_open(void);
 
 static uint32_t next_generation(uint32_t generation)
@@ -191,6 +192,7 @@ void audio_service_shutdown(void)
     hardware_active      = false;
     platform_initialized = false;
     initialized          = false;
+    power_suspended      = false;
 }
 
 bool audio_service_info(tabos_audio_info_t* info, const char** driver, int* error)
@@ -228,6 +230,29 @@ bool audio_service_power_inhibited(void)
     const bool inhibited = streams_open();
     platform_mutex_unlock(audio_mutex);
     return inhibited;
+}
+
+int audio_service_power_suspend(void)
+{
+    if (!initialized) {
+        return 0;
+    }
+    platform_mutex_lock(audio_mutex);
+    const bool busy = streams_open() || reconfiguring || hardware_active;
+    if (!busy) {
+        power_suspended = true;
+    }
+    platform_mutex_unlock(audio_mutex);
+    return busy ? -TABOS_EBUSY : 0;
+}
+
+void audio_service_power_resume(void)
+{
+    if (initialized) {
+        platform_mutex_lock(audio_mutex);
+        power_suspended = false;
+        platform_mutex_unlock(audio_mutex);
+    }
 }
 
 static uint32_t sample_rate_flag(uint32_t sample_rate)
@@ -300,7 +325,7 @@ tabos_audio_stream_t audio_service_open(const void* owner, const tabos_audio_con
     }
     const uint32_t sample_rate = config->sample_rate != 0U ? config->sample_rate : platform_info.default_sample_rate;
     const bool first_stream    = !streams_open();
-    if (reconfiguring || (!first_stream && sample_rate != active_sample_rate)) {
+    if (power_suspended || reconfiguring || (!first_stream && sample_rate != active_sample_rate)) {
         platform_mutex_unlock(audio_mutex);
         free(ring);
         return -TABOS_EBUSY;

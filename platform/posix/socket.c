@@ -26,6 +26,19 @@
 #endif
 #include <stdatomic.h>
 #include <string.h>
+#include "power_admission.h"
+
+static atomic_uint power_resources;
+
+bool platform_network_socket_power_suspend(void)
+{
+    return posix_power_suspend(&power_resources);
+}
+
+void platform_network_socket_power_resume(void)
+{
+    posix_power_resume(&power_resources);
+}
 
 #if !defined(ESP_PLATFORM)
 static int socket_cancel_pipe[2] = {-1, -1};
@@ -465,7 +478,9 @@ void platform_network_socket_operations_resume(void)
 
 void platform_network_socket_dispose(int socket)
 {
-    (void) close_native_socket(socket);
+    if (close_native_socket(socket) == 0) {
+        posix_power_release(&power_resources);
+    }
 }
 
 static int submit_socket_request(const socket_request_t* request, socket_response_t* response)
@@ -545,7 +560,9 @@ void platform_network_socket_operations_resume(void)
 
 void platform_network_socket_dispose(int socket)
 {
-    (void) close_native_socket(socket);
+    if (close_native_socket(socket) == 0) {
+        posix_power_release(&power_resources);
+    }
 }
 
 static int submit_socket_request(const socket_request_t* request, socket_response_t* response)
@@ -610,14 +627,25 @@ static int simple_request(socket_operation_t operation, int socket)
 
 int platform_network_socket_open(uint32_t family, uint32_t type)
 {
+    if (!posix_power_acquire(&power_resources)) {
+        return -TABOS_EBUSY;
+    }
     const socket_request_t request = {.operation = SOCKET_OPERATION_OPEN, .family = family, .type = type};
     socket_response_t response;
-    return submit_socket_request(&request, &response);
+    const int result = submit_socket_request(&request, &response);
+    if (result < 0) {
+        posix_power_release(&power_resources);
+    }
+    return result;
 }
 
 int platform_network_socket_close(int socket)
 {
-    return simple_request(SOCKET_OPERATION_CLOSE, socket);
+    const int result = simple_request(SOCKET_OPERATION_CLOSE, socket);
+    if (result == 0) {
+        posix_power_release(&power_resources);
+    }
+    return result;
 }
 
 static int endpoint_request(socket_operation_t operation, int socket, const platform_network_address_t* address,
@@ -660,9 +688,15 @@ int platform_network_socket_listen(int socket, uint16_t backlog)
 
 int platform_network_socket_accept(int socket, platform_network_address_t* address, uint16_t* port)
 {
+    if (!posix_power_acquire(&power_resources)) {
+        return -TABOS_EBUSY;
+    }
     const socket_request_t request = {.operation = SOCKET_OPERATION_ACCEPT, .socket = socket};
     socket_response_t response;
     const int accepted = submit_socket_request(&request, &response);
+    if (accepted < 0) {
+        posix_power_release(&power_resources);
+    }
     if (accepted >= 0 && address != NULL && port != NULL) {
         *address = response.address;
         *port    = response.port;

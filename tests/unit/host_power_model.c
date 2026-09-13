@@ -1,4 +1,6 @@
 #include "power_test.h"
+#include <tabos/filesystem.h>
+#include <tabos/network.h>
 
 #include <assert.h>
 
@@ -42,7 +44,42 @@ int main(void)
     assert(platform_power_set_brightness(42U));
     assert(framebuffer.pixels[0] == 0x5678U);
     assert(host_power_test_brightness() == 42U);
+    for (unsigned int cycle = 0U; cycle < 100U; ++cycle) {
+        assert(platform_display_power_suspend() == 0);
+        assert(platform_display_power_suspend() == 0);
+        assert(!host_power_test_panel_enabled() && host_power_test_brightness() == 0U);
+        assert(framebuffer.pixels[0] == 0x5678U);
+        assert(platform_display_power_resume() == 0);
+        assert(platform_display_power_resume() == 0);
+        assert(host_power_test_panel_enabled() && host_power_test_brightness() == 42U);
+    }
+    host_power_test_fail(HOST_POWER_FAIL_PANEL);
+    assert(platform_display_power_suspend() == -TABOS_EIO);
+    host_power_test_fail(HOST_POWER_FAIL_BRIGHTNESS);
+    assert(platform_display_power_resume() == -TABOS_EIO);
+    assert(platform_display_power_resume() == 0);
+    assert(platform_display_power_suspend() == 0);
     platform_display_shutdown();
+    assert(platform_display_init(&framebuffer));
+    assert(platform_power_set_brightness(37U));
+    assert(platform_display_power_suspend() == 0);
+    assert(host_power_test_brightness() == 0U);
+    assert(platform_display_power_resume() == 0);
+    assert(host_power_test_brightness() == 37U);
+    platform_display_shutdown();
+    assert(platform_network_init("power-test", NULL));
+    for (unsigned int cycle = 0U; cycle < 100U; ++cycle) {
+        const int socket = platform_network_socket_open(4U, TABOS_SOCKET_UDP);
+        assert(socket >= 0);
+        assert(platform_network_power_suspend() == -TABOS_EBUSY);
+        assert(platform_network_socket_close(socket) == 0);
+        assert(platform_network_power_suspend() == 0);
+        assert(platform_network_socket_open(4U, TABOS_SOCKET_UDP) == -TABOS_EBUSY);
+        assert(platform_tls_connect("unused.test", 443U) == -TABOS_EBUSY);
+        assert(platform_network_power_resume() == 0);
+    }
+    platform_network_socket_operations_shutdown();
+    platform_network_shutdown();
     host_power_test_fail(HOST_POWER_FAIL_PREPARE);
     assert(!platform_power_prepare_sleep());
     assert(platform_power_prepare_sleep());

@@ -227,6 +227,10 @@ bool platform_power_set_brightness(uint8_t percent);
  * Caller disables the backlight before disabling the panel and restores the panel first.
  */
 bool platform_power_set_panel_enabled(bool enabled);
+/* Retained-buffer quiescence, distinct from panel blanking. ENOTSUP/EBUSY have
+ * no side effects. Other failures require resume for partial-step rollback. */
+int platform_display_power_suspend(void);
+int platform_display_power_resume(void);
 bool platform_power_prepare_sleep(void);
 void platform_power_abort_sleep(void);
 bool platform_power_enter_light_sleep(void);
@@ -242,6 +246,16 @@ void platform_network_shutdown(void);
 bool platform_network_connect(const char* ssid, const char* password);
 bool platform_network_disconnect(void);
 bool platform_network_status(platform_network_status_t* status);
+/* Called with portable network admission frozen/drained. Suspend atomically
+ * rejects live backend resources, disconnects, and quiesces transport. Failure
+ * leaves normal admission/transport intact. Resume restores transport, not an AP
+ * connection. Return 0 or negative TABOS errno; never destroy service identities. */
+int platform_network_power_suspend(void);
+int platform_network_power_resume(void);
+bool platform_network_socket_power_suspend(void);
+void platform_network_socket_power_resume(void);
+bool platform_tls_power_suspend(void);
+void platform_tls_power_resume(void);
 bool platform_battery_status(platform_battery_status_t* status);
 bool platform_battery_set_charging(bool enabled);
 bool platform_battery_set_fast_charging(bool enabled);

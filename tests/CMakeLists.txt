@@ -1,5 +1,20 @@
 set(TABOS_TEST_PLATFORM_FAKES fakes/platform_display.c fakes/platform_storage.c)
 
+add_executable(tabos_service_power unit/service_power.c ${TABOS_TEST_PLATFORM_FAKES})
+target_include_directories(tabos_service_power PRIVATE
+    "${TABOS_ROOT}/audio/include" "${TABOS_ROOT}/camera/include"
+    "${TABOS_ROOT}/graphics/include" "${TABOS_ROOT}/input/include"
+    "${TABOS_ROOT}/pointer/include" "${TABOS_ROOT}/net/include"
+    "${TABOS_ROOT}/fs/include" "${TABOS_ROOT}/kernel/include"
+    "${TABOS_ROOT}/platform/include" "${TABOS_ROOT}/sdk/include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/fakes"
+)
+target_link_libraries(tabos_service_power PRIVATE tabos_core)
+target_compile_options(tabos_service_power PRIVATE -UNDEBUG)
+tabos_enable_warnings(tabos_service_power)
+tabos_enable_sanitizers(tabos_service_power)
+add_test(NAME unit.service_power COMMAND tabos_service_power)
+
 # Test assertions must keep evaluating checks and setup calls in optimized builds.
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     add_compile_options($<$<COMPILE_LANGUAGE:C>:-UNDEBUG>)

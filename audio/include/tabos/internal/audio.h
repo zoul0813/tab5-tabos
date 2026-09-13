@@ -11,6 +11,10 @@ bool audio_service_init(void);
 void audio_service_shutdown(void);
 bool audio_service_info(tabos_audio_info_t* info, const char** driver, int* error);
 bool audio_service_power_inhibited(void);
+/* Runtime-owned, idempotent idle admission barrier. Returns 0 or -TABOS_EBUSY.
+ * Open streams and start/stop work are blockers; no stream is destroyed. */
+int audio_service_power_suspend(void);
+void audio_service_power_resume(void);
 tabos_audio_stream_t audio_service_open(const void* owner, const tabos_audio_config_t* config);
 int audio_service_close(const void* owner, tabos_audio_stream_t stream);
 int audio_service_flush(const void* owner, tabos_audio_stream_t stream);

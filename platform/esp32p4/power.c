@@ -1,6 +1,31 @@
 #include <tabos/platform/platform.h>
 
 #include <tabos/battery.h>
+#include <tabos/filesystem.h>
+
+int platform_network_power_suspend(void)
+{
+    /* Wi-Fi disconnect alone does not quiesce ESP-Hosted SDIO/RPC workers.
+     * Keep this blocker until retained transport lifecycle is validated. */
+    return -TABOS_ENOTSUP;
+}
+
+int platform_network_power_resume(void)
+{
+    return 0; /* Suspend currently cannot change transport state. */
+}
+
+int platform_display_power_suspend(void)
+{
+    /* Pinned MIPI-DPI driver has no retained-buffer DMA/VSYNC pause. Reject
+     * before blanking; esp_lcd_panel_disp_on_off is not scanout quiescence. */
+    return -TABOS_ENOTSUP;
+}
+
+int platform_display_power_resume(void)
+{
+    return 0;
+}
 
 #include <bsp/esp-bsp.h>
 #include <bsp/m5stack_tab5.h>

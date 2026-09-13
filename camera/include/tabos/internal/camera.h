@@ -12,6 +12,9 @@ void camera_service_shutdown(void);
 void camera_service_resume_capture(void);
 bool camera_service_info(tabos_camera_info_t* info, const char** driver, bool* ready, int* error);
 bool camera_service_power_inhibited(void);
+/* Idle admission barrier; live streams/leases or pipeline work return -TABOS_EBUSY. */
+int camera_service_power_suspend(void);
+void camera_service_power_resume(void);
 void camera_service_set_device_id(tabos_device_id_t device_id);
 tabos_camera_stream_t camera_service_open(const void* owner, const tabos_camera_config_t* config);
 int camera_service_close(const void* owner, tabos_camera_stream_t stream);

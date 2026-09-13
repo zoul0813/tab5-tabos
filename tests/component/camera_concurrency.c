@@ -2,6 +2,7 @@
 #include <tabos/platform/platform.h>
 #include <SDL3/SDL.h>
 #include <stdatomic.h>
+#include <assert.h>
 #include <stdio.h>
 #include <tabos/filesystem.h>
 #include <tabos/wait.h>
@@ -52,6 +53,7 @@ void platform_runtime_notify(platform_runtime_events_t events)
 
 bool platform_camera_start(const tabos_camera_config_t* requested)
 {
+    assert(camera_service_power_suspend() == -TABOS_EBUSY);
     enter_backend();
     streaming        = true;
     active_format    = requested->format;
@@ -62,6 +64,9 @@ bool platform_camera_start(const tabos_camera_config_t* requested)
 
 void platform_camera_stop(void)
 {
+    if (streaming) {
+        assert(camera_service_power_suspend() == -TABOS_EBUSY);
+    }
     enter_backend();
     streaming = false;
     leave_backend();
@@ -69,6 +74,7 @@ void platform_camera_stop(void)
 
 void platform_camera_resume(void)
 {
+    assert(camera_service_power_suspend() == -TABOS_EBUSY);
     enter_backend();
     if (streaming && capture_ready()) {
         const uint8_t bytes[8] = {++encoded_sequence};

@@ -363,6 +363,11 @@ sleep entry, time accounting, and measurement rather than repeating that convers
 - [ ] Define suspend blockers for active filesystem writes, media streams, network operations,
   and unreleased camera frames.
 - [ ] Add service suspend/resume callbacks and explicit dependency ordering.
+
+  Internal reversible idle media/input/display/network hooks now exist. Host callback
+  tests cover retention, admission, reconnect, and failure recovery; system graph wiring
+  remains pending. Tab5 retained display DMA/VSYNC and C6 transport lifecycle remain
+  unsupported blockers. No CPU sleep or physical callback validation is claimed.
 - [ ] Suspend services in dependency order and resume them in reverse order.
 - [ ] Reject suspend while an unsafe operation or unsupported active driver remains.
 - [ ] Preserve RTC wall time and account for sleep in the monotonic-time contract.

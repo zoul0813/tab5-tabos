@@ -81,6 +81,56 @@ static platform_network_event_fn fake_network_event;
 static unsigned int network_connect_calls;
 static unsigned int network_status_calls;
 static char network_hostname[33];
+static int network_suspend_error;
+static int network_resume_error;
+static bool display_suspended;
+static uint8_t display_saved_brightness;
+static bool display_saved_panel;
+
+void test_platform_network_power_errors(int suspend_error, int resume_error)
+{
+    network_suspend_error = suspend_error;
+    network_resume_error  = resume_error;
+}
+
+int platform_network_power_suspend(void)
+{
+    if (network_suspend_error != 0) {
+        return network_suspend_error;
+    }
+    (void) platform_network_disconnect();
+    return 0;
+}
+
+int platform_network_power_resume(void)
+{
+    return network_resume_error;
+}
+
+int platform_display_power_suspend(void)
+{
+    if (!display_suspended) {
+        display_saved_brightness = fake_brightness;
+        display_saved_panel      = fake_panel_enabled;
+        display_suspended        = true;
+        if (!platform_power_set_brightness(0U) || !platform_power_set_panel_enabled(false)) {
+            return -TABOS_EIO;
+        }
+    }
+    return 0;
+}
+
+int platform_display_power_resume(void)
+{
+    if (display_suspended) {
+        if (!platform_power_set_panel_enabled(display_saved_panel) ||
+            !platform_power_set_brightness(display_saved_brightness)) {
+            return -TABOS_EIO;
+        }
+        display_suspended = false;
+    }
+    return 0;
+}
 static bool fake_rtc_ready = true;
 static int fake_rtc_error;
 static bool fake_keyboard_ready = true;

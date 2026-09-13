@@ -68,6 +68,7 @@ static void socket_continuations(void)
     const int server                         = listener(&port);
     const platform_network_address_t address = {.family = 4U, .text = "127.0.0.1"};
     const int client                         = platform_network_socket_open(4U, TABOS_SOCKET_TCP);
+    check(!platform_network_socket_power_suspend(), "live socket blocks power without closing it");
     host_io_enter(&scope);
     const uint64_t start = now_ms();
     int result           = platform_network_socket_accept(server, NULL, NULL);
@@ -105,6 +106,9 @@ static void socket_continuations(void)
           "explicit EAGAIN returns to guest");
     host_io_leave();
     check(platform_network_socket_close(client) == 0, "close client");
+    check(platform_network_socket_power_suspend(), "closed sockets permit power freeze");
+    check(platform_network_socket_open(4U, TABOS_SOCKET_TCP) == -TABOS_EBUSY, "power freeze rejects socket open");
+    platform_network_socket_power_resume();
     close(accepted);
     close(server);
     platform_network_socket_operations_shutdown();
@@ -181,6 +185,7 @@ static void tls_continuations(void)
         pause_briefly();
     } while (scope.pending && now_ms() - start < 5000U);
     check(connection > 0, "TLS worker completes verified connection");
+    check(!platform_tls_power_suspend(), "live TLS connection blocks power without destroying identity");
     while (!atomic_load(&server_ready)) {
         pause_briefly();
     }
@@ -207,6 +212,9 @@ static void tls_continuations(void)
     check(sent == 1, "TLS send completes");
     pthread_join(thread, NULL);
     check(platform_tls_close(connection) == 0, "TLS close");
+    check(platform_tls_power_suspend(), "closed TLS permits power freeze");
+    check(platform_tls_connect("localhost", port) == -TABOS_EBUSY, "power freeze rejects TLS setup");
+    platform_tls_power_resume();
     close(server);
     SSL_CTX_free(server_context);
     check(unlink(certificate_path) == 0, "remove CA");

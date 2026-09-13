@@ -16,6 +16,8 @@ void host_io_enter(host_io_scope_t* scope);
 void host_io_leave(void);
 bool host_io_active(void);
 bool host_io_retrying(void);
+/* Includes abandoned and completed-but-unconsumed jobs. */
+bool host_io_busy(void);
 void host_io_retry(void);
 void host_io_cancel(host_io_scope_t* scope);
 

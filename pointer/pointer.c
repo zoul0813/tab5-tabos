@@ -42,6 +42,7 @@ static bool detected;
 static bool initialized;
 static bool power_contacts[TABOS_POINTER_MAX_CONTACTS];
 static bool power_activity_pending;
+static bool power_suspended;
 
 static uint32_t next_generation(uint32_t generation)
 {
@@ -107,6 +108,7 @@ bool pointer_service_init(void)
     memset(streams, 0, sizeof(streams));
     memset(power_contacts, 0, sizeof(power_contacts));
     power_activity_pending = false;
+    power_suspended        = false;
     pointer_mutex          = platform_mutex_create();
     if (pointer_mutex == NULL) {
         return false;
@@ -189,6 +191,10 @@ tabos_pointer_stream_t pointer_service_open(const void* owner, tabos_device_id_t
         return -TABOS_EINVAL;
     }
     platform_mutex_lock(pointer_mutex);
+    if (power_suspended) {
+        platform_mutex_unlock(pointer_mutex);
+        return -TABOS_EBUSY;
+    }
     for (size_t index = 0U; index < POINTER_STREAM_CAPACITY; ++index) {
         if (streams[index].open) {
             continue;
@@ -239,7 +245,7 @@ int pointer_service_read(const void* owner, tabos_pointer_stream_t handle, tabos
         platform_mutex_unlock(pointer_mutex);
         return -TABOS_EACCES;
     }
-    if (stream->count == 0U) {
+    if (power_suspended || stream->count == 0U) {
         const int result = stream->hangup ? -TABOS_ENODEV : -TABOS_EAGAIN;
         platform_mutex_unlock(pointer_mutex);
         return result;
@@ -307,6 +313,40 @@ bool pointer_service_take_power_activity(bool* contact_active)
     }
     platform_mutex_unlock(pointer_mutex);
     return activity;
+}
+
+int pointer_service_power_suspend(void)
+{
+    if (!initialized) {
+        return 0;
+    }
+    platform_mutex_lock(pointer_mutex);
+    if (power_suspended) {
+        platform_mutex_unlock(pointer_mutex);
+        return 0;
+    }
+    bool busy = power_activity_pending;
+    for (size_t index = 0U; index < TABOS_POINTER_MAX_CONTACTS; ++index) {
+        busy |= power_contacts[index];
+    }
+    for (size_t index = 0U; index < POINTER_STREAM_CAPACITY; ++index) {
+        busy |= streams[index].open && streams[index].count != 0U;
+    }
+    if (!busy) {
+        power_suspended = true;
+    }
+    platform_mutex_unlock(pointer_mutex);
+    return busy ? -TABOS_EBUSY : 0;
+}
+
+void pointer_service_power_resume(void)
+{
+    if (initialized) {
+        platform_mutex_lock(pointer_mutex);
+        power_suspended = false;
+        platform_mutex_unlock(pointer_mutex);
+        platform_runtime_notify(PLATFORM_RUNTIME_EVENT_POINTER);
+    }
 }
 
 void pointer_service_record_movement(void)

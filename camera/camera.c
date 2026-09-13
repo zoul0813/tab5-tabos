@@ -5,6 +5,7 @@
 #include <tabos/wait.h>
 
 #include <limits.h>
+#include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -47,6 +48,10 @@ static platform_mutex_t* pipeline_mutex;
 static tabos_device_id_t camera_device_id = TABOS_DEVICE_ID_INVALID;
 static size_t open_count;
 static bool initialized;
+/* Counts pipeline entrants, including those queued behind start/stop. */
+static atomic_uint pipeline_users;
+static bool power_suspended;
+static bool power_remove_pending;
 
 static bool camera_service_capture_ready(void)
 {
@@ -142,12 +147,14 @@ void camera_service_shutdown(void)
     camera_service_close_owner(NULL);
     platform_mutex_destroy(camera_mutex);
     platform_mutex_destroy(pipeline_mutex);
-    pipeline_mutex   = NULL;
-    camera_mutex     = NULL;
-    platform_info    = (platform_camera_info_t) {0};
-    camera_device_id = TABOS_DEVICE_ID_INVALID;
-    open_count       = 0U;
-    initialized      = false;
+    pipeline_mutex       = NULL;
+    camera_mutex         = NULL;
+    platform_info        = (platform_camera_info_t) {0};
+    camera_device_id     = TABOS_DEVICE_ID_INVALID;
+    open_count           = 0U;
+    initialized          = false;
+    power_suspended      = false;
+    power_remove_pending = false;
 }
 
 bool camera_service_info(tabos_camera_info_t* info, const char** driver, bool* ready, int* error)
@@ -185,6 +192,34 @@ bool camera_service_power_inhibited(void)
     const bool inhibited = open_count != 0U;
     platform_mutex_unlock(camera_mutex);
     return inhibited;
+}
+
+int camera_service_power_suspend(void)
+{
+    if (!initialized) {
+        return 0;
+    }
+    platform_mutex_lock(camera_mutex);
+    const bool busy = open_count != 0U || atomic_load(&pipeline_users) != 0U;
+    if (!busy) {
+        power_suspended = true;
+    }
+    platform_mutex_unlock(camera_mutex);
+    return busy ? -TABOS_EBUSY : 0;
+}
+
+void camera_service_power_resume(void)
+{
+    if (initialized) {
+        platform_mutex_lock(camera_mutex);
+        power_suspended      = false;
+        const bool remove    = power_remove_pending;
+        power_remove_pending = false;
+        platform_mutex_unlock(camera_mutex);
+        if (remove) {
+            camera_service_remove_device();
+        }
+    }
 }
 
 void camera_service_set_device_id(tabos_device_id_t device_id)
@@ -516,9 +551,20 @@ static void remove_device_pipeline_locked(void)
 
 tabos_camera_stream_t camera_service_open(const void* owner, const tabos_camera_config_t* config)
 {
+    if (!initialized) {
+        return -TABOS_ENODEV;
+    }
+    platform_mutex_lock(camera_mutex);
+    if (power_suspended) {
+        platform_mutex_unlock(camera_mutex);
+        return -TABOS_EBUSY;
+    }
+    atomic_fetch_add(&pipeline_users, 1U);
+    platform_mutex_unlock(camera_mutex);
     platform_mutex_lock(pipeline_mutex);
     const tabos_camera_stream_t result = open_pipeline_locked(owner, config);
     platform_mutex_unlock(pipeline_mutex);
+    atomic_fetch_sub(&pipeline_users, 1U);
     if (result >= 0) {
         platform_runtime_notify(PLATFORM_RUNTIME_EVENT_POWER);
     }
@@ -527,9 +573,11 @@ tabos_camera_stream_t camera_service_open(const void* owner, const tabos_camera_
 
 int camera_service_close(const void* owner, tabos_camera_stream_t handle)
 {
+    atomic_fetch_add(&pipeline_users, 1U);
     platform_mutex_lock(pipeline_mutex);
     const int result = close_pipeline_locked(owner, handle);
     platform_mutex_unlock(pipeline_mutex);
+    atomic_fetch_sub(&pipeline_users, 1U);
     if (result == 0) {
         platform_runtime_notify(PLATFORM_RUNTIME_EVENT_POWER);
     }
@@ -538,24 +586,50 @@ int camera_service_close(const void* owner, tabos_camera_stream_t handle)
 
 void camera_service_close_owner(const void* owner)
 {
+    atomic_fetch_add(&pipeline_users, 1U);
     platform_mutex_lock(pipeline_mutex);
     close_owner_pipeline_locked(owner);
     platform_mutex_unlock(pipeline_mutex);
+    atomic_fetch_sub(&pipeline_users, 1U);
     platform_runtime_notify(PLATFORM_RUNTIME_EVENT_POWER);
 }
 
 void camera_service_remove_device(void)
 {
+    if (!initialized) {
+        return;
+    }
+    platform_mutex_lock(camera_mutex);
+    if (power_suspended) {
+        power_remove_pending = true;
+        platform_mutex_unlock(camera_mutex);
+        platform_runtime_notify(PLATFORM_RUNTIME_EVENT_POWER | PLATFORM_RUNTIME_EVENT_DEVICE);
+        return;
+    }
+    atomic_fetch_add(&pipeline_users, 1U);
+    platform_mutex_unlock(camera_mutex);
     platform_mutex_lock(pipeline_mutex);
     remove_device_pipeline_locked();
     platform_mutex_unlock(pipeline_mutex);
+    atomic_fetch_sub(&pipeline_users, 1U);
 }
 
 // Serialize a capacity wake with start/stop without performing capture work
 // on the caller.
 void camera_service_resume_capture(void)
 {
+    if (!initialized) {
+        return;
+    }
+    platform_mutex_lock(camera_mutex);
+    if (power_suspended) {
+        platform_mutex_unlock(camera_mutex);
+        return;
+    }
+    atomic_fetch_add(&pipeline_users, 1U);
+    platform_mutex_unlock(camera_mutex);
     platform_mutex_lock(pipeline_mutex);
     platform_camera_resume();
     platform_mutex_unlock(pipeline_mutex);
+    atomic_fetch_sub(&pipeline_users, 1U);
 }

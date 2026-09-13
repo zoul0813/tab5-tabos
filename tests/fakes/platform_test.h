@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <tabos/platform/platform.h>
+void test_platform_network_power_errors(int suspend_error, int resume_error);
 
 void test_platform_set_time_ms(uint64_t time_ms);
 void test_platform_advance_time_ms(uint64_t elapsed_ms);

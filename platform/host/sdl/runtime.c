@@ -1,5 +1,7 @@
 #include "internal.h"
 #include "power_test.h"
+#include "../../posix/host_io.h"
+#include <tabos/filesystem.h>
 
 #include <tabos/platform/platform.h>
 
@@ -16,6 +18,7 @@ static bool is_headless;
 static bool quit_requested;
 static platform_network_status_t network_status;
 static platform_network_event_fn network_event_callback;
+static bool network_power_suspended;
 static bool host_battery_charging_enabled;
 static bool host_battery_fast_charging_enabled;
 static atomic_uint runtime_events;
@@ -212,8 +215,9 @@ bool platform_init(bool headless)
 bool platform_network_init(const char* hostname, platform_network_event_fn event)
 {
     (void) hostname;
-    network_event_callback = event;
-    network_status         = (platform_network_status_t) {.state = PLATFORM_NETWORK_OFFLINE};
+    network_event_callback  = event;
+    network_power_suspended = false;
+    network_status          = (platform_network_status_t) {.state = PLATFORM_NETWORK_OFFLINE};
     if (network_event_callback != NULL) {
         network_event_callback();
     }
@@ -222,6 +226,7 @@ bool platform_network_init(const char* hostname, platform_network_event_fn event
 
 void platform_network_shutdown(void)
 {
+    (void) platform_network_power_resume();
     network_status         = (platform_network_status_t) {0};
     network_event_callback = NULL;
 }
@@ -229,7 +234,7 @@ void platform_network_shutdown(void)
 bool platform_network_connect(const char* ssid, const char* password)
 {
     (void) password;
-    if (ssid == NULL || ssid[0] == '\0') {
+    if (network_power_suspended || ssid == NULL || ssid[0] == '\0') {
         return false;
     }
     network_status = (platform_network_status_t) {
@@ -261,6 +266,40 @@ bool platform_network_status(platform_network_status_t* status)
     }
     *status = network_status;
     return true;
+}
+
+int platform_network_power_suspend(void)
+{
+    if (network_power_suspended) {
+        return 0;
+    }
+    if (!platform_network_socket_power_suspend()) {
+        return -TABOS_EBUSY;
+    }
+    if (!platform_tls_power_suspend()) {
+        platform_network_socket_power_resume();
+        return -TABOS_EBUSY;
+    }
+    /* Acquisitions and portable DNS/echo ingress are frozen before checking
+     * detached jobs, including abandoned TLS setup and unconsumed replies. */
+    if (host_io_busy()) {
+        platform_tls_power_resume();
+        platform_network_socket_power_resume();
+        return -TABOS_EBUSY;
+    }
+    (void) platform_network_disconnect();
+    network_power_suspended = true;
+    return 0;
+}
+
+int platform_network_power_resume(void)
+{
+    if (network_power_suspended) {
+        network_power_suspended = false;
+        platform_tls_power_resume();
+        platform_network_socket_power_resume();
+    }
+    return 0;
 }
 
 bool platform_battery_status(platform_battery_status_t* status)
@@ -402,7 +441,7 @@ void platform_log(const char* message)
 
 uint64_t platform_time_ms(void)
 {
-    const uint64_t now = SDL_GetTicks();
+    const uint64_t now    = SDL_GetTicks();
     const uint64_t offset = host_power_time_offset();
     return UINT64_MAX - now < offset ? UINT64_MAX : now + offset;
 }

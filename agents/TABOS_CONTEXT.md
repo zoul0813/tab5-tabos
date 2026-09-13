@@ -929,3 +929,12 @@ until completion. Shutdown waits before destroying storage. Health audit does no
 frozen storage offline. Host metadata barriers explicitly return ENOTSUP; Tab5 uses the
 pinned FatFs namespace-sync and synchronous SDMMC contract. Other services and the system
 dependency graph remain unintegrated; this does not enable CPU sleep.
+
+Reversible internal service hooks now cover idle audio/camera admission, retained keyboard
+and pointer delivery, retained display presentation, and network reconnect preparation.
+Open media/network resources block rather than being destroyed. Host tests directly exercise
+cycles and rollback; ordinary tester/display-idle checks do not invoke these hooks. Network
+transport restores before asynchronous retries, with configuration and manual/autoconnect
+intent retained. Failed transport/display restoration retains ownership for retry. Tab5 C6
+transport and MIPI-DPI quiescence remain explicit ENOTSUP blockers. Service graph registration,
+network control synchronization audit, physical callback validation, and CPU sleep remain open.

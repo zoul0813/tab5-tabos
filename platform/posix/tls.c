@@ -19,11 +19,47 @@
 #include <stdio.h>
 #include <stdatomic.h>
 #include <string.h>
+#include "power_admission.h"
+
+static atomic_uint power_resources;
+static int connect_transport(const char* hostname, uint16_t port);
+static int close_transport(int connection);
+
+bool platform_tls_power_suspend(void)
+{
+    return posix_power_suspend(&power_resources);
+}
+
+void platform_tls_power_resume(void)
+{
+    posix_power_resume(&power_resources);
+}
+
+int platform_tls_connect(const char* hostname, uint16_t port)
+{
+    if (!posix_power_acquire(&power_resources)) {
+        return -TABOS_EBUSY;
+    }
+    const int result = connect_transport(hostname, port);
+    if (result < 0) {
+        posix_power_release(&power_resources);
+    }
+    return result;
+}
+
+int platform_tls_close(int connection)
+{
+    const int result = close_transport(connection);
+    if (result == 0) {
+        posix_power_release(&power_resources);
+    }
+    return result;
+}
 
 enum {
     TLS_CONNECTION_CAPACITY = 4,
-    TLS_HOSTNAME_MAX = 253,
-    TLS_IO_MAX = 1024,
+    TLS_HOSTNAME_MAX        = 253,
+    TLS_IO_MAX              = 1024,
 };
 
 #if defined(ESP_PLATFORM)
@@ -33,9 +69,9 @@ typedef SSL* native_tls_t;
 #endif
 
 typedef struct {
-    native_tls_t native;
+        native_tls_t native;
 #if !defined(ESP_PLATFORM)
-    BIO* transport;
+        BIO* transport;
 #endif
 } tls_connection_t;
 
@@ -48,7 +84,8 @@ static int tls_error(void)
 
 static int connection_allocate(native_tls_t native
 #if !defined(ESP_PLATFORM)
-                               , BIO* transport
+                               ,
+                               BIO* transport
 #endif
 )
 {
@@ -90,17 +127,17 @@ typedef enum {
 } tls_operation_t;
 
 typedef struct {
-    tls_operation_t operation;
-    int connection;
-    uint16_t port;
-    uint32_t size;
-    char hostname[TLS_HOSTNAME_MAX + 1];
-    uint8_t data[TLS_IO_MAX];
+        tls_operation_t operation;
+        int connection;
+        uint16_t port;
+        uint32_t size;
+        char hostname[TLS_HOSTNAME_MAX + 1];
+        uint8_t data[TLS_IO_MAX];
 } tls_request_t;
 
 typedef struct {
-    int result;
-    uint8_t data[TLS_IO_MAX];
+        int result;
+        uint8_t data[TLS_IO_MAX];
 } tls_response_t;
 
 static QueueHandle_t tls_requests;
@@ -140,7 +177,7 @@ static void tls_worker(void* argument)
                 response.result = -TABOS_EBADF;
             } else if (request.operation == TLS_OPERATION_CLOSE) {
                 connections[request.connection - 1].native = NULL;
-                response.result = esp_tls_conn_destroy(native) == 0 ? 0 : tls_error();
+                response.result                            = esp_tls_conn_destroy(native) == 0 ? 0 : tls_error();
             } else {
                 response.result = tls_transfer_direct(native, &request, &response);
             }
@@ -154,18 +191,24 @@ bool platform_tls_operations_init(void)
     if (tls_task != NULL) {
         return true;
     }
-    tls_requests = xQueueCreate(1U, sizeof(tls_request_t));
+    tls_requests  = xQueueCreate(1U, sizeof(tls_request_t));
     tls_responses = xQueueCreate(1U, sizeof(tls_response_t));
-    tls_mutex = xSemaphoreCreateMutex();
+    tls_mutex     = xSemaphoreCreateMutex();
     if (tls_requests == NULL || tls_responses == NULL || tls_mutex == NULL ||
         xTaskCreate(tls_worker, "tabos_tls", 8192U, NULL, 5U, &tls_task) != pdPASS) {
-        if (tls_requests != NULL) { vQueueDelete(tls_requests); }
-        if (tls_responses != NULL) { vQueueDelete(tls_responses); }
-        if (tls_mutex != NULL) { vSemaphoreDelete(tls_mutex); }
-        tls_requests = NULL;
+        if (tls_requests != NULL) {
+            vQueueDelete(tls_requests);
+        }
+        if (tls_responses != NULL) {
+            vQueueDelete(tls_responses);
+        }
+        if (tls_mutex != NULL) {
+            vSemaphoreDelete(tls_mutex);
+        }
+        tls_requests  = NULL;
         tls_responses = NULL;
-        tls_mutex = NULL;
-        tls_task = NULL;
+        tls_mutex     = NULL;
+        tls_task      = NULL;
         return false;
     }
     return true;
@@ -198,14 +241,16 @@ void platform_tls_operations_shutdown(void)
     vQueueDelete(tls_requests);
     vQueueDelete(tls_responses);
     vSemaphoreDelete(tls_mutex);
-    tls_requests = NULL;
+    tls_requests  = NULL;
     tls_responses = NULL;
-    tls_mutex = NULL;
+    tls_mutex     = NULL;
+    atomic_store(&power_resources, 0U);
 }
 
-int platform_tls_connect(const char* hostname, uint16_t port)
+static int connect_transport(const char* hostname, uint16_t port)
 {
-    if (hostname == NULL || hostname[0] == '\0' || strnlen(hostname, TLS_HOSTNAME_MAX + 1U) > TLS_HOSTNAME_MAX || port == 0U) {
+    if (hostname == NULL || hostname[0] == '\0' || strnlen(hostname, TLS_HOSTNAME_MAX + 1U) > TLS_HOSTNAME_MAX ||
+        port == 0U) {
         return -TABOS_EINVAL;
     }
     tls_request_t request = {.operation = TLS_OPERATION_CONNECT, .port = port};
@@ -214,7 +259,7 @@ int platform_tls_connect(const char* hostname, uint16_t port)
     return submit_request(&request, &response);
 }
 
-int platform_tls_close(int connection)
+static int close_transport(int connection)
 {
     const tls_request_t request = {.operation = TLS_OPERATION_CLOSE, .connection = connection};
     tls_response_t response;
@@ -263,9 +308,10 @@ void platform_tls_operations_shutdown(void)
         if (connections[index].transport != NULL) {
             BIO_free_all(connections[index].transport);
             connections[index].transport = NULL;
-            connections[index].native = NULL;
+            connections[index].native    = NULL;
         }
     }
+    atomic_store(&power_resources, 0U);
 }
 
 typedef struct {
@@ -338,7 +384,7 @@ static void host_tls_connect_dispose(void* data, bool delivered)
     }
 }
 
-int platform_tls_connect(const char* hostname, uint16_t port)
+static int connect_transport(const char* hostname, uint16_t port)
 {
     if (hostname == NULL || hostname[0] == '\0' || port == 0U ||
         strnlen(hostname, TLS_HOSTNAME_MAX + 1U) > TLS_HOSTNAME_MAX) {
@@ -357,13 +403,13 @@ int platform_tls_connect(const char* hostname, uint16_t port)
     return result;
 }
 
-int platform_tls_close(int connection)
+static int close_transport(int connection)
 {
     if (connection_get(connection) == NULL) {
         return -TABOS_EBADF;
     }
-    BIO* transport = connections[connection - 1].transport;
-    connections[connection - 1].native = NULL;
+    BIO* transport                        = connections[connection - 1].transport;
+    connections[connection - 1].native    = NULL;
     connections[connection - 1].transport = NULL;
     BIO_free_all(transport);
     return 0;
@@ -402,16 +448,24 @@ static int host_tls_transfer(native_tls_t native, void* data, uint32_t size, boo
 int platform_tls_send(int connection, const void* data, uint32_t size)
 {
     native_tls_t native = connection_get(connection);
-    if (native == NULL) { return -TABOS_EBADF; }
-    if (data == NULL || size == 0U || size > INT_MAX) { return -TABOS_EINVAL; }
+    if (native == NULL) {
+        return -TABOS_EBADF;
+    }
+    if (data == NULL || size == 0U || size > INT_MAX) {
+        return -TABOS_EINVAL;
+    }
     return host_tls_transfer(native, (void*) data, size, true);
 }
 
 int platform_tls_receive(int connection, void* data, uint32_t capacity)
 {
     native_tls_t native = connection_get(connection);
-    if (native == NULL) { return -TABOS_EBADF; }
-    if (data == NULL || capacity == 0U || capacity > INT_MAX) { return -TABOS_EINVAL; }
+    if (native == NULL) {
+        return -TABOS_EBADF;
+    }
+    if (data == NULL || capacity == 0U || capacity > INT_MAX) {
+        return -TABOS_EINVAL;
+    }
     return host_tls_transfer(native, data, capacity, false);
 }
 

@@ -52,6 +52,10 @@ bool network_service_init(void);
 void network_service_update(void);
 uint64_t network_service_next_deadline(void);
 void network_service_shutdown(void);
+/* Runtime-owned reversible barrier; 0 or negative TABOS errno. Busy/unsupported
+ * leaves operation intact. Resume failure retains the freeze for retry/rollback. */
+int network_service_power_suspend(void);
+int network_service_power_resume(void);
 bool network_service_connect(const char* ssid, const char* password, bool automatic);
 bool network_service_disconnect(void);
 bool network_service_status(network_status_t* status);

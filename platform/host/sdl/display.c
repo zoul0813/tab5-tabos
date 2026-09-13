@@ -280,6 +280,7 @@ bool platform_display_present(const platform_framebuffer_t* framebuffer)
 
 void platform_display_shutdown(void)
 {
+    host_power_display_reset();
     display_brightness = 100U;
     panel_enabled      = true;
     if (texture != NULL) {

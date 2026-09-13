@@ -21,6 +21,11 @@ struct host_io_job {
 static _Thread_local host_io_scope_t* current_scope;
 static atomic_uint job_count;
 
+bool host_io_busy(void)
+{
+    return atomic_load(&job_count) != 0U;
+}
+
 static void job_free(host_io_job_t* job, bool delivered)
 {
     if (job->dispose != NULL) {

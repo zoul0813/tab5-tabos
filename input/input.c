@@ -1,5 +1,6 @@
 #include <tabos/internal/input.h>
 #include <tabos/internal/time.h>
+#include <tabos/filesystem.h>
 
 #include <tabos/config/input.h>
 #include <tabos/platform/platform.h>
@@ -25,6 +26,7 @@ static bool power_keys[INPUT_POWER_KEY_LIMIT];
 static size_t power_held_count;
 static size_t power_unknown_held_count;
 static bool power_activity_pending;
+static bool power_suspended;
 
 static bool modifier_key(tabos_key_t key)
 {
@@ -72,6 +74,7 @@ bool input_init(void)
     power_held_count         = 0U;
     power_unknown_held_count = 0U;
     power_activity_pending   = false;
+    power_suspended          = false;
     tabos_timer_cancel(&repeat_timer);
     unlock_queue();
     return true;
@@ -113,7 +116,7 @@ bool input_submit(const tabos_input_event_t* event)
         return false;
     }
     if (event->type == TABOS_INPUT_KEY_DOWN || event->type == TABOS_INPUT_KEY_UP) {
-        const bool down = event->type == TABOS_INPUT_KEY_DOWN;
+        const bool down        = event->type == TABOS_INPUT_KEY_DOWN;
         power_activity_pending = true;
         if (event->key > TABOS_KEY_UNKNOWN && event->key <= TABOS_KEY_SYM) {
             if (power_keys[(size_t) event->key] != down) {
@@ -173,12 +176,40 @@ bool input_take_power_activity(bool* held)
     return activity;
 }
 
+int input_power_suspend(void)
+{
+    if (!lock_queue()) {
+        return 0;
+    }
+    if (power_suspended) {
+        unlock_queue();
+        return 0;
+    }
+    const bool busy =
+        queue_count != 0U || power_activity_pending || power_held_count != 0U || power_unknown_held_count != 0U;
+    if (!busy) {
+        power_suspended = true;
+    }
+    unlock_queue();
+    return busy ? -TABOS_EBUSY : 0;
+}
+
+void input_power_resume(void)
+{
+    if (lock_queue()) {
+        power_suspended = false;
+        unlock_queue();
+        input_wake_waiter();
+        platform_runtime_notify(PLATFORM_RUNTIME_EVENT_INPUT);
+    }
+}
+
 void input_update(void)
 {
     if (!lock_queue()) {
         return;
     }
-    if (held_key == TABOS_KEY_UNKNOWN || !tabos_timer_poll(&repeat_timer)) {
+    if (power_suspended || held_key == TABOS_KEY_UNKNOWN || !tabos_timer_poll(&repeat_timer)) {
         unlock_queue();
         return;
     }
@@ -229,7 +260,8 @@ uint64_t input_next_deadline(void)
     if (!lock_queue()) {
         return TIME_DEADLINE_NONE;
     }
-    const uint64_t deadline = held_key != TABOS_KEY_UNKNOWN ? time_timer_deadline(&repeat_timer) : TIME_DEADLINE_NONE;
+    const uint64_t deadline =
+        !power_suspended && held_key != TABOS_KEY_UNKNOWN ? time_timer_deadline(&repeat_timer) : TIME_DEADLINE_NONE;
     unlock_queue();
     return deadline;
 }
@@ -239,7 +271,7 @@ static bool pop_event(tabos_input_event_t* event)
     if (event == NULL || !lock_queue()) {
         return false;
     }
-    if (queue_count == 0U) {
+    if (power_suspended || queue_count == 0U) {
         unlock_queue();
         return false;
     }

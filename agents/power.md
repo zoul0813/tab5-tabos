@@ -255,6 +255,9 @@ Initial blockers include:
 - [x] Permit inactive open descriptors, including writable descriptors after successful synchronization. Open handle alone does not imply active mutation.
 - [x] Do not destroy storage resources if drain deadline expires while I/O still runs. Abort transition; let operation complete normally.
 - [ ] Add reversible callbacks for audio/camera workers, display/backlight, input, health audit, networking, and storage.
+- [x] Add internal idle media admission, retained input/display lifecycle, and network
+  reconnect preparation hooks with deterministic callback tests; retain explicit native
+  display/C6 blockers. These hooks are not yet registered in the system graph.
 - [ ] Reuse existing low-level initialization helpers where safe; do not call public service shutdown paths that invalidate identities.
 - [ ] Suspend network admission, intentionally disconnect Wi-Fi, and quiesce C6 transport through supported component lifecycle.
 - [ ] Preserve network configuration and reconnect intent. Restore transport first; reconnect asynchronously with existing bounded retry policy.
@@ -268,6 +271,26 @@ mutex-protected I/O, separate mutation counts, two-second drain/sync deadline, a
 platform work. Successful barriers retain handles and stay frozen until release. Sync
 timeout/abort retains admission until worker completion; shutdown waits before destruction.
 The health audit skips frozen storage probes. Other services and system graph remain open.
+
+Service slice adds `audio_service_power_*`, `camera_service_power_*`, `input_power_*`,
+`pointer_service_power_*`, `display_power_*`, and `network_service_power_*` hooks.
+Media streams block entry; idle workers remain allocated and dormant. Admission covers
+audio reconfiguration and camera pipeline entrants queued behind start/stop. Input retains
+ingress and suppresses delivery/repeat, without changing controller IRQs or wake arming.
+Display presentation drains before backend quiescence; partial failure retains restoration
+ownership. Network service admission drains before freezing socket/TLS acquisitions and
+checking detached host jobs. Transport restores before asynchronous reconnect, preserving
+manual connection intent as well as autoconnect configuration. Open resources are not closed.
+
+Tab5 display and network transport hooks return ENOTSUP before changing hardware. Pinned
+ESP-Hosted 1.4.7 exposes deinit/reinit, but its lifecycle uses ESP_ERROR_CHECK and tears down
+RPC/transport registrations; retained, bounded rollback with Wi-Fi/netif ownership has not
+been validated. Do not replace the blocker with Wi-Fi disconnect alone. Whole-system graph,
+portable network control synchronization audit, and physical service cycles remain open.
+
+Service-slice software validation: macOS Debug/Release full suites pass (74 tests each),
+including 100-cycle callback checks; Tab5 Debug/Release cross-builds pass. Linux and
+physical callback validation were not run. No sleep graph is enabled and no flash occurred.
 
 Pinned-source evidence: ESP-IDF v5.4.4 `vfs_fat_fsync` calls `f_sync`; FatFs namespace
 unlink/mkdir/rename paths call `sync_fs`; SDMMC `CTRL_SYNC` has no queued work. Tab5 syncs

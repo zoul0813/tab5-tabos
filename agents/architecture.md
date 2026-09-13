@@ -1631,3 +1631,27 @@ used. Current host backends report ENOTSUP rather than equating per-file fsync w
 volume-wide metadata barrier. This is a storage participant foundation, not yet wired to
 the system suspend graph. Other service admission/callback work and hardware validation
 remain prerequisites for sleep.
+
+Reversible service power hooks are internal and runtime-owned, not automatically invoked
+by display idle policy. Idle audio admission shares the stream mutex and blocks throughout
+reconfiguration; camera counts pipeline entrants before its start/stop mutex. Active media
+streams/leases block rather than being closed. Camera removal arriving while paused is
+retained for processing on resume. Keyboard/pointer pause delivery and repeat only, retain
+queues/handles/focus, and continue recording physical ingress. Controller wake arming and
+final activity checks belong to the future coordinator.
+
+Display hooks require parked applications and exclusion of fullscreen ownership. Atomic
+presentation admission drains before retained-buffer backend suspension. ENOTSUP/EBUSY
+leave output unchanged; other failures retain rollback ownership until successful resume.
+Host preserves prior panel/brightness and allocations. Tab5 returns ENOTSUP because panel
+blanking does not quiesce MIPI-DPI DMA/VSYNC.
+
+Network hooks freeze portable calls before checking backend ownership. Socket/TLS acquisition
+counts are retained through resource close; detached host jobs remain busy through disposal,
+including abandoned work and unconsumed results. These gates are distinct from destructive
+socket-teardown mutex acquisition. Host transport suspension freezes acquisitions and
+disconnects without resetting configuration or registry identity. Resume restores transport
+before scheduling the existing bounded connection retries; transport failure keeps admission
+frozen. Tab5 returns ENOTSUP without disconnecting until ESP-Hosted retained lifecycle is
+validated. This slice does not register the whole-system graph or resolve the outstanding
+normal-operation portable network control synchronization audit.

@@ -11,5 +11,8 @@ bool display_graphics_present(void);
 void display_overlay_set_flags(uint32_t flags);
 platform_framebuffer_t* display_framebuffer(void);
 void display_shutdown(void);
+/* Caller has parked applications and excluded fullscreen ownership. */
+int display_power_suspend(void);
+int display_power_resume(void);
 
 #endif

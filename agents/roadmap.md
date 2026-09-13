@@ -140,6 +140,12 @@ ordered callbacks are implemented. No new display policy or CPU sleep behavior i
 - [ ] Validate physical storage barriers, implement supported host-volume metadata sync,
   remaining service callbacks, and ordered whole-system suspend integration.
 
+- [x] Add reversible idle audio/camera admission and retained keyboard/pointer/display
+  hooks, plus network configuration/reconnect preservation and backend resource guards.
+- [ ] Validate Tab5 C6 retained transport lifecycle and display DMA/VSYNC quiescence;
+  both remain explicit ENOTSUP blockers. Register service hooks in the ordered graph only
+  after its process parking, lifecycle-race, and rollback prerequisites are satisfied.
+
 ### Hardware Services Phase 6 Validation
 
 - [x] Physical RAW8 capture writes 921,600 payload bytes to microSD (operator confirmed).

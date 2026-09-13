@@ -223,3 +223,32 @@ read 0.04 A. This is reproducible coarse whole-system evidence. Meter resolution
 sampling do not support precise energy or isolated Phase 3 savings claims. Available
 equipment cannot intercept the battery-only path, so battery-powered current cannot be
 reported; power validation is limited to USB-C input measurements.
+
+## Reversible service preparation
+
+Internal suspend/resume hooks now prepare audio, camera, networking, display, and input
+for a future coordinated transition. They are not invoked by dimming, backlight-off,
+or panel-off, and do not enable CPU sleep or add an application API.
+
+- Audio and camera reject suspension while streams or start/stop work remain active.
+  Idle suspension prevents new streams without deleting service/device identities.
+- Keyboard and pointer suspension retain queued events, pointer handles, and foreground
+  ownership. New input is retained for delivery after restoration; held or pending input
+  blocks initial entry. Wake-source hardware arming remains separate.
+- Host display suspension blanks output while retaining pixels and allocations; restoration
+  restores the prior panel/brightness state. A partial failure requires rollback before
+  presentation can resume.
+- Network preparation preserves configuration and connection intent. Open sockets, TLS
+  connections, and unfinished host jobs block it. Host restoration reopens transport
+  first, then reconnects asynchronously with the existing three-attempt retry policy.
+  Missing access points are ordinary connection failures; transport restoration failure
+  keeps admission closed and reports an error.
+
+Tab5 display quiescence and C6 transport suspension still return unsupported. Panel-off
+does not stop DMA/VSYNC; Wi-Fi disconnect does not stop ESP-Hosted transport workers.
+Neither is advertised as safe hardware suspension. The whole-system dependency graph,
+platform wake preparation, and physical callback validation remain pending.
+
+After flashing, normal `tester`, audio, camera, network, and display-stage checks remain
+regression tests only. They do not invoke these internal hooks. Automated host tests
+exercise the hooks directly; no special on-device test command is added.

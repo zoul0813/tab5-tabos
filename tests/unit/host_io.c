@@ -44,15 +44,18 @@ static void dispose(void* data, bool delivered)
 
 int main(void)
 {
+    assert(!host_io_busy());
     host_io_scope_t scopes[17] = {0};
     request_t request          = {.input = "copied input"};
     for (unsigned int index = 0U; index < 16U; ++index) {
         host_io_enter(&scopes[index]);
         assert(host_io_call(&request, sizeof(request), work, dispose) == 0);
         assert(scopes[index].pending);
+        assert(host_io_busy());
         host_io_leave();
         host_io_cancel(&scopes[index]);
         host_io_cancel(&scopes[index]); /* Cancellation is idempotent. */
+        assert(host_io_busy());         /* Abandoned work still blocks power entry. */
     }
     host_io_enter(&scopes[16]);
     assert(host_io_call(&request, sizeof(request), work, dispose) == -1);

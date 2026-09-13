@@ -1,6 +1,8 @@
 #include <tabos/internal/display.h>
 #include <tabos/internal/network.h>
 #include <tabos/battery.h>
+#include <tabos/filesystem.h>
+#include <tabos/internal/service_admission.h>
 
 #include <string.h>
 
@@ -17,6 +19,9 @@ enum {
 
 static platform_framebuffer_t framebuffer;
 static bool display_initialized;
+static service_admission_t power_admission;
+static bool power_suspended;
+static int power_suspend_result;
 static uint32_t overlay_flags = TABOS_GRAPHICS_OVERLAY_ALL;
 static uint64_t overlay_refresh_at;
 static platform_battery_status_t overlay_battery;
@@ -225,12 +230,63 @@ bool display_init(void)
 
 bool display_present(void)
 {
-    return present_with_overlay(false);
+    if (!service_admission_enter(&power_admission, false)) {
+        return false;
+    }
+    const bool result = present_with_overlay(false);
+    service_admission_leave(&power_admission, false);
+    return result;
 }
 
 bool display_graphics_present(void)
 {
-    return present_with_overlay(true);
+    if (!service_admission_enter(&power_admission, false)) {
+        return false;
+    }
+    const bool result = present_with_overlay(true);
+    service_admission_leave(&power_admission, false);
+    return result;
+}
+
+int display_power_suspend(void)
+{
+    if (!display_initialized) {
+        return 0;
+    }
+    if (power_suspended) {
+        return power_suspend_result;
+    }
+    service_admission_freeze(&power_admission, true);
+    if ((atomic_load(&power_admission.state) & SERVICE_ADMISSION_MASK) != 0U) {
+        service_admission_freeze(&power_admission, false);
+        return -TABOS_EBUSY;
+    }
+    const int result     = platform_display_power_suspend();
+    power_suspend_result = result;
+    if (result != 0) {
+        if (result == -TABOS_ENOTSUP || result == -TABOS_EBUSY) {
+            service_admission_freeze(&power_admission, false);
+        } else {
+            power_suspended = true; /* Preserve partial-step rollback ownership. */
+        }
+        return result;
+    }
+    power_suspended = true;
+    return 0;
+}
+
+int display_power_resume(void)
+{
+    if (!power_suspended) {
+        return 0;
+    }
+    const int result = platform_display_power_resume();
+    if (result == 0) {
+        power_suspended      = false;
+        power_suspend_result = 0;
+        service_admission_freeze(&power_admission, false);
+    }
+    return result;
 }
 
 void display_overlay_set_flags(uint32_t flags)
@@ -252,6 +308,8 @@ void display_shutdown(void)
     platform_display_shutdown();
     framebuffer         = (platform_framebuffer_t) {0};
     display_initialized = false;
-    overlay_flags       = TABOS_GRAPHICS_OVERLAY_ALL;
-    overlay_refresh_at  = 0U;
+    power_suspended     = false;
+    atomic_store(&power_admission.state, 0U);
+    overlay_flags      = TABOS_GRAPHICS_OVERLAY_ALL;
+    overlay_refresh_at = 0U;
 }
