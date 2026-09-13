@@ -1186,6 +1186,7 @@ add_test(NAME unit.gui_apps COMMAND tabos_gui_apps)
 
 add_executable(tabos_gui_rv32 component/gui_rv32.c fixtures/elf/hello_elf.c)
 target_include_directories(tabos_gui_rv32 PRIVATE
+    "${TABOS_ROOT}/loader/include"
     "${TABOS_ROOT}/kernel/include" "${TABOS_ROOT}/console/include"
     "${TABOS_ROOT}/graphics/include" "${TABOS_ROOT}/input/include"
     "${TABOS_ROOT}/pointer/include" "${TABOS_ROOT}/platform/include"

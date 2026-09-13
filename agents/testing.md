@@ -2044,11 +2044,26 @@ before the existing successful handoff and dirty-close cases continue.
 
 The fixture's fault ELF is valid for inspection and faults only when executed.
 Loader status 5 is asserted; desktop currently returns without a modal for positive
-child statuses. Executable-memory exhaustion and saturated lifecycle-IPC injection
-remain pending; host instruction-fault recovery does not establish Tab5 native
+child statuses. Executable-memory exhaustion and saturated lifecycle-IPC injection are now
+covered by the follow-up below; host instruction-fault recovery does not establish Tab5 native
 fault containment.
 
 Validation: the complete standalone GUI RV32 workflow passes macOS Debug with
 ASan/UBSan and macOS Release using the existing SDK application artifacts. Git
 whitespace checks pass. No production application/runtime code changed; no Linux
 builds/tests, host simulator launch/control or Tab5 flashing were performed.
+
+### GUI Memory and Lifecycle Queue Pressure
+
+`tabos_gui_rv32` uses scoped interception around production loader executable
+allocation/free and IPC requests. The fixture fails exactly one image allocation
+after executable inspection while both GUI clients' data/control queues are full
+in both directions. It verifies the failure is exercised and executable image,
+endpoint and surface counts return to baseline. IPC injection immediately before
+a CLOSE request proves the desktop sees EAGAIN, retries and reaches the dirty
+Editor confirmation flow. Retained document bytes and fresh Canvas input are
+checked afterward; shutdown leaves zero images and endpoints.
+
+The complete standalone workflow passes macOS Debug with ASan/UBSan and Release.
+These are deterministic fault-injection results, not physical Tab5 memory or
+contention measurements. Production APIs and behavior are unchanged.

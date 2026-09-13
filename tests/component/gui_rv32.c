@@ -15,6 +15,9 @@
 #include <tabos/device.h>
 #include <tabos/session.h>
 #include <tabos/internal/elf_api.h>
+#include <tabos/internal/ipc.h>
+#include <tabos/gui_protocol.h>
+#include <tabos/filesystem.h>
 #include "hello_elf.h"
 
 #include <stdio.h>
@@ -23,6 +26,111 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <dirent.h>
+
+static bool fail_executable_once;
+static unsigned int executable_failures;
+static unsigned int live_executables;
+
+static void* recovery_executable_alloc(size_t size)
+{
+    if (fail_executable_once) {
+        fail_executable_once = false;
+        ++executable_failures;
+        return NULL;
+    }
+    void* memory = platform_executable_alloc(size);
+    if (memory != NULL) {
+        ++live_executables;
+    }
+    return memory;
+}
+
+static void recovery_executable_free(void* memory)
+{
+    if (memory != NULL) {
+        if (live_executables == 0U) {
+            abort();
+        }
+        --live_executables;
+    }
+    platform_executable_free(memory);
+}
+
+/* Test-local interception; all other loader and IPC behavior is production code. */
+#define platform_executable_alloc recovery_executable_alloc
+#define platform_executable_free  recovery_executable_free
+#include "../../loader/elf_loader.c"
+#undef platform_executable_free
+#undef platform_executable_alloc
+#define ipc_service_request recovery_ipc_request
+#include "../../kernel/ipc.c"
+#undef ipc_service_request
+
+static bool saturate_close_once;
+static unsigned int blocked_closes;
+static unsigned int retried_closes;
+
+static void fill_channel(uint32_t owner, uint32_t session, int channel)
+{
+    ipc_transport_packet_t packet = {
+        .channel = channel, .message = {.kind = TABOS_GUI_WAKE, .size = sizeof(tabos_gui_packet_t)}
+    };
+    const tabos_gui_packet_t wake = {.version = TABOS_GUI_PROTOCOL_VERSION};
+    memcpy(packet.message.data, &wake, sizeof(wake));
+    const uint32_t operations[] = {IPC_TRANSPORT_SEND, IPC_TRANSPORT_CONTROL};
+    for (unsigned int index = 0U; index < 2U; ++index) {
+        int result;
+        do {
+            result = recovery_ipc_request(owner, session, operations[index], &packet);
+        } while (result == 0);
+        if (result != -TABOS_EAGAIN) {
+            fprintf(stderr, "Cannot saturate GUI channel: %d\n", result);
+            abort();
+        }
+    }
+}
+
+int ipc_service_request(uint32_t owner, uint32_t session, uint32_t operation, ipc_transport_packet_t* packet)
+{
+    const bool closing =
+        operation == IPC_TRANSPORT_CONTROL && packet != NULL && packet->message.kind == TABOS_GUI_CLOSE;
+    if (closing && saturate_close_once) {
+        saturate_close_once = false;
+        fill_channel(owner, session, packet->channel);
+    }
+    const int result = recovery_ipc_request(owner, session, operation, packet);
+    if (closing && result == -TABOS_EAGAIN) {
+        ++blocked_closes;
+    } else if (closing && result == 0 && blocked_closes != 0U) {
+        ++retried_closes;
+    }
+    return result;
+}
+
+static unsigned int live_endpoints(void)
+{
+    unsigned int count = 0U;
+    for (unsigned int index = 0U; index < IPC_CHANNELS; ++index) {
+        if (endpoints[index].handle > 0) {
+            ++count;
+        }
+    }
+    return count;
+}
+
+static unsigned int saturate_session_channels(void)
+{
+    unsigned int filled = 0U;
+    /* No runtime step occurs during injection; endpoints cannot change here. */
+    for (unsigned int index = 0U; index < IPC_CHANNELS; ++index) {
+        const ipc_endpoint_t* entry = &endpoints[index];
+        if (entry->handle > 0 && !entry->listener && entry->session == 2U && entry->peer > 0) {
+            fill_channel(entry->owner, entry->session, entry->handle);
+            ++filled;
+        }
+    }
+    return filled;
+}
 
 static char storage_root[] = "/tmp/tabos-gui-rv32-XXXXXX";
 static tabos_app_context_t* parent_context;
@@ -283,31 +391,39 @@ static void write_fault(const char* path)
 
 static void recovery_cases(const char* hello, const char* note)
 {
-    const uint32_t retained = surface_bytes();
-    for (unsigned int failure = 0U; failure < 3U; ++failure) {
+    const uint32_t retained                = surface_bytes();
+    const unsigned int executable_baseline = live_executables;
+    const unsigned int endpoint_baseline   = live_endpoints();
+    for (unsigned int failure = 0U; failure < 4U; ++failure) {
         fprintf(stderr, "GUI recovery case %u\n", failure);
         /* Test-only member stays uncooperative until explicitly acknowledged. */
-        blocker_context->session_id = failure < 2U ? 2U : 0U;
+        blocker_context->session_id = failure != 2U ? 2U : 0U;
         if (failure == 2U) {
             write_fault(hello);
         }
         click(428, 84);
         int token = 0;
-        if (failure < 2U) {
+        if (failure != 2U) {
             const uint64_t deadline = platform_time_ms() + 1000U;
             while (token <= 0 && platform_time_ms() < deadline) {
                 pump();
                 token = kernel_process_session_control(blocker_context, TABOS_SESSION_CHECKPOINT, 0U, 0U);
             }
             check(token > 0, "desktop began pause before injected failure");
-            if (failure == 1U) {
-                check(unlink(hello) == 0, "remove executable after successful inspection");
+            if (failure == 3U) {
+                check(saturate_session_channels() == 4U, "saturate both directions of two GUI channels");
+                fail_executable_once = true;
+            }
+            if (failure == 1U || failure == 3U) {
+                if (failure == 1U) {
+                    check(unlink(hello) == 0, "remove executable after successful inspection");
+                }
                 check(kernel_process_session_control(blocker_context, TABOS_SESSION_ACKNOWLEDGE, (uint32_t) token,
                                                      0U) == TABOS_ELF_EXEC_PENDING,
                       "release pause for missing executable launch");
             }
         }
-        if (failure < 2U) {
+        if (failure != 2U) {
             await_pixel(130U, 300U, 0xc618U); /* Desktop error panel over Canvas. */
         } else {
             int status              = 0;
@@ -319,11 +435,16 @@ static void recovery_cases(const char* hello, const char* note)
             check(status == 5, "fullscreen instruction fault reported with loader status");
             settle();
         }
+        if (failure == 3U) {
+            check(executable_failures == 1U && !fail_executable_once, "fullscreen allocation failure was exercised");
+        }
         check(surface_bytes() == retained, "handoff failure retains both client surfaces");
+        check(live_executables == executable_baseline && live_endpoints() == endpoint_baseline,
+              "failure recovery returns executable and IPC allocations to baseline");
         tabos_process_info_t info;
         check(tabos_process_info(2U, &info) && info.state == TABOS_PROCESS_RUNNING,
               "desktop runnable after handoff failure");
-        if (failure < 2U) {
+        if (failure != 2U) {
             check(kernel_process_session_control(blocker_context, TABOS_SESSION_CHECKPOINT, 0U, 0U) == 0,
                   "failed transition resumes session");
             check(kernel_process_session_control(blocker_context, TABOS_SESSION_ACKNOWLEDGE, (uint32_t) token, 0U) == 0,
@@ -331,7 +452,7 @@ static void recovery_cases(const char* hello, const char* note)
             blocker_context->session_id = 0U;
         }
         check(tabos_process_count() == 5U && !tabos_process_system_panicked(), "failed fullscreen child cleaned up");
-        if (failure < 2U) {
+        if (failure != 2U) {
             click(520, 448);
         }
         await_pixel(400U, 300U, 0xffffU);
@@ -354,7 +475,7 @@ static void recovery_cases(const char* hello, const char* note)
     click(196, 680);
     await_pixel(8U, 112U, 0x632cU);
     settle();
-    click(220, 80); /* Save the document that was dirty through all three failures. */
+    click(220, 80); /* Save the document that was dirty through all four failures. */
     settle();
     FILE* file    = fopen(note, "rb");
     char text[16] = {0};
@@ -504,12 +625,15 @@ int main(int argc, char** argv)
     await_count(3U);
     click(196, 680);
     settle();
+    saturate_close_once = true;
     click(1208, 680);
     settle();
     capture_frame();
     click(640, 352);
     settle();
     check(tabos_process_count() == 3U, "dirty close cancellation retains editor");
+    check(!saturate_close_once && blocked_closes > 0U && retried_closes > 0U,
+          "saturated close control retries and reaches dirty editor confirmation");
     close_shortcut();
     settle();
     click(900, 352);
@@ -578,6 +702,7 @@ int main(int argc, char** argv)
               "desktop recovery tears down GUI and fullscreen descendants");
     }
     kernel_runtime_shutdown();
+    check(live_executables == 0U && live_endpoints() == 0U, "shutdown releases all executable images and endpoints");
     platform_shutdown();
     for (size_t index = 0U; index < 3U; ++index) {
         check(unlink(extras[index]) == 0, "extra client cleanup");

@@ -95,7 +95,7 @@ Exit gate: kernel-launched fullscreen programs return to the same usable GUI ses
 - [x] GUI-505: Transfer display/input exclusively to fullscreen child and its nested foreground chain. On normal exit, failed launch, or recoverable fault, reclaim child resources, restore prior display owner, repaint retained windows, clear stale input, and resume GUI clients.
 - [x] GUI-506: Implement orderly desktop exit honoring unsaved-work cancellation. Add explicit force-close with unsaved-data warning for hung clients; stop execution before reclaiming resources and include descendants in cleanup.
 - [x] GUI-507: Handle recoverable desktop failure by tearing down remaining GUI-session processes and any active handoff chain, restoring terminal ownership, and resuming shell. Keep PID 0 panic and arbitrary Tab5 native fault limitations explicit.
-- [ ] GUI-508: Test repeated Starfall/DOOM and console-app handoffs with unsaved editor text and retained window positions. Inject pause timeout, late acknowledgement, saturated IPC, failed load, insufficient memory, recoverable child fault, client force-close, and desktop failure both during GUI operation and fullscreen handoff.
+- [x] GUI-508: Test repeated Starfall/DOOM and console-app handoffs with unsaved editor text and retained window positions. Inject pause timeout, late acknowledgement, saturated IPC, failed load, insufficient memory, recoverable child fault, client force-close, and desktop failure both during GUI operation and fullscreen handoff.
 
 ## Phase 6 — Delivery and Physical Acceptance
 
@@ -442,7 +442,7 @@ Tab5 flashing were performed.
 - [x] GUI-508: Remove the fullscreen executable after successful inspection while pause is held; acknowledge pause, verify load-error recovery, retained surfaces and resumed Canvas input.
 - [x] GUI-508: Execute a valid ELF containing an illegal RV32 instruction; assert loader fault status 5, child cleanup, runnable desktop, retained surfaces and resumed Canvas input.
 - [x] GUI-508: Keep Editor dirty across all three failures, save and verify the exact `retained!` bytes, then make it dirty again and complete the existing normal handoff and close-cancellation workflow.
-- [ ] GUI-508: Add deterministic fullscreen executable-memory exhaustion and saturated lifecycle-IPC fault injection.
+- [x] GUI-508: Add deterministic fullscreen executable-memory exhaustion and saturated lifecycle-IPC fault injection.
 
 The component fixture creates an inert descriptor child before starting desktop
 and temporarily assigns it to that desktop session to control acknowledgement
@@ -456,3 +456,27 @@ Validation: the complete standalone GUI RV32 workflow passes macOS Debug with
 ASan/UBSan and macOS Release using the existing SDK application artifacts. Git
 whitespace checks pass. No production application/runtime code changed; no Linux
 builds/tests, host simulator launch/control or Tab5 flashing were performed.
+
+### Executable Memory and IPC Pressure Recovery
+
+The GUI component fixture compiles the production loader and IPC service with
+test-local interception. After successful launch inspection, it fills both data
+and control queues in both directions for Canvas and Editor, then fails exactly
+one executable-image allocation before releasing the pause barrier. It asserts
+the allocation failure was consumed, retained surfaces and executable/endpoint
+counts return to their prior baseline, desktop resumes and Canvas accepts input.
+Exact dirty Editor bytes survive this fourth recovery case.
+
+A separate injection fills the destination queue immediately before the first
+desktop CLOSE control send. The test records EAGAIN and a later successful retry,
+then verifies Editor's dirty-close cancellation. Final runtime teardown asserts
+zero live executable images and IPC endpoints. Full standalone GUI RV32 workflows
+pass macOS Debug (ASan/UBSan) and Release. No production hooks, ABI changes or
+application rebuilds were needed; no Linux builds/tests, host simulator launch or
+control, or Tab5 flashing were performed.
+
+Together with the previously recorded game, pause, failed-load, fault, force-close
+and coordinator-failure checks, this completes GUI-508 automated coverage. Native
+contention, physical memory/headroom and device acceptance remain open under
+GUI-104/202 and Phase 6; injected allocation failure is not a hardware headroom
+measurement.
