@@ -9,6 +9,7 @@
 #include <tabos/internal/display.h>
 #include <tabos/internal/filesystem.h>
 #include <tabos/internal/input.h>
+#include <tabos/internal/pointer.h>
 #include <tabos/internal/network.h>
 #include <tabos/internal/runtime.h>
 #include <tabos/internal/hardware_devices.h>
@@ -27,6 +28,37 @@ static unsigned int app_entries;
 static unsigned int app_cleanups;
 static power_manager_t manager;
 static power_services_t services;
+static int pointer_owner;
+static tabos_pointer_stream_t pointer_stream;
+static bool inject_pointer;
+static bool expect_input;
+static power_callback_fn saved_suspend;
+
+static void inject_activity(void)
+{
+    if (inject_pointer) {
+        tabos_pointer_event_t event = {.type = TABOS_POINTER_DOWN, .contact_id = 0U, .x = 12, .y = 34};
+        pointer_service_submit(&event);
+        event.type = TABOS_POINTER_UP;
+        pointer_service_submit(&event);
+    } else {
+        tabos_input_event_t event = {.type = TABOS_INPUT_KEY_DOWN, .key = TABOS_KEY_A};
+        assert(input_submit(&event));
+        event.type = TABOS_INPUT_TEXT;
+        strcpy(event.text, "a");
+        assert(input_submit(&event));
+        event.type = TABOS_INPUT_KEY_UP;
+        assert(input_submit(&event));
+    }
+    expect_input = true;
+}
+
+static power_callback_result_t suspend_with_activity(void* context, power_completion_token_t token)
+{
+    const power_callback_result_t result = saved_suspend(context, token);
+    inject_activity();
+    return result;
+}
 
 bool platform_battery_status(platform_battery_status_t* status)
 {
@@ -86,6 +118,23 @@ static void app_update(tabos_app_context_t* context)
     (void) context;
     assert(!filesystem_power_is_frozen());
     assert(test_platform_panel_enabled() && test_platform_brightness() == 75U);
+    if (expect_input) {
+        if (inject_pointer) {
+            tabos_pointer_event_t event;
+            assert(pointer_service_read(&pointer_owner, pointer_stream, &event) == 0);
+            assert(event.type == TABOS_POINTER_DOWN && event.x == 12 && event.y == 34);
+            assert(pointer_service_read(&pointer_owner, pointer_stream, &event) == 0);
+            assert(event.type == TABOS_POINTER_UP);
+            assert(pointer_service_read(&pointer_owner, pointer_stream, &event) == -TABOS_EAGAIN);
+        } else {
+            tabos_input_event_t event;
+            assert(tabos_input_poll(&event) && event.type == TABOS_INPUT_KEY_DOWN);
+            assert(tabos_input_poll(&event) && event.type == TABOS_INPUT_TEXT && strcmp(event.text, "a") == 0);
+            assert(tabos_input_poll(&event) && event.type == TABOS_INPUT_KEY_UP);
+            assert(!tabos_input_poll(&event));
+        }
+        expect_input = false;
+    }
     ++app_updates;
 }
 static void app_cleanup(tabos_app_context_t* context, int status)
@@ -143,6 +192,52 @@ static void reset_manager(void)
     assert(power_manager_finalize(&manager));
 }
 
+static void activity_boundaries(void)
+{
+    pointer_service_set_device_id(43U);
+    pointer_service_set_foreground_owner(&pointer_owner);
+    pointer_stream = pointer_service_open(&pointer_owner, 43U);
+    assert(pointer_stream > 0);
+    for (unsigned int source = 0U; source < 2U; ++source) {
+        inject_pointer = source != 0U;
+        for (size_t index = 0U; index <= POWER_SERVICE_COUNT; ++index) {
+            reset_manager();
+            power_policy_t policy    = manager.status.policy;
+            policy.automatic_suspend = true;
+            assert(power_manager_set_policy(&manager, policy, platform_time_ms()));
+            if (index == POWER_SERVICE_COUNT) {
+                test_platform_power_prepare_hook(inject_activity);
+            } else {
+                saved_suspend                       = manager.participants[index].suspend;
+                manager.participants[index].suspend = suspend_with_activity;
+            }
+            const unsigned int sleeps  = test_platform_sleep_calls();
+            const unsigned int updates = app_updates;
+            assert(power_manager_request_suspend(&manager));
+            dispatch();
+            for (unsigned int pass = 0U; pass < 8U && manager.status.state == POWER_STATE_SUSPENDING; ++pass) {
+                assert(app_updates == updates);
+                if (filesystem_power_status().state == FILESYSTEM_POWER_SYNCING) {
+                    test_platform_work_finish();
+                }
+                dispatch();
+            }
+            assert(expect_input);
+            assert_active(); /* App sees retained input only after display/storage restoration. */
+            assert(!expect_input && manager.status.failure.code == POWER_FAILURE_NONE);
+            assert(manager.status.policy.automatic_suspend);
+            assert(test_platform_sleep_calls() == sleeps);
+            bool held;
+            (void) input_take_power_activity(&held);
+            assert(!held);
+            (void) pointer_service_take_power_activity(&held);
+            assert(!held);
+        }
+    }
+    assert(pointer_service_close(&pointer_owner, pointer_stream) == 0);
+    reset_manager();
+}
+
 int main(void)
 {
     assert(mkdtemp(root) != NULL);
@@ -167,10 +262,37 @@ int main(void)
     kernel_runtime_update(PLATFORM_RUNTIME_EVENT_NETWORK | PLATFORM_RUNTIME_EVENT_DEADLINE);
     assert(app_updates == updates && test_platform_network_status_calls() == reads);
     assert(kernel_runtime_next_deadline() == PLATFORM_RUNTIME_DEADLINE_NONE);
-    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_POWER);
-    assert(kernel_runtime_power_status()->state == POWER_STATE_ACTIVE);
+    inject_activity();
+    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_INPUT);
+    assert(kernel_runtime_power_status()->state == POWER_STATE_ACTIVE && !expect_input);
     assert(app_updates == updates + 1U && test_platform_network_status_calls() > reads);
     assert(kernel_runtime_next_deadline() > platform_time_ms());
+    /* Same-pass activity takes priority over a queued explicit request. */
+    const unsigned int prior_sleeps = test_platform_sleep_calls();
+    assert(kernel_runtime_request_suspend());
+    inject_activity();
+    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_INPUT | PLATFORM_RUNTIME_EVENT_POWER);
+    assert(kernel_runtime_power_status()->state == POWER_STATE_ACTIVE && !expect_input);
+    assert(test_platform_sleep_calls() == prior_sleeps);
+
+    pointer_service_set_device_id(43U);
+    pointer_service_set_foreground_owner(&pointer_owner);
+    pointer_stream = pointer_service_open(&pointer_owner, 43U);
+    assert(pointer_stream > 0);
+    assert(kernel_runtime_request_suspend());
+    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_POWER);
+    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_POWER);
+    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_POWER);
+    assert(filesystem_power_status().state == FILESYSTEM_POWER_SYNCING);
+    test_platform_work_finish();
+    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_POWER);
+    assert(kernel_runtime_power_status()->state == POWER_STATE_SUSPENDED);
+    inject_pointer = true;
+    inject_activity();
+    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_POINTER);
+    assert(kernel_runtime_power_status()->state == POWER_STATE_ACTIVE && !expect_input);
+    assert(pointer_service_close(&pointer_owner, pointer_stream) == 0);
+    inject_pointer = false;
     assert(kernel_runtime_request_suspend());
     kernel_runtime_update(PLATFORM_RUNTIME_EVENT_POWER);
     kernel_runtime_update(PLATFORM_RUNTIME_EVENT_POWER);
@@ -185,6 +307,7 @@ int main(void)
     assert(application_registry_register(&app));
     assert(tabos_app_launch(app.name) == TABOS_APP_RESULT_OK);
     reset_manager();
+    activity_boundaries();
     const tabos_fd_t file = tabos_fs_open("T:/retained", TABOS_O_CREAT | TABOS_O_RDWR, 0600U);
     assert(file > 0 && tabos_fs_write(file, "abc", 3U) == 3);
     assert(tabos_fs_seek(file, 1, TABOS_SEEK_SET) == 1);

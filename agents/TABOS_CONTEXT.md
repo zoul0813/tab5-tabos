@@ -950,3 +950,10 @@ Rollback includes partially failed steps. Resume failure reports a power panic a
 applications parked. Shutdown joins borrowed storage work and destroys parked execution
 without unpark. Host tests cover 1,000 retained-state cycles, failures, and runtime dispatch;
 physical cycles, wake controllers/shared buses, and CPU sleep remain unvalidated/disabled.
+
+Phase 6 input continuation rechecks normalized activity between callbacks and after
+platform preparation without consuming input. Cancellation retains callback ownership,
+restores display before applications, and preserves keyboard/text/pointer ordering.
+Residual logical pointer cancellations precede later reports even across queue overflow;
+held physical input remains a blocker. Raw pending IRQ/event checks and atomic hardware
+wake arming remain separate prerequisites; normal display-idle behavior is unchanged.

@@ -409,6 +409,15 @@ static void resume_failed(power_manager_t* manager, power_failure_code_t code, c
     manager->status.state                    = POWER_STATE_RESUMING;
 }
 
+static bool preparation_cancelled(power_manager_t* manager)
+{
+    platform_mutex_lock(manager->mutex);
+    const bool activity = manager->activity_requested;
+    platform_mutex_unlock(manager->mutex);
+    return manager->cancel_requested || activity || manager->shutdown_requested ||
+           (manager->activity_pending != NULL && manager->activity_pending());
+}
+
 static void drive(power_manager_t* manager, uint64_t now_ms)
 {
     if (manager->status.resume_failed) {
@@ -438,10 +447,7 @@ static void drive(power_manager_t* manager, uint64_t now_ms)
             continue;
         }
         if (manager->phase == POWER_PHASE_SUSPEND) {
-            platform_mutex_lock(manager->mutex);
-            const bool activity = manager->activity_requested;
-            platform_mutex_unlock(manager->mutex);
-            if (manager->cancel_requested || activity || manager->shutdown_requested) {
+            if (preparation_cancelled(manager)) {
                 rollback(manager, now_ms, POWER_FAILURE_NONE, NULL);
                 continue;
             }
@@ -452,11 +458,7 @@ static void drive(power_manager_t* manager, uint64_t now_ms)
                     rollback(manager, now_ms, POWER_FAILURE_PLATFORM_PREPARE, NULL);
                     continue;
                 }
-                manager->platform_prepared = true;
-                platform_mutex_lock(manager->mutex);
-                const bool late_activity = manager->activity_requested;
-                platform_mutex_unlock(manager->mutex);
-                if (late_activity) {
+                if (preparation_cancelled(manager)) {
                     rollback(manager, now_ms, POWER_FAILURE_NONE, NULL);
                     continue;
                 }
@@ -572,6 +574,7 @@ void power_manager_update(power_manager_t* manager, platform_runtime_events_t ev
     manager->activity_requested = false;
     platform_mutex_unlock(manager->mutex);
     if (activity) {
+        request                          = false;
         manager->automatic_blocked       = false;
         manager->status.last_activity_ms = activity_ms;
         if (manager->status.state == POWER_STATE_SUSPENDING) {
@@ -601,8 +604,11 @@ void power_manager_update(power_manager_t* manager, platform_runtime_events_t ev
             request = true;
         }
     }
-    if (manager->status.state == POWER_STATE_SUSPENDED && (events & PLATFORM_RUNTIME_EVENT_POWER) != 0U) {
+    if (manager->status.state == POWER_STATE_SUSPENDED && (activity || (events & PLATFORM_RUNTIME_EVENT_POWER) != 0U)) {
         platform_power_wake_cause_t causes = platform_power_collect_wake_causes();
+        if (activity && causes == PLATFORM_POWER_WAKE_NONE) {
+            causes = PLATFORM_POWER_WAKE_OTHER;
+        }
         if (causes != PLATFORM_POWER_WAKE_NONE) {
             manager->status.wake_causes = causes;
             if (!platform_power_restore()) {

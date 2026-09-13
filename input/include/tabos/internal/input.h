@@ -16,6 +16,8 @@ void input_update(void);
 uint64_t input_next_deadline(void);
 bool input_submit(const tabos_input_event_t* event);
 bool input_take_power_activity(bool* held);
+/* Non-consuming transition recheck, including retained input and held keys. */
+bool input_power_activity_pending(void);
 /* Retain ingress and queues, suppress delivery/repeat. Pending activity blocks entry. */
 int input_power_suspend(void);
 void input_power_resume(void);

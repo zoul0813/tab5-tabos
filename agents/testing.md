@@ -1895,3 +1895,19 @@ not replace them or hardware validation. No public/manual suspend command was ad
 Local coordinator validation: macOS Debug/Release full suites pass, 76/76 each; Debug
 uses configured ASan/UBSan. Tab5 Debug/Release cross-builds pass. Linux execution and
 physical coordinated transitions were not run, and no firmware was flashed.
+
+Phase 6 input coverage injects keyboard down/text/up and pointer down/up after each of
+nine registered suspend callbacks and during platform preparation. Tests require zero
+sleep entries, no callback-failure classification, retained automatic-policy enablement,
+unchanged parked execution, and exactly ordered input consumption after display/storage
+restoration. Runtime coverage restores on INPUT and POINTER events without an additional
+POWER bit, and gives simultaneous activity priority over a queued suspend request.
+Service tests retain held-contact blockers, repeat idempotent suspension/resumption,
+check non-consuming activity probes, and require residual-contact cancellations before
+wake reports even after an 80-event overflow burst. Synthetic cancellations must not
+count as physical activity. These tests do not close raw IRQ or hardware entry races.
+
+Input-continuation validation: macOS Debug/Release full suites pass (76/76 each), with
+final targeted input/coordinator checks after extending runtime wake coverage. Debug
+uses configured ASan/UBSan. Tab5 Debug/Release cross-builds pass; Linux and physical
+coordinated transitions were not run. No hardware was flashed.

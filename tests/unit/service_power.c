@@ -180,10 +180,81 @@ static void network(void)
     filesystem_shutdown();
 }
 
+static void pointer_cancellation(void)
+{
+    assert(pointer_service_init());
+    pointer_service_set_device_id(43U);
+    pointer_service_set_foreground_owner(&owner);
+    const tabos_pointer_stream_t stream = pointer_service_open(&owner, 43U);
+    assert(stream > 0);
+    tabos_pointer_event_t event = {.type = TABOS_POINTER_DOWN, .contact_id = 0U, .x = 10, .y = 20};
+    pointer_service_submit(&event);
+    tabos_pointer_event_t received;
+    assert(pointer_service_read(&owner, stream, &received) == 0);
+    bool held;
+    assert(pointer_service_take_power_activity(&held) && held);
+    assert(pointer_service_power_activity_pending());
+    assert(pointer_service_power_suspend() == -TABOS_EBUSY); /* Held input is not erased. */
+    event.type = TABOS_POINTER_UP;
+    pointer_service_submit(&event);
+    assert(pointer_service_read(&owner, stream, &received) == 0);
+    assert(pointer_service_take_power_activity(&held) && !held);
+    for (unsigned int cycle = 0U; cycle < 3U; ++cycle) {
+        /* Recovery/focus can leave a logical MOVE without a physical DOWN. */
+        event.type = TABOS_POINTER_MOVE;
+        for (uint32_t contact = 0U; contact < 2U; ++contact) {
+            event.contact_id = contact;
+            pointer_service_submit(&event);
+            assert(pointer_service_read(&owner, stream, &received) == 0);
+        }
+        assert(pointer_service_power_activity_pending());
+        assert(pointer_service_power_activity_pending()); /* Probe does not consume. */
+        assert(pointer_service_take_power_activity(&held) && !held);
+        assert(pointer_service_power_suspend() == 0 && pointer_service_power_suspend() == 0);
+        assert(!pointer_service_power_activity_pending()); /* Cancels are not activity. */
+        assert(pointer_service_read(&owner, stream, &received) == -TABOS_EAGAIN);
+        if (cycle == 0U) {
+            event.type = TABOS_POINTER_MOVE;
+            pointer_service_submit(&event); /* New sequence must begin DOWN. */
+        } else if (cycle == 1U) {
+            event.type = TABOS_POINTER_UP;
+            pointer_service_submit(&event); /* Old contact already cancelled. */
+        } else {
+            event.type = TABOS_POINTER_DOWN;
+            pointer_service_submit(&event);
+            for (unsigned int index = 0U; index < 80U; ++index) {
+                event.type = TABOS_POINTER_MOVE;
+                pointer_service_submit(&event);
+            }
+            event.type = TABOS_POINTER_UP;
+            pointer_service_submit(&event);
+        }
+        pointer_service_power_resume();
+        pointer_service_power_resume();
+        for (uint32_t contact = 0U; contact < 2U; ++contact) {
+            assert(pointer_service_read(&owner, stream, &received) == 0);
+            assert(received.type == TABOS_POINTER_CANCEL && received.contact_id == contact);
+            assert(received.x == 10 && received.y == 20 && received.device_id == 43U);
+        }
+        if (cycle == 0U) {
+            assert(pointer_service_read(&owner, stream, &received) == 0 && received.type == TABOS_POINTER_DOWN);
+            event.type = TABOS_POINTER_UP;
+            pointer_service_submit(&event);
+        }
+        while (pointer_service_read(&owner, stream, &received) == 0) {
+            assert(cycle != 1U);
+        }
+        assert(pointer_service_take_power_activity(&held) && !held);
+    }
+    assert(pointer_service_close(&owner, stream) == 0);
+    pointer_service_shutdown();
+}
+
 int main(void)
 {
     media();
     input_display();
+    pointer_cancellation();
     network();
     return 0;
 }

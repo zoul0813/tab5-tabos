@@ -318,6 +318,12 @@ void test_platform_fail_panel_once(void)
     fail_panel_once = true;
 }
 static unsigned int power_failure_stage;
+static void (*power_prepare_hook)(void);
+
+void test_platform_power_prepare_hook(void (*hook)(void))
+{
+    power_prepare_hook = hook;
+}
 static unsigned int sleep_calls;
 
 void test_platform_power_fail_once(unsigned int stage)
@@ -341,6 +347,11 @@ static bool power_stage(unsigned int stage)
 
 bool platform_power_prepare_sleep(void)
 {
+    if (power_prepare_hook != NULL) {
+        void (*hook)(void) = power_prepare_hook;
+        power_prepare_hook = NULL;
+        hook();
+    }
     return power_stage(1U);
 }
 void platform_power_abort_sleep(void)

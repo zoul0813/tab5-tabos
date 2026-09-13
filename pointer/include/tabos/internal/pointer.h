@@ -20,6 +20,8 @@ void pointer_service_close_owner(const void* owner);
 void pointer_service_submit(const tabos_pointer_event_t* event);
 void pointer_service_record_movement(void);
 bool pointer_service_take_power_activity(bool* contact_active);
+/* Physical activity only; synthetic cancellation is not wake activity. */
+bool pointer_service_power_activity_pending(void);
 int pointer_service_power_suspend(void);
 void pointer_service_power_resume(void);
 void pointer_service_remove_device(void);

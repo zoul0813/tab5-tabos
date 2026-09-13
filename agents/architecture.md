@@ -1676,3 +1676,11 @@ resume failure terminates traversal with a power panic, never reopening applicat
 System shutdown joins retained storage work without relying on a stopped runtime loop and
 destroys parked native tasks without an intermediate unpark. These internal integration
 surfaces add no SDK transport, public suspend command, or enabled Tab5 sleep path.
+
+The coordinator installs a non-consuming normalized-input probe, called outside the power
+mutex between suspend callbacks and after platform preparation. Input queues and physical
+held state remain authoritative. Activity cancels preparation without unpark until owned
+callbacks complete and dependencies restore. Residual logical pointer contacts use a
+separate bounded cancellation prefix that cannot be overwritten by later ingress overflow;
+held physical contacts still block entry. Hardware notification/arming and the atomic
+check-to-sleep boundary remain platform work, not guarantees of this software probe.

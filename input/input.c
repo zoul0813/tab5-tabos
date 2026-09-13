@@ -176,6 +176,17 @@ bool input_take_power_activity(bool* held)
     return activity;
 }
 
+bool input_power_activity_pending(void)
+{
+    if (!lock_queue()) {
+        return false;
+    }
+    const bool pending =
+        queue_count != 0U || power_activity_pending || power_held_count != 0U || power_unknown_held_count != 0U;
+    unlock_queue();
+    return pending;
+}
+
 int input_power_suspend(void)
 {
     if (!lock_queue()) {

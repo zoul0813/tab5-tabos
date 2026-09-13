@@ -25,6 +25,11 @@ typedef struct {
         bool contacts[TABOS_POINTER_MAX_CONTACTS];
         int32_t contact_x[TABOS_POINTER_MAX_CONTACTS];
         int32_t contact_y[TABOS_POINTER_MAX_CONTACTS];
+        /* Suspend cancellations precede ingress and survive ordinary queue overflow. */
+        tabos_pointer_event_t power_cancels[TABOS_POINTER_MAX_CONTACTS];
+        size_t power_cancel_head;
+        size_t power_cancel_count;
+        bool power_cancelled[TABOS_POINTER_MAX_CONTACTS];
         uint32_t generation;
         size_t head;
         size_t count;
@@ -245,10 +250,16 @@ int pointer_service_read(const void* owner, tabos_pointer_stream_t handle, tabos
         platform_mutex_unlock(pointer_mutex);
         return -TABOS_EACCES;
     }
-    if (power_suspended || stream->count == 0U) {
+    if (power_suspended || (stream->power_cancel_count == 0U && stream->count == 0U)) {
         const int result = stream->hangup ? -TABOS_ENODEV : -TABOS_EAGAIN;
         platform_mutex_unlock(pointer_mutex);
         return result;
+    }
+    if (stream->power_cancel_count != 0U) {
+        *event = stream->power_cancels[stream->power_cancel_head++];
+        --stream->power_cancel_count;
+        platform_mutex_unlock(pointer_mutex);
+        return 0;
     }
     *event       = stream->queue[stream->head];
     stream->head = (stream->head + 1U) % POINTER_QUEUE_CAPACITY;
@@ -270,7 +281,8 @@ int pointer_service_poll(const void* owner, tabos_pointer_stream_t handle, uint3
         return -TABOS_EBADF;
     }
     uint32_t result = 0U;
-    if (owner == foreground_owner && stream->count > 0U && (requested_events & TABOS_WAIT_READABLE) != 0U) {
+    if (owner == foreground_owner && (stream->power_cancel_count != 0U || stream->count > 0U) &&
+        (requested_events & TABOS_WAIT_READABLE) != 0U) {
         result |= TABOS_WAIT_READABLE;
     }
     if (stream->hangup && (requested_events & TABOS_WAIT_HANGUP) != 0U) {
@@ -315,6 +327,20 @@ bool pointer_service_take_power_activity(bool* contact_active)
     return activity;
 }
 
+bool pointer_service_power_activity_pending(void)
+{
+    if (!initialized) {
+        return false;
+    }
+    platform_mutex_lock(pointer_mutex);
+    bool pending = power_activity_pending;
+    for (size_t index = 0U; index < TABOS_POINTER_MAX_CONTACTS; ++index) {
+        pending |= power_contacts[index];
+    }
+    platform_mutex_unlock(pointer_mutex);
+    return pending;
+}
+
 int pointer_service_power_suspend(void)
 {
     if (!initialized) {
@@ -330,10 +356,33 @@ int pointer_service_power_suspend(void)
         busy |= power_contacts[index];
     }
     for (size_t index = 0U; index < POINTER_STREAM_CAPACITY; ++index) {
-        busy |= streams[index].open && streams[index].count != 0U;
+        busy |= streams[index].open && (streams[index].count != 0U || streams[index].power_cancel_count != 0U);
     }
     if (!busy) {
         power_suspended = true;
+        /* Held physical contacts block above. Clear any remaining logical contacts
+         * (for example an orphan MOVE after focus/queue recovery), not wake input.
+         * Separate storage prevents a later burst from overwriting these cancels. */
+        for (size_t index = 0U; index < POINTER_STREAM_CAPACITY; ++index) {
+            pointer_stream_t* stream = &streams[index];
+            if (!stream->open) {
+                continue;
+            }
+            stream->power_cancel_head = 0U;
+            for (uint32_t contact = 0U; contact < TABOS_POINTER_MAX_CONTACTS; ++contact) {
+                if (stream->contacts[contact]) {
+                    stream->power_cancels[stream->power_cancel_count++] = (tabos_pointer_event_t) {
+                        .type       = TABOS_POINTER_CANCEL,
+                        .device_id  = pointer_device_id,
+                        .contact_id = contact,
+                        .x          = stream->contact_x[contact],
+                        .y          = stream->contact_y[contact],
+                    };
+                    stream->contacts[contact]        = false;
+                    stream->power_cancelled[contact] = true;
+                }
+            }
+        }
     }
     platform_mutex_unlock(pointer_mutex);
     return busy ? -TABOS_EBUSY : 0;
@@ -357,6 +406,7 @@ void pointer_service_record_movement(void)
     platform_mutex_lock(pointer_mutex);
     power_activity_pending = true;
     platform_mutex_unlock(pointer_mutex);
+    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_POINTER);
 }
 
 void pointer_service_submit(const tabos_pointer_event_t* event)
@@ -378,11 +428,18 @@ void pointer_service_submit(const tabos_pointer_event_t* event)
         if (!stream->open || stream->owner != foreground_owner || stream->hangup) {
             continue;
         }
+        tabos_pointer_event_t normalized = *event;
+        normalized.device_id             = pointer_device_id;
+        if (stream->power_cancelled[event->contact_id]) {
+            stream->power_cancelled[event->contact_id] = false;
+            if (event->type == TABOS_POINTER_UP || event->type == TABOS_POINTER_CANCEL) {
+                continue;
+            }
+            normalized.type = TABOS_POINTER_DOWN;
+        }
         if (stream->count == POINTER_QUEUE_CAPACITY) {
             cancel_contacts(stream);
         }
-        tabos_pointer_event_t normalized = *event;
-        normalized.device_id             = pointer_device_id;
         enqueue(stream, &normalized);
         if (event->type == TABOS_POINTER_DOWN || event->type == TABOS_POINTER_MOVE) {
             stream->contacts[event->contact_id]  = true;
@@ -393,6 +450,7 @@ void pointer_service_submit(const tabos_pointer_event_t* event)
         }
     }
     platform_mutex_unlock(pointer_mutex);
+    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_POINTER);
 }
 
 void pointer_service_remove_device(void)

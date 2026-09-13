@@ -33,6 +33,11 @@ static power_callback_result_t result_of(int result)
     return result == 0 ? POWER_CALLBACK_SUCCESS : POWER_CALLBACK_FAILURE;
 }
 
+static bool activity_pending(void)
+{
+    return input_power_activity_pending() || pointer_service_power_activity_pending();
+}
+
 static power_callback_result_t pending(power_service_t* service, power_completion_token_t token)
 {
     service->owner->pending       = true;
@@ -145,7 +150,8 @@ bool power_services_register(power_services_t* services, power_manager_t* manage
     if (services == NULL || manager == NULL) {
         return false;
     }
-    *services = (power_services_t) {.manager = manager};
+    *services                 = (power_services_t) {.manager = manager};
+    manager->activity_pending = activity_pending;
     for (unsigned int index = 0U; index < POWER_SERVICE_COUNT; ++index) {
         services->services[index]                           = (power_service_t) {.owner = services, .kind = index};
         const char* dependencies[]                          = {index == 0U ? NULL : names[index - 1U]};

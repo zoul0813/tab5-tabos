@@ -319,7 +319,9 @@ validation remain pending; this slice has not been flashed as part of implementa
 - [ ] Suspend dependents first; resume dependencies first. Foreground execution resumes last.
 - [ ] Use order: freeze/park applications → quiesce media/network → drain/sync storage → prepare input/wake → blank/quiesce display → prepare platform → sleep.
 - [ ] Keep shared I2C available until all dependent peripherals and wake controllers finish preparation.
-- [ ] Cancel pre-suspend pointer contacts deterministically; preserve cancellation ordering relative to subsequent wake reports.
+- [x] Cancel residual logical pointer contacts at retained suspension; preserve cancellation
+  ordering ahead of subsequent reports, including queue overflow. Held physical contacts
+  remain blockers rather than being erased to force sleep.
 - [ ] Cancel automatic transition if new user activity arrives before sleep. Restore brightness and deliver retained activity afterward.
 - [ ] Recheck pending runtime events and asserted wake lines immediately before entry; close notification-versus-sleep race.
 - [ ] Record successful suspend steps. Roll back in reverse order, including cleanup of partially completed failing callback.
@@ -361,6 +363,25 @@ hardware flash, or additional current savings is delivered by this slice.
 Coordinator software validation: macOS Debug/Release full suites pass (76/76 each),
 including the new graph test; Tab5 Debug/Release cross-builds pass. Debug uses configured
 ASan/UBSan. Linux execution and physical coordinated transitions were not run locally.
+
+Phase 6 input continuation adds a non-consuming normalized-input probe between suspend
+callbacks and after platform preparation. Activity rolls back without consuming the
+keyboard/text or pointer queue; outstanding callbacks retain ownership until completion.
+Dispatcher-reported activity also restores a simulated suspended system without requiring
+a separate POWER event. Simultaneous activity wins over a queued suspend request.
+Residual logical pointer contacts receive a bounded cancellation prefix before later
+reports; the prefix survives ordinary queue overflow. A subsequent move starts a new
+logical contact, while release of an already-cancelled contact is suppressed.
+
+These are software checks, not atomic hardware wake arming: pending platform IRQ/SDL
+events not yet normalized and the final check-to-entry race remain open with Phase 7.
+Automatic suspend and Tab5 sleep remain disabled. Tests inject keyboard/text and pointer
+activity after every registered suspend callback and during platform preparation, and
+verify no sleep entry, retained input, restored brightness, and application-last delivery.
+
+Input-continuation validation: macOS Debug/Release full suites pass (76/76 each), plus
+final targeted service/coordinator checks; Tab5 Debug/Release cross-builds pass. Linux
+and physical transitions were not run; no firmware was flashed.
 
 ## Phase 7 — Tab5 light sleep and time semantics
 

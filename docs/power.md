@@ -259,6 +259,13 @@ and keeps applications parked for explicit reset/reboot. Outstanding storage wor
 owned until completion, including during shutdown. Automated host tests exercise 1,000
 retained-state cycles and injected failures; these are not physical light-sleep results.
 
+During internal coordinated preparation, newly normalized keyboard or touch activity
+cancels suspension without consuming the input. Applications receive retained events
+after services and active display brightness are restored. Held physical input still
+blocks suspension; any residual logical pointer contacts are cancelled before later
+reports. These software checks do not yet provide atomic hardware wake arming or enable
+Tab5 sleep. Ordinary dim/backlight-off/panel-off behavior is unchanged.
+
 After flashing, normal `tester`, audio, camera, network, and display-stage checks remain
 regression tests only. They do not invoke these internal hooks. Automated host tests
 exercise the hooks directly; no special on-device test command is added.

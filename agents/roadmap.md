@@ -147,8 +147,10 @@ ordered callbacks are implemented. No new display policy or CPU sleep behavior i
 - [x] Power Phase 6 first coordinator slice: register retained service hooks, bridge parking
   and storage completions, reverse partial-step rollback, stop on resume failure, and
   retain application/storage ownership during shutdown. Host graph runs 1,000 cycles.
+- [x] Power Phase 6 input continuation: recheck normalized activity between callbacks,
+  retain input through cancellation, and order residual pointer cancellations before wake reports.
 - [ ] Complete wake-controller/shared-bus integration, final wake-line race closure,
-  pointer cancellation ordering, and physical coordinated cycles before enabling Tab5 sleep.
+  and physical coordinated cycles before enabling Tab5 sleep.
 
 ### Hardware Services Phase 6 Validation
 
