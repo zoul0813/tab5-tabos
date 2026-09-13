@@ -84,9 +84,13 @@ pixels across resize/handoff, editor save and close cancellation, coherent surfa
 input routing and process cleanup. These tests do not establish physical touch
 quality, input latency, PSRAM headroom or game performance on Tab5.
 
-### SDK IPC Validation
+### SDK Service Validation
 
 Run `tester --concurrent` from the shell to exercise concurrent processes and GUI
 session services. Its IPC checks include listener readiness, finite channel waits,
 control delivery after peer close, hangup readiness and stale wait-source rejection
 after channel reuse. The command runs three rounds and reports failed assertions.
+
+The same command checks rejected surface dimensions, rectangles and null buffers,
+verifies failed uploads preserve committed pixels, and confirms surface read grants
+become invalid after their owning child exits. It checks allocation cleanup as well.

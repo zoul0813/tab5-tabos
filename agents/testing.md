@@ -2081,3 +2081,14 @@ contention across 102 rounds. Reads must be coherent or return EBADF; old handle
 and revoked grants remain invalid after slot reuse. Each round checks zero live
 allocations and surface bytes. macOS Debug ASan/UBSan and Release pass; native
 process-stop/service contention requires separate acceptance.
+
+### RV32 SDK Surface Rejections
+
+`tester --concurrent` exercises invalid surface creation dimensions, invalid
+rectangles and null buffers through public SDK calls. Repeated rejection checks
+assert errno, caller-output preservation, staging rollback, committed pixels and
+revision, and baseline allocation accounting. After concurrent child exit, cached
+read grants reject both metadata and pixel access without overwriting outputs.
+The rebuilt RV32 tester passes standalone macOS Debug (ASan/UBSan) and Release
+process harnesses. Service-only short-buffer tests remain appropriate because
+the public surface API has no explicit buffer-length argument.

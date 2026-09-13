@@ -56,7 +56,7 @@ Exit gate: separate RV32 clients publish coherent retained images through public
 - [x] GUI-203: Implement OS-owned RGB565 surfaces, clipped/bounded rectangle uploads, staged commits, compositor read grants, and explicit release using GUI-005's contract.
 - [ ] GUI-204: Enforce measured process/aggregate surface and staging limits. Preserve the last committed image on failed upload/commit; release endpoints, staging, surfaces, and grants during stopped-process teardown.
 - [x] GUI-205: Add public SDK wrappers and private native/host gates consistently; rebuild bundled apps under the current pre-release ABI policy.
-- [ ] GUI-206: Add sanitizer-backed IPC/surface tests for saturation, lifecycle delivery under saturation, foreign/stale handles, invalid dimensions/rectangles, atomic visibility, reader/commit races, exit during commit, allocation failures, and repeated cleanup. Add real RV32 `tester` coverage.
+- [x] GUI-206: Add sanitizer-backed IPC/surface tests for saturation, lifecycle delivery under saturation, foreign/stale handles, invalid dimensions/rectangles, atomic visibility, reader/commit races, exit during commit, allocation failures, and repeated cleanup. Add real RV32 `tester` coverage.
 
 ## Phase 3 — Desktop, Dock, and Input Routing
 
@@ -410,7 +410,7 @@ host simulator launch/control, MSC copy or hardware flashing was performed.
 - [x] GUI-202/206: Add maintained SDK tester cases for empty/ready listener, channel timeout, queued control with hangup, close invalidation and stale source rejection after reuse.
 - [ ] GUI-202/206: Validate native Tab5 wait cancellation/interleavings and remaining service-contention cases.
 - [x] GUI-206: Add service-level concurrent teardown/commit and invalid-input failure coverage.
-- [ ] GUI-206: Extend maintained real RV32 tester with invalid surface transfer and revoked-grant rejection cases.
+- [x] GUI-206: Extend maintained real RV32 tester with invalid surface transfer and revoked-grant rejection cases.
 
 Both `unit.ipc` and `unit.surface` pass in macOS Debug (ASan/UBSan) and Release.
 Allocation interception is local to the test translation units; production services
@@ -500,3 +500,19 @@ use the existing host fixture mutex and do not establish native process stop or
 physical contention behavior. No production code changed. No Linux builds/tests,
 host simulator launch/control or Tab5 flashing were performed. Real RV32 SDK
 rejection cases remain the next GUI-206 increment.
+
+### Real RV32 Surface Rejection Evidence
+
+Maintained `tester --concurrent` now checks five invalid creation dimensions and
+repeats ten invalid rectangles plus null buffers across three rounds. Public SDK
+reads preserve output/staging on rejection; failed uploads discard staging and
+preserve committed pixels/revision. Allocation accounting returns to baseline.
+After each pair of real child processes exits, previously granted surfaces reject
+metadata and pixel reads with EBADF while preserving caller output.
+
+The rebuilt SDK tester passes the standalone process harness in macOS Debug
+(ASan/UBSan) and Release; the public application API boundary check passes. With
+the recorded service-level saturation, invalid-input, allocation-failure, commit
+race and cleanup evidence, GUI-206 automated coverage is complete. Native wait
+interleavings and hardware acceptance remain separate open tasks. No Linux
+builds/tests, host simulator launch/control or Tab5 flashing were performed.

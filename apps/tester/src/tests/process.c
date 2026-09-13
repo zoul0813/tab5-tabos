@@ -67,6 +67,90 @@ static void test_ipc_wait_lifecycle(tester_context_t* context, tabos_ipc_channel
     }
 }
 
+static void test_surface_rejections(tester_context_t* context)
+{
+    tabos_surface_stats_t baseline = {0};
+    tester_expect(context, tabos_surface_stats(&baseline) == 0, "surface rejection allocation baseline");
+    const uint32_t dimensions[][2] = {
+        {        0U,         2U},
+        {        2U,         0U},
+        {     1281U,         2U},
+        {        2U,       721U},
+        {UINT32_MAX, UINT32_MAX}
+    };
+    for (size_t index = 0U; index < sizeof(dimensions) / sizeof(dimensions[0]); ++index) {
+        tester_expect(context,
+                      tabos_surface_create(dimensions[index][0], dimensions[index][1]) == -1 && errno == EINVAL,
+                      "SDK rejects invalid surface dimensions");
+    }
+    const tabos_surface_t surface = tabos_surface_create(2U, 2U);
+    tester_expect(context, surface > 0, "create SDK surface rejection fixture");
+    if (surface <= 0) {
+        return;
+    }
+    const uint16_t original[4] = {1U, 2U, 3U, 4U};
+    const uint16_t staged[4]   = {5U, 6U, 7U, 8U};
+    tester_expect(context,
+                  tabos_surface_upload(surface, 0U, 0U, 2U, 2U, original) == 0 && tabos_surface_commit(surface) == 0,
+                  "commit surface rejection baseline");
+    const uint32_t rectangles[][4] = {
+        {        0U,         0U,         0U,         2U},
+        {        0U,         0U,         2U,         0U},
+        {        2U,         0U,         1U,         1U},
+        {        0U,         2U,         1U,         1U},
+        {        1U,         0U,         2U,         1U},
+        {        0U,         1U,         1U,         2U},
+        {UINT32_MAX,         0U,         1U,         1U},
+        {        0U, UINT32_MAX,         1U,         1U},
+        {        0U,         0U, UINT32_MAX,         1U},
+        {        0U,         0U,         1U, UINT32_MAX},
+    };
+    for (unsigned int round = 0U; round < 3U; ++round) {
+        for (size_t index = 0U; index <= sizeof(rectangles) / sizeof(rectangles[0]); ++index) {
+            const bool null_buffer    = index == sizeof(rectangles) / sizeof(rectangles[0]);
+            const uint32_t valid[4]   = {0U, 0U, 2U, 2U};
+            const uint32_t* rectangle = null_buffer ? valid : rectangles[index];
+            uint16_t guarded[6]       = {99U, 99U, 99U, 99U, 99U, 99U};
+            uint16_t* output          = null_buffer ? NULL : guarded + 1;
+            tester_expect(context, tabos_surface_upload(surface, 0U, 0U, 2U, 2U, staged) == 0,
+                          "stage pixels before SDK rejection");
+            tester_expect(context,
+                          tabos_surface_read(surface, rectangle[0], rectangle[1], rectangle[2], rectangle[3], output) ==
+                                  -1 &&
+                              errno == EINVAL,
+                          "invalid SDK read rejects geometry or null buffer");
+            bool unchanged = true;
+            for (size_t pixel = 0U; pixel < 6U; ++pixel) {
+                unchanged = unchanged && guarded[pixel] == 99U;
+            }
+            tabos_surface_stats_t stats = {0};
+            tester_expect(context,
+                          unchanged && tabos_surface_stats(&stats) == 0 &&
+                              stats.used_bytes == baseline.used_bytes + 2U * sizeof(original),
+                          "failed SDK read preserves output and staging");
+            tester_expect(context,
+                          tabos_surface_upload(surface, rectangle[0], rectangle[1], rectangle[2], rectangle[3],
+                                               null_buffer ? NULL : staged) == -1 &&
+                              errno == EINVAL,
+                          "invalid SDK upload rejects and aborts staging");
+            tabos_surface_info_t info = {0};
+            tester_expect(context,
+                          tabos_surface_commit(surface) == 0 && tabos_surface_info(surface, &info) == 0 &&
+                              info.revision == 1U && tabos_surface_read(surface, 0U, 0U, 2U, 2U, guarded + 1) == 0 &&
+                              memcmp(guarded + 1, original, sizeof(original)) == 0 && guarded[0] == 99U &&
+                              guarded[5] == 99U,
+                          "failed upload preserves committed image and revision");
+            tester_expect(
+                context, tabos_surface_stats(&stats) == 0 && stats.used_bytes == baseline.used_bytes + sizeof(original),
+                "SDK rejected upload releases staging allocation");
+        }
+    }
+    tester_expect(context, tabos_surface_release(surface) == 0, "release SDK surface rejection fixture");
+    tabos_surface_stats_t after = {0};
+    tester_expect(context, tabos_surface_stats(&after) == 0 && after.used_bytes == baseline.used_bytes,
+                  "SDK rejection cases return allocations to baseline");
+}
+
 void tester_test_concurrent_process(tester_context_t* context)
 {
     tabos_program_info_t program;
@@ -83,11 +167,13 @@ void tester_test_concurrent_process(tester_context_t* context)
     }
     const tabos_wait_source_t source = tabos_ipc_wait_source(listener);
     test_ipc_wait_lifecycle(context, listener, source);
+    test_surface_rejections(context);
     tabos_surface_stats_t baseline = {0};
     tester_expect(context, tabos_surface_stats(&baseline) == 0, "surface allocation baseline");
     const char* const first_args[]  = {"T:/bin/tester", "--concurrent-peer", "1", NULL};
     const char* const second_args[] = {"T:/bin/tester", "--concurrent-peer", "2", NULL};
     for (unsigned int round = 0U; round < 3U; ++round) {
+        tabos_surface_t granted[2]              = {-1, -1};
         tabos_ipc_channel_t channels[2]         = {-1, -1};
         const int first                         = tabos_spawn(first_args[0], 3, first_args);
         const int second                        = tabos_spawn(second_args[0], 3, second_args);
@@ -116,6 +202,7 @@ void tester_test_concurrent_process(tester_context_t* context)
             if (message.size == sizeof(surface)) {
                 memcpy(&surface, message.data, sizeof(surface));
             }
+            granted[index]            = surface;
             tabos_surface_info_t info = {0};
             uint16_t pixels[4]        = {0};
             tester_expect(context,
@@ -166,6 +253,20 @@ void tester_test_concurrent_process(tester_context_t* context)
         }
         tester_expect(context, first_status == 91 && second_status == 92,
                       "both independent RV32 children progress while parent waits; background display denied");
+        for (unsigned int index = 0U; index < 2U; ++index) {
+            tabos_surface_info_t stale_info = {.width = 99U, .height = 99U, .revision = 99U};
+            uint16_t stale_pixels[4]        = {99U, 99U, 99U, 99U};
+            tester_expect(context,
+                          granted[index] > 0 && tabos_surface_info(granted[index], &stale_info) == -1 &&
+                              errno == EBADF && stale_info.width == 99U && stale_info.height == 99U &&
+                              stale_info.revision == 99U,
+                          "owner exit revokes surface metadata grant");
+            tester_expect(context,
+                          tabos_surface_read(granted[index], 0U, 0U, 2U, 2U, stale_pixels) == -1 && errno == EBADF &&
+                              stale_pixels[0] == 99U && stale_pixels[1] == 99U && stale_pixels[2] == 99U &&
+                              stale_pixels[3] == 99U,
+                          "owner exit revokes surface read grant without touching output");
+        }
         (void) unlink("T:/tabos-concurrent-1.tmp");
         (void) unlink("T:/tabos-concurrent-2.tmp");
         tabos_surface_stats_t stats = {0};
