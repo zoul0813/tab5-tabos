@@ -6,7 +6,7 @@ import shutil
 
 from .common import ROOT, fail, require_tool, run
 from .config import project_cmake_arguments
-from .environment import idf_environment
+from .environment import host_openssl_cmake_arguments, idf_environment
 
 
 HOST_TARGETS = {"macos", "linux"}
@@ -25,7 +25,13 @@ def host_build(target: str, configuration: str) -> None:
     cmake = require_tool("cmake", "install CMake 3.22 or newer")
     require_tool("ninja", "install Ninja")
     preset = f"{target}-{configuration}"
-    run([cmake, "--preset", preset, *project_cmake_arguments(target)])
+    run([
+        cmake,
+        "--preset",
+        preset,
+        *host_openssl_cmake_arguments(),
+        *project_cmake_arguments(target),
+    ])
     run([cmake, "--build", "--preset", preset])
 
 

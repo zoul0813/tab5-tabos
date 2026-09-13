@@ -69,17 +69,18 @@ explicit confirmation; Enter alone aborts. All host builds require:
 - Ninja
 - C17 compiler
 - SDL3 installed as a system package
+- OpenSSL development headers and libraries
 
 Install SDL3 on macOS:
 
 ```sh
-brew install sdl3
+brew install sdl3 openssl@3
 ```
 
 On Ubuntu 26.04 or newer:
 
 ```sh
-sudo apt-get install build-essential cmake ninja-build libsdl3-dev python3
+sudo apt-get install build-essential cmake ninja-build libsdl3-dev libssl-dev python3
 ```
 
 Tab5 builds require ESP-IDF v5.4.4. Setup installs a project-local copy and its
