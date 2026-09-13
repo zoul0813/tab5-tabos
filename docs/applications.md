@@ -19,7 +19,8 @@ Build and install every independently loaded application with:
 ./apps/build.sh
 ```
 
-Script discovers maintained `apps/*/Makefile` projects, builds each default application,
+Script discovers maintained `apps/*/Makefile` and `apps/gui/*/Makefile` projects,
+builds each default application,
 and installs runnable ELF images under `.local/rootfs/T/bin/`. Optional DOOM stays
 excluded unless `--with-doom` is present. Script activates project-local ESP-IDF
 toolchain automatically when compiler is not already available. Arguments pass to each
@@ -77,6 +78,9 @@ file and provides search, C/C++ highlighting, and recoverable staged saves. See
 by `--msc`; separate binary distributions must preserve their notices.
 
 Individual application commands such as `make -C apps/shell` remain available.
+Desktop, Files, Canvas and Editor sources live under `apps/gui/`; for example,
+`make -C apps/gui/desktop build` builds the desktop. Their outputs remain under
+`build/apps/<name>/` and install directly into `T:/bin/`.
 
 Published macOS and Linux host archives include the maintained application set under
 `rootfs/`, including the required `T:/bin/shell`. The archive launcher resolves that

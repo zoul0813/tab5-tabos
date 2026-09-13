@@ -1,7 +1,7 @@
 # TabOS Codex Context
 
-GUI implementation update (2026-09-12): `apps/desktop` is an optional shell child;
-`apps/files`, `apps/calculator`, `apps/editor` and `apps/canvas` are independent
+GUI implementation update (2026-09-12): `apps/gui/desktop` is an optional shell child;
+`apps/gui/files`, `apps/calculator`, `apps/gui/editor` and `apps/gui/canvas` are independent
 marked RV32 clients. Public IPC/surfaces/session services provide retained windows
 and resident fullscreen pause/return. See [GUI tasks](apps/gui.md) for automated
 evidence and physical/native acceptance gaps; this does not supersede the native

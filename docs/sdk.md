@@ -202,7 +202,7 @@ Pause hooks must finish bounded work and release leases; after acknowledgement,
 the kernel retains memory but closes audio/camera streams. Reopen these in the
 resume callback. The client waits when idle and does not repaint periodically.
 
-Build `apps/desktop` and `apps/canvas` with the SDK application build script. Launch
+Build `apps/gui/desktop` and `apps/gui/canvas` with the SDK application build script. Launch
 `T:/bin/desktop` from the shell, then choose Canvas. The desktop opens windows
 maximized above its dock; title controls minimize, restore/maximize and close.
 Restored windows move by their title bar and resize using the lower-right grip.

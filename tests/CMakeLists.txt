@@ -1159,26 +1159,26 @@ tabos_enable_sanitizers(tabos_gui_client)
 add_test(NAME unit.gui_client COMMAND tabos_gui_client)
 
 add_executable(tabos_desktop_model unit/desktop_model.c
-    "${TABOS_ROOT}/apps/desktop/src/model.c"
-    "${TABOS_ROOT}/apps/desktop/src/render.c"
+    "${TABOS_ROOT}/apps/gui/desktop/src/model.c"
+    "${TABOS_ROOT}/apps/gui/desktop/src/render.c"
     "${TABOS_ROOT}/sdk/lib/gui_draw.c"
     "${TABOS_ROOT}/sdk/lib/gui_font.c")
 target_include_directories(tabos_desktop_model PRIVATE
-    "${TABOS_ROOT}/sdk/include" "${TABOS_ROOT}/apps/desktop/include")
+    "${TABOS_ROOT}/sdk/include" "${TABOS_ROOT}/apps/gui/desktop/include")
 tabos_enable_warnings(tabos_desktop_model)
 tabos_enable_sanitizers(tabos_desktop_model)
 add_test(NAME unit.desktop_model COMMAND tabos_desktop_model)
 
-add_executable(tabos_desktop_input unit/desktop_input.c "${TABOS_ROOT}/apps/desktop/src/input.c")
+add_executable(tabos_desktop_input unit/desktop_input.c "${TABOS_ROOT}/apps/gui/desktop/src/input.c")
 target_include_directories(tabos_desktop_input PRIVATE
-    "${TABOS_ROOT}/sdk/include" "${TABOS_ROOT}/apps/desktop/include")
+    "${TABOS_ROOT}/sdk/include" "${TABOS_ROOT}/apps/gui/desktop/include")
 tabos_enable_warnings(tabos_desktop_input)
 tabos_enable_sanitizers(tabos_desktop_input)
 add_test(NAME unit.desktop_input COMMAND tabos_desktop_input)
 
 add_executable(tabos_gui_apps unit/gui_apps.c "${TABOS_ROOT}/apps/calculator/src/calculate.c")
 target_include_directories(tabos_gui_apps PRIVATE "${TABOS_ROOT}/sdk/include"
-    "${TABOS_ROOT}/apps/editor/include" "${TABOS_ROOT}/apps/calculator/include")
+    "${TABOS_ROOT}/apps/gui/editor/include" "${TABOS_ROOT}/apps/calculator/include")
 tabos_enable_warnings(tabos_gui_apps)
 tabos_enable_sanitizers(tabos_gui_apps)
 add_test(NAME unit.gui_apps COMMAND tabos_gui_apps)

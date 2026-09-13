@@ -1,7 +1,7 @@
 # Directory Structure
 
-The optional GUI lives in `apps/desktop` with independent clients in `apps/files`,
-`apps/calculator`, `apps/editor` and `apps/canvas`. Portable widgets/client lifecycle
+The optional GUI lives in `apps/gui/desktop` with independent clients in `apps/gui/files`,
+`apps/calculator`, `apps/gui/editor` and `apps/gui/canvas`. Portable widgets/client lifecycle
 live under `sdk/lib/gui*`; kernel IPC and surface ownership remain separate from
 desktop policy. See [Desktop and GUI Applications](gui.md).
 
@@ -20,6 +20,11 @@ tabos/
 │   │   ├── console/     Console/input diagnostic
 │   │   ├── elf_loader/  Embedded-ELF loader/execution diagnostic
 │   │   └── filesystem/  Filesystem/storage diagnostic
+│   ├── gui/             Independent desktop and GUI application projects
+│   │   ├── desktop/     Desktop coordinator and window manager
+│   │   ├── files/       File browser and launcher
+│   │   ├── canvas/      Custom drawing client
+│   │   └── editor/      GUI text editor
 │   ├── hello_elf/       Independently built ELF example application
 │   ├── coreutils/       Independently built small command-line utilities
 │   │   └── src/<name>/   Separate utility source and executable target

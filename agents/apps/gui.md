@@ -386,3 +386,16 @@ CTest cases pass in each configuration, including the new desktop-input test,
 GUI client cancellation, desktop model, pointer services, keyboard queue and public
 API boundary. The SDK desktop binary was rebuilt; kernel and wire ABI are unchanged.
 No Linux tests, host simulator launch/control or hardware flashing were performed.
+
+## Follow-up: GUI Application Source Organization
+
+- [x] Move Desktop, Files, Canvas and Editor into `apps/gui/`, retaining independent SDK projects and existing executable/output/install names.
+- [x] Extend application build, install and MSC packaging discovery to include `apps/gui/*/Makefile`; update test source paths and recursive API boundary coverage.
+- [x] Update contributor documentation for the source layout and individual build commands.
+
+Validation: `./apps/build.sh build` passes for the default application set. All four
+relocated projects pass their individual SDK install targets with byte-identical
+local installed outputs. The affected macOS Debug test targets rebuild; desktop
+model/input, GUI apps, application build tracking and public API boundary checks
+pass (five tests). Shell syntax and Git whitespace checks pass. No Linux tests,
+host simulator launch/control, MSC copy or hardware flashing was performed.

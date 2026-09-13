@@ -27,6 +27,7 @@ CTestTestfile.cmake
 Testing/
 Makefile
 !apps/*/Makefile
+!apps/gui/*/Makefile
 
 # ESP-IDF generated files
 sdkconfig

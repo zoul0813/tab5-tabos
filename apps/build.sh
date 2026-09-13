@@ -47,7 +47,7 @@ if ! command -v riscv32-esp-elf-gcc >/dev/null 2>&1; then
     eval "$("$project_root/tools/tabos" activate-idf)"
 fi
 
-for application_dir in "$script_dir"/*; do
+for application_dir in "$script_dir"/* "$script_dir"/gui/*; do
     if [ ! -f "$application_dir/Makefile" ]; then
         continue
     fi
@@ -73,7 +73,7 @@ if [ -n "$msc_mount" ]; then
     mkdir -p "$destination"
     application_outputs=
     application_assets=
-    for application_dir in "$script_dir"/*; do
+    for application_dir in "$script_dir"/* "$script_dir"/gui/*; do
         if [ ! -f "$application_dir/Makefile" ]; then
             continue
         fi
@@ -122,7 +122,7 @@ if [ -n "$msc_mount" ]; then
 
     # Copy notices from selected source projects, including `build --msc` which
     # does not run application install recipes or populate the local rootfs.
-    for application_dir in "$script_dir"/*; do
+    for application_dir in "$script_dir"/* "$script_dir"/gui/*; do
         if [ ! -f "$application_dir/Makefile" ]; then
             continue
         fi

@@ -36,7 +36,7 @@ static int test_close(int fd)
 #define read   test_read
 #define rename test_rename
 #define close  test_close
-#include "../../apps/editor/src/document.c"
+#include "../../apps/gui/editor/src/document.c"
 #undef write
 #undef read
 #undef rename
