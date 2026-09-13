@@ -37,6 +37,52 @@ def sdl3_is_available() -> bool:
     return pkg_config is not None and command_succeeds([pkg_config, "--exists", "sdl3"])
 
 
+def pkg_config_package_is_available(package: str) -> bool:
+    pkg_config = shutil.which("pkg-config")
+    return pkg_config is not None and command_succeeds([pkg_config, "--exists", package])
+
+
+def homebrew_openssl_root(brew: str | None = None) -> Path | None:
+    brew = brew or shutil.which("brew")
+    if brew is None:
+        return None
+    environment = os.environ.copy()
+    environment["HOMEBREW_NO_AUTO_UPDATE"] = "1"
+    installed = subprocess.run(
+        [brew, "list", "--versions", "openssl@3"],
+        env=environment,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    if installed.returncode != 0:
+        return None
+    result = subprocess.run(
+        [brew, "--prefix", "openssl@3"],
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return None
+    prefix = result.stdout.strip()
+    return Path(prefix) if prefix else None
+
+
+def openssl_is_available(host: str, brew: str | None = None) -> bool:
+    if pkg_config_package_is_available("openssl"):
+        return True
+    return host == "Darwin" and homebrew_openssl_root(brew) is not None
+
+
+def host_openssl_cmake_arguments() -> list[str]:
+    if platform.system() != "Darwin":
+        return []
+    root = homebrew_openssl_root()
+    return [] if root is None else [f"-DOPENSSL_ROOT_DIR={root}"]
+
+
 def local_idf_installed() -> bool:
     return (LOCAL_IDF / "export.sh").is_file() and (LOCAL_IDF / "install.sh").is_file()
 
@@ -99,6 +145,8 @@ def setup_host_tools() -> None:
             packages.append("ninja")
         if not sdl3_is_available():
             packages.append("sdl3")
+        if not openssl_is_available(host, brew):
+            packages.append("openssl@3")
         if shutil.which("git") is None:
             packages.append("git")
         if packages:
@@ -120,6 +168,8 @@ def setup_host_tools() -> None:
             packages.append("ninja-build")
         if not sdl3_is_available():
             packages.append("libsdl3-dev")
+        if not openssl_is_available(host):
+            packages.append("libssl-dev")
         if shutil.which("python3") is None:
             packages.append("python3")
         if shutil.which("git") is None:

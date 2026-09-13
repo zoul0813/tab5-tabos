@@ -1132,6 +1132,10 @@ add_test(NAME component.lua_cli COMMAND "${CMAKE_COMMAND}"
 set_tests_properties(component.lua_cli PROPERTIES TIMEOUT 30)
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
+add_test(NAME unit.host_environment
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_LIST_DIR}/unit/host_environment.py"
+        "${TABOS_ROOT}")
+
 add_test(NAME component.lua_snake_audio
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_LIST_DIR}/lua_snake_audio.py"
         "$<TARGET_FILE:tabos_lua_native>" "${TABOS_ROOT}/apps/lua/examples/snake.lua")
