@@ -1,4 +1,5 @@
 #include <desktop/model.h>
+#include <desktop/input.h>
 #include <tabos/device.h>
 #include <tabos/filesystem.h>
 #include <tabos/process.h>
@@ -49,6 +50,7 @@ typedef struct {
         desktop_child_t children[TABOS_GUI_WINDOW_MAX];
         desktop_capture_t captures[TABOS_POINTER_MAX_CONTACTS];
         uint32_t outgoing[TABOS_GUI_WINDOW_MAX];
+        desktop_input_queue_t input[TABOS_GUI_WINDOW_MAX];
         bool running;
         bool quitting;
         int closing_slot;
@@ -95,6 +97,8 @@ static void cancel_window(int slot)
     if (slot < 0 || slot >= TABOS_GUI_WINDOW_MAX) {
         return;
     }
+    desktop.input[slot].head                              = 0U;
+    desktop.input[slot].count                             = 0U;
     desktop.outgoing[slot]                               |= SEND_CANCEL;
     desktop.model.windows[slot].cancelled_input_sequence  = desktop.model.windows[slot].input_sequence;
     for (size_t index = 0U; index < TABOS_POINTER_MAX_CONTACTS; ++index) {
@@ -558,12 +562,30 @@ static void route_input(unsigned int slot, uint32_t kind, tabos_gui_packet_t* pa
         return;
     }
     packet->input_sequence = ++window->input_sequence;
-    if (tabos_gui_send(window->channel, kind, packet, false) != 0) {
-        if (kind == TABOS_GUI_POINTER && packet->data.pointer.type == TABOS_POINTER_MOVE) {
-            return;
-        }
+    if (!desktop_input_push(&desktop.input[slot], kind, packet)) {
         cancel_window((int) slot);
-        notify("Application input queue is full. Input cancelled; try again.");
+        notify("Application is not consuming input. Input cancelled; try again.");
+    }
+}
+
+static void flush_inputs(void)
+{
+    for (unsigned int slot = 0U; slot < TABOS_GUI_WINDOW_MAX; ++slot) {
+        desktop_window_t* window = &desktop.model.windows[slot];
+        if (!window->occupied || window->channel <= 0 || window->pending || desktop.pause_token != 0U ||
+            (desktop.outgoing[slot] & SEND_CANCEL) != 0U) {
+            continue;
+        }
+        if (desktop_input_flush(&desktop.input[slot], window->channel) != 0) {
+            const int error = errno;
+            cancel_window((int) slot);
+            /* Peer shutdown is handled by receive/reap, not an input error dialog. */
+            if (error != TABOS_EPIPE && error != TABOS_EBADF) {
+                char message[128];
+                (void) snprintf(message, sizeof(message), "Application input delivery failed (error %d).", error);
+                notify(message);
+            }
+        }
     }
 }
 
@@ -769,8 +791,13 @@ static void idle_wait(void)
     }
     for (unsigned int slot = 0U; slot < TABOS_GUI_WINDOW_MAX && count < TABOS_WAIT_MAX; ++slot) {
         if (desktop.model.windows[slot].occupied && desktop.model.windows[slot].channel > 0) {
-            items[count++] = (tabos_wait_item_t) {.source = tabos_ipc_wait_source(desktop.model.windows[slot].channel),
-                                                  .events = TABOS_WAIT_READABLE | TABOS_WAIT_HANGUP};
+            items[count++] = (tabos_wait_item_t) {
+                .source = tabos_ipc_wait_source(desktop.model.windows[slot].channel),
+                .events = TABOS_WAIT_READABLE | TABOS_WAIT_HANGUP |
+                          ((desktop.input[slot].count != 0U && desktop.pause_token == 0U &&
+                            !desktop.model.windows[slot].pending && (desktop.outgoing[slot] & SEND_CANCEL) == 0U) ?
+                               TABOS_WAIT_WRITABLE :
+                               0U)};
         }
     }
     for (unsigned int index = 0U; index < TABOS_GUI_WINDOW_MAX && count < TABOS_WAIT_MAX; ++index) {
@@ -846,6 +873,7 @@ int main(void)
             keyboard_event(&key);
         }
         flush_controls();
+        flush_inputs();
         if (!desktop.running || !present()) {
             break;
         }

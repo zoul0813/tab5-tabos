@@ -25,6 +25,11 @@ Ctrl+Escape opens Files. Mouse hover and wheel events use the same pointer servi
 wheel scrolls lists and moves the multiline editor caret through the document.
 Text uses CP437 and a physical keyboard; no on-screen keyboard is provided.
 
+Pointer motion is coalesced while delivery is pending. Clicks, wheel steps and keys
+are retried in order when an application is briefly busy. If the bounded pending
+queue fills, the desktop cancels held input and reports that the application is
+not consuming input. Closing an application does not produce a queue-full dialog.
+
 ## Included Applications
 
 - **Files:** starts at `T:/bin`. Enter a directory and tap Go, use Up or Apps,

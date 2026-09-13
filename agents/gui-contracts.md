@@ -10,6 +10,14 @@ Status: implementation contracts, 2026-09-12. These specify the GUI successor to
 foreground-only execution; they do not claim that every service is implemented.
 Track implementation and evidence in [GUI tasks](apps/gui.md).
 
+Desktop input uses a bounded 64-packet FIFO per window ahead of the eight-message
+IPC data queue. Consecutive pending hover/move events coalesce only for matching
+geometry, pointer type, device, contact and buttons. Motion leaves four pending
+slots for discrete events. EAGAIN retains the unsent tail; writable readiness
+resumes delivery. Cancellation clears the local tail and fences already-sent input.
+Input waits behind pending Cancel control and does not flush during session pause
+or geometry adoption. Other transport failures are distinguished from saturation.
+
 ## Process lifecycle
 
 - Runtime owns process-table mutations. Native gates publish copied requests and

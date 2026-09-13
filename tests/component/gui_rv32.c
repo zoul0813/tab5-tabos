@@ -275,6 +275,14 @@ int main(int argc, char** argv)
     click(1060, 180);
     await_count(3U);
     await_pixel(100U, 200U, 0xffffU);
+    /* A busy client must tolerate a pointer burst followed by a real click. */
+    tabos_device_info_t pointer_device;
+    check(device_registry_find(TABOS_DEVICE_NAME_TOUCH, &pointer_device), "burst pointer device");
+    for (unsigned int index = 0U; index < 48U; ++index) {
+        tabos_pointer_event_t hover = {
+            .type = TABOS_POINTER_HOVER, .device_id = pointer_device.id, .x = 400 + (int32_t) index, .y = 300};
+        pointer_service_submit(&hover);
+    }
     click(400, 300);
     await_pixel(400U, 300U, 0x1082U);
     click(1208, 24);

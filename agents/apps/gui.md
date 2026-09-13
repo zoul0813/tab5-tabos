@@ -372,3 +372,17 @@ The five GUI applications also pass their ordinary SDK `install` targets into th
 local `.local/rootfs/T/bin` directory. No mounted-device installation was requested
 or performed. Use matching rebuilt SDK binaries with matching firmware; pointer and
 keyboard structures changed under the existing mutable prerelease ABI policy.
+
+## Follow-up: macOS pointer burst backpressure
+
+- [x] Reproduce the reported input-queue dialog with a 48-hover burst followed by a click in the standalone RV32 GUI component test.
+- [x] Add bounded per-window pending input, motion coalescing, FIFO retry on IPC EAGAIN, writable waits and cancellation cleanup. Keep discrete events ordered and report other transport errors accurately.
+- [x] Add deterministic tests for motion coalescing around press/release, saturation, repeated eight-message drains without duplication and peer disconnect.
+
+The regression fails against the previous desktop binary: the expected Canvas ink
+pixel is replaced by the error dialog. The updated desktop passes the same burst
+and the complete standalone GUI workflow in macOS Debug and Release. Seven focused
+CTest cases pass in each configuration, including the new desktop-input test,
+GUI client cancellation, desktop model, pointer services, keyboard queue and public
+API boundary. The SDK desktop binary was rebuilt; kernel and wire ABI are unchanged.
+No Linux tests, host simulator launch/control or hardware flashing were performed.
