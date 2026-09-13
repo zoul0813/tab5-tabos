@@ -1,6 +1,8 @@
 # Physical GUI Acceptance
 
-Status: procedure prepared; no physical results recorded. Automated macOS evidence
+Status: physical Tab5 verification pending/incomplete; to be tested later.
+User reports GUI workflows manually verified on macOS host simulator on
+2026-09-13. Continued development is proceeding without physical confirmation. Automated macOS evidence
 and Tab5 compilation do not complete this acceptance. This procedure assumes a
 Tab5 already running matching firmware and SDK applications; it does not provide
 flashing or device-control instructions.

@@ -17,6 +17,13 @@ Direction and scope: [TabOS Retro Desktop milestone](../milestone-gui.md). This 
 - Keep full release scope. An early compositor demo is an internal milestone, not the completed desktop.
 - Resource quotas, staging strategy, and low-level protocol details need concrete specifications and measurements in Phase 0. These are explicit tasks, not already settled numerical contracts.
 
+User acceptance update (2026-09-13): user reports all GUI workflows verified
+manually on macOS host simulator. Record this as user-provided host acceptance,
+separate from automated evidence. User authorizes continued development without
+physical Tab5 confirmation. All native/physical acceptance and measurement tasks
+remain pending/incomplete for later testing; they do not block continued software
+work and must not be marked passed from host results.
+
 Current user restrictions: no Linux builds/tests, Tab5 flashing, host simulator
 launch or UI automation. macOS and Tab5 builds and macOS automated suites are
 allowed. Exclude `integration.host_smoke`, which launches the simulator binary.
@@ -542,3 +549,14 @@ and memory/timing checkpoints. It explicitly identifies native instrumentation
 and unresolved threshold gaps. No physical result is recorded by preparing this
 procedure; GUI-005/006/104/202/204 and GUI-602–605 remain open. Device execution,
 flashing and simulator control were not performed.
+
+## User Acceptance Update — 2026-09-13
+
+- [x] User reports GUI workflows manually verified on macOS host simulator.
+- [ ] Physical Tab5 GUI verification: deferred, incomplete, to be tested later.
+- [ ] Native contention, physical memory/headroom and timing measurements: pending.
+
+Continue development without waiting for Tab5 confirmation, as explicitly
+authorized by the user. Existing restrictions on agent-run simulator execution,
+UI control and flashing remain unchanged. Host verification does not satisfy
+physical gates or establish native crash containment.

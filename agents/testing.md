@@ -2104,3 +2104,13 @@ Tab5 Debug/Release builds pass with 3,744 / 106,368 app-partition bytes free. Al
 bundled apps, including optional Doom, build and install into the local rootfs.
 No Linux build/test, host simulator launch/control, device copy or Tab5 flashing
 was performed. Native contention and physical GUI acceptance remain pending.
+
+### User-Reported GUI Acceptance — 2026-09-13
+
+The user reports all GUI workflows verified manually on macOS host simulator.
+This is user-provided acceptance, not an additional agent-run test. Physical
+Tab5 verification has not occurred and remains pending/incomplete. The user
+authorizes continued development without Tab5 confirmation for now; native
+contention and physical memory/timing acceptance must still be completed later.
+Existing agent restrictions on Linux tests, simulator execution/control and
+Tab5 flashing remain in effect.
