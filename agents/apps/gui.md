@@ -1,10 +1,11 @@
 # GUI Implementation Tasks
 
-Status: software implemented; release acceptance remains pending, 2026-09-12. Desktop, Files,
+Status: software implemented and permitted automated validation refreshed; native/physical
+release acceptance remains pending, 2026-09-13. Desktop, Files,
 Calculator, Text editor and Canvas are implemented as independent RV32 applications.
 Concurrent processes, session pause/restore, IPC, surfaces, launch inspection and
-GUI toolkit are integrated. Remaining gates include exhaustive failure-injection coverage, native
-contention and physical touch/performance/memory acceptance under user restrictions.
+GUI toolkit are integrated. Service and fullscreen failure-injection coverage is recorded below. Remaining gates
+include native contention and physical touch/performance/memory acceptance under user restrictions.
 
 Direction and scope: [TabOS Retro Desktop milestone](../milestone-gui.md). This file tracks executable work packages; the milestone records agreed product behavior. Read [context](../TABOS_CONTEXT.md), [architecture](../architecture.md), [testing](../testing.md), and [roadmap](../roadmap.md) before implementation, plus [coding style](../coding-style.md) before C changes.
 
@@ -45,7 +46,7 @@ Exit gate: independent real RV32 clients progress on host and native tasks remai
 - [ ] GUI-104: Extend managed Tab5 task lifecycle to concurrent processes. Audit caller identity, per-process libc/filesystem state, locking, cancellable waits, and stop-before-resource-release across multiple service callers.
 - [x] GUI-105: Implement session membership and owner-exit cleanup from GUI-003. Launch desktop as shell child with shell retained; reject unauthorized raw input/display access from background clients.
 - [x] GUI-106: Add deterministic process/session tests for two progressing clients, blocked waits, exit before wait, repeated reaping attempts, capacity failures, descendant cleanup, slot reuse, and cancellation during service calls. Retain nested shell/child/grandchild and PID 0 panic coverage.
-- [ ] GUI-107: Extend maintained `tester` with concurrent RV32 child progress, wait/status, ownership, and repeated cleanup cases. Validate native task/service contention on physical Tab5 separately.
+- [x] GUI-107: Extend maintained `tester` with concurrent RV32 child progress, wait/status, ownership, and repeated cleanup cases. Physical native contention remains tracked by GUI-104 and Phase 6.
 
 ## Phase 2 — IPC and Retained Surfaces
 
@@ -64,7 +65,7 @@ Exit gate: desktop switches between independent window clients with usable touch
 
 - [x] GUI-301: Build independent `desktop` application through the ordinary SDK/build/install path. Acquire session display/input through public services; draw decorations in desktop and content in clients.
 - [x] GUI-302: Implement opaque damage-based composition, clipped surface blits, and retained repaint using existing portable acceleration. Wait when idle; do not introduce a periodic idle repaint loop.
-- [ ] GUI-303: Define and implement the 1280×720 touch layout: retro bitmap/beveled styling, large icons, generous spacing, and roughly 44-pixel minimum primary touch targets. Use modern phone/tablet layout cues without copying dense historical desktop layouts.
+- [x] GUI-303: Define and implement the 1280×720 touch layout: retro bitmap/beveled styling, large icons, generous spacing, and roughly 44-pixel minimum primary touch targets. Use modern phone/tablet layout cues without copying dense historical desktop layouts. Physical usability acceptance remains GUI-603.
 - [x] GUI-304: Implement persistent bottom launcher/switcher dock and maximized client work area above it. Open apps maximized; support restore, minimize, dock restore/switching, stacking, focus, and close.
 - [x] GUI-305: Implement movable restored windows and touch-accessible outline resize. Commit dimensions/redraw only on release; failed resize preserves old geometry and committed pixels. Cancelled drags preserve a usable window.
 - [x] GUI-306: Extend normalized pointer contract and SDL backend with mouse hover/wheel. Route pointer events in client coordinates; capture contacts through release/cancel. Touch navigation must work without hover, right-click, or double-click.
@@ -101,7 +102,7 @@ Exit gate: kernel-launched fullscreen programs return to the same usable GUI ses
 
 Exit gate: complete first-release experience, automated evidence, hardware results, and documentation agree. A compiling binary or screenshot is insufficient.
 
-- [ ] GUI-601: Run relevant portable tests with ASan/UBSan and real RV32 integration through maintained `tester`. Complete macOS, Linux, and Tab5 Debug/Release builds using existing project workflows; verify ordinary app build/install and incremental SDK/marker/resource-setting rebuilds.
+- [x] GUI-601: Run permitted portable tests with ASan/UBSan and real RV32 integration through maintained `tester`. Complete macOS and Tab5 Debug/Release builds using existing project workflows; verify ordinary app build/install and incremental SDK/marker/resource-setting rebuilds. Linux and simulator smoke execution are excluded by user instruction, not claimed as validated.
 - [ ] GUI-602: Validate physical touch orientation, contact routing/cancellation, dock switching, and window controls on ILI9881C/GT911, ST7123, and ST7121 revisions. Record each revision independently.
 - [ ] GUI-603: Validate large icons/targets and maximized/restored workflows on the actual 5-inch screen, including Tab5 keyboard text/modifiers and window navigation. Adjust spacing/targets from observed usability.
 - [ ] GUI-604: Record input latency, damage-composition time, idle behavior, process heap/stack, PSRAM peak, staging/surface usage, and fullscreen game headroom. Exercise near-limit windows and repeated open/resize/close/handoff cycles; reconcile limits with Phase 0 measurements.
@@ -516,3 +517,19 @@ the recorded service-level saturation, invalid-input, allocation-failure, commit
 race and cleanup evidence, GUI-206 automated coverage is complete. Native wait
 interleavings and hardware acceptance remain separate open tasks. No Linux
 builds/tests, host simulator launch/control or Tab5 flashing were performed.
+
+## Delivery Validation Refresh — 2026-09-13
+
+- macOS Debug and Release builds pass via `./tools/tabos macos <configuration> build`.
+- Each full permitted CTest suite passes 90/90 with `-E 'integration.host_smoke|linux'`; Debug uses ASan/UBSan. Application build tracking covers incremental header, Makefile, resource-setting and GUI-marker changes.
+- Tab5 Debug and Release builds pass via `./tools/tabos tab5 <configuration> build`. Firmware sizes are `0x176160` and `0x15d080`; app-partition headroom is 3,744 and 106,368 bytes respectively.
+- `./apps/build.sh build --with-doom` and `./apps/build.sh install --with-doom` pass. Outputs install only into the local rootfs; no device copy was performed.
+- Standalone real RV32 process/tester and complete GUI recovery harnesses pass Debug and Release using the rebuilt application artifacts.
+
+GUI-107's maintained tester work, GUI-303's implemented layout and GUI-601's
+permitted build/test delivery checks are complete. Their physical counterparts
+remain explicitly separate. Open release work is measured buffering/limits
+(GUI-005/006/204), native task/wait contention (GUI-104/202), and physical display,
+touch, keyboard, latency, memory and recovery acceptance (GUI-602–605). Linux
+validation remains excluded. No host simulator executable or UI automation was
+run, and no Tab5 flashing was attempted. Kilo launcher work remains deferred.

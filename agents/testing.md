@@ -2092,3 +2092,15 @@ read grants reject both metadata and pixel access without overwriting outputs.
 The rebuilt RV32 tester passes standalone macOS Debug (ASan/UBSan) and Release
 process harnesses. Service-only short-buffer tests remain appropriate because
 the public surface API has no explicit buffer-length argument.
+
+### GUI Delivery Refresh — 2026-09-13
+
+Both macOS builds pass, and their complete permitted CTest suites each pass 90/90
+(`ctest --test-dir build/macos-<configuration> --output-on-failure -E
+'integration.host_smoke|linux'`). Debug runs ASan/UBSan. Standalone real RV32 process
+and GUI recovery harnesses also pass both configurations against rebuilt apps.
+
+Tab5 Debug/Release builds pass with 3,744 / 106,368 app-partition bytes free. All
+bundled apps, including optional Doom, build and install into the local rootfs.
+No Linux build/test, host simulator launch/control, device copy or Tab5 flashing
+was performed. Native contention and physical GUI acceptance remain pending.
