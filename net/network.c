@@ -23,9 +23,44 @@ static bool connection_requested;
 static bool retry_suppressed;
 static tabos_timer_t retry_timer;
 static atomic_bool status_pending;
-static service_admission_t power_admission;
+static service_admission_t power_admission = {.state = SERVICE_ADMISSION_FROZEN};
 static bool power_suspended;
 static bool reconnect_after_resume;
+static platform_mutex_t* state_mutex;
+static platform_signal_t* drained_signal;
+/* Serializes control transactions without holding the state mutex in a driver.
+ * Readers remain available; competing control requests fail without side effects. */
+static bool control_busy;
+static bool update_deferred;
+
+static bool begin_call(void)
+{
+    if (!service_admission_enter(&power_admission, false)) {
+        return false;
+    }
+    platform_mutex_lock(state_mutex);
+    return true;
+}
+
+static void finish_call(void)
+{
+    service_admission_leave(&power_admission, false);
+    /* Notify before dropping the mutex: shutdown must not destroy the signal
+     * between the final admission decrement and this notification. */
+    if ((atomic_load(&power_admission.state) & SERVICE_ADMISSION_FROZEN) != 0U) {
+        platform_signal_notify(drained_signal);
+    }
+    platform_mutex_unlock(state_mutex);
+}
+
+static void finish_control(void)
+{
+    control_busy = false;
+    if (update_deferred) {
+        update_deferred = false;
+        platform_runtime_notify(PLATFORM_RUNTIME_EVENT_NETWORK | PLATFORM_RUNTIME_EVENT_DEADLINE);
+    }
+}
 
 static void network_event(void)
 {
@@ -51,7 +86,14 @@ static bool start_attempt(void)
     ++current.attempts;
     current.state           = NETWORK_STATE_CONNECTING;
     current.last_failure[0] = '\0';
-    if (!platform_network_connect(current.ssid, password)) {
+    char attempt_ssid[sizeof(current.ssid)];
+    char attempt_password[sizeof(password)];
+    memcpy(attempt_ssid, current.ssid, sizeof(attempt_ssid));
+    memcpy(attempt_password, password, sizeof(attempt_password));
+    platform_mutex_unlock(state_mutex);
+    const bool connected = platform_network_connect(attempt_ssid, attempt_password);
+    platform_mutex_lock(state_mutex);
+    if (!connected) {
         set_failure("platform rejected connection");
         return false;
     }
@@ -62,6 +104,15 @@ bool network_service_init(void)
 {
     if (initialized) {
         return true;
+    }
+    state_mutex    = platform_mutex_create();
+    drained_signal = platform_signal_create();
+    if (state_mutex == NULL || drained_signal == NULL) {
+        platform_signal_destroy(drained_signal);
+        platform_mutex_destroy(state_mutex);
+        state_mutex    = NULL;
+        drained_signal = NULL;
+        return false;
     }
     current = (network_status_t) {.state = NETWORK_STATE_STARTING};
     tabos_timer_cancel(&retry_timer);
@@ -74,6 +125,7 @@ bool network_service_init(void)
     if (!platform_network_init(config.name, network_event)) {
         set_failure("network backend unavailable");
         initialized = true;
+        service_admission_freeze(&power_admission, false);
         return true;
     }
     if (!platform_network_operations_init() || !platform_network_socket_operations_init() ||
@@ -84,6 +136,7 @@ bool network_service_init(void)
         platform_network_shutdown();
         set_failure("network operations unavailable");
         initialized = true;
+        service_admission_freeze(&power_admission, false);
         return true;
     }
     current.state = NETWORK_STATE_OFFLINE;
@@ -95,13 +148,16 @@ bool network_service_init(void)
         (void) snprintf(password, sizeof(password), "%s", config.password);
         if (config.auto_connect) {
             connection_requested = true;
+            platform_mutex_lock(state_mutex);
             (void) start_attempt();
+            platform_mutex_unlock(state_mutex);
         }
     } else if (result != NETWORK_CONFIG_NOT_FOUND && result != NETWORK_CONFIG_UNAVAILABLE) {
         (void) snprintf(current.last_failure, sizeof(current.last_failure), "wifi.conf: %s",
                         network_config_result_name(result));
     }
     initialized = true;
+    service_admission_freeze(&power_admission, false);
     return true;
 }
 
@@ -112,14 +168,17 @@ static void update_active(void)
     }
     if (atomic_exchange_explicit(&status_pending, false, memory_order_acq_rel)) {
         platform_network_status_t platform_status;
-        if (!platform_network_status(&platform_status)) {
+        platform_mutex_unlock(state_mutex);
+        const bool available = platform_network_status(&platform_status);
+        platform_mutex_lock(state_mutex);
+        if (!available) {
             set_failure("network status unavailable");
-        } else if (platform_status.state == PLATFORM_NETWORK_ONLINE) {
+        } else if (platform_status.state == PLATFORM_NETWORK_ONLINE && !retry_suppressed) {
             current.state = NETWORK_STATE_ONLINE;
             tabos_timer_cancel(&retry_timer);
             (void) snprintf(current.ipv4, sizeof(current.ipv4), "%s", platform_status.ipv4);
             current.signal_dbm = platform_status.signal_dbm;
-        } else if (platform_status.state == PLATFORM_NETWORK_CONNECTING) {
+        } else if (platform_status.state == PLATFORM_NETWORK_CONNECTING && !retry_suppressed) {
             current.state = NETWORK_STATE_CONNECTING;
         } else if (platform_status.state == PLATFORM_NETWORK_FAILED && !retry_suppressed) {
             const bool was_connecting = current.state == NETWORK_STATE_CONNECTING;
@@ -140,16 +199,33 @@ static void update_active(void)
 
 uint64_t network_service_next_deadline(void)
 {
-    return initialized && !power_suspended ? time_timer_deadline(&retry_timer) : TIME_DEADLINE_NONE;
+    if (!begin_call()) {
+        return TIME_DEADLINE_NONE;
+    }
+    const uint64_t deadline = !control_busy ? time_timer_deadline(&retry_timer) : TIME_DEADLINE_NONE;
+    if (control_busy) {
+        update_deferred = true;
+    }
+    finish_call();
+    return deadline;
 }
+
+static int resume_active(bool reopen);
 
 void network_service_shutdown(void)
 {
     if (!initialized) {
         return;
     }
-    tabos_timer_cancel(&retry_timer);
-    (void) network_service_power_resume();
+    service_admission_freeze(&power_admission, true);
+    platform_mutex_lock(state_mutex);
+    while ((atomic_load(&power_admission.state) & SERVICE_ADMISSION_MASK) != 0U) {
+        platform_mutex_unlock(state_mutex);
+        platform_signal_wait(drained_signal, UINT32_MAX);
+        platform_mutex_lock(state_mutex);
+    }
+    platform_mutex_unlock(state_mutex);
+    (void) resume_active(false);
     tabos_timer_cancel(&retry_timer);
     (void) platform_network_disconnect();
     platform_tls_operations_shutdown();
@@ -164,7 +240,12 @@ void network_service_shutdown(void)
     connection_requested   = false;
     power_suspended        = false;
     reconnect_after_resume = false;
-    atomic_store(&power_admission.state, 0U);
+    control_busy           = false;
+    update_deferred        = false;
+    platform_signal_destroy(drained_signal);
+    platform_mutex_destroy(state_mutex);
+    drained_signal = NULL;
+    state_mutex    = NULL;
 }
 
 static bool connect_active(const char* ssid, const char* supplied_password, bool automatic)
@@ -173,7 +254,9 @@ static bool connect_active(const char* ssid, const char* supplied_password, bool
         strlen(ssid) > NETWORK_CONFIG_SSID_MAX || strlen(supplied_password) > NETWORK_CONFIG_PASSWORD_MAX) {
         return false;
     }
+    platform_mutex_unlock(state_mutex);
     (void) platform_network_disconnect();
+    platform_mutex_lock(state_mutex);
     (void) snprintf(current.ssid, sizeof(current.ssid), "%s", ssid);
     (void) snprintf(password, sizeof(password), "%s", supplied_password);
     current.auto_connect = automatic;
@@ -197,7 +280,10 @@ static bool disconnect_active(void)
     connection_requested = false;
     current.state        = NETWORK_STATE_DISCONNECTING;
     platform_runtime_notify(PLATFORM_RUNTIME_EVENT_DEADLINE);
-    if (!platform_network_disconnect()) {
+    platform_mutex_unlock(state_mutex);
+    const bool disconnected = platform_network_disconnect();
+    platform_mutex_lock(state_mutex);
+    if (!disconnected) {
         set_failure("disconnect failed");
         return false;
     }
@@ -225,7 +311,9 @@ static network_operation_result_t resolve_active(const char* hostname, uint32_t 
         return NETWORK_OPERATION_OFFLINE;
     }
     platform_network_address_t platform_address;
+    platform_mutex_unlock(state_mutex);
     const platform_network_operation_result_t result = platform_network_resolve(hostname, family, &platform_address);
+    platform_mutex_lock(state_mutex);
     if (result == PLATFORM_NETWORK_OPERATION_OK) {
         address->family = platform_address.family;
         (void) snprintf(address->text, sizeof(address->text), "%s", platform_address.text);
@@ -249,8 +337,10 @@ static network_operation_result_t echo_active(const network_address_t* address, 
     platform_network_address_t copied_address         = platform_address;
     (void) snprintf(copied_address.text, sizeof(copied_address.text), "%s", address->text);
     platform_network_echo_result_t platform_result;
+    platform_mutex_unlock(state_mutex);
     const platform_network_operation_result_t operation =
         platform_network_echo(&copied_address, sequence, payload_bytes, timeout_ms, &platform_result);
+    platform_mutex_lock(state_mutex);
     if (operation == PLATFORM_NETWORK_OPERATION_OK) {
         result->sequence      = platform_result.sequence;
         result->bytes         = platform_result.bytes;
@@ -289,7 +379,7 @@ int network_service_power_suspend(void)
     return 0;
 }
 
-int network_service_power_resume(void)
+static int resume_active(bool reopen)
 {
     if (!power_suspended) {
         return 0;
@@ -310,57 +400,83 @@ int network_service_power_resume(void)
         tabos_timer_start(&retry_timer, NETWORK_RETRY_DELAY_MS, 0U);
     }
     reconnect_after_resume = false;
-    service_admission_freeze(&power_admission, false);
+    if (reopen) {
+        service_admission_freeze(&power_admission, false);
+    }
     network_event();
     platform_runtime_notify(PLATFORM_RUNTIME_EVENT_DEADLINE);
     return 0;
 }
 
+int network_service_power_resume(void)
+{
+    return resume_active(true);
+}
+
 void network_service_update(void)
 {
-    if (service_admission_enter(&power_admission, false)) {
-        update_active();
-        service_admission_leave(&power_admission, false);
+    if (!begin_call()) {
+        return;
     }
+    if (control_busy) {
+        update_deferred = true;
+    } else {
+        control_busy = true;
+        update_active();
+        finish_control();
+    }
+    finish_call();
 }
 
 bool network_service_connect(const char* ssid, const char* supplied_password, bool automatic)
 {
-    if (!service_admission_enter(&power_admission, false)) {
+    if (!begin_call()) {
         return false;
     }
+    if (control_busy) {
+        finish_call();
+        return false;
+    }
+    control_busy      = true;
     const bool result = connect_active(ssid, supplied_password, automatic);
-    service_admission_leave(&power_admission, false);
+    finish_control();
+    finish_call();
     return result;
 }
 
 bool network_service_disconnect(void)
 {
-    if (!service_admission_enter(&power_admission, false)) {
+    if (!begin_call()) {
         return false;
     }
+    if (control_busy) {
+        finish_call();
+        return false;
+    }
+    control_busy      = true;
     const bool result = disconnect_active();
-    service_admission_leave(&power_admission, false);
+    finish_control();
+    finish_call();
     return result;
 }
 
 bool network_service_status(network_status_t* status)
 {
-    if (!service_admission_enter(&power_admission, false)) {
+    if (!begin_call()) {
         return false;
     }
     const bool result = status_active(status);
-    service_admission_leave(&power_admission, false);
+    finish_call();
     return result;
 }
 
 network_operation_result_t network_service_resolve(const char* hostname, uint32_t family, network_address_t* address)
 {
-    if (!service_admission_enter(&power_admission, false)) {
+    if (!begin_call()) {
         return NETWORK_OPERATION_OFFLINE;
     }
     const network_operation_result_t result = resolve_active(hostname, family, address);
-    service_admission_leave(&power_admission, false);
+    finish_call();
     return result;
 }
 
@@ -368,11 +484,11 @@ network_operation_result_t network_service_echo(const network_address_t* address
                                                 uint16_t payload_bytes, uint32_t timeout_ms,
                                                 network_echo_result_t* result)
 {
-    if (!service_admission_enter(&power_admission, false)) {
+    if (!begin_call()) {
         return NETWORK_OPERATION_OFFLINE;
     }
     const network_operation_result_t operation = echo_active(address, sequence, payload_bytes, timeout_ms, result);
-    service_admission_leave(&power_admission, false);
+    finish_call();
     return operation;
 }
 

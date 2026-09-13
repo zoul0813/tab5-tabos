@@ -48,6 +48,8 @@ typedef struct {
         uint32_t round_trip_ms;
 } network_echo_result_t;
 
+/* Init, shutdown, and power lifecycle calls are serialized by the runtime owner.
+ * Shutdown closes admission and drains entered calls before destroying state. */
 bool network_service_init(void);
 void network_service_update(void);
 uint64_t network_service_next_deadline(void);
@@ -56,6 +58,8 @@ void network_service_shutdown(void);
  * leaves operation intact. Resume failure retains the freeze for retry/rollback. */
 int network_service_power_suspend(void);
 int network_service_power_resume(void);
+/* Concurrent control transactions return false without changing the active one.
+ * Status/deadline reads do not wait for backend I/O. */
 bool network_service_connect(const char* ssid, const char* password, bool automatic);
 bool network_service_disconnect(void);
 bool network_service_status(network_status_t* status);

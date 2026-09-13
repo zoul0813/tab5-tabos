@@ -286,7 +286,10 @@ Tab5 display and network transport hooks return ENOTSUP before changing hardware
 ESP-Hosted 1.4.7 exposes deinit/reinit, but its lifecycle uses ESP_ERROR_CHECK and tears down
 RPC/transport registrations; retained, bounded rollback with Wi-Fi/netif ownership has not
 been validated. Do not replace the blocker with Wi-Fi disconnect alone. Whole-system graph,
-portable network control synchronization audit, and physical service cycles remain open.
+Tab5 partial Wi-Fi initialization cleanup (AUD-042), and physical service cycles remain open.
+Portable network control synchronization (AUD-015) now uses mutex-protected state and
+owned control transactions without holding the state lock across backend calls. Shutdown
+freezes admission and drains active calls before releasing synchronization objects.
 
 Service-slice software validation: macOS Debug/Release full suites pass (74 tests each),
 including 100-cycle callback checks; Tab5 Debug/Release cross-builds pass. Linux and

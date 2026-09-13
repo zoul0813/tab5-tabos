@@ -59,6 +59,13 @@ Failed autoconnect attempts use an exact monotonic retry deadline. Disconnecting
 starting an explicit connection cancels pending retry immediately; retry never fires
 before its configured delay.
 
+Network status and retry state are synchronized across application and runtime tasks.
+Status reads remain available while a backend control call is in progress. A simultaneous
+connect/disconnect request is rejected without replacing that transaction; retry the
+command after it finishes. Blocking DNS and echo operations do not hold the service state
+lock. Manual disconnect suppresses late online/connecting notifications until a new
+connection is requested.
+
 Interactive credential entry, scanning, and forgetting credentials are not
 implemented yet.
 

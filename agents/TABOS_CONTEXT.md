@@ -937,4 +937,7 @@ cycles and rollback; ordinary tester/display-idle checks do not invoke these hoo
 transport restores before asynchronous retries, with configuration and manual/autoconnect
 intent retained. Failed transport/display restoration retains ownership for retry. Tab5 C6
 transport and MIPI-DPI quiescence remain explicit ENOTSUP blockers. Service graph registration,
-network control synchronization audit, physical callback validation, and CPU sleep remain open.
+physical callback validation, and CPU sleep remain open. Portable network state now uses a
+short platform mutex, with serialized control transactions outside the lock and responsive
+status/deadline reads. Shutdown drains admitted calls before destroying synchronization.
+AUD-015 is addressed; Tab5 partial Wi-Fi initialization cleanup (AUD-042) remains open.

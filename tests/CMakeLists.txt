@@ -518,6 +518,26 @@ tabos_enable_warnings(tabos_network_service)
 tabos_enable_sanitizers(tabos_network_service)
 add_test(NAME unit.network_service COMMAND tabos_network_service)
 
+add_executable(tabos_network_concurrency
+    component/network_concurrency.c
+    "${TABOS_ROOT}/net/network.c"
+    "${TABOS_ROOT}/time/time.c"
+    "${TABOS_ROOT}/platform/host/sdl/mutex.c"
+)
+target_include_directories(tabos_network_concurrency PRIVATE
+    "${TABOS_ROOT}/net/include"
+    "${TABOS_ROOT}/time/include"
+    "${TABOS_ROOT}/kernel/include"
+    "${TABOS_ROOT}/platform/include"
+    "${TABOS_ROOT}/sdk/include"
+    "${TABOS_GENERATED_INCLUDE_DIR}"
+)
+target_link_libraries(tabos_network_concurrency PRIVATE SDL3::SDL3)
+tabos_enable_warnings(tabos_network_concurrency)
+tabos_enable_sanitizers(tabos_network_concurrency)
+add_test(NAME component.network_concurrency COMMAND tabos_network_concurrency)
+set_tests_properties(component.network_concurrency PROPERTIES TIMEOUT 15)
+
 add_executable(tabos_shell_parser
     unit/shell_parser.c
     "${TABOS_ROOT}/apps/shell/src/parser.c"

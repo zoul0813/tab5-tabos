@@ -1844,6 +1844,19 @@ cross-builds pass. Linux and physical Tab5 storage-barrier validation were not r
 
 ## Reversible service hooks
 
+`component.network_concurrency` uses the production portable service and SDL mutex/signal
+implementation with deterministic backend barriers. It holds connect, disconnect, status,
+DNS, and echo calls open while testing responsive status/deadline reads, rejected overlapping
+controls, busy suspend admission, deferred dispatcher notifications, and control progress
+during blocked DNS/echo. It also exercises concurrent status snapshots, the exact retry
+boundary and its control slot, suppression of late online events after disconnect, no
+idle self-notification loop, shutdown drain, and reinitialization. CTest bounds deadlocks
+with a 15-second timeout. This does not validate Tab5 Wi-Fi startup teardown (AUD-042).
+
+AUD-015 validation (2026-09-12): macOS Debug and Release full suites pass, 75/75 each;
+Debug uses the configured ASan/UBSan instrumentation. Tab5 Debug and Release cross-builds
+pass. Linux execution and physical Tab5 regression were not run; nothing was flashed.
+
 `unit.service_power` directly exercises 100 cycles of idle media admission, retained
 camera device IDs, blocked live audio buffers/frame leases, retained keyboard/pointer
 events and handles, display pixels/brightness, partial display rollback, network

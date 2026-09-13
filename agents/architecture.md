@@ -1653,5 +1653,13 @@ socket-teardown mutex acquisition. Host transport suspension freezes acquisition
 disconnects without resetting configuration or registry identity. Resume restores transport
 before scheduling the existing bounded connection retries; transport failure keeps admission
 frozen. Tab5 returns ENOTSUP without disconnecting until ESP-Hosted retained lifecycle is
-validated. This slice does not register the whole-system graph or resolve the outstanding
-normal-operation portable network control synchronization audit.
+validated. This slice does not register the whole-system graph.
+
+Portable network state and retry timers use a short platform mutex. Control transactions
+reserve a busy slot and release that mutex before backend connect/disconnect/status calls;
+connect credentials are copied into transaction-owned storage. Competing controls fail
+without mutation, while status/deadline reads continue. Deferred dispatcher work is notified
+when the slot is released, without periodic polling. DNS/echo also release the state mutex
+for backend work. Admission covers entered and queued calls; runtime-owned shutdown freezes
+entry and drains them through a retained signal before destroying synchronization objects.
+Init, shutdown, and power lifecycle operations remain serialized by the runtime owner.
