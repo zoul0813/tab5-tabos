@@ -22,6 +22,7 @@ This directory contains user and contributor documentation for TabOS.
 - [Kilo](kilo.md): terminal editing, search, byte-preserving saves, and recovery.
 - [Shell](shell.md): build, install, start, and use filesystem-backed PID 0 shell.
 - [Desktop and GUI Applications](gui.md): windows, Files, Calculator, Text editor, Canvas and resident fullscreen handoff.
+- [Physical GUI Acceptance](gui-acceptance.md): device procedures, revision matrix and memory/timing evidence template.
 - [Networking](networking.md): saved Wi-Fi configuration, network status, and connection control.
 - [Audio Service](audio.md): PCM streams, waits, mixing, routes, and the audio test utility.
 

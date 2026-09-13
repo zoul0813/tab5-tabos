@@ -94,3 +94,6 @@ after channel reuse. The command runs three rounds and reports failed assertions
 The same command checks rejected surface dimensions, rectangles and null buffers,
 verifies failed uploads preserve committed pixels, and confirms surface read grants
 become invalid after their owning child exits. It checks allocation cleanup as well.
+
+Physical validation uses the [GUI acceptance procedure](gui-acceptance.md), with
+separate records for each display/touch revision and measured memory/timing.

@@ -533,3 +533,12 @@ remain explicitly separate. Open release work is measured buffering/limits
 touch, keyboard, latency, memory and recovery acceptance (GUI-602–605). Linux
 validation remains excluded. No host simulator executable or UI automation was
 run, and no Tab5 flashing was attempted. Kilo launcher work remains deferred.
+
+## Physical Acceptance Handoff
+
+The contributor-facing [physical acceptance procedure](../../docs/gui-acceptance.md)
+provides per-revision setup/results, repeatable input/window/fullscreen workflows
+and memory/timing checkpoints. It explicitly identifies native instrumentation
+and unresolved threshold gaps. No physical result is recorded by preparing this
+procedure; GUI-005/006/104/202/204 and GUI-602–605 remain open. Device execution,
+flashing and simulator control were not performed.
