@@ -19,8 +19,10 @@ Script discovers maintained `apps/*/Makefile` projects, builds each default appl
 and installs runnable ELF images under `.local/rootfs/T/bin/`. Optional DOOM stays
 excluded unless `--with-doom` is present. Script activates project-local ESP-IDF
 toolchain automatically when compiler is not already available. Arguments pass to each
-application Makefile. Repository paths containing spaces are supported. For example,
-this builds without installing:
+application Makefile with their original boundaries and literal contents; spaces,
+quotes, dollar signs, and command-substitution characters are not reinterpreted by a
+shell. Repository paths containing spaces are supported. For example, this builds
+without installing:
 
 ```sh
 ./apps/build.sh build

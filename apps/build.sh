@@ -5,7 +5,6 @@ set -eu
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 project_root=$(dirname "$script_dir")
 msc_mount=${TABOS_MSC_MOUNT:-}
-make_arguments=
 with_doom=false
 clean_requested=false
 
@@ -18,7 +17,12 @@ if [ -z "${TABOS_POINTER_MAX_CONTACTS:-}" ] && [ -f "$project_root/.local/tabos.
     fi
 fi
 
-for argument in "$@"; do
+# Rotate each original argument once. Non-script arguments remain as positional
+# parameters, preserving their exact bytes and boundaries for every make call.
+original_argument_count=$#
+while [ "$original_argument_count" -gt 0 ]; do
+    argument=$1
+    shift
     case "$argument" in
         --msc)
             msc_mount=${msc_mount:-/Volumes/TAB5}
@@ -31,12 +35,13 @@ for argument in "$@"; do
             ;;
         clean)
             clean_requested=true
-            make_arguments="$make_arguments \"$argument\""
+            set -- "$@" "$argument"
             ;;
         *)
-            make_arguments="$make_arguments \"$argument\""
+            set -- "$@" "$argument"
             ;;
     esac
+    original_argument_count=$((original_argument_count - 1))
 done
 
 if [ "$clean_requested" = true ]; then
@@ -54,13 +59,7 @@ for application_dir in "$script_dir"/*; do
     if [ "$(basename "$application_dir")" = doom ] && [ "$with_doom" = false ]; then
         continue
     fi
-    if [ -n "$make_arguments" ]; then
-        # Keep make arguments word-separated while preserving the simple CLI
-        # contract of this script.
-        eval "make -C \"$application_dir\"$make_arguments"
-    else
-        make -C "$application_dir"
-    fi
+    make -C "$application_dir" "$@"
 done
 
 if [ -n "$msc_mount" ]; then

@@ -1019,6 +1019,12 @@ add_test(
         -P "${CMAKE_CURRENT_LIST_DIR}/check_application_build_tracking.cmake"
 )
 
+add_test(
+    NAME build.application_arguments
+    COMMAND sh "${CMAKE_CURRENT_LIST_DIR}/check_application_build_arguments.sh"
+        "${TABOS_ROOT}"
+)
+
 add_executable(tabos_camera_concurrency
     component/camera_concurrency.c
     "${TABOS_ROOT}/camera/camera.c"
