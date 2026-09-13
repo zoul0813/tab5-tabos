@@ -90,15 +90,17 @@ $(TABOS_BUILD_CONFIG): tabos-force-build-config
 		'TABOS_BUILD_PREREQUISITES=$(TABOS_BUILD_PREREQUISITES)' > "$@.tmp"
 	@if [ -f "$@" ] && cmp -s "$@.tmp" "$@"; then \
 		rm -f "$@.tmp"; \
-		if [ -f "$(TABOS_DEPENDENCY_FILE)" ]; then touch -r "$(TABOS_DEPENDENCY_FILE)" "$@"; \
-		elif [ -f "$(UNSTRIPPED)" ]; then touch -r "$(UNSTRIPPED)" "$@"; fi; \
+		if [ -f "$(UNSTRIPPED)" ]; then touch -r "$(UNSTRIPPED)" "$@"; \
+		elif [ -f "$(TABOS_DEPENDENCY_FILE)" ]; then touch -r "$(TABOS_DEPENDENCY_FILE)" "$@"; fi; \
 	else \
 		mv "$@.tmp" "$@"; \
 		rm -f $(TABOS_CONFIG_INVALIDATES); \
 	fi
 
 ifndef TABOS_CUSTOM_BUILD
-$(TABOS_DEPENDENCY_FILE): $(TABOS_BUILD_CONFIG) $(SOURCES) $(TABOS_RUNTIME_SOURCES) $(TABOS_BUILD_PREREQUISITES) $(TABOS_APPLICATION_MAKEFILES)
+# Keep the included dependency file independent of the always-checked config stamp.
+# Otherwise GNU Make may remake it and restart solely because the stamp was touched.
+$(TABOS_DEPENDENCY_FILE): $(SOURCES) $(TABOS_RUNTIME_SOURCES) $(TABOS_BUILD_PREREQUISITES) $(TABOS_APPLICATION_MAKEFILES)
 	@mkdir -p $(dir $@)
 	@$(CC) $(TABOS_CPPFLAGS) $(TABOS_CFLAGS) -MM -MP -MT "$(UNSTRIPPED)" -MT "$@" \
 		$(TABOS_RUNTIME_SOURCES) $(SOURCES) > "$@.tmp"
@@ -106,15 +108,17 @@ $(TABOS_DEPENDENCY_FILE): $(TABOS_BUILD_CONFIG) $(SOURCES) $(TABOS_RUNTIME_SOURC
 
 $(UNSTRIPPED): $(TABOS_BUILD_CONFIG) $(TABOS_DEPENDENCY_FILE) $(TABOS_APPLICATION_MAKEFILES)
 
+# A config change can remove the dependency file after Make parsed it, so refresh it before linking.
 $(UNSTRIPPED): $(SOURCES) $(TABOS_RUNTIME_SOURCES) $(TABOS_BUILD_PREREQUISITES) $(SDK_ROOT)/linker/app-riscv32.ld $(TABOS_APPLICATION_MAKEFILE)
 	@mkdir -p $(dir $@)
+	@$(CC) $(TABOS_CPPFLAGS) $(TABOS_CFLAGS) -MM -MP -MT "$(UNSTRIPPED)" -MT "$(TABOS_DEPENDENCY_FILE)" \
+		$(TABOS_RUNTIME_SOURCES) $(SOURCES) > "$(TABOS_DEPENDENCY_FILE).tmp"
+	@mv "$(TABOS_DEPENDENCY_FILE).tmp" "$(TABOS_DEPENDENCY_FILE)"
 	$(CC) $(TABOS_CPPFLAGS) $(TABOS_CFLAGS) $(TABOS_LDFLAGS) -o "$@" $(TABOS_RUNTIME_SOURCES) $(SOURCES) $(TABOS_LDLIBS)
 
 clean:
 	rm -rf "$(BUILD_DIR)"
 endif
-
-$(OUTPUT): $(TABOS_BUILD_CONFIG)
 
 $(OUTPUT): $(UNSTRIPPED)
 	$(STRIP) --strip-unneeded "$<" -o "$@"
