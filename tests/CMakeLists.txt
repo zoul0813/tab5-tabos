@@ -41,6 +41,7 @@ add_executable(tabos_core_smoke unit/core_smoke.c ${TABOS_TEST_PLATFORM_FAKES})
 # Tests keep assertions enabled, but the linked runtime retains its build mode.
 target_compile_definitions(tabos_core_smoke PRIVATE TABOS_TEST_RUNTIME_DIAGNOSTICS=$<CONFIG:Debug>)
 target_include_directories(tabos_core_smoke PRIVATE
+    "${TABOS_ROOT}/console/include"
     "${TABOS_ROOT}/graphics/include"
     "${TABOS_ROOT}/input/include"
     "${TABOS_ROOT}/pointer/include"
@@ -88,6 +89,16 @@ target_include_directories(tabos_sdk_device PRIVATE "${TABOS_ROOT}/sdk/include")
 tabos_enable_warnings(tabos_sdk_device)
 tabos_enable_sanitizers(tabos_sdk_device)
 add_test(NAME unit.sdk_device COMMAND tabos_sdk_device)
+
+add_executable(tabos_sdk_posix_filesystem
+    unit/sdk_posix_filesystem.c
+    "${TABOS_ROOT}/sdk/lib/posix_filesystem.c"
+)
+target_compile_definitions(tabos_sdk_posix_filesystem PRIVATE TABOS_APPLICATION=1)
+target_include_directories(tabos_sdk_posix_filesystem PRIVATE "${TABOS_ROOT}/sdk/include")
+tabos_enable_warnings(tabos_sdk_posix_filesystem)
+tabos_enable_sanitizers(tabos_sdk_posix_filesystem)
+add_test(NAME unit.sdk_posix_filesystem COMMAND tabos_sdk_posix_filesystem)
 
 add_executable(tabos_sdk_battery
     unit/sdk_battery.c
@@ -216,6 +227,17 @@ tabos_enable_warnings(tabos_host_camera_completion)
 tabos_enable_sanitizers(tabos_host_camera_completion)
 add_test(NAME unit.host_camera_completion COMMAND tabos_host_camera_completion)
 
+add_executable(tabos_host_headless_audio unit/host_headless_audio.c)
+target_include_directories(tabos_host_headless_audio PRIVATE
+    "${TABOS_ROOT}/audio/include"
+    "${TABOS_ROOT}/platform/include"
+    "${TABOS_ROOT}/sdk/include"
+)
+target_link_libraries(tabos_host_headless_audio PRIVATE tabos_core tabos_platform_host SDL3::SDL3)
+tabos_enable_warnings(tabos_host_headless_audio)
+tabos_enable_sanitizers(tabos_host_headless_audio)
+add_test(NAME unit.host_headless_audio COMMAND tabos_host_headless_audio)
+
 add_executable(tabos_raster unit/raster.c ${TABOS_TEST_PLATFORM_FAKES})
 target_include_directories(tabos_raster PRIVATE
     "${TABOS_ROOT}/graphics/include"
@@ -284,6 +306,17 @@ tabos_enable_warnings(tabos_starfall_game)
 tabos_enable_sanitizers(tabos_starfall_game)
 add_test(NAME unit.starfall_game COMMAND tabos_starfall_game)
 
+add_executable(tabos_irc_protocol
+    unit/irc_protocol.c
+    "${TABOS_ROOT}/apps/netutils/src/irc/protocol.c"
+)
+target_include_directories(tabos_irc_protocol PRIVATE
+    "${TABOS_ROOT}/apps/netutils/src/irc"
+)
+tabos_enable_warnings(tabos_irc_protocol)
+tabos_enable_sanitizers(tabos_irc_protocol)
+add_test(NAME unit.irc_protocol COMMAND tabos_irc_protocol)
+
 add_executable(tabos_doom_video
     unit/doom_video.c
     "${TABOS_ROOT}/apps/doom/src/doom_tabos_video.c"
@@ -333,7 +366,9 @@ add_executable(tabos_display_diagnostic unit/display_diagnostic.c ${TABOS_TEST_P
 target_include_directories(tabos_display_diagnostic PRIVATE
     "${TABOS_ROOT}/graphics/include"
     "${TABOS_ROOT}/kernel/include"
+    "${TABOS_ROOT}/net/include"
     "${TABOS_ROOT}/platform/include"
+    "${CMAKE_CURRENT_LIST_DIR}/fakes"
     "${TABOS_GENERATED_INCLUDE_DIR}"
 )
 target_link_libraries(tabos_display_diagnostic PRIVATE tabos_core)
@@ -366,7 +401,7 @@ target_include_directories(tabos_console_service PRIVATE
     "${CMAKE_CURRENT_LIST_DIR}/fakes"
     "${TABOS_GENERATED_INCLUDE_DIR}"
 )
-target_link_libraries(tabos_console_service PRIVATE tabos_core)
+target_link_libraries(tabos_console_service PRIVATE tabos_core Threads::Threads)
 tabos_enable_warnings(tabos_console_service)
 tabos_enable_sanitizers(tabos_console_service)
 
@@ -530,7 +565,7 @@ target_include_directories(tabos_network_service PRIVATE
     "${TABOS_ROOT}/sdk/include"
     "${CMAKE_CURRENT_LIST_DIR}/fakes"
 )
-target_link_libraries(tabos_network_service PRIVATE tabos_core)
+target_link_libraries(tabos_network_service PRIVATE tabos_core Threads::Threads)
 tabos_enable_warnings(tabos_network_service)
 tabos_enable_sanitizers(tabos_network_service)
 add_test(NAME unit.network_service COMMAND tabos_network_service)
@@ -613,6 +648,24 @@ tabos_enable_warnings(tabos_shell_history_file)
 tabos_enable_sanitizers(tabos_shell_history_file)
 add_test(NAME component.shell_history_file COMMAND tabos_shell_history_file)
 set_tests_properties(component.shell_history_file PROPERTIES TIMEOUT 10)
+
+add_library(tabos_starfall_storage_faults OBJECT "${TABOS_ROOT}/apps/starfall/src/storage.c")
+target_include_directories(tabos_starfall_storage_faults PRIVATE "${TABOS_ROOT}/apps/starfall/include")
+target_compile_definitions(tabos_starfall_storage_faults PRIVATE rename=test_starfall_rename)
+if(TABOS_TARGET STREQUAL "linux")
+    target_compile_options(tabos_starfall_storage_faults PRIVATE -U_FORTIFY_SOURCE)
+endif()
+tabos_enable_warnings(tabos_starfall_storage_faults)
+tabos_enable_sanitizers(tabos_starfall_storage_faults)
+add_executable(tabos_starfall_storage
+    component/starfall_storage.c
+    $<TARGET_OBJECTS:tabos_starfall_storage_faults>
+)
+target_include_directories(tabos_starfall_storage PRIVATE "${TABOS_ROOT}/apps/starfall/include")
+tabos_enable_warnings(tabos_starfall_storage)
+tabos_enable_sanitizers(tabos_starfall_storage)
+add_test(NAME component.starfall_storage COMMAND tabos_starfall_storage)
+set_tests_properties(component.starfall_storage PROPERTIES TIMEOUT 10)
 
 add_library(tabos_shell_session_main OBJECT "${TABOS_ROOT}/apps/shell/src/main.c")
 target_include_directories(tabos_shell_session_main PRIVATE
@@ -846,7 +899,7 @@ add_executable(tabos_host_network_io component/host_network_io.c
     "${TABOS_ROOT}/platform/posix/network.c"
     "${TABOS_ROOT}/platform/posix/tls.c")
 target_include_directories(tabos_host_network_io PRIVATE "${TABOS_ROOT}/platform/include" "${TABOS_ROOT}/sdk/include")
-target_compile_definitions(tabos_host_network_io PRIVATE _POSIX_C_SOURCE=200809L)
+target_compile_definitions(tabos_host_network_io PRIVATE _POSIX_C_SOURCE=200809L TABOS_TEST_TLS_HOOKS=1)
 if(TABOS_TARGET STREQUAL "macos")
     target_compile_definitions(tabos_host_network_io PRIVATE _DARWIN_C_SOURCE)
 endif()
@@ -884,6 +937,35 @@ tabos_enable_warnings(tabos_filesystem)
 tabos_enable_sanitizers(tabos_filesystem)
 
 add_test(NAME component.filesystem COMMAND tabos_filesystem)
+
+add_library(tabos_storage_rename_source OBJECT "${TABOS_ROOT}/platform/posix/storage.c")
+target_include_directories(tabos_storage_rename_source PRIVATE
+    "${TABOS_ROOT}/fs/include"
+    "${TABOS_ROOT}/platform/include"
+    "${TABOS_ROOT}/sdk/include"
+)
+target_compile_definitions(tabos_storage_rename_source PRIVATE rename=test_storage_rename)
+if(TABOS_TARGET STREQUAL "linux")
+    target_compile_options(tabos_storage_rename_source PRIVATE -U_FORTIFY_SOURCE)
+endif()
+tabos_enable_warnings(tabos_storage_rename_source)
+tabos_enable_sanitizers(tabos_storage_rename_source)
+add_executable(tabos_storage_rename
+    fakes/platform_display.c
+    component/storage_rename.c
+    fakes/storage_backend.c
+    $<TARGET_OBJECTS:tabos_storage_rename_source>
+)
+target_include_directories(tabos_storage_rename PRIVATE
+    "${TABOS_ROOT}/fs/include"
+    "${TABOS_ROOT}/platform/include"
+    "${TABOS_ROOT}/sdk/include"
+    "${CMAKE_CURRENT_LIST_DIR}/fakes"
+)
+target_link_libraries(tabos_storage_rename PRIVATE tabos_core)
+tabos_enable_warnings(tabos_storage_rename)
+tabos_enable_sanitizers(tabos_storage_rename)
+add_test(NAME component.storage_rename COMMAND tabos_storage_rename)
 
 add_library(tabos_posix_source OBJECT
     component/posix_filesystem.c
@@ -940,6 +1022,27 @@ target_link_libraries(tabos_coreutils_cp PRIVATE tabos_core)
 tabos_enable_warnings(tabos_coreutils_cp)
 tabos_enable_sanitizers(tabos_coreutils_cp)
 add_test(NAME component.coreutils_cp COMMAND tabos_coreutils_cp)
+
+add_executable(tabos_coreutils_wc unit/coreutils_wc.c)
+target_include_directories(tabos_coreutils_wc PRIVATE "${TABOS_ROOT}")
+tabos_enable_warnings(tabos_coreutils_wc)
+tabos_enable_sanitizers(tabos_coreutils_wc)
+add_test(NAME unit.coreutils_wc COMMAND tabos_coreutils_wc)
+
+add_executable(tabos_coreutils_ls unit/coreutils_ls.c)
+target_include_directories(tabos_coreutils_ls PRIVATE "${TABOS_ROOT}" "${TABOS_ROOT}/sdk/include")
+tabos_enable_warnings(tabos_coreutils_ls)
+tabos_enable_sanitizers(tabos_coreutils_ls)
+add_test(NAME unit.coreutils_ls COMMAND tabos_coreutils_ls)
+
+add_executable(tabos_netutils_fetch unit/netutils_fetch.c)
+target_include_directories(tabos_netutils_fetch PRIVATE
+    "${TABOS_ROOT}"
+    "${TABOS_ROOT}/sdk/include"
+)
+tabos_enable_warnings(tabos_netutils_fetch)
+tabos_enable_sanitizers(tabos_netutils_fetch)
+add_test(NAME unit.netutils_fetch COMMAND tabos_netutils_fetch)
 
 add_test(NAME integration.host_smoke COMMAND tabos_host --smoke)
 set_tests_properties(integration.host_smoke PROPERTIES
@@ -1046,3 +1149,75 @@ target_include_directories(tabos_gpio_interrupt PRIVATE
 tabos_enable_warnings(tabos_gpio_interrupt)
 tabos_enable_sanitizers(tabos_gpio_interrupt)
 add_test(NAME unit.gpio_interrupt COMMAND tabos_gpio_interrupt)
+
+# Use the same explicit source manifest and profile for native Lua tests.
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${TABOS_ROOT}/apps/lua/sources.mk")
+file(READ "${TABOS_ROOT}/apps/lua/sources.mk" lua_manifest)
+string(REGEX MATCHALL "[a-zA-Z0-9_/]+[.]c" lua_sources "${lua_manifest}")
+list(TRANSFORM lua_sources PREPEND "${TABOS_ROOT}/apps/lua/")
+add_library(tabos_lua_profile STATIC ${lua_sources} "${TABOS_ROOT}/sdk/lib/graphics.c"
+    "${TABOS_ROOT}/sdk/lib/audio.c" "${TABOS_ROOT}/sdk/lib/pointer.c"
+    "${TABOS_ROOT}/sdk/lib/device.c")
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    foreach(lua_source IN LISTS lua_sources)
+        if(lua_source MATCHES "/apps/lua/src/")
+            set_property(SOURCE "${lua_source}" APPEND PROPERTY COMPILE_OPTIONS
+                -Wall -Wextra -Wpedantic -Wconversion -Wshadow)
+        endif()
+    endforeach()
+endif()
+target_include_directories(tabos_lua_profile PUBLIC "${TABOS_ROOT}/apps/lua/include"
+    "${TABOS_ROOT}/apps/lua/vendor/lua/src" "${TABOS_ROOT}/sdk/include")
+target_compile_options(tabos_lua_profile PUBLIC
+    -include "${TABOS_ROOT}/apps/lua/include/lua_tabos/config.h")
+tabos_enable_sanitizers(tabos_lua_profile)
+add_executable(tabos_lua_native "${TABOS_ROOT}/apps/lua/src/main.c" component/lua_fakes.c)
+target_link_libraries(tabos_lua_native PRIVATE tabos_lua_profile m)
+tabos_enable_sanitizers(tabos_lua_native)
+add_executable(tabos_lua component/lua.c component/lua_fakes.c)
+target_link_libraries(tabos_lua PRIVATE tabos_lua_profile m)
+tabos_enable_warnings(tabos_lua)
+tabos_enable_sanitizers(tabos_lua)
+add_test(NAME component.lua COMMAND tabos_lua)
+set_tests_properties(component.lua PROPERTIES TIMEOUT 30)
+add_executable(tabos_lua_rv32 component/lua_rv32.c)
+target_include_directories(tabos_lua_rv32 PRIVATE
+    "${TABOS_ROOT}/graphics/include" "${TABOS_ROOT}/console/include"
+    "${TABOS_ROOT}/kernel/include" "${TABOS_ROOT}/input/include" "${TABOS_ROOT}/platform/include")
+if(TABOS_TARGET STREQUAL "linux")
+    target_link_libraries(tabos_lua_rv32 PRIVATE
+        "-Wl,--start-group" tabos_core tabos_platform_host "-Wl,--end-group" SDL3::SDL3)
+else()
+    target_link_libraries(tabos_lua_rv32 PRIVATE tabos_core tabos_platform_host SDL3::SDL3)
+endif()
+tabos_enable_warnings(tabos_lua_rv32)
+tabos_enable_sanitizers(tabos_lua_rv32)
+
+foreach(lua_suite utf8 strings math)
+    add_test(NAME component.lua_upstream_${lua_suite}
+        COMMAND tabos_lua_native -e "_U=true; _soft=true; _port=true"
+            "${TABOS_ROOT}/apps/lua/tests/upstream/${lua_suite}.lua")
+    set_tests_properties(component.lua_upstream_${lua_suite} PROPERTIES TIMEOUT 30)
+endforeach()
+
+add_test(NAME component.lua_cli COMMAND "${CMAKE_COMMAND}"
+    "-DLUA_EXECUTABLE=$<TARGET_FILE:tabos_lua_native>"
+    "-DLUA_TEST_DIR=${CMAKE_CURRENT_BINARY_DIR}/lua-cli"
+    -P "${CMAKE_CURRENT_LIST_DIR}/check_lua_cli.cmake")
+set_tests_properties(component.lua_cli PROPERTIES TIMEOUT 30)
+
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+add_test(NAME component.lua_snake_audio
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_LIST_DIR}/lua_snake_audio.py"
+        "$<TARGET_FILE:tabos_lua_native>" "${TABOS_ROOT}/apps/lua/examples/snake.lua")
+set_tests_properties(component.lua_snake_audio PROPERTIES TIMEOUT 40)
+
+add_test(NAME component.lua_starfall
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_LIST_DIR}/lua_starfall.py"
+        "$<TARGET_FILE:tabos_lua_native>" "${TABOS_ROOT}/apps/lua/examples/starfall.lua")
+set_tests_properties(component.lua_starfall PROPERTIES TIMEOUT 60)
+
+add_test(NAME component.lua_touch
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_LIST_DIR}/lua_touch.py"
+        "$<TARGET_FILE:tabos_lua_native>" "${TABOS_ROOT}/apps/lua/examples/touch.lua")
+set_tests_properties(component.lua_touch PROPERTIES TIMEOUT 30)

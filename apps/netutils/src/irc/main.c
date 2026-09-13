@@ -10,6 +10,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "protocol.h"
+
 enum {
     IRC_PORT    = 6667,
     LINE_MAX    = 480,
@@ -24,6 +26,10 @@ typedef struct {
 } member_t;
 
 static member_t members[MEMBER_MAX];
+
+typedef struct {
+        tabos_socket_t socket;
+} protocol_callbacks_t;
 
 static void usage(FILE* stream)
 {
@@ -126,6 +132,24 @@ static bool display_privmsg(char* message)
     return true;
 }
 
+static void display_server_line(char* message, void* context)
+{
+    (void) context;
+    char names_copy[IRC_PROTOCOL_LINE_MAX + 1];
+
+    (void) snprintf(names_copy, sizeof(names_copy), "%s", message);
+    remember_names(names_copy);
+    if (!display_privmsg(message)) {
+        puts(message);
+    }
+}
+
+static void send_protocol_line(const char* line, void* opaque_callbacks)
+{
+    const protocol_callbacks_t* callbacks = opaque_callbacks;
+    (void) send_line(callbacks->socket, line);
+}
+
 int main(int argc, char** argv)
 {
     (void) setvbuf(stdout, NULL, _IONBF, 0);
@@ -147,22 +171,26 @@ int main(int argc, char** argv)
         }
         return 1;
     }
-    char line[LINE_MAX + 3];
-    (void) snprintf(line, sizeof(line), "NICK %s\r\nUSER %s 0 * :TabOS\r\n", argv[2], argv[2]);
-    if (send_line(socket, line) != 0) {
+    char protocol_output[IRC_PROTOCOL_LINE_MAX + 8];
+    (void) snprintf(protocol_output, sizeof(protocol_output), "NICK %s\r\nUSER %s 0 * :TabOS\r\n", argv[2], argv[2]);
+    if (send_line(socket, protocol_output) != 0) {
         fprintf(stderr, "irc: register: %s\n", strerror(errno));
         (void) tabos_socket_close(socket);
         return 1;
     }
-    char channel[LINE_MAX + 1]  = {0};
-    const char* initial_channel = argc == 4 ? argv[3] : NULL;
-    bool registered             = false;
-    const int stdin_flags       = fcntl(STDIN_FILENO, F_GETFL);
+    char channel[LINE_MAX + 1]              = {0};
+    const char* initial_channel             = argc == 4 ? argv[3] : NULL;
+    protocol_callbacks_t protocol_callbacks = {.socket = socket};
+    irc_protocol_session_t protocol_session;
+    irc_protocol_session_init(&protocol_session, initial_channel, channel, sizeof(channel), display_server_line,
+                              send_protocol_line, &protocol_callbacks);
+    const int stdin_flags = fcntl(STDIN_FILENO, F_GETFL);
     (void) fcntl(STDIN_FILENO, F_SETFL, stdin_flags | O_NONBLOCK);
     puts("IRC connected. /join #channel, /msg target text, /quit; plain text sends to current channel.");
     draw_prompt("");
-    size_t used  = 0U;
-    bool running = true;
+    char edit_line[LINE_MAX + 1] = {0};
+    size_t used                  = 0U;
+    bool running                 = true;
     while (running) {
         tabos_wait_item_t item = {
             .source = tabos_socket_wait_source(socket),
@@ -175,52 +203,33 @@ int main(int argc, char** argv)
                 running = false;
                 break;
             }
-            received[count] = '\0';
             fputs("\r\033[2K", stdout);
-            char names_copy[RECEIVE_MAX + 1];
-            (void) snprintf(names_copy, sizeof(names_copy), "%s", received);
-            remember_names(names_copy);
-            if (!display_privmsg(received)) {
-                fputs(received, stdout);
-                if (received[count - 1] != '\n') {
-                    putchar('\n');
-                }
+            if (!irc_protocol_session_feed(&protocol_session, received, (size_t) count)) {
+                fputs("irc: discarded overlong server message\n", stderr);
             }
-            if (strncmp(received, "PING :", 6U) == 0) {
-                (void) snprintf(line, sizeof(line), "PONG :%s", received + 6);
-                (void) send_line(socket, line);
-            }
-            if (!registered && strstr(received, " 001 ") != NULL) {
-                registered = true;
-                if (initial_channel != NULL) {
-                    (void) snprintf(channel, sizeof(channel), "%s", initial_channel);
-                    (void) snprintf(line, sizeof(line), "JOIN %s\r\n", channel);
-                    (void) send_line(socket, line);
-                }
-            }
-            line[used] = '\0';
-            draw_prompt(line);
+            edit_line[used] = '\0';
+            draw_prompt(edit_line);
         }
         char character;
         while (read(STDIN_FILENO, &character, 1U) == 1) {
             if (character == '\n' || character == '\r') {
-                line[used] = '\0';
+                edit_line[used] = '\0';
                 putchar('\n');
-                if (strcmp(line, "/quit") == 0) {
+                if (strcmp(edit_line, "/quit") == 0) {
                     running = false;
                     break;
                 }
-                if (strncmp(line, "/join ", 6U) == 0) {
-                    if (!registered) {
+                if (strncmp(edit_line, "/join ", 6U) == 0) {
+                    if (!irc_protocol_session_registered(&protocol_session)) {
                         puts("Waiting for IRC registration.");
                         used = 0U;
                         draw_prompt("");
                         continue;
                     }
-                    (void) snprintf(channel, sizeof(channel), "%s", line + 6);
-                    (void) snprintf(line, sizeof(line), "JOIN %s\r\n", channel);
-                } else if (strncmp(line, "/msg ", 5U) == 0) {
-                    char* target = line + 5;
+                    (void) snprintf(channel, sizeof(channel), "%s", edit_line + 6);
+                    (void) snprintf(protocol_output, sizeof(protocol_output), "JOIN %s\r\n", channel);
+                } else if (strncmp(edit_line, "/msg ", 5U) == 0) {
+                    char* target = edit_line + 5;
                     char* text   = strchr(target, ' ');
                     if (text == NULL) {
                         puts("Usage: /msg target text");
@@ -239,24 +248,24 @@ int main(int argc, char** argv)
                     used = 0U;
                     draw_prompt("");
                     continue;
-                } else if (line[0] == '/') {
-                    (void) send_command(socket, line);
+                } else if (edit_line[0] == '/') {
+                    (void) send_command(socket, edit_line);
                     used = 0U;
                     draw_prompt("");
                     continue;
                 } else if (channel[0] != '\0') {
-                    if (!registered) {
+                    if (!irc_protocol_session_registered(&protocol_session)) {
                         puts("Waiting for IRC registration.");
                         used = 0U;
                         draw_prompt("");
                         continue;
                     }
                     char message[LINE_MAX + 3];
-                    (void) snprintf(message, sizeof(message), "PRIVMSG %s :%s\r\n", channel, line);
+                    (void) snprintf(message, sizeof(message), "PRIVMSG %s :%s\r\n", channel, edit_line);
                     if (send_line(socket, message) != 0) {
                         fprintf(stderr, "irc: send: %s\n", strerror(errno));
                     } else {
-                        printf("<\033[32m%s\033[0m> %s\n", argv[2], line);
+                        printf("<\033[32m%s\033[0m> %s\n", argv[2], edit_line);
                     }
                     used = 0U;
                     draw_prompt("");
@@ -267,7 +276,7 @@ int main(int argc, char** argv)
                     draw_prompt("");
                     continue;
                 }
-                (void) send_line(socket, line);
+                (void) send_line(socket, protocol_output);
                 used = 0U;
                 draw_prompt("");
             } else if (character == '\b' || character == 0x7f) {
@@ -276,7 +285,7 @@ int main(int argc, char** argv)
                     erase_character();
                 }
             } else if ((unsigned char) character >= 32U && used < LINE_MAX) {
-                line[used++] = character;
+                edit_line[used++] = character;
                 putchar(character);
             }
         }

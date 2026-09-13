@@ -6,6 +6,7 @@
 
 #include "hello_elf.h"
 
+#include <stdio.h>
 #include <string.h>
 
 static bool write_file(const char* path, const void* data, size_t size)
@@ -34,6 +35,55 @@ static bool inherited_path_loads(const char* requested_path, const char* working
     }
     loader_elf_application_destroy(application);
     return loaded;
+}
+
+static bool large_directory_reports_overflow(loader_elf_application_t* application)
+{
+    static const char suffix[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    char paths[64][TABOS_FS_PATH_MAX];
+    size_t created = 0U;
+    bool valid     = tabos_fs_mkdir("A:/large", 0755U) == 0;
+    while (valid && created < 64U) {
+        const int length =
+            snprintf(paths[created], sizeof(paths[created]), "A:/large/entry-%02u-%s", (unsigned int) created, suffix);
+        valid = length > 0 && (size_t) length < sizeof(paths[created]) && write_file(paths[created], "x", 1U);
+        if (valid) {
+            ++created;
+        }
+    }
+
+    char listing[4096];
+    if (valid) {
+        *tabos_errno_location() = 0;
+        valid =
+            loader_elf_application_list_directory(application, "A:/large", listing, sizeof(listing)) == -TABOS_ENOSPC;
+    }
+    if (valid) {
+        *tabos_errno_location() = TABOS_EIO;
+        valid =
+            loader_elf_application_list_directory(application, "A:/large", listing, sizeof(listing)) == -TABOS_ENOSPC;
+    }
+
+    for (size_t index = 0U; index < created; ++index) {
+        valid = tabos_fs_unlink(paths[index]) == 0 && valid;
+    }
+    valid = tabos_fs_rmdir("A:/large") == 0 && valid;
+    return valid;
+}
+
+static bool batched_text_survives_short_reads(loader_elf_application_t* application)
+{
+    const tabos_input_event_t event = {.type = TABOS_INPUT_TEXT, .text = "paste"};
+    char copied[sizeof("paste")]    = {0};
+    if (!loader_elf_application_queue_input_event(application, &event)) {
+        return false;
+    }
+    for (size_t index = 0U; index < sizeof("paste") - 1U; ++index) {
+        if (loader_elf_application_read_pending_input(application, &copied[index], 1U) != 1) {
+            return false;
+        }
+    }
+    return strcmp(copied, "paste") == 0 && loader_elf_application_read_pending_input(application, copied, 1U) == 0;
 }
 
 int main(void)
@@ -67,6 +117,8 @@ int main(void)
                                 loader_elf_application_tty_mode(application) ==
                                     (uint32_t) (TABOS_TTY_MODE_SCROLL_KEYS | TABOS_TTY_MODE_RAW_INPUT) &&
                                 !loader_elf_application_set_tty_mode(application, UINT32_C(0x80000000));
+    const bool directory_overflow = application != NULL && large_directory_reports_overflow(application);
+    const bool batched_text       = application != NULL && batched_text_survives_short_reads(application);
     loader_elf_application_destroy(application);
 
     static const unsigned char invalid_elf[] = {0U};
@@ -97,5 +149,5 @@ int main(void)
     (void) tabos_fs_unlink(path);
     (void) tabos_fs_rmdir("A:/bin");
     filesystem_shutdown();
-    return valid && missing_rejected && tty_mode_valid && inherited_paths ? 0 : 1;
+    return valid && missing_rejected && tty_mode_valid && directory_overflow && batched_text && inherited_paths ? 0 : 1;
 }

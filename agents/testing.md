@@ -131,6 +131,10 @@ compatibility deadline remains.
 Network-service tests count platform status reads and prove idle runtime updates perform
 none; one coalesced backend transition causes one copied status read. Core smoke tests
 advance fake monotonic time to exercise the 60-second hardware-health audit explicitly.
+Network-service concurrency coverage runs status copies and deadline reads against repeated
+connect, disconnect, and runtime updates from separate host threads. It must validate whole
+status strings and bounded attempt/deadline state while backend operations remain serialized
+outside the portable state mutex.
 
 Deadline-service tests use fake monotonic time and must prove exact key-repeat, cursor,
 network-retry, and finite-wait deadlines; no firing one millisecond early; immediate
@@ -162,6 +166,11 @@ Host builds are especially useful for:
 - utility applications
 - error handling
 - integration tests
+
+IRC protocol tests feed fragmented and coalesced TCP input through the bounded CRLF
+stream parser. They must cover PING, registration welcome, multiple PRIVMSG lines,
+overlong-message recovery, and preservation of an in-progress user draft while
+asynchronous protocol output is generated.
 
 ### Persistent foreground-process validation
 
@@ -233,6 +242,11 @@ Process module must remain self-contained: tester parent launches tester child, 
 launches tester grandchild, known statuses unwind in reverse, and parent repeats chain to
 prove cleanup and reload. Run tester from shell so this also exercises persistent PID 0.
 
+macOS release packaging recursively bundles every non-system dynamic dependency, rewrites
+each reference to `@executable_path`, and rejects unresolved or machine-specific references
+before signing. The extracted-archive startup smoke test then exercises the relocated host
+binary and packaged rootfs.
+
 `component.elf_wait` executes real RV32 fixtures through the loader and headless SDL
 runtime. It checks finite/infinite pointer waits, SDL pointer delivery and shutdown,
 blocking UDP receive, socket-only/mixed zero and infinite waits, DNS continuation,
@@ -240,10 +254,13 @@ repeated forced socket/DNS teardown, and parent restoration. `unit.host_io` hold
 cancelled workers behind a barrier, checks bounded exhaustion and copied inputs, then
 checks disposal and normal delivery. `component.host_network_io` exercises suspended
 TCP accept/connect/receive, explicit EAGAIN, DNS, verified TLS connection setup and
-TLS read/write against an ephemeral local CA/server. These tests use host sanitizers;
-loopback tests need permission to bind local ports. Closed-peer socket coverage runs in a
-subprocess with the default SIGPIPE action and requires repeated sends to return errors
-without terminating the process.
+TLS read/write against an ephemeral local CA/server. It injects repeated trust-store
+initialization failures and a rejected final verification result, proving each attempt
+uses a newly configured context and never publishes a rejected connection. Host TLS
+initialization suppresses process-wide `SIGPIPE` before OpenSSL performs socket I/O. These
+tests use host sanitizers; loopback tests need permission to bind local ports. Closed-peer
+socket coverage runs in a subprocess with the default SIGPIPE action and requires repeated
+sends to return errors without terminating the process.
 
 Generic-wait validation covers zero and finite application waits, cancellable infinite
 backend waits, monotonic timeout, readiness clearing, source ordering, mixed socket/device
@@ -564,7 +581,7 @@ on pointer input.
 
 Current keyboard coverage includes host tests for HID-to-text translation, key/text event ordering, queue overflow policy, and runtime bootstrap with a fake keyboard platform. SDL3 and the Tab5 I2C backend feed the same public queue. Hardware validation must confirm that boot diagnostics show `TAB5 KEYBOARD FW ...; HID MODE`; missing keyboard must remain a warning rather than preventing boot. Builds configured with `TABOS_ENABLE_KEYBOARD_DIAGNOSTICS=ON` also log every normalized key/text event without consuming the queue; this flag defaults off. USB HID keyboards on Tab5 are not yet supported.
 
-Console tests cover exclusive foreground acquisition, background and stale-session rejection, rejected-read non-consumption, cursor pixels and blink phase, clearing, history ring overflow, Page Up/Down/Home/End navigation, automatic return to live output, and scale reflow with retained cells. Timer tests cover one-shot, repeating, late-poll skipping, and cancellation behavior with fake monotonic time. Manual validation must verify shell opt-in consumes Page Up/Down/Home/End and Tab5 Ctrl+Arrow equivalents, a disabled mode delivers those events to the application, children inherit by value, and returning to the parent restores its unchanged mode. `TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP=ON` provides manual cross-target keyboard-to-framebuffer validation and defaults off. Diagnostic application is not shell.
+Console tests cover exclusive foreground acquisition, background and stale-session rejection, rejected-read non-consumption, cursor pixels and blink phase, clearing, history ring overflow, Page Up/Down/Home/End navigation, automatic return to live output, bounded multi-parameter ANSI parsing, live-screen cursor clamping and restore after eviction, scale reflow with retained color/reverse attributes, active reverse rendition after resize, and concurrent output/resize serialization through the platform mutex. Runtime smoke coverage changes scale while fullscreen graphics owns the framebuffer and verifies that the retained terminal neither alters graphics pixels nor triggers presentation. Timer tests cover one-shot, repeating, late-poll skipping, and cancellation behavior with fake monotonic time. Manual validation must verify shell opt-in consumes Page Up/Down/Home/End and Tab5 Ctrl+Arrow equivalents, a disabled mode delivers those events to the application, children inherit by value, and returning to the parent restores its unchanged mode. `TABOS_ENABLE_CONSOLE_DIAGNOSTIC_APP=ON` provides manual cross-target keyboard-to-framebuffer validation and defaults off. Diagnostic application is not shell.
 
 Application lifecycle tests cover descriptor validation, duplicate rejection, registry lookup, startup failure cleanup, PID metadata, process-table retention, PID 0→1→2 nesting, blocked-parent state, console focus transfer, reverse-order status unwind, root-exit panic transition, and shutdown cleanup. Runtime smoke test verifies configured `console-test` remains PID 0 after Ctrl+Q reports completion. Same portable lifecycle code compiles into host and Tab5; host executes deterministic tests while Tab5 cross-build verifies target compatibility.
 
@@ -580,6 +597,9 @@ line-buffered stdout, unbuffered stderr/stdin, binary-transparent I/O, heap
 growth and limit failure, and deterministic cleanup after success and failure.
 Test blocking stdin plus `O_NONBLOCK`/`EAGAIN`. Text fixtures use raw CP437 bytes;
 host Unicode input outside CP437 must be rejected or explicitly substituted.
+ELF standard-stream regressions must read a multi-byte text event one byte at a time
+without loss and verify that embedded NUL, including at counted-write boundaries, does
+not suppress following terminal output.
 
 `component.coreutils_cp` builds the production `cp` source against SDK POSIX
 compatibility headers and the real portable/host storage path. It must reject an
@@ -587,6 +607,10 @@ identical path, a normalized relative alias, and a host hard link without changi
 source bytes, then truncate and copy into a distinct destination. Filesystem and
 POSIX adapter tests must verify matching nonzero identity across `stat()`/`fstat()`
 and across rename.
+
+`unit.coreutils_wc` compiles the production `wc` source with deterministic stream
+fixtures. It must return failure for an absent input, an injected mid-stream read
+error, and an injected close error, while retaining success for a clean stream.
 
 System-action tests cover invalid reboot commands, unavailable and rejected ELF gates,
 first-request-wins kernel state, and action consumption. Host integration must verify
@@ -605,6 +629,8 @@ the real cross toolchain after shared-rule changes.
 Filesystem-backed application coverage must keep the global filesystem working directory
 distinct from the child's inherited directory and verify relative PATH entries, `./`,
 `../`, and current-drive `/` executable paths load the file selected by the child.
+It must also verify that an ELF directory listing larger than its fixed transport buffer
+returns `ENOSPC` with both zero and stale nonzero errno state.
 
 Manual console validation must include prompt-boundary Backspace, held Backspace, held printable keys, Enter, and Tab followed by visible text. Host backend synthesizes missing Enter/Tab/repeat text while retaining SDL text input for normal layout and IME behavior; matching SDL text events are suppressed to prevent duplicates.
 
@@ -1020,6 +1046,13 @@ termination, then repeats the cases to exercise cleanup and parent restoration. 
 present/close control proves explicit flushing still works. The regression must pass
 under ASan/UBSan; teardown discards pending drawing without accessing freed guest RAM.
 
+Overlay coverage must exercise enabled and disabled status icons through both logical
+host presentation and a direct-native backend. The entire overlay region must be
+pixel-equivalent across paths, untouched application pixels must remain unchanged, and
+the portable logical framebuffer must be restored after presentation. Tab5 direct-buffer
+state must retain covered pixels per scanout buffer and remove old overlays before partial
+frame copies; cross-build the real backend after platform-contract changes.
+
 Scaled-canvas tests must cover zero-initialized native opening, dimensions supplied before
 the single open call, rejection when only one dimension is supplied, fullscreen and 4:3
 dimensions, integer fit/centering,
@@ -1029,7 +1062,8 @@ per present, and matching logical output on host and Tab5.
 
 Foreground application stdin represents arrow-key presses and normalized repeats as ANSI
 CSI `A`, `B`, `C`, and `D` sequences. Reads smaller than a sequence must preserve and
-return its remaining bytes on later calls. Graphics-mode arrow keys must reach the active
+return its remaining bytes on later calls. The same bounded pending buffer preserves a
+multi-byte text event across short reads. Graphics-mode arrow keys must reach the active
 application rather than trigger inherited terminal scrollback policy.
 
 ---
@@ -1699,6 +1733,32 @@ Hardware-specific code:
     test on Tab5
 ```
 
+POSIX directory compatibility tests must exercise both build modes. Non-application
+coverage repeatedly opens a missing directory beyond the eight-entry wrapper capacity,
+then opens a real directory. Application-mode coverage must verify a missing runtime or
+directory-listing gate returns `ENOSYS`, releases the provisional wrapper entry, and
+allows a later gate-backed open.
+
+`component.storage_rename` substitutes a deterministic backend that rejects replacement
+with `EEXIST`. It verifies replacement succeeds through the platform fallback, failure
+to move the old destination leaves both files untouched, and installation failure rolls
+the backup back without losing either version. `component.shell_history_file` performs
+successive saves, and `unit.netutils_fetch` verifies successful commit plus preservation
+of an existing destination across finalization failures. The Tab5 build cross-compiles
+these consumers and the FatFs replacement fallback; physical power-loss behavior is not
+claimed.
+
+`unit.coreutils_ls` compiles the production utility and verifies option parsing,
+alphabetical sorting, terminal-width column packing, narrow one-column fallback, and
+aligned long-format type/size/UTC timestamp output under ASan/UBSan.
+
+The native production-source `fetch` regression runs with ASan/UBSan. It must exercise
+every first-read split through the HTTP header terminator, a header that fills the
+bounded accumulator without a terminator, successful length and close framing, error
+and redirect statuses, unsupported transfer coding, truncated advertised bodies, and
+receive, close, and rename failures. Failure cases must preserve an existing destination;
+close and rename injection must prove the output stream is closed exactly once.
+
 A developer working on the shell, filesystem, graphics model, UI, utilities, or application APIs should normally be able to work on a Mac or Linux machine without having the physical Tab5 attached.
 
 The real Tab5 remains the final source of truth for hardware behavior.
@@ -1763,6 +1823,113 @@ capture, route, fault, wait, and shared-clock assertions remain mandatory. Healt
 must prove suspended deadlines disappear, no audit occurs while paused, and resume runs one
 overdue audit while advancing directly to the next future deadline. Cross-build real Tab5
 audio code; host fakes do not prove codec shutdown, jack routing, or electrical savings.
+The real headless host backend must also fill and drain a playback ring, produce capture PCM,
+and wake playback and capture waits without an SDL audio device.
+
+## Lua CLI validation (2026-09-12)
+
+`component.lua` compiles the same Lua profile under host sanitizers with deterministic
+clock/input fakes, registration allocation failures, quota/shrink/free accounting,
+console line/typeahead handling, file/NUL errors, UTC dates, modules, recursion and
+coroutine cancellation. `component.lua_cli` runs argument ordering, script varargs,
+source-module loading, ignored workstation environment, error/status and exit-finalizer
+cases in isolated subprocesses. `component.lua_upstream_utf8`, `_strings`, and `_math`
+run unchanged official 5.5.1 files with `_U`, `_soft`, and `_port`; exclusions are recorded
+in `apps/lua/UPSTREAM.md`. The source manifest is shared with the application Makefile.
+
+Optional `tabos_lua_rv32` accepts separately SDK-built shell and Lua artifacts. It uses
+temporary drives and a real terminal to check stdout, statuses, script args, nested
+source modules, binary file bytes, UTC/64-bit arithmetic, REPL continuation, OOM/error
+recovery, Ctrl-C in loops/coroutines/console reads, os.exit file cleanup, forced wait
+teardown and repeat launches. REPL regression also injects physical Backspace,
+Delete, Left/Right, Home/End, history with draft restoration, long horizontal input,
+Escape preserving input, the version banner, Ctrl-C/Ctrl-D exit from entered text,
+loops/coroutines/console reads, and Ctrl-U cancellation during continuation; terminal cells and restored
+parent status are checked. Ordinary CTest remains independent of application builds.
+Shared build tracking checks `TABOS_LDLIBS` invalidation and verifies that an unchanged
+configuration does not relink even when its stamp has a newer timestamp. Naming lint excludes the
+pinned upstream Lua tree (which owns `tab_funcs`); local adapters remain checked.
+
+macOS Debug/Release and Tab5 Debug/Release builds passed. Linux builds/tests excluded
+by explicit user direction for this implementation. Physical Tab5 functional acceptance,
+stack/heap high-water, timing and service responsiveness remain separate required checks.
+Evidence and exact commands: `docs/validation/lua-cli-2026-09-12.md`.
+
+
+## Lua graphics validation (2026-09-12)
+
+`component.lua` links the real portable SDK graphics implementation against a fake
+display transport. Independent expected pixels cover primitive clipping, outlines,
+lines and packed little-endian RGB565 blits. Tests cover invalid arguments, canvas
+limits, duplicate opens, stale handles, finalizers, `<close>` unwinding, failed
+open/present/close, OOM recovery, raw press/release delivery, held state through
+queue overflow, console-read exclusion and interruption. A failed close retains
+canvas memory until retry succeeds.
+
+`tabos_lua_rv32` additionally checks real shell-launched Lua rendering and upscale,
+packed pixels, short raw key taps, return/error/os.exit/Ctrl-C/Ctrl-D cleanup and
+terminal restoration. Supply `apps/lua/examples/snake.lua` as the optional third
+path to exercise the actual shipped Lua game. Physical graphics/input and timing
+acceptance remains separate; Linux stays excluded by user direction.
+
+
+## Lua audio validation (2026-09-12)
+
+`component.lua` links real SDK audio wrappers against deterministic eight-stream
+fake transport. Coverage includes PCM/channel/offset/rate validation, copied bytes,
+partial writes, full-ring EAGAIN, flush, volume/status, shared-rate conflict, failed
+open/write/close, stale finalizers, slot reuse, stream exhaustion, OOM, cancellation,
+and `<close>` cleanup. Runtime cleanup retains failed closes for retry.
+
+`component.lua_snake_audio` uses Python 3 to run the actual Snake sound prelude in
+the native Lua profile and compare all four PCM strings with independent native
+integer-synthesis expectations from `apps/snake/src/sound.c` at `809b65f`. It checks
+replacement, stop, and mute. No game-loop timing is used for PCM equivalence.
+
+`tabos_lua_rv32` exercises real audio open/write/status/flush/close, error and
+os.exit cleanup, interruption, repeat launch, and forced teardown alongside live
+graphics. The optional Snake path includes its audio startup and M toggle.
+Physical audible output and latency acceptance remain separate.
+
+## Lua Starfall validation (2026-09-12)
+
+`component.lua_starfall` runs the shipped Starfall code in the native Lua profile.
+It checks uint32 RNG vectors, bounded pools, movement/clamping, fire cadence, all
+enemy score types, drift/seeking, wave/spawn timing, damage immunity, pause, death,
+restart, and rendering through real SDK canvas methods. Temporary filesystem tests
+cover score round trips/replacement/clamping, invalid input, missing directories,
+and preservation of the previous score after an injected rename failure. A second
+run executes the entire unmodified game with scheduled input around the real canvas,
+checking held movement/fire, pause-repeat suppression, resume and normal cleanup.
+
+Supply `apps/lua/examples/starfall.lua` after the optional Snake path to
+`tabos_lua_rv32` for real shell-launched title/player/pause pixel checks, Q exit,
+Escape exit after relaunch, and terminal restoration. Physical performance,
+keyboard play and microSD persistence remain acceptance work; Linux is excluded.
+
+`component.starfall_storage` exercises the native game's production score storage. It
+checks initial and replacement saves and injects a rename failure, proving the previous
+score remains readable and the failed temporary file is removed.
+
+## Lua pointer validation (2026-09-12)
+
+`component.lua` links real SDK pointer/device wrappers against deterministic
+transport fakes. It checks canvas/letterbox mapping, contact IDs, pressure, all
+event kinds, empty/error results, keyboard coexistence, stale screens, repeated
+close, cleanup failure/retry, missing devices, GC/scope cleanup, interruption,
+and pending event recovery after allocation failure.
+
+`component.lua_touch` runs the unmodified shipped demo with scripted input and
+real SDK drawing. It checks first-contact ownership (including contact zero),
+letterbox rejection, movement, edge clamping, cancellation/release colors, no
+idle redraws, keyboard exit, and reopening after cleanup.
+
+`tabos_lua_rv32` always checks SDL touch down/move/up/cancel through the real
+loader, SDK stream and Lua canvas mapping. Graphics error/return/exit/interruption
+and forced-teardown scenarios also own pointer streams. Pass `touch.lua` after
+the optional Snake and Starfall paths to exercise the complete graphical demo
+with framebuffer checks and shell restoration. Physical Tab5 validation remains
+open; see `docs/validation/lua-pointer-2026-09-12.md`.
 
 Screen-off coverage extends `unit.power_manager` with exact 180-second total-inactivity
 timing, late dispatch, simultaneous activity, all display inhibitors, immediate policy

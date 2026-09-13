@@ -72,8 +72,8 @@ valid document state. Saving streams rows without a second document-sized buffer
 Kilo exclusively creates a sibling `.kilo-N.tmp`, writes all data, and checks close.
 If the destination exists, it reserves an unused `.kilo-N.bak` name, removes only the
 empty reservation, moves the original to that name, then installs the staged file.
-This works with host rename and the pinned FatFs backend's refusal to replace an
-existing destination. Kilo never unlinks the original before installation.
+This application-owned recovery protocol works independently of the filesystem's
+replacement support. Kilo never unlinks the original before installation.
 
 Staging failures leave the original untouched. Failed installation attempts restore
 the backup. A failed rollback retains both original backup and completed edited copy,

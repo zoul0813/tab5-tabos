@@ -30,6 +30,11 @@ binaries install to `.local/rootfs/T/bin/` without filename extensions.
 normalized path aliases and host-storage hard links, before opening the destination
 for truncation.
 
+`ls [path]` sorts names and lays them out in columns sized to the current terminal.
+Directories have a trailing `/`. Use `ls -l [path]` for one entry per line with its
+type, byte size, and UTC modification time. Use `ls -- -name` for a path beginning
+with `-`.
+
 `reboot` immediately performs an orderly system restart. `shutdown` immediately
 unmounts storage and requests system power-off. Neither command schedules a delayed
 action.

@@ -667,6 +667,11 @@ backends retain native device/inode identity and therefore recognize hard links.
 ESP-IDF FAT reports no inode, so portable core supplies case-folded normalized-path
 identity and updates open-file fallback identity across rename. Identity values are
 comparison data for current files, not persistent storage IDs.
+[DECIDED] Same-drive rename replaces an existing destination. Backends such as the
+pinned FatFs implementation that reject replacement move the destination to a reserved
+drive-root recovery name, install the source, and restore the destination if installation
+fails. This multi-step fallback preserves recoverable data but is not power-loss atomic;
+a cleanup or rollback failure may leave a `.tabos-rename-*.bak` recovery file.
 Tab5 FAT uses heap-backed long-filename buffers with a 255-character maximum so
 the backend honors the public filesystem name limit instead of silently imposing
 8.3 names.
@@ -1560,6 +1565,17 @@ audio streams only while TabOS streams exist. Backend-start failure updates devi
 remains retryable after no stream was admitted. Maintenance audit supports suppressed deadlines
 and one overdue resume pass. Pinned ESP-IDF v5.4.4 exposes no public retained-buffer MIPI-DPI
 pause; controller display-off is not treated as scanout quiescence.
+
+## Lua CLI implementation (2026-09-12)
+
+Lua 5.5.1 is an independent RV32/newlib application under `apps/lua`, using only
+public SDK services. No public ABI change is required: the cooked-event console broker
+reuses Kilo's keyboard wait source. CLI, console I/O and count-hook cancellation share
+one consumer. Pure-source modules and explicit library registration omit desktop-only
+integration. Metadata requests 4 MiB heap/64 KiB stack, with a 3 MiB Lua allocation
+ceiling and 48-level C-call/pattern limits. Physical high-water and latency measurements
+remain pending. The shared Make rules accept tracked trailing `TABOS_LDLIBS`; Lua uses
+`-lm`. These application-specific budgets/profile choices do not alter general SDK limits.
 
 [DECIDED] Display-only idle policy dims at 60 seconds, disables backlight at 180 seconds,
 and disables panel output at 300 seconds of

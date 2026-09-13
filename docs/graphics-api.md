@@ -95,7 +95,11 @@ path.
 Tab5 uses two native scanout framebuffers. Commands render into the back buffer, and
 `tabos_graphics_present()` submits it at VSYNC before exchanging front and back buffers.
 This caps visible presentation at the panel refresh rate and prevents partial frames and
-terminal contents from appearing during graphics applications.
+terminal contents from appearing during graphics applications. Status overlays are
+composited into that native back buffer immediately before submission. TabOS retains the
+covered application pixels for each scanout buffer and removes the old overlay before
+copying or updating the next application frame, so changing or hiding an overlay does not
+damage application output.
 
 The macOS and Linux SDL hosts use renderer VSYNC when available for smooth presentation
 at the desktop display cadence. If VSYNC is unavailable, they pace graphics `present()`

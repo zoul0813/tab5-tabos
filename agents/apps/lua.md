@@ -1,8 +1,95 @@
 # Lua Implementation Plan
 
-Status: proposed implementation plan, 2026-09-07. Implementation has not started.
+Status: CLI implementation and automated validation completed 2026-09-12; physical Tab5 acceptance pending. Basic graphics, keyboard, pointer/touch, and PCM playback bindings implemented at user direction before final CLI acceptance; process bindings remain follow-up work. Linux builds/tests excluded by user direction for this implementation.
+
+Current implementation uses the proposed 5.5.1 baseline and resource budgets, with
+48-level C-call/pattern limits. Kilo's keyboard wait source is reused without a new
+public ABI. UTC table input validates rather than normalizes overflowing calendar
+fields; `os.exit` always closes the state and rejects recursive exit during finalization.
+See [user documentation](../../docs/lua.md), [provenance](../../apps/lua/UPSTREAM.md),
+and [validation](../../docs/validation/lua-cli-2026-09-12.md) for exact behavior and evidence.
 
 This expands the Lua candidate in [Application Port Candidates](../milestone-apps.md). Version selection, resource budgets, binding names, and staged feature choices below are recommendations, not new `[DECIDED]` architectural requirements.
+
+## Remaining Work
+
+Track outstanding work here; completed CLI work remains in [Validation and Delivery](#validation-and-delivery).
+User direction on 2026-09-12 authorizes basic graphics and keyboard input now, without waiting for the tile engine or final CLI acceptance. User additionally authorizes PCM playback, native Snake sound port, and pointer/touch input with a graphical demo. Remaining acceptance checks stay open.
+Linux builds/tests remain excluded by user direction. Each binding slice needs its
+own implementation, documentation/example, automated coverage, and physical validation.
+
+### CLI Acceptance on Tab5
+
+- [X] Verify physical keyboard editing, Aa/Sym typing, multiline input, Ctrl-U cancellation, and Ctrl-C/Ctrl-D REPL exit.
+- [X] Run examples and nested modules from microSD; verify binary file reads/writes.
+- [ ] Verify recovery from allocation, parser-depth, and recursion failures; repeat launches and `os.exit(7)` with a usable shell afterward.
+- [ ] Measure interruption latency in loops and coroutines; verify runtime service responsiveness.
+- [ ] Record stack/heap high-water usage, count-hook overhead, and representative computation/allocation performance.
+- [ ] Record physical validation evidence and mark the CLI milestone accepted.
+
+### Graphics Bindings
+
+- [x] Implement SDK-owned logical canvas lifecycle, RGB565 primitives/blits, explicit present/close, and dimension/buffer validation using packed buffers or userdata.
+- [x] Implement idempotent resource cleanup on explicit close, Lua errors, finalization, and process teardown; define cancellation and buffer lifetime for blocking operations.
+- [x] Document the Lua graphics API and ship a single-file Snake game.
+- [x] Port native Starfall gameplay, artwork, font, and high-score storage to `examples/starfall.lua` using existing bindings; stage/install the single-file example.
+- [x] Complete deterministic host and real RV32 validation for drawing, argument validation, resource failures, and cleanup.
+- [ ] Validate rendering, presentation, cleanup, memory use, and representative frame performance on physical Tab5; record results.
+
+Initial API: `tabos.rgb`, `tabos.graphics.open(width,height)`, and screen methods
+`size`, `clear`, `pixel`, `line`, `rect`, `fill_rect`, packed little-endian RGB565
+`blit`, `set_letterbox_color`, `present`, `close`, `poll`, and `is_down`.
+One SDK canvas uses at most 512 KiB outside the 3 MiB Lua-managed budget; blit
+scratch memory counts against that Lua budget. Userdata generation checks prevent
+stale handles/finalizers from closing a later screen. `<close>` is recommended;
+CLI boundaries close graphics before error reporting and the next prompt.
+No tile-engine dependency, public ABI change, image decoder, or text renderer.
+Evidence: [graphics validation](../../docs/validation/lua-graphics-2026-09-12.md).
+Starfall port evidence: [validation](../../docs/validation/lua-starfall-2026-09-12.md).
+
+### Input Bindings
+
+- [x] Expose keyboard press/release and held-key state through the shared console broker.
+- [x] Implement console/graphics input transitions without competing consumers; preserve interruption handling and restore console mode on close/error.
+- [x] Document keyboard game input and demonstrate it in Snake.
+- [x] Complete deterministic host and real RV32 validation for keyboard events, transitions, interruption, and restoration.
+- [ ] Validate keyboard interaction and return to a usable shell on physical Tab5; record results.
+- [x] Add pointer bindings with documentation/example and host/RV32 validation.
+- [ ] Validate pointer interaction and cleanup on physical Tab5.
+
+Pointer methods are screen-owned `pointer_open`, `pointer_poll`, and `pointer_close`.
+They use the existing `touch0` stream independently of the keyboard broker, map
+display coordinates into the logical canvas, preserve contact/pressure/cancel
+semantics, and close with the screen. `examples/touch.lua` demonstrates touch/click
+and drag to move a square, first-contact ownership, clipping, and keyboard exit.
+Evidence: [pointer validation](../../docs/validation/lua-pointer-2026-09-12.md).
+
+### Audio Bindings
+
+- [x] Implement bounded signed-16-bit PCM playback with explicit backpressure and close, without per-sample Lua callbacks or hidden resampling.
+- [x] Define buffer ownership/lifetime and cancellation; implement idempotent cleanup on close, Lua errors, finalization, and process teardown.
+- [x] Document `tabos.audio` playback; port native Snake start/eat/lose/win PCM, stream reuse, pause-stop, and mute into single-file Lua Snake.
+- [x] Add deterministic host coverage for buffer validation, backpressure, cancellation, failures, and cleanup; exercise bindings through the real RV32 runtime.
+- [ ] Validate playback, backpressure, cancellation, and resource cleanup on physical Tab5; record results.
+
+Audio evidence: [validation](../../docs/validation/lua-audio-2026-09-12.md).
+The nonblocking playback API provides `open`, `info`, `write`, `flush`, `set_volume`,
+`status`, and `close`; capture and audio waits remain outside this initial slice.
+
+### Foreground Child Execution
+
+- [ ] Wrap `tabos_exec(path, argv)` with path/argument validation, argument count/byte limits, and negative-error conversion.
+- [ ] Preserve the loaded parent Lua state while the child runs; restore focus after child exit and define blocking-call cancellation behavior.
+- [ ] Document the Lua execution API and ship a small child-launch example; retain the distinction from shell-string execution and background jobs.
+- [ ] Add deterministic host coverage for invalid arguments, launch failures, exit statuses, and parent-state/focus restoration; exercise bindings through the real RV32 runtime.
+- [ ] Validate child launch, exit, repeated execution, and Lua/shell restoration on physical Tab5; record results.
+
+### Later Follow-Up
+
+These items are outside CLI acceptance. Other explicitly deferred capabilities
+remain listed in [Outcome and Milestone Boundaries](#outcome-and-milestone-boundaries).
+
+- [ ] Add persistent REPL history, with documented storage and failure behavior plus automated coverage.
 
 ## Outcome and Milestone Boundaries
 
@@ -11,7 +98,7 @@ Provide an independently built `T:/bin/lua` application that runs source scripts
 Deliver two distinct milestones:
 
 1. **CLI Lua:** language runtime, files, pure-Lua modules, usable REPL, bounded memory, errors/interruption, and a small system-information/time module.
-2. **TabOS scripting bindings:** graphics, input, audio, and foreground child execution, added in separate validated slices after CLI acceptance.
+2. **TabOS scripting bindings:** graphics, input, audio, and foreground child execution, added in separate validated slices. User direction permits basic graphics/keyboard and PCM playback before final CLI acceptance.
 
 The CLI milestone does not depend on Kilo being implemented. Reuse any generic keyboard-wait work completed for Kilo, but do not require its terminal-size or ANSI improvements just to execute scripts.
 
@@ -129,7 +216,7 @@ Ship examples through the existing flat runtime-asset mechanism into `T:/data/lu
 
 Build one application-local console broker shared by the REPL, console I/O, and interrupt handling. It consumes cooked input events exclusively. Keep Aa/Sym text translation enabled, preserve unrelated TTY bits, and disable inherited scroll-key interception where Lua handles those keys. Restore the inherited mode on every exit path.
 
-Provide prompt echo, Backspace, Enter, multiline continuation, expression-result display, and Ctrl-D exit on an empty REPL line. Ctrl-C cancels the current input or running chunk. Use bounded input buffers and report overlong input without executing a truncated command. Persistent history and advanced line editing are follow-up work.
+Provide prompt echo, Backspace, Enter, multiline continuation, expression-result display, and Ctrl-C/Ctrl-D exit from the REPL, including pending input and running interactive chunks. Ctrl-U cancels pending input and multiline chunks. Use bounded input buffers and report overlong input without executing a truncated command. The REPL also supports physical Backspace/Delete, Left/Right, Home/End, 16 session-local history lines with Up/Down and draft restoration, and horizontal scrolling. Ctrl-C/Ctrl-D exit continuation prompts with or without text. Interactive startup displays the upstream version/copyright banner; Escape has no exit action. Persistent history remains follow-up work.
 
 If regular Lua `io` code would otherwise read console descriptors through newlib, route those console operations through the same broker. Cover `io.read`, `io.stdin:read`, console line iteration, and any explicit standard-input file handle. File reads remain ordinary stdio. Do not combine a hook that drains raw events with an independent `fgets(stdin)` loop.
 
@@ -167,7 +254,7 @@ This module should require no new public TabOS ABI beyond any separately impleme
 
 ## Follow-On: Graphics, Input, Audio, and Process Bindings
 
-Start these only after the CLI milestone passes. Each slice needs API documentation, a small example, deterministic host coverage, and physical validation where relevant.
+The original sequence gated these on CLI acceptance. User direction on 2026-09-12 authorizes basic graphics and keyboard game input now, independently of the tile engine. Each slice still needs API documentation, a small example, deterministic host coverage, and physical validation where relevant. User subsequently authorizes PCM playback, native Snake sound port, and pointer/touch bindings with a graphical demo. Process bindings remain follow-up work.
 
 | Slice | Initial design |
 | --- | --- |
@@ -198,14 +285,16 @@ Build through `./apps/build.sh` and shared Make rules with the pinned project to
 
 Suggested delivery sequence: pinned build and arithmetic proof; library/profile and module loading; bounded REPL/interruption; memory/error hardening and small TabOS module; cross-target acceptance and docs. Graphics/audio follow separately.
 
-- [ ] Pin upstream archive, verify checksum, retain license, and build the independent RV32 executable.
-- [ ] Implement and document supported CLI, standard libraries, source loading, and module paths.
-- [ ] Validate unified console input, idle waiting, coroutine interruption, and parent restoration.
-- [ ] Validate numeric semantics, memory limits, recursion, OOM handling, and file errors.
-- [ ] Add the small TabOS module and installable example scripts.
-- [ ] Pass native sanitizer tests, applicable upstream tests, and actual RV32 host integration.
-- [ ] Complete supported-target builds and separate physical Tab5 acceptance.
-- [ ] Write `docs/lua.md`; update `docs/README.md`, `docs/applications.md`, and any affected SDK/input documentation.
-- [ ] Update `agents/roadmap.md` when implementation starts and as validation completes; record accepted shared API changes in architecture/context/testing documents.
+- [x] Pin upstream archive, verify checksum, retain license, and build the independent RV32 executable.
+- [x] Implement and document supported CLI, standard libraries, source loading, and module paths.
+- [x] Validate unified console input, idle waiting, coroutine interruption, and parent restoration.
+- [x] Validate numeric semantics, memory limits, recursion, OOM handling, and file errors.
+- [x] Add the small TabOS module and installable example scripts.
+- [x] Pass native sanitizer tests, applicable upstream tests, and actual RV32 host integration.
+- [x] Complete macOS Debug/Release and Tab5 Debug/Release builds; Linux excluded by user direction.
+- [x] Write `docs/lua.md`; update `docs/README.md`, `docs/applications.md`, and any affected SDK/input documentation.
+- [x] Update `agents/roadmap.md` when implementation starts and as validation completes; record accepted shared API changes in architecture/context/testing documents.
+
+Outstanding physical acceptance and measurements are tracked in [CLI Acceptance on Tab5](#cli-acceptance-on-tab5).
 
 CLI completion means a user can run a script with arguments, read/write files, require a source module, interact at the prompt, recover from ordinary errors or memory exhaustion, interrupt a cooperative running chunk, and return to the shell on host and Tab5. Successful compilation alone is insufficient.

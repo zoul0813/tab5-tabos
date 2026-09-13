@@ -8,8 +8,29 @@
 
 #include "platform_test.h"
 
+#include <pthread.h>
+#include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>
+
+typedef struct {
+        const tabos_console_session_t* session;
+        atomic_bool start;
+        atomic_bool failed;
+} concurrent_write_context_t;
+
+static void* write_during_resize(void* opaque)
+{
+    concurrent_write_context_t* context = opaque;
+    while (!atomic_load_explicit(&context->start, memory_order_acquire)) {}
+    for (size_t iteration = 0U; iteration < 512U; ++iteration) {
+        if (!tabos_console_write(context->session, "x")) {
+            atomic_store_explicit(&context->failed, true, memory_order_release);
+            break;
+        }
+    }
+    return NULL;
+}
 
 int main(void)
 {
@@ -68,6 +89,15 @@ int main(void)
     size_t column = 99U;
     size_t row    = 99U;
     if (!tabos_console_get_cursor(&foreground, &column, &row) || column != 0U || row != 1U) {
+        return 1;
+    }
+    static const char embedded_nul[] = {'A', '\0', 'B'};
+    if (!tabos_console_write_bytes(&foreground, embedded_nul, sizeof(embedded_nul)) ||
+        !tabos_console_write_bytes(&foreground, embedded_nul, 2U) ||
+        !tabos_console_write_bytes(&foreground, embedded_nul + 2U, 1U) ||
+        terminal.cells[terminal.columns].character != 'A' || terminal.cells[terminal.columns + 1U].character != 'B' ||
+        terminal.cells[terminal.columns + 2U].character != 'A' ||
+        terminal.cells[terminal.columns + 3U].character != 'B') {
         return 1;
     }
 
@@ -173,8 +203,27 @@ int main(void)
     }
 
     if (!tabos_console_clear(&background) || !tabos_console_write(&background, "SCALE") ||
-        !terminal_resize(&terminal, display_framebuffer(), 4U) || terminal.scale != 4U || terminal.column != 5U ||
-        terminal.cells[0].character != 'S' || terminal.cells[4].character != 'E') {
+        console_resize(display_framebuffer(), 4U) != CONSOLE_RESIZE_OK || terminal.scale != 4U ||
+        terminal.column != 5U || terminal.cells[0].character != 'S' || terminal.cells[4].character != 'E') {
+        return 1;
+    }
+
+    concurrent_write_context_t context = {
+        .session = &background,
+    };
+    pthread_t writer;
+    if (pthread_create(&writer, NULL, write_during_resize, &context) != 0) {
+        return 1;
+    }
+    atomic_store_explicit(&context.start, true, memory_order_release);
+    for (size_t iteration = 0U; iteration < 32U; ++iteration) {
+        const unsigned int scale = iteration % 2U == 0U ? 2U : 4U;
+        if (console_resize(display_framebuffer(), scale) != CONSOLE_RESIZE_OK) {
+            return 1;
+        }
+    }
+    if (pthread_join(writer, NULL) != 0 || atomic_load_explicit(&context.failed, memory_order_acquire) ||
+        terminal.scale != 4U || terminal.cells == NULL || terminal.dirty_cells == NULL) {
         return 1;
     }
 

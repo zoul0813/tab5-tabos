@@ -27,7 +27,7 @@ SDL host graphics applications use renderer VSYNC when available. Timer pacing u
 event-driven, and headless tests are not artificially delayed. Configure the fallback
 value with `./tools/tabos config`.
 
-Software can change scale from 1 through 8 at runtime using `tabos_terminal_set_scale()` from `<tabos/terminal.h>` and inspect it with `tabos_terminal_get_scale()`. A value set before runtime startup becomes initial boot scale. A value set after startup rebuilds geometry, reflows retained hard and soft-wrapped cell history, preserves colors and cursor, and redraws current viewport. Runtime value is retained for life of running system but is not yet persisted across restarts; persistent preference storage will depend on future filesystem/configuration service.
+Software can change scale from 1 through 8 at runtime using `tabos_terminal_set_scale()` from `<tabos/terminal.h>` and inspect it with `tabos_terminal_get_scale()`. A value set before runtime startup becomes initial boot scale. A value set after startup rebuilds geometry, reflows retained hard and soft-wrapped cell history, preserves colors, reverse-video attributes, active rendition, and cursor, and redraws current viewport. Resize is serialized with console access. If fullscreen graphics is active, the resized terminal remains suspended and is not presented until graphics ownership ends. Runtime value is retained for life of running system but is not yet persisted across restarts; persistent preference storage will depend on future filesystem/configuration service.
 
 At startup, the kernel creates one structured boot report and writes it to both the platform log and the terminal framebuffer. The report identifies the TabOS version, target, detected display, logical framebuffer, processor, memory, storage state, and kernel runtime state. Tab5 also reports internal heap availability, PSRAM availability, and physical flash capacity. This prevents serial and on-screen diagnostics from evolving as separate lists.
 
@@ -46,6 +46,12 @@ The Tab5 target uses the official `espressif/m5stack_tab5_noglib` BSP component,
 At boot, the platform detects and reports the installed display controller over serial in both debug and release builds. Current detection supports ILI9881C, ST7123, and ST7121 Tab5 variants. The detected controller name is also available through the platform interface for a future on-screen boot driver list.
 
 TabOS keeps its shared logical orientation at 1280×720. Before presenting, the Tab5 backend rotates that frame counter-clockwise into the panel's native 720×1280 layout, sends it to the LCD, and then enables the backlight at 75% brightness. The pure rotation operation is covered by a host unit test.
+
+Fullscreen graphics use native portrait double buffers. Battery and WiFi overlays are
+mapped into the active native back buffer before VSYNC submission while retaining the
+covered application pixels independently for both scanout buffers. Overlay changes and
+disablement therefore reveal the original application frame instead of terminal pixels
+or pixels left by an earlier overlay.
 
 The BSP integration deliberately excludes LVGL. UI composition remains owned by TabOS and will be designed separately.
 

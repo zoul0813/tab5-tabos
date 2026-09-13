@@ -9,6 +9,8 @@
 
 #include <tabos/platform/platform.h>
 
+#include <string.h>
+
 static terminal_t* active_terminal;
 static uint32_t foreground_token;
 static uint32_t next_token = 1U;
@@ -72,12 +74,34 @@ bool console_init(terminal_t* terminal)
 
 void console_rebind(terminal_t* terminal)
 {
+    if (console_mutex == NULL || terminal == NULL) {
+        return;
+    }
     lock_console();
     active_terminal = terminal;
     if (foreground_token != 0U) {
         restart_cursor_blink();
     }
     unlock_console();
+}
+
+console_resize_result_t console_resize(platform_framebuffer_t* framebuffer, unsigned int scale)
+{
+    if (console_mutex == NULL) {
+        return CONSOLE_RESIZE_FAILED;
+    }
+
+    lock_console();
+    if (active_terminal == NULL || !terminal_resize(active_terminal, framebuffer, scale)) {
+        unlock_console();
+        return CONSOLE_RESIZE_FAILED;
+    }
+    if (foreground_token != 0U) {
+        restart_cursor_blink();
+    }
+    const bool presented = present_console();
+    unlock_console();
+    return presented ? CONSOLE_RESIZE_OK : CONSOLE_RESIZE_PRESENT_FAILED;
 }
 
 bool console_write_panic(const char* text)
@@ -182,9 +206,9 @@ bool tabos_console_is_foreground(const tabos_console_session_t* session)
     return foreground;
 }
 
-bool tabos_console_write(const tabos_console_session_t* session, const char* text)
+bool tabos_console_write_bytes(const tabos_console_session_t* session, const void* data, size_t size)
 {
-    if (text == NULL) {
+    if (data == NULL && size != 0U) {
         return false;
     }
 
@@ -193,11 +217,16 @@ bool tabos_console_write(const tabos_console_session_t* session, const char* tex
         unlock_console();
         return false;
     }
-    terminal_write(active_terminal, text);
+    terminal_write_bytes(active_terminal, data, size);
     restart_cursor_blink();
     const bool presented = present_console();
     unlock_console();
     return presented;
+}
+
+bool tabos_console_write(const tabos_console_session_t* session, const char* text)
+{
+    return text != NULL && tabos_console_write_bytes(session, text, strlen(text));
 }
 
 bool tabos_console_write_line(const tabos_console_session_t* session, const char* text)

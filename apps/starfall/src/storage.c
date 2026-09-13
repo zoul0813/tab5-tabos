@@ -60,11 +60,10 @@ int starfall_high_score_save(uint32_t score)
         return -1;
     }
     if (rename(SCORE_TEMP_PATH, SCORE_PATH) != 0) {
-        (void) unlink(SCORE_PATH);
-        if (rename(SCORE_TEMP_PATH, SCORE_PATH) != 0) {
-            (void) unlink(SCORE_TEMP_PATH);
-            return -1;
-        }
+        const int error = errno;
+        (void) unlink(SCORE_TEMP_PATH);
+        errno = error;
+        return -1;
     }
     return 0;
 }

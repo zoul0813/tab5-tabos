@@ -16,7 +16,9 @@ bool tabos_console_acquire(tabos_console_session_t* session);
 void tabos_console_release(tabos_console_session_t* session);
 bool tabos_console_is_foreground(const tabos_console_session_t* session);
 
-/* Foreground output is rendered and presented immediately. */
+/* Foreground output is rendered and presented immediately. NUL bytes in a
+ * counted write have no terminal action and do not suppress following bytes. */
+bool tabos_console_write_bytes(const tabos_console_session_t* session, const void* data, size_t size);
 bool tabos_console_write(const tabos_console_session_t* session, const char* text);
 bool tabos_console_write_line(const tabos_console_session_t* session, const char* text);
 bool tabos_console_clear(const tabos_console_session_t* session);

@@ -26,7 +26,7 @@ same synchronization.
 
 ## Output and Cursor Controls
 
-Terminal stores character, foreground color, and background color in a cell/history model. Framebuffer is rendered view, not only copy of terminal state. `tabos_console_write()` updates cells and presents changed framebuffer immediately. Normal writes and cursor changes redraw dirty cells only; clear, resize, and viewport movement perform full redraw. Supported controls are:
+Terminal stores character, foreground color, and background color in a cell/history model. Framebuffer is rendered view, not only copy of terminal state. `tabos_console_write()` updates cells and presents changed framebuffer immediately. `tabos_console_write_bytes()` accepts an explicit byte count, so embedded NUL bytes cannot truncate later output; NUL itself has no terminal action. Normal writes and cursor changes redraw dirty cells only; clear, resize, and viewport movement perform full redraw. Supported controls are:
 
 - `\n`: move to first column of next row.
 - `\r`: move to first column of current row.
@@ -53,7 +53,7 @@ Terminal retains visible rows plus `TABOS_TERMINAL_SCROLLBACK_LINES` history row
 
 Oldest history row is discarded when ring fills. Any new console output automatically returns viewport to live end. Scrollback keyboard handling is process-owned and opt-in rather than a global kernel shortcut. The shell enables it: Page Up or Ctrl+Up moves up, Page Down or Ctrl+Down moves down, Home or Ctrl+Left moves to oldest history, and End or Ctrl+Right returns to live output. A child inherits its parent's mode, may disable it for raw keyboard use, and cannot change the retained parent's mode.
 
-Changing terminal scale rebuilds geometry, reflows retained hard and soft-wrapped lines, preserves colors and cursor, and redraws current viewport. Console content no longer falls back to boot-only redraw after scale change.
+Changing terminal scale rebuilds geometry, reflows retained hard and soft-wrapped lines, preserves colors and cursor, and redraws current viewport. Resize is serialized with console output and cursor updates. While fullscreen graphics owns the framebuffer, resizing retains terminal rendering state without modifying or presenting the graphics surface; leaving fullscreen redraws the resized console.
 
 ## Input
 
@@ -98,8 +98,10 @@ CSI supports bounded row/column `H` and `f`, omitted/default parameters, multipl
 SGR values, default colors 39/49, and private cursor visibility `?25h`/`?25l`.
 Sequences may span writes. Overflow, excessive parameters (more than eight), and
 unsupported sequences are consumed without exposing parameter bytes as text.
-Cursor addressing is clamped to the live screen, independently of retained
-scrollback. Moving the cursor does not discard rows below it.
+Cursor addressing and saved-cursor restoration are clamped to the live screen,
+independently of retained scrollback. If a saved line is evicted, restoration
+selects the oldest row on the current live screen. Moving the cursor does not
+discard rows below it.
 
 Wrapping remains immediate, including at the bottom-right cell. Full-screen painters
 should reserve the final column and explicitly position each row without a final

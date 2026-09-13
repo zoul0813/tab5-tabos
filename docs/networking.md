@@ -94,8 +94,9 @@ closes the native accepted socket before returning.
 Socket payload calls are bounded to `TABOS_NETWORK_IO_MAX` bytes. Applications
 must loop when transferring larger streams. A zero return from receive means the
 peer performed an orderly shutdown. Nonblocking operations report `EAGAIN`
-through `errno`. Host sends suppress the native SIGPIPE signal, so sending after a
-peer disconnect returns an application error without terminating TabOS.
+through `errno`. Host networking suppresses the native SIGPIPE signal for plain
+sockets and TLS, so sending after a peer disconnect returns an application error
+without terminating TabOS.
 
 Sockets belong to the loaded application that opened or accepted them. TabOS
 closes remaining sockets during normal exit and fault cleanup. Public headers do
@@ -163,7 +164,8 @@ socket coverage remains independent of Wi-Fi state.
 connection is process-owned, uses the system CA store on host builds and the
 ESP-IDF certificate bundle on Tab5, verifies both the certificate chain and the
 requested hostname, and is cleaned up when its application exits. It supports
-up to four bounded connections.
+up to four bounded connections. Host trust-store setup is fail-closed and retried
+with a fresh TLS context on every connection attempt after a setup failure.
 
 `tabos_tls_connect()`, `tabos_tls_send()`, `tabos_tls_receive()`, and
 `tabos_tls_close()` use the same `errno` convention as sockets. Send and receive
@@ -199,6 +201,13 @@ the URL does not provide a usable filename:
 fetch https://example.com/files/readme.txt
 fetch https://example.com/ T:/example.html
 ```
+
+Responses must use HTTP/1.0 or HTTP/1.1 and a successful 2xx status. `fetch`
+supports a decimal `Content-Length` or a body delimited by a clean TLS close;
+it rejects transfer codings, malformed or oversized headers, HTTP errors, and
+truncated length-delimited bodies. The destination is replaced only after the
+complete response has been written and closed successfully. Failed downloads
+remove the `.part` file and preserve an existing destination.
 
 ## Ping
 

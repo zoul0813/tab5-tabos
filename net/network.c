@@ -92,6 +92,7 @@ static bool start_attempt(void)
     memcpy(attempt_password, password, sizeof(attempt_password));
     platform_mutex_unlock(state_mutex);
     const bool connected = platform_network_connect(attempt_ssid, attempt_password);
+    memset(attempt_password, 0, sizeof(attempt_password));
     platform_mutex_lock(state_mutex);
     if (!connected) {
         set_failure("platform rejected connection");
@@ -254,6 +255,9 @@ static bool connect_active(const char* ssid, const char* supplied_password, bool
         strlen(ssid) > NETWORK_CONFIG_SSID_MAX || strlen(supplied_password) > NETWORK_CONFIG_PASSWORD_MAX) {
         return false;
     }
+    tabos_timer_cancel(&retry_timer);
+    retry_suppressed = true;
+    current.state    = NETWORK_STATE_DISCONNECTING;
     platform_mutex_unlock(state_mutex);
     (void) platform_network_disconnect();
     platform_mutex_lock(state_mutex);
@@ -263,7 +267,6 @@ static bool connect_active(const char* ssid, const char* supplied_password, bool
     connection_requested = true;
     current.attempts     = 0U;
     current.ipv4[0]      = '\0';
-    tabos_timer_cancel(&retry_timer);
     retry_suppressed   = false;
     const bool started = start_attempt();
     platform_runtime_notify(PLATFORM_RUNTIME_EVENT_DEADLINE);

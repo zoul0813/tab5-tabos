@@ -49,6 +49,14 @@ case-folded normalized-path identity there; FAT links are unsupported. These val
 support current-file comparisons and must not be persisted across rename, unmount, or
 reboot.
 
+Same-drive `rename()` follows replacement semantics: when the destination exists, the
+source replaces it. On the Tab5 FAT backend, TabOS implements this with a recoverable
+multi-step fallback because FatFs itself returns `EEXIST`: the old destination is moved
+to a reserved `.tabos-rename-*.bak` file at the drive root, the source is installed, and
+the old destination is restored if installation fails. This protects the prior contents
+from reported I/O failures, but it is not power-loss atomic. An interrupted cleanup or
+failed rollback can leave the hidden backup for manual recovery.
+
 Use `tabos_fs_drive_count()` and `tabos_fs_drive_info()` to enumerate available drives,
 their letters, names, removable status, capacity, and free space.
 Boot diagnostics list every available drive on its own line with the same letter,
@@ -85,7 +93,11 @@ same system-wide open-file capacity. It defaults to 32 and can be changed throug
 The corresponding `TABOS_FILESYSTEM_MAX_DIRECTORIES` setting controls the
 system-wide open-directory table on every target and defaults to 8. Each loaded
 application also has a separate eight-entry `DIR*` wrapper pool; this per-process SDK
-limit is independent of the shared kernel capacity.
+limit is independent of the shared kernel capacity. Failed directory opens release their
+wrapper entry immediately. A loaded application whose runtime does not provide the
+directory-listing ABI gate receives `ENOSYS` without consuming an entry.
+Loaded-application directory enumeration uses a fixed 4096-byte snapshot. If all entries
+do not fit, `opendir()` fails with `ENOSPC`; it never exposes a silently truncated listing.
 
 Disk format is FAT filesystem supported by Tab5 BSP. `A:` is unavailable until internal
 flash filesystem is implemented, then appears separately in boot diagnostics. Live

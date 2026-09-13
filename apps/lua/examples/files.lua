@@ -1,0 +1,7 @@
+local path = assert(arg[1], "usage: lua files.lua output-path")
+local f = assert(io.open(path, "wb"))
+assert(f:write("Lua file bytes\0\255\n"))
+assert(f:close())
+f = assert(io.open(path, "rb"))
+print(string.format("%q", assert(f:read("a"))))
+assert(f:close())

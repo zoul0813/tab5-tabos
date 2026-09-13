@@ -20,6 +20,23 @@
 
 ## Current Work
 
+### Lua CLI
+
+- [x] Fix physical Backspace; add cursor editing, Delete, session history, horizontal scrolling, Ctrl-C/Ctrl-D exit, and Ctrl-U input cancellation.
+- [x] Implement pinned Lua 5.5.1, source-only library profile, console broker, and small TabOS module.
+- [x] Validate native sanitizers, official UTF-8/string/math subsets, RV32 sessions and macOS/Tab5 Debug/Release builds.
+- [x] Verify ordinary application build/install, licenses/examples and trailing math-library build tracking.
+- Linux builds/tests excluded by user direction; evidence: `docs/validation/lua-cli-2026-09-12.md`.
+- [ ] Complete remaining physical Tab5 CLI acceptance and measurements.
+- [x] Add Lua logical-canvas primitives, packed RGB565 blits, lifecycle and shared-broker keyboard game input; ship a single-file Snake example.
+- [x] Port Starfall to a self-contained Lua example with native gameplay/artwork, fixed-step simulation, and nonfatal high-score persistence.
+- User authorized this basic graphics/input slice before final CLI acceptance and without the tile engine on 2026-09-12.
+- [x] Add screen-owned Lua pointer/touch streams, canvas coordinate mapping and a single-file drag-to-move demo with host/RV32 validation.
+- [ ] Complete physical Lua Snake/graphics/keyboard/pointer acceptance and frame/memory measurements; process bindings remain follow-up work.
+
+- [x] Add nonblocking Lua PCM playback, partial-write/backpressure reporting, bounded stream ownership and cleanup; port native Snake melodies exactly with mute and stream reuse.
+- [ ] Physically validate Lua audio output, cancellation, resource cleanup, and gameplay latency on Tab5.
+
 ### Kilo Terminal Editor
 
 - [x] Implement terminal geometry, bounded ANSI controls, and keyboard readiness waits.
@@ -220,6 +237,7 @@ ordered callbacks are implemented. No new display policy or CPU sleep behavior i
 - [x] Implement C runtime startup and newlib syscall stubs.
 - [x] Convert independently loaded sample applications to standard `main`.
 - [x] Validate libc, filesystem, heap, CP437, nonblocking input, and cleanup on host and Tab5.
+- [x] Preserve batched text across short stdin reads and bytes after NUL in console writes.
 - [x] Add modular `apps/tester` application for ongoing public SDK and ABI validation.
 - [ ] Add RVC/compressed-instruction support to host execution, then select compressed
   application multilib for shared artifacts.
@@ -238,6 +256,8 @@ ordered callbacks are implemented. No new display policy or CPU sleep behavior i
 - [x] Preserve host invalid-memory fault containment and PID 0 panic behavior.
 - [x] Resolve AUD-009: revoke fullscreen graphics ownership and present a plain terminal
   panic surface for every retained process-0 failure path.
+- [x] Resolve AUD-010: serialize runtime terminal resize with console access and suppress
+  retained-terminal presentation while fullscreen graphics owns the framebuffer.
 - [x] Document that native Tab5 application faults remain device-fatal until a
   user-mode/PMP execution boundary and recoverable trap path are implemented.
 - [ ] Design and implement the Tab5 user-mode/PMP boundary and recoverable native-fault path.
@@ -281,6 +301,7 @@ ordered callbacks are implemented. No new display policy or CPU sleep behavior i
 - [x] Publish downloadable macOS, Linux, and Tab5 artifacts.
 - [x] Include executable `run.sh` launchers in macOS and Linux artifacts.
 - [x] Package maintained applications and a checkout-independent writable rootfs with host artifacts.
+- [x] Bundle and relocate macOS SDL3/OpenSSL runtime dependencies and reject nonportable links.
 - [x] Let macOS launcher remove quarantine attribute before starting unsigned host binary.
 - [x] Package correctly capitalized Tab5 firmware image and flash metadata.
 
@@ -445,6 +466,7 @@ ordered callbacks are implemented. No new display policy or CPU sleep behavior i
 - [x] Implement file/directory handle ownership and cleanup.
 - [x] Implement application-facing filesystem API dispatch.
 - [x] Add deterministic tests for paths, handles, errors, and boundary cases.
+- [x] Preserve `ENOSPC` when loaded-application directory listings exceed their fixed transport buffer.
 
 ### Host Storage Backend
 
@@ -500,6 +522,14 @@ ordered callbacks are implemented. No new display policy or CPU sleep behavior i
 - [x] Resolve AUD-005: suspend host generic/socket/TLS waits, retain finite deadlines,
   bound copied DNS/echo/TLS setup workers, and cancel without retaining guest memory.
   Add RV32 SDL/input/shutdown, forced teardown, socket, and local TLS regressions.
+- [x] Resolve AUD-017: keep host TLS contexts attempt-local, free failed trust-store
+  initialization, and reject connections whose final certificate result is not valid.
+- [x] Resolve AUD-018: give `fetch` output streams single-close ownership across close
+  and rename failures, with sanitizer-backed injected finalization regressions.
+- [x] Resolve AUD-019: accumulate bounded HTTP headers across TLS reads and preserve
+  body bytes received with the terminator, validating every first-read split point.
+- [x] Resolve AUD-020: require a 2xx response and valid supported body framing before
+  committing a download; preserve existing destinations on errors and truncation.
 - [x] Report illegal instructions and invalid guest memory accesses without crashing host.
 - [ ] Add optional instruction/register tracing for application debugging.
 - [ ] Evaluate GDB remote debugging after basic interpreter execution is stable.
@@ -627,6 +657,8 @@ but is not a substitute for this execution path.
 - [x] Resolve AUD-007: clip line and rectangle-outline geometry with widened arithmetic
   before bounded visible rasterization and gate dispatch.
 - [x] Resolve AUD-008: reject empty raster-fill intersections before pointer and span arithmetic.
+- [x] Resolve AUD-021: composite status overlays into direct Tab5 scanout buffers while
+  retaining covered application pixels across double-buffer swaps.
 - [x] Add a portable graphics benchmark application.
 - [x] Add application-owned integer-scaled logical canvases with automatic presentation.
 - [ ] Validate PPA orientation, transforms, and fallback on physical Tab5 variants.
@@ -750,6 +782,10 @@ but is not a substitute for this execution path.
 
 ## Maintenance and Technical Debt
 
+- [x] Make `wc` propagate open, read, and close failures through its process status,
+  with deterministic injected stream-error regression coverage.
+- [x] Release provisional POSIX `DIR*` wrapper entries after failed opens in both
+  application and non-application builds, including unavailable listing gates.
 - [x] Centralize Tab5 GPIO ISR-service ownership; touch attaches directly with checked
   errors instead of invoking component global installation. Failure/retry and shared
   consumer lifetime regression passes; physical boot verification remains above.

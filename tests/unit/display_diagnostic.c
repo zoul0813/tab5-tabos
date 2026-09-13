@@ -1,7 +1,10 @@
 #include <tabos/internal/display.h>
 #include <tabos/internal/font.h>
+#include <tabos/internal/network.h>
 #include <tabos/internal/terminal.h>
 #include <tabos/platform/display_transform.h>
+
+#include "platform_test.h"
 
 #include <stddef.h>
 
@@ -81,6 +84,40 @@ int main(void)
     if (!display_present()) {
         return 1;
     }
+
+    if (!network_service_init()) {
+        return 1;
+    }
+    test_platform_network_set_state(PLATFORM_NETWORK_ONLINE, NULL);
+    network_service_update();
+    test_platform_set_time_ms(1000U);
+    const platform_pixel_t background = 0x1234U;
+    for (size_t index = 0U; index < framebuffer->width * framebuffer->height; ++index) {
+        framebuffer->pixels[index] = background;
+    }
+    const size_t overlay_x = 1240U;
+    const size_t overlay_y = 25U;
+    display_overlay_set_flags(TABOS_GRAPHICS_OVERLAY_WIFI);
+    test_platform_graphics_direct_begin(background);
+    if (!display_graphics_present() || test_platform_graphics_pixel(overlay_x, overlay_y) != 0xffffU ||
+        test_platform_graphics_pixel(1126U, 10U) != background ||
+        pixel_at(framebuffer, overlay_x, overlay_y) != background) {
+        return 1;
+    }
+    test_platform_graphics_direct_end();
+    test_platform_display_compare_graphics_region(1126U, 10U, 144U, 22U);
+    if (!display_graphics_present() || !test_platform_display_graphics_region_matches() ||
+        pixel_at(framebuffer, overlay_x, overlay_y) != background) {
+        return 1;
+    }
+
+    display_overlay_set_flags(TABOS_GRAPHICS_OVERLAY_NONE);
+    test_platform_graphics_direct_resume();
+    if (!display_graphics_present() || test_platform_graphics_pixel(overlay_x, overlay_y) != background) {
+        return 1;
+    }
+    test_platform_graphics_direct_end();
+    network_service_shutdown();
     terminal_shutdown(&terminal);
     display_shutdown();
     return 0;

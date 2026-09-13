@@ -1,6 +1,27 @@
 #include <tabos/platform/platform.h>
 #include <tabos/filesystem.h>
 
+#include <stddef.h>
+#include <stdatomic.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+static platform_pixel_t pixels[TABOS_DISPLAY_WIDTH * TABOS_DISPLAY_HEIGHT];
+static platform_pixel_t direct_pixels[TABOS_DISPLAY_WIDTH * TABOS_DISPLAY_HEIGHT];
+static platform_pixel_t direct_overlay_saved[4096];
+static bool fake_direct_graphics;
+static bool fake_direct_overlay_active;
+static int32_t direct_overlay_x;
+static int32_t direct_overlay_y;
+static uint32_t direct_overlay_width;
+static uint32_t direct_overlay_height;
+static size_t comparison_x;
+static size_t comparison_y;
+static size_t comparison_width;
+static size_t comparison_height;
+static bool comparison_matches;
+
 uint32_t platform_graphics_capabilities(void)
 {
     return 0U;
@@ -15,9 +36,77 @@ void platform_graphics_end(void)
 {
 }
 
+bool platform_graphics_overlay(platform_framebuffer_t* framebuffer, const platform_graphics_overlay_t* overlay)
+{
+    if (framebuffer == NULL) {
+        return false;
+    }
+    if (!fake_direct_graphics) {
+        return true;
+    }
+    if (overlay == NULL) {
+        if (fake_direct_overlay_active) {
+            for (uint32_t row = 0U; row < direct_overlay_height; ++row) {
+                for (uint32_t column = 0U; column < direct_overlay_width; ++column) {
+                    const size_t destination =
+                        (size_t) (direct_overlay_y + (int32_t) row) * framebuffer->stride_pixels +
+                        (size_t) (direct_overlay_x + (int32_t) column);
+                    direct_pixels[destination] = direct_overlay_saved[(size_t) row * direct_overlay_width + column];
+                }
+            }
+            fake_direct_overlay_active = false;
+        }
+        return true;
+    }
+    if ((uint64_t) overlay->width * overlay->height > 4096U) {
+        return false;
+    }
+    direct_overlay_x      = overlay->x;
+    direct_overlay_y      = overlay->y;
+    direct_overlay_width  = overlay->width;
+    direct_overlay_height = overlay->height;
+    for (uint32_t row = 0U; row < overlay->height; ++row) {
+        for (uint32_t column = 0U; column < overlay->width; ++column) {
+            const size_t source = (size_t) (overlay->y + (int32_t) row) * framebuffer->stride_pixels +
+                                  (size_t) (overlay->x + (int32_t) column);
+            const size_t overlay_index          = (size_t) row * overlay->width + column;
+            direct_overlay_saved[overlay_index] = direct_pixels[source];
+            if (framebuffer->pixels[source] != overlay->background[overlay_index]) {
+                direct_pixels[source] = framebuffer->pixels[source];
+            }
+        }
+    }
+    fake_direct_overlay_active = true;
+    return true;
+}
+
 bool platform_graphics_present(platform_framebuffer_t* framebuffer)
 {
-    return platform_display_present(framebuffer);
+    return fake_direct_graphics ? framebuffer != NULL : platform_display_present(framebuffer);
+}
+
+void test_platform_graphics_direct_begin(platform_pixel_t color)
+{
+    for (size_t index = 0U; index < TABOS_DISPLAY_WIDTH * TABOS_DISPLAY_HEIGHT; ++index) {
+        direct_pixels[index] = color;
+    }
+    fake_direct_graphics       = true;
+    fake_direct_overlay_active = false;
+}
+
+void test_platform_graphics_direct_end(void)
+{
+    fake_direct_graphics = false;
+}
+
+void test_platform_graphics_direct_resume(void)
+{
+    fake_direct_graphics = true;
+}
+
+platform_pixel_t test_platform_graphics_pixel(size_t x, size_t y)
+{
+    return direct_pixels[y * TABOS_DISPLAY_WIDTH + x];
 }
 
 bool platform_graphics_fill(platform_framebuffer_t* framebuffer, int32_t x, int32_t y, uint32_t width, uint32_t height,
@@ -59,16 +148,10 @@ void platform_raster_diagnostics(void)
 {
 }
 
-#include <stddef.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
 struct platform_mutex {
-        unsigned int unused;
+        atomic_flag locked;
 };
 
-static platform_pixel_t pixels[TABOS_DISPLAY_WIDTH * TABOS_DISPLAY_HEIGHT];
 static uint64_t monotonic_ms;
 static uint8_t fake_brightness = 100U;
 static bool fail_brightness_once;
@@ -171,7 +254,34 @@ bool platform_display_init(platform_framebuffer_t* framebuffer)
 bool platform_display_present(const platform_framebuffer_t* framebuffer)
 {
     ++fake_display_present_calls;
-    return framebuffer != NULL && framebuffer->pixels == pixels;
+    if (framebuffer == NULL || framebuffer->pixels != pixels || comparison_x >= framebuffer->width ||
+        comparison_y >= framebuffer->height || comparison_width > framebuffer->width - comparison_x ||
+        comparison_height > framebuffer->height - comparison_y) {
+        return false;
+    }
+    comparison_matches = true;
+    for (size_t row = 0U; row < comparison_height; ++row) {
+        for (size_t column = 0U; column < comparison_width; ++column) {
+            const size_t index = (comparison_y + row) * framebuffer->stride_pixels + comparison_x + column;
+            if (framebuffer->pixels[index] != direct_pixels[index]) {
+                comparison_matches = false;
+            }
+        }
+    }
+    return true;
+}
+
+void test_platform_display_compare_graphics_region(size_t x, size_t y, size_t width, size_t height)
+{
+    comparison_x      = x;
+    comparison_y      = y;
+    comparison_width  = width;
+    comparison_height = height;
+}
+
+bool test_platform_display_graphics_region_matches(void)
+{
+    return comparison_matches;
 }
 
 unsigned int test_platform_display_present_calls(void)
@@ -1075,7 +1185,11 @@ void test_platform_camera_error(int error)
 
 platform_mutex_t* platform_mutex_create(void)
 {
-    return calloc(1U, sizeof(platform_mutex_t));
+    platform_mutex_t* mutex = calloc(1U, sizeof(*mutex));
+    if (mutex != NULL) {
+        atomic_flag_clear_explicit(&mutex->locked, memory_order_release);
+    }
+    return mutex;
 }
 
 void platform_mutex_destroy(platform_mutex_t* mutex)
@@ -1085,12 +1199,16 @@ void platform_mutex_destroy(platform_mutex_t* mutex)
 
 void platform_mutex_lock(platform_mutex_t* mutex)
 {
-    (void) mutex;
+    if (mutex != NULL) {
+        while (atomic_flag_test_and_set_explicit(&mutex->locked, memory_order_acquire)) {}
+    }
 }
 
 void platform_mutex_unlock(platform_mutex_t* mutex)
 {
-    (void) mutex;
+    if (mutex != NULL) {
+        atomic_flag_clear_explicit(&mutex->locked, memory_order_release);
+    }
 }
 
 struct platform_signal {

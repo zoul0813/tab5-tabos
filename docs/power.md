@@ -56,7 +56,7 @@ Applications use `<tabos/battery.h>`. `tabos_battery_status_t.valid` identifies 
 telemetry, source, state, and charger-control fields are meaningful. Callers must not
 interpret fields whose matching `TABOS_BATTERY_VALID_*` bit is clear. INA226 read or
 charger-control failures move registry device `battery0` to `fault`; a successful retry
-restores `ready`.
+restores `ready`. Both state changes are published immediately after the operation.
 
 ## Power-management development
 

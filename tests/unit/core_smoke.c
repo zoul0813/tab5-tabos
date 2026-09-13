@@ -1,4 +1,6 @@
 #include <tabos/internal/runtime.h>
+#include <tabos/internal/console.h>
+#include <tabos/internal/display.h>
 #include <tabos/internal/input.h>
 #include <tabos/internal/pointer.h>
 #include <tabos/internal/application.h>
@@ -147,32 +149,44 @@ int main(void)
         return 1;
     }
 
+    static const int health_event_owner;
+    const tabos_device_subscription_t health_events = device_registry_subscribe(&health_event_owner);
+    tabos_device_event_t health_event;
+    const uint64_t health_audit_deadline = hardware_devices_next_deadline();
+    if (health_events < 0) {
+        return 1;
+    }
     test_platform_rtc_set_status(false, EIO);
-    test_platform_advance_time_ms(60000U);
-    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_DEADLINE);
+    hardware_devices_health_changed(HARDWARE_DEVICE_HEALTH_RTC);
     if (!device_registry_find(TABOS_DEVICE_NAME_RTC, &device) || device.state != TABOS_DEVICE_FAULT ||
-        device.last_error != EIO) {
+        device.last_error != EIO || hardware_devices_next_deadline() != health_audit_deadline ||
+        device_registry_read_event(&health_event_owner, health_events, &health_event) != 0 ||
+        health_event.type != TABOS_DEVICE_EVENT_FAULT || health_event.device.id != device.id) {
         return 1;
     }
     test_platform_rtc_set_status(true, 0);
-    test_platform_advance_time_ms(60000U);
-    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_DEADLINE);
+    hardware_devices_health_changed(HARDWARE_DEVICE_HEALTH_RTC);
     if (!device_registry_find(TABOS_DEVICE_NAME_RTC, &device) || device.state != TABOS_DEVICE_READY ||
-        device.last_error != 0) {
+        device.last_error != 0 || hardware_devices_next_deadline() != health_audit_deadline ||
+        device_registry_read_event(&health_event_owner, health_events, &health_event) != 0 ||
+        health_event.type != TABOS_DEVICE_EVENT_READY || health_event.device.id != device.id) {
         return 1;
     }
     test_platform_battery_set_status(false, EIO);
-    test_platform_advance_time_ms(60000U);
-    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_DEADLINE);
+    hardware_devices_health_changed(HARDWARE_DEVICE_HEALTH_BATTERY);
     if (!device_registry_find(TABOS_DEVICE_NAME_BATTERY, &device) || device.state != TABOS_DEVICE_FAULT ||
-        device.last_error != EIO) {
+        device.last_error != EIO || hardware_devices_next_deadline() != health_audit_deadline ||
+        device_registry_read_event(&health_event_owner, health_events, &health_event) != 0 ||
+        health_event.type != TABOS_DEVICE_EVENT_FAULT || health_event.device.id != device.id) {
         return 1;
     }
     test_platform_battery_set_status(true, 0);
-    test_platform_advance_time_ms(60000U);
-    kernel_runtime_update(PLATFORM_RUNTIME_EVENT_DEADLINE);
+    hardware_devices_health_changed(HARDWARE_DEVICE_HEALTH_BATTERY);
     if (!device_registry_find(TABOS_DEVICE_NAME_BATTERY, &device) || device.state != TABOS_DEVICE_READY ||
-        device.last_error != 0) {
+        device.last_error != 0 || hardware_devices_next_deadline() != health_audit_deadline ||
+        device_registry_read_event(&health_event_owner, health_events, &health_event) != 0 ||
+        health_event.type != TABOS_DEVICE_EVENT_READY || health_event.device.id != device.id ||
+        !device_registry_unsubscribe(&health_event_owner, health_events)) {
         return 1;
     }
 
@@ -237,6 +251,25 @@ int main(void)
     if (!tabos_terminal_set_scale(4U) || tabos_terminal_get_scale() != 4U) {
         return 1;
     }
+
+    console_set_graphics_active(true);
+    platform_framebuffer_t* framebuffer = display_framebuffer();
+    const size_t pixel_count            = framebuffer->stride_pixels * framebuffer->height;
+    for (size_t index = 0U; index < pixel_count; ++index) {
+        framebuffer->pixels[index] = 0x1234U;
+    }
+    const unsigned int presents_before_scale = test_platform_display_present_calls();
+    if (!tabos_terminal_set_scale(2U) || tabos_terminal_get_scale() != 2U || !console_graphics_active() ||
+        test_platform_display_present_calls() != presents_before_scale) {
+        return 1;
+    }
+    for (size_t index = 0U; index < pixel_count; ++index) {
+        if (framebuffer->pixels[index] != 0x1234U) {
+            return 1;
+        }
+    }
+    console_set_graphics_active(false);
+
     kernel_runtime_shutdown();
     /* Isolate power checks from optional diagnostic startup applications. */
     if (!kernel_runtime_init() || !kernel_runtime_start(false)) {

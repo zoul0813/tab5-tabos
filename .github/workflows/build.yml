@@ -57,15 +57,9 @@ jobs:
           executable="build/macos-release/tabos_host"
           mkdir -p "$package"
           cp "$executable" "$package/tabos_host"
-          sdl_library="$(otool -L "$executable" | awk '/libSDL3\.0\.dylib/ { print $1; exit }')"
-          test -n "$sdl_library"
-          cp "$sdl_library" "$package/libSDL3.0.dylib"
           cp targets/host/packaging/macos/run.sh "$package/run.sh"
           tar -C "$package" -xzf dist/host-rootfs.tar.gz
-          install_name_tool -change "$sdl_library" '@executable_path/libSDL3.0.dylib' "$package/tabos_host"
-          codesign --force --sign - "$package/libSDL3.0.dylib"
-          codesign --force --sign - "$package/tabos_host"
-          chmod u+w "$package/libSDL3.0.dylib"
+          targets/host/packaging/macos/bundle-dependencies.sh "$executable" "$package"
           chmod +x "$package/tabos_host" "$package/run.sh"
           tar -C dist -czf dist/tabos-macos-arm64.tar.gz tabos-macos-arm64
           clean_directory="$(mktemp -d)"

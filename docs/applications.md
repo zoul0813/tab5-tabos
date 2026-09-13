@@ -4,6 +4,9 @@ The supported external application SDK and libc surface are documented in `docs/
 
 TabOS has portable application descriptors, built-in application registry, and single foreground application lifecycle. This foundation runs identically in host and Tab5 builds. Applications use public TabOS APIs and do not call SDL3, ESP-IDF, or FreeRTOS directly.
 
+Lua is included in ordinary builds as `T:/bin/lua`, with examples under `T:/data/lua/`.
+See [Lua](lua.md) for commands, supported libraries, resource limits and validation.
+
 ## Filesystem regression checks
 
 Run the existing tester filesystem module on its own:
@@ -43,6 +46,10 @@ this builds without installing:
 ```sh
 ./apps/build.sh build
 ```
+
+Applications that need trailing link libraries can set `TABOS_LDLIBS` before including
+`sdk/make/application.mk` (for example, `TABOS_LDLIBS := -lm`). Libraries follow all
+application/runtime sources; changes invalidate the cached executable.
 
 Application builds track included SDK and application headers, each application's
 Makefile, generated prerequisites, and effective compiler/linker resource settings.
@@ -97,7 +104,9 @@ directory's contents to the root of the TF/microSD card.
 Core utilities are grouped under `apps/coreutils/`, but each utility remains a separate
 program. Build one with `make -C apps/coreutils ls` or `make -C apps/coreutils mkdir`.
 Sources live in `apps/coreutils/src/<name>/main.c`; each output installs directly under
-`T:/bin/`.
+`T:/bin/`. Core utilities return a nonzero status when an input cannot be opened or
+an operation fails; `wc` also reports stream read and close failures instead of treating
+them as successful end-of-file.
 
 `devices` lists registry entries using public copied metadata: unpadded decimal boot-local ID,
 logical name, class, state, symbolic features, driver name, and nonzero last error. It does not
@@ -177,7 +186,9 @@ strings.
 Independently loaded C17 applications expose `main(argc, argv)`, not a kernel descriptor
 or raw ELF entry. SDK `crt0` and newlib stubs translate standard C/POSIX calls to the
 versioned TabOS ABI. Standard streams are console-backed: stdin is unbuffered, stdout is
-line-buffered, and stderr is unbuffered. Each process owns descriptors, errno, current
+line-buffered, and stderr is unbuffered. A short stdin read retains the unread suffix of a
+batched text event. Counted stdout and stderr writes retain bytes after embedded NUL;
+NUL itself has no terminal action. Each process owns descriptors, errno, current
 working directory, and a bounded heap; children inherit a copy of the parent's working
 directory. TTY input mode is also inherited by value. Applications can include
 `<sys/ioctl.h>` and `<tabos/tty.h>` to query or replace that mode. For example, a game

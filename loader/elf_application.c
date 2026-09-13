@@ -163,7 +163,7 @@ struct loader_elf_application {
         size_t heap_used;
         size_t heap_limit;
         uint32_t tty_mode;
-        char input_pending[4];
+        char input_pending[TABOS_INPUT_TEXT_MAX_BYTES];
         uint8_t input_pending_offset;
         uint8_t input_pending_length;
 };
@@ -392,8 +392,11 @@ static int elf_fd_close(int descriptor)
     return 0;
 }
 
-static int elf_copy_pending_input(loader_elf_application_t* application, void* buffer, uint32_t count)
+int loader_elf_application_read_pending_input(loader_elf_application_t* application, void* buffer, uint32_t count)
 {
+    if (application == NULL || (buffer == NULL && count != 0U)) {
+        return -TABOS_EINVAL;
+    }
     const uint32_t available = (uint32_t) application->input_pending_length - application->input_pending_offset;
     const uint32_t copied    = available < count ? available : count;
     if (copied == 0U) {
@@ -408,8 +411,25 @@ static int elf_copy_pending_input(loader_elf_application_t* application, void* b
     return (int) copied;
 }
 
-static bool elf_queue_arrow_input(loader_elf_application_t* application, const tabos_input_event_t* event)
+bool loader_elf_application_queue_input_event(loader_elf_application_t* application, const tabos_input_event_t* event)
 {
+    if (application == NULL || event == NULL || application->input_pending_length != 0U) {
+        return false;
+    }
+    if (event->type == TABOS_INPUT_TEXT) {
+        const char* terminator = memchr(event->text, '\0', sizeof(event->text));
+        if (terminator == NULL) {
+            return false;
+        }
+        const size_t length = (size_t) (terminator - event->text);
+        if (length == 0U || length > sizeof(application->input_pending)) {
+            return false;
+        }
+        memcpy(application->input_pending, event->text, length);
+        application->input_pending_offset = 0U;
+        application->input_pending_length = (uint8_t) length;
+        return true;
+    }
     if (event->type != TABOS_INPUT_KEY_DOWN) {
         return false;
     }
@@ -457,7 +477,7 @@ static int elf_fd_read(int descriptor, void* buffer, uint32_t count)
         if (count == 0U) {
             return 0;
         }
-        const int pending = elf_copy_pending_input(application, buffer, count);
+        const int pending = loader_elf_application_read_pending_input(application, buffer, count);
         if (pending != 0) {
             return pending;
         }
@@ -467,17 +487,17 @@ static int elf_fd_read(int descriptor, void* buffer, uint32_t count)
                 continue;
             }
             if (event.type == TABOS_INPUT_TEXT) {
-                const size_t length = strlen(event.text);
-                const size_t copied = length < count ? length : count;
-                memcpy(buffer, event.text, copied);
-                return (int) copied;
+                if (loader_elf_application_queue_input_event(application, &event)) {
+                    return loader_elf_application_read_pending_input(application, buffer, count);
+                }
+                continue;
             }
             if (event.type == TABOS_INPUT_KEY_DOWN && event.key == TABOS_KEY_BACKSPACE) {
                 ((char*) buffer)[0] = '\b';
                 return 1;
             }
-            if (elf_queue_arrow_input(application, &event)) {
-                return elf_copy_pending_input(application, buffer, count);
+            if (loader_elf_application_queue_input_event(application, &event)) {
+                return loader_elf_application_read_pending_input(application, buffer, count);
             }
         }
         return -TABOS_EAGAIN;
@@ -531,23 +551,14 @@ static int elf_fd_write(int descriptor, const void* buffer, uint32_t count)
         return -TABOS_EINVAL;
     }
     if (descriptor == 1 || descriptor == 2) {
+        if (count == 0U) {
+            return 0;
+        }
         const char* source = platform_executable_data_pointer(buffer, count);
         if (source == NULL) {
             return -TABOS_EIO;
         }
-        char chunk[129];
-        uint32_t written = 0U;
-        while (written < count) {
-            const uint32_t length =
-                count - written < sizeof(chunk) - 1U ? count - written : (uint32_t) sizeof(chunk) - 1U;
-            memcpy(chunk, source + written, length);
-            chunk[length] = '\0';
-            if (!tabos_console_write(application->console, chunk)) {
-                return -TABOS_EIO;
-            }
-            written += length;
-        }
-        return (int) count;
+        return tabos_console_write_bytes(application->console, source, count) ? (int) count : -TABOS_EIO;
     }
     if (descriptor < 3 || descriptor >= ELF_DESCRIPTOR_CAPACITY || !application->descriptors[descriptor].open) {
         return -TABOS_EBADF;
@@ -713,12 +724,12 @@ static void* elf_heap_sbrk(int32_t increment)
     return previous;
 }
 
-static int elf_fs_list(const char* path, char* buffer, uint32_t capacity)
+int loader_elf_application_list_directory(loader_elf_application_t* application, const char* path, char* buffer,
+                                          uint32_t capacity)
 {
     if (path == NULL || buffer == NULL || capacity == 0U) {
         return -TABOS_EINVAL;
     }
-    loader_elf_application_t* application = platform_riscv32_current_user_data();
     if (application == NULL) {
         return -TABOS_EINVAL;
     }
@@ -733,7 +744,15 @@ static int elf_fs_list(const char* path, char* buffer, uint32_t capacity)
     size_t used = 0U;
     tabos_dirent_t entry;
     int result = 0;
-    while ((result = tabos_fs_readdir(directory, &entry)) > 0) {
+    for (;;) {
+        const int read_result = tabos_fs_readdir(directory, &entry);
+        if (read_result < 0) {
+            result = -*tabos_errno_location();
+            break;
+        }
+        if (read_result == 0) {
+            break;
+        }
         const size_t length = strlen(entry.name);
         if (length + 3U >= (size_t) capacity - used) {
             result = -TABOS_ENOSPC;
@@ -745,14 +764,16 @@ static int elf_fs_list(const char* path, char* buffer, uint32_t capacity)
         used           += length;
         buffer[used++]  = '\n';
     }
-    if (result < 0) {
-        result = -*tabos_errno_location();
-    }
     if (tabos_fs_closedir(directory) != 0 && result == 0) {
         result = -*tabos_errno_location();
     }
     buffer[used] = '\0';
     return result;
+}
+
+static int elf_fs_list(const char* path, char* buffer, uint32_t capacity)
+{
+    return loader_elf_application_list_directory(platform_riscv32_current_user_data(), path, buffer, capacity);
 }
 
 static uint64_t elf_monotonic_ms(void)
@@ -768,7 +789,9 @@ static int elf_wall_time_get(tabos_elf_wall_time_t* time)
     if (writable_time == NULL) {
         return -TABOS_EINVAL;
     }
-    if (!platform_wall_clock_get(&seconds)) {
+    const bool success = platform_wall_clock_get(&seconds);
+    hardware_devices_health_changed(HARDWARE_DEVICE_HEALTH_RTC);
+    if (!success) {
         return -TABOS_EIO;
     }
     writable_time->seconds_low  = (uint32_t) seconds;
@@ -784,7 +807,9 @@ static int elf_wall_time_set(const tabos_elf_wall_time_t* time)
     }
     const int64_t seconds =
         (int64_t) ((uint64_t) readable_time->seconds_low | (uint64_t) (uint32_t) readable_time->seconds_high << 32U);
-    return platform_wall_clock_set(seconds) ? 0 : -TABOS_EIO;
+    const bool success = platform_wall_clock_set(seconds);
+    hardware_devices_health_changed(HARDWARE_DEVICE_HEALTH_RTC);
+    return success ? 0 : -TABOS_EIO;
 }
 
 static int elf_system_action(uint32_t action)
@@ -1872,11 +1897,11 @@ static int elf_battery_status(tabos_elf_battery_status_t* info)
     if (writable == NULL) {
         return -TABOS_EINVAL;
     }
-    if (!platform_battery_status(&source)) {
-        hardware_devices_update();
+    const bool success = platform_battery_status(&source);
+    hardware_devices_health_changed(HARDWARE_DEVICE_HEALTH_BATTERY);
+    if (!success) {
         return -TABOS_EIO;
     }
-    hardware_devices_update();
     *writable = (tabos_elf_battery_status_t) {
         .available              = source.available ? 1U : 0U,
         .external_power_present = source.external_power_present ? 1U : 0U,
@@ -1895,14 +1920,14 @@ static int elf_battery_status(tabos_elf_battery_status_t* info)
 static int elf_battery_set_charging(uint32_t enabled)
 {
     const bool success = platform_battery_set_charging(enabled != 0U);
-    hardware_devices_update();
+    hardware_devices_health_changed(HARDWARE_DEVICE_HEALTH_BATTERY);
     return success ? 0 : -TABOS_EIO;
 }
 
 static int elf_battery_set_fast_charging(uint32_t enabled)
 {
     const bool success = platform_battery_set_fast_charging(enabled != 0U);
-    hardware_devices_update();
+    hardware_devices_health_changed(HARDWARE_DEVICE_HEALTH_BATTERY);
     return success ? 0 : -TABOS_EIO;
 }
 
