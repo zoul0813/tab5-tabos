@@ -262,6 +262,15 @@ tests use host sanitizers; loopback tests need permission to bind local ports. C
 socket coverage runs in a subprocess with the default SIGPIPE action and requires repeated
 sends to return errors without terminating the process.
 
+`unit.wifi_driver` injects failure at every Tab5 ESP-NETIF, event-loop, station-netif,
+Wi-Fi-driver, handler-registration, mode, and start stage. It requires reverse-order
+cleanup of only owned resources, preserves shared infrastructure, checks idempotent normal
+shutdown, and uses a concurrent fake startup worker to prove shutdown joins completion
+before shared state can be released. The production implementation must also cross-build
+against the pinned ESP-IDF. Its global ESP-NETIF TCP/IP foundation remains boot-lifetime
+because that implementation cannot deinitialize lwIP; physical failure injection remains
+hardware validation.
+
 Generic-wait validation covers zero and finite application waits, cancellable infinite
 backend waits, monotonic timeout, readiness clearing, source ordering, mixed socket/device
 readiness, stale and foreign handles, interrupted waits, and leaked-source process cleanup. With configured

@@ -797,6 +797,17 @@ tabos_enable_warnings(tabos_native_task)
 tabos_enable_sanitizers(tabos_native_task)
 add_test(NAME unit.native_task COMMAND tabos_native_task)
 set_tests_properties(unit.native_task PROPERTIES TIMEOUT 15)
+add_executable(tabos_wifi_driver
+    unit/wifi_driver.c
+    "${TABOS_ROOT}/platform/esp32p4/wifi_driver.c"
+    "${TABOS_ROOT}/platform/esp32p4/wifi_startup.c")
+target_include_directories(tabos_wifi_driver PRIVATE
+    "${TABOS_ROOT}/tests/fakes/wifi_driver"
+    "${TABOS_ROOT}/platform/esp32p4")
+tabos_enable_warnings(tabos_wifi_driver)
+tabos_enable_sanitizers(tabos_wifi_driver)
+target_link_libraries(tabos_wifi_driver PRIVATE Threads::Threads)
+add_test(NAME unit.wifi_driver COMMAND tabos_wifi_driver)
 add_executable(tabos_native_tls_cancel unit/native_tls_cancel.c)
 target_include_directories(tabos_native_tls_cancel PRIVATE "${TABOS_ROOT}/sdk/include")
 tabos_enable_warnings(tabos_native_tls_cancel)
