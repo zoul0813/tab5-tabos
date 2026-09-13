@@ -13,6 +13,60 @@
 #include <tabos/runtime_time.h>
 #include <string.h>
 
+static void test_ipc_wait_lifecycle(tester_context_t* context, tabos_ipc_channel_t listener,
+                                    tabos_wait_source_t listener_source)
+{
+    tabos_wait_source_t stale = TABOS_WAIT_SOURCE_INVALID;
+    for (unsigned int round = 0U; round < 3U; ++round) {
+        tabos_wait_item_t pending = {.source = listener_source, .events = TABOS_WAIT_READABLE};
+        tester_expect(context, tabos_wait(&pending, 1U, 0U) == 0 && pending.returned_events == 0U,
+                      "empty listener is not ready");
+        const tabos_ipc_channel_t client = tabos_ipc_connect();
+        tester_expect(context, client > 0, "local IPC wait fixture connects");
+        if (client <= 0) {
+            return;
+        }
+        tester_expect(context, tabos_wait(&pending, 1U, 0U) == 1 && pending.returned_events == TABOS_WAIT_READABLE,
+                      "connection queued before wait is immediately readable");
+        const tabos_ipc_channel_t server = tabos_ipc_accept(listener);
+        tester_expect(context, server > 0, "local IPC wait fixture accepts");
+        if (server <= 0) {
+            (void) tabos_ipc_close(client);
+            return;
+        }
+        const tabos_wait_source_t source = tabos_ipc_wait_source(server);
+        tester_expect(context, source > 0, "accepted channel has generic wait source");
+        if (stale != TABOS_WAIT_SOURCE_INVALID) {
+            pending = (tabos_wait_item_t) {.source = stale, .events = TABOS_WAIT_READABLE};
+            tester_expect(context, tabos_wait(&pending, 1U, 0U) == -1 && errno == EBADF,
+                          "reused endpoint and source slots do not revive stale wait");
+        }
+        pending              = (tabos_wait_item_t) {.source = source, .events = TABOS_WAIT_READABLE};
+        const uint64_t start = tabos_monotonic_ms();
+        tester_expect(context,
+                      tabos_wait(&pending, 1U, 20U) == 0 && pending.returned_events == 0U &&
+                          tabos_monotonic_ms() - start >= 20U,
+                      "empty IPC channel honors finite timeout");
+        const tabos_ipc_message_t message = {.kind = 73U};
+        tester_expect(context, tabos_ipc_send(client, &message, true) == 0, "queue control before peer close");
+        tester_expect(context, tabos_ipc_close(client) == 0, "close peer with pending control");
+        pending.events = TABOS_WAIT_READABLE | TABOS_WAIT_HANGUP | TABOS_WAIT_WRITABLE;
+        tester_expect(context,
+                      tabos_wait(&pending, 1U, 0U) == 1 &&
+                          pending.returned_events == (TABOS_WAIT_READABLE | TABOS_WAIT_HANGUP),
+                      "closed peer retains readable control and reports hangup without writable");
+        tabos_ipc_message_t received = {0};
+        tester_expect(context, tabos_ipc_receive(server, &received) == 0 && received.kind == message.kind,
+                      "drain control after peer close");
+        tester_expect(context, tabos_wait(&pending, 1U, 0U) == 1 && pending.returned_events == TABOS_WAIT_HANGUP,
+                      "drained channel reports only hangup");
+        tester_expect(context, tabos_ipc_close(server) == 0, "close waited channel");
+        tester_expect(context, tabos_wait(&pending, 1U, 0U) == -1 && errno == EBADF,
+                      "channel close invalidates its wait source");
+        stale = source;
+    }
+}
+
 void tester_test_concurrent_process(tester_context_t* context)
 {
     tabos_program_info_t program;
@@ -28,7 +82,8 @@ void tester_test_concurrent_process(tester_context_t* context)
         return;
     }
     const tabos_wait_source_t source = tabos_ipc_wait_source(listener);
-    tabos_surface_stats_t baseline   = {0};
+    test_ipc_wait_lifecycle(context, listener, source);
+    tabos_surface_stats_t baseline = {0};
     tester_expect(context, tabos_surface_stats(&baseline) == 0, "surface allocation baseline");
     const char* const first_args[]  = {"T:/bin/tester", "--concurrent-peer", "1", NULL};
     const char* const second_args[] = {"T:/bin/tester", "--concurrent-peer", "2", NULL};

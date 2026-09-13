@@ -406,7 +406,9 @@ host simulator launch/control, MSC copy or hardware flashing was performed.
 - [x] GUI-206: Exhaust the endpoint table with one slot remaining, repeat failed pair creation and prove the remaining slot is reusable; reject stale listener handles after shutdown/reinitialization.
 - [x] GUI-202/206: Verify writable readiness stays blocked while only control messages drain, returns when data capacity frees, and queued control/data remain readable with hangup until drained after peer teardown.
 - [x] GUI-206: Inject committed-surface and staging allocation failures across 100 rounds; preserve committed pixels/revision/accounting, retry successfully and reclaim retained plus unfinished staging buffers during owner teardown.
-- [ ] GUI-202/206: Complete generic-wait lost-wakeup, deadline and cancellation interleavings and real RV32 tester failure cases.
+- [x] GUI-202/206: Add host RV32 IPC waits covering readiness before wait and after empty poll/before runtime sleep, finite deadlines under repeated unrelated wakeups, peer close, endpoint replacement and forced blocked-child cleanup.
+- [x] GUI-202/206: Add maintained SDK tester cases for empty/ready listener, channel timeout, queued control with hangup, close invalidation and stale source rejection after reuse.
+- [ ] GUI-202/206: Validate native Tab5 wait cancellation/interleavings and remaining service-contention cases.
 - [ ] GUI-206: Complete concurrent teardown/commit and remaining invalid-input failure coverage.
 
 Both `unit.ipc` and `unit.surface` pass in macOS Debug (ASan/UBSan) and Release.
@@ -415,3 +417,21 @@ and public ABI are unchanged. The surface fixture uses the build's generated GUI
 quota configuration. These checks narrow the remaining work without completing
 GUI-202 or GUI-206. No Linux builds/tests, simulator launch/control or Tab5 flashing
 were performed. Kilo launcher changes remain deferred by user request.
+
+### Generic IPC Wait Evidence
+
+`component.elf_wait` now provisions guest-owned IPC endpoints in its fixture and
+executes the actual RV32 wait-source and generic-wait gates. It injects a message
+after the first empty poll, before runtime sleep, verifies a 70 ms deadline under
+repeated application wakeups, and repeats message, hangup, endpoint replacement
+and forced-exit cases three times. Endpoint replacement rejects the old source
+with EBADF; forced termination restores the parent and leaves peer hangup.
+
+Maintained `tester --concurrent` adds three public-SDK listener/channel lifecycle
+rounds, including 20 ms timeout, control delivery after peer close, exact readiness
+bits and stale-source rejection after reuse. The rebuilt tester passes the
+standalone RV32 process harness in macOS Debug and Release; `component.elf_wait`
+also passes both configurations (Debug ASan/UBSan). This is host scheduler and SDK
+evidence, not validation of native Tab5 wait interleavings. No production runtime
+or ABI changes were needed. No Linux tests, host simulator launch/control or
+Tab5 flashing were performed.

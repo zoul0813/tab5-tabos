@@ -2015,3 +2015,18 @@ owner teardown with unfinished staging. Each allocation-failure workflow repeats
 100 times and asserts zero remaining tracked allocations. Both tests pass in
 macOS Debug with ASan/UBSan and in macOS Release. Generic-wait race/cancellation
 and physical contention acceptance remain separate pending GUI tasks.
+
+### IPC Generic-Wait Regression Coverage
+
+`component.elf_wait` includes host RV32 IPC cases for zero-time readiness, a message
+between empty poll and runtime sleep, a finite deadline under repeated unrelated
+wakeups, peer hangup, endpoint close/replacement and forced process termination
+during an infinite wait. The fixture provisions IPC endpoints owned by the guest
+PID directly; the guest invokes real wait-source and wait gates. This isolates the
+wait adapter from session setup, which is covered by the maintained tester.
+
+`tester --concurrent` additionally exercises public SDK IPC listener/channel waits,
+finite timeout, exact readable/hangup/writable bits, retained control delivery after
+peer close and stale wait sources after endpoint/source reuse. Both the component
+test and standalone RV32 process harness pass macOS Debug (ASan/UBSan) and Release.
+Native wait-loop race and service-contention acceptance remains pending.

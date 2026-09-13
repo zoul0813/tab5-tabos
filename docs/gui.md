@@ -83,3 +83,10 @@ Dedicated macOS unit/component tests exercise real RV32 desktop/client execution
 pixels across resize/handoff, editor save and close cancellation, coherent surfaces,
 input routing and process cleanup. These tests do not establish physical touch
 quality, input latency, PSRAM headroom or game performance on Tab5.
+
+### SDK IPC Validation
+
+Run `tester --concurrent` from the shell to exercise concurrent processes and GUI
+session services. Its IPC checks include listener readiness, finite channel waits,
+control delivery after peer close, hangup readiness and stale wait-source rejection
+after channel reuse. The command runs three rounds and reports failed assertions.

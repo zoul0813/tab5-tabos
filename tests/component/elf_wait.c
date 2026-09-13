@@ -12,6 +12,8 @@
 #include <tabos/device.h>
 #include <tabos/internal/device_registry.h>
 #include <tabos/internal/network.h>
+#include <tabos/internal/ipc.h>
+#include <tabos/filesystem.h>
 #include <tabos/wait.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
@@ -92,13 +94,20 @@ static uint8_t code[IMAGE_BYTES];
 static size_t code_size;
 static tabos_device_id_t pointer_id;
 static tabos_process_id_t child_id;
+static int ipc_listener;
+static int ipc_channel;
+static int ipc_peer;
+enum {
+    IPC_PEER_OWNER = 10000
+};
 
 typedef enum {
     POINTER_WAIT,
     SOCKET_WAIT,
     MIXED_WAIT,
     SOCKET_RECEIVE,
-    NETWORK_RESOLVE
+    NETWORK_RESOLVE,
+    IPC_WAIT
 } wait_kind_t;
 
 static void emit(uint32_t instruction)
@@ -144,7 +153,7 @@ static void write_child(const char* path, wait_kind_t kind, int timeout, uint16_
         store(10U, ITEMS);
         write_u32(code + ITEMS + 4U, TABOS_WAIT_READABLE);
     }
-    if (kind != POINTER_WAIT && kind != NETWORK_RESOLVE) {
+    if (kind != POINTER_WAIT && kind != NETWORK_RESOLVE && kind != IPC_WAIT) {
         immediate(10U, 4);
         immediate(11U, TABOS_SOCKET_UDP);
         call(184U);
@@ -159,6 +168,14 @@ static void write_child(const char* path, wait_kind_t kind, int timeout, uint16_
         write_u32(code + ENDPOINT, 4U);
         strcpy((char*) code + ENDPOINT + 4U, "127.0.0.1");
         write_u32(code + ENDPOINT + 52U, port);
+    }
+    if (kind == IPC_WAIT) {
+        write_u32(code + ENDPOINT, (uint32_t) ipc_channel);
+        immediate(10U, IPC_TRANSPORT_WAIT_SOURCE);
+        immediate(11U, ENDPOINT);
+        call(412U);
+        store(10U, ITEMS);
+        write_u32(code + ITEMS + 4U, TABOS_WAIT_READABLE | TABOS_WAIT_HANGUP);
     }
     call(36U); /* yield: test can queue readiness before a zero wait */
     if (kind == NETWORK_RESOLVE) {
@@ -220,6 +237,15 @@ static void finish(int expected)
 
 static void launch(const char* path, wait_kind_t kind, int timeout, uint16_t port)
 {
+    if (kind == IPC_WAIT) {
+        const uint32_t owner          = child_id + 1U;
+        ipc_transport_packet_t packet = {0};
+        ipc_listener                  = ipc_service_request(owner, owner, IPC_TRANSPORT_LISTEN, &packet);
+        ipc_peer                      = ipc_service_request(IPC_PEER_OWNER, owner, IPC_TRANSPORT_CONNECT, &packet);
+        packet.channel                = ipc_listener;
+        ipc_channel                   = ipc_service_request(owner, owner, IPC_TRANSPORT_ACCEPT, &packet);
+        check(ipc_listener > 0 && ipc_peer > 0 && ipc_channel > 0, "prepare guest-owned IPC channel");
+    }
     write_child(path, kind, timeout, port);
     check(tabos_app_exec(parent_context, "T:/child") == TABOS_APP_RESULT_OK, "launch child");
     ++child_id;
@@ -256,6 +282,73 @@ static void send_byte(uint16_t port)
     close(socket_fd);
 }
 
+static void send_ipc(void)
+{
+    ipc_transport_packet_t packet = {.channel = ipc_peer, .message = {.kind = 42U}};
+    check(ipc_service_request(IPC_PEER_OWNER, child_id, IPC_TRANSPORT_SEND, &packet) == 0, "inject IPC message");
+}
+
+static void ipc_wait_cases(const char* path)
+{
+    launch(path, IPC_WAIT, 0, 0U);
+    finish(0);
+    ipc_service_close_owner(IPC_PEER_OWNER);
+
+    launch(path, IPC_WAIT, 0, 0U);
+    send_ipc();
+    finish(1);
+    ipc_service_close_owner(IPC_PEER_OWNER);
+
+    launch(path, IPC_WAIT, 70, 0U);
+    const uint64_t start = platform_time_ms();
+    enter_wait();
+    unsigned int wakes = 0U;
+    while (tabos_process_count() > 1U && platform_time_ms() - start < 500U) {
+        platform_runtime_notify(PLATFORM_RUNTIME_EVENT_APPLICATION);
+        kernel_runtime_update(PLATFORM_RUNTIME_EVENT_APPLICATION);
+        ++wakes;
+        SDL_Delay(1U);
+    }
+    check(wakes > 1U && platform_time_ms() - start >= 70U, "IPC deadline survives unrelated wakeups");
+    check(tabos_process_count() == 1U, "IPC wakeups do not restart finite timeout");
+    finish(0);
+    ipc_service_close_owner(IPC_PEER_OWNER);
+
+    for (unsigned int round = 0U; round < 3U; ++round) {
+        launch(path, IPC_WAIT, -1, 0U);
+        enter_wait(); /* First empty poll has returned; runtime has not slept yet. */
+        send_ipc();
+        finish(1);
+        ipc_service_close_owner(IPC_PEER_OWNER);
+
+        launch(path, IPC_WAIT, -1, 0U);
+        enter_wait();
+        ipc_service_close_owner(IPC_PEER_OWNER);
+        finish(1); /* Peer hangup wakes the retained guest wait. */
+
+        launch(path, IPC_WAIT, -1, 0U);
+        enter_wait();
+        ipc_transport_packet_t packet = {.channel = ipc_channel};
+        check(ipc_service_request(child_id, child_id, IPC_TRANSPORT_CLOSE, &packet) == 0, "close waited endpoint");
+        const int replacement_peer = ipc_service_request(IPC_PEER_OWNER, child_id, IPC_TRANSPORT_CONNECT, &packet);
+        packet.channel             = ipc_listener;
+        const int replacement      = ipc_service_request(child_id, child_id, IPC_TRANSPORT_ACCEPT, &packet);
+        check(replacement_peer > 0 && replacement > 0 && replacement != ipc_channel,
+              "reuse endpoint with fresh handle");
+        finish(-TABOS_EBADF); /* Old wait source must not bind to the replacement. */
+        ipc_service_close_owner(IPC_PEER_OWNER);
+
+        launch(path, IPC_WAIT, -1, 0U);
+        enter_wait();
+        check(kernel_process_force_terminate(child_id, 9), "force IPC-waiting child");
+        finish(9);
+        uint32_t ready = 0U;
+        check(ipc_service_poll(IPC_PEER_OWNER, ipc_peer, TABOS_WAIT_HANGUP, &ready) == 0 && ready == TABOS_WAIT_HANGUP,
+              "cancelled guest releases IPC endpoint");
+        ipc_service_close_owner(IPC_PEER_OWNER);
+    }
+}
+
 int main(void)
 {
     check(mkdtemp(storage_root) != NULL, "temporary storage");
@@ -269,6 +362,8 @@ int main(void)
     network_service_update();
     char path[512];
     (void) snprintf(path, sizeof(path), "%s/child", storage_root);
+
+    ipc_wait_cases(path);
 
     launch(path, POINTER_WAIT, 0, 0U);
     finish(0);
