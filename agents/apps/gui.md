@@ -435,3 +435,24 @@ also passes both configurations (Debug ASan/UBSan). This is host scheduler and S
 evidence, not validation of native Tab5 wait interleavings. No production runtime
 or ABI changes were needed. No Linux tests, host simulator launch/control or
 Tab5 flashing were performed.
+
+## Follow-up: Fullscreen Failure Recovery
+
+- [x] GUI-508: Hold a desktop session member outside its safe point, observe the timeout dialog, verify session resume and harmless late acknowledgement, then draw through Canvas again.
+- [x] GUI-508: Remove the fullscreen executable after successful inspection while pause is held; acknowledge pause, verify load-error recovery, retained surfaces and resumed Canvas input.
+- [x] GUI-508: Execute a valid ELF containing an illegal RV32 instruction; assert loader fault status 5, child cleanup, runnable desktop, retained surfaces and resumed Canvas input.
+- [x] GUI-508: Keep Editor dirty across all three failures, save and verify the exact `retained!` bytes, then make it dirty again and complete the existing normal handoff and close-cancellation workflow.
+- [ ] GUI-508: Add deterministic fullscreen executable-memory exhaustion and saturated lifecycle-IPC fault injection.
+
+The component fixture creates an inert descriptor child before starting desktop
+and temporarily assigns it to that desktop session to control acknowledgement
+timing. Desktop, Canvas and Editor remain actual SDK-built RV32 programs. Missing
+file injection occurs only after the pause token proves inspection succeeded.
+Fault recovery preserves existing behavior: loader reports status 5 and desktop
+returns without a modal; negative launch failures and pause timeout show dialogs.
+These checks do not change Kilo launch behavior or claim native fault containment.
+
+Validation: the complete standalone GUI RV32 workflow passes macOS Debug with
+ASan/UBSan and macOS Release using the existing SDK application artifacts. Git
+whitespace checks pass. No production application/runtime code changed; no Linux
+builds/tests, host simulator launch/control or Tab5 flashing were performed.

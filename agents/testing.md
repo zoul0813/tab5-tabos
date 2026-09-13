@@ -2030,3 +2030,25 @@ finite timeout, exact readable/hangup/writable bits, retained control delivery a
 peer close and stale wait sources after endpoint/source reuse. Both the component
 test and standalone RV32 process harness pass macOS Debug (ASan/UBSan) and Release.
 Native wait-loop race and service-contention acceptance remains pending.
+
+### GUI Fullscreen Failure Fixtures
+
+The standalone `tabos_gui_rv32` workflow now retains dirty Editor plus Canvas while
+exercising pause timeout/late acknowledgement, executable disappearance between
+inspection and load, and an illegal-instruction fullscreen ELF. An inert descriptor
+fixture temporarily joins the desktop session to hold its pause barrier; actual
+GUI programs run from SDK-built RV32 artifacts. Each failure verifies retained
+surface accounting, process cleanup/desktop liveness and fresh Canvas input. After
+all failures the Editor saves exact expected dirty bytes and accepts more input
+before the existing successful handoff and dirty-close cases continue.
+
+The fixture's fault ELF is valid for inspection and faults only when executed.
+Loader status 5 is asserted; desktop currently returns without a modal for positive
+child statuses. Executable-memory exhaustion and saturated lifecycle-IPC injection
+remain pending; host instruction-fault recovery does not establish Tab5 native
+fault containment.
+
+Validation: the complete standalone GUI RV32 workflow passes macOS Debug with
+ASan/UBSan and macOS Release using the existing SDK application artifacts. Git
+whitespace checks pass. No production application/runtime code changed; no Linux
+builds/tests, host simulator launch/control or Tab5 flashing were performed.

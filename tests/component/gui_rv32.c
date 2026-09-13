@@ -13,6 +13,8 @@
 #include <tabos/internal/pointer.h>
 #include <tabos/internal/surface.h>
 #include <tabos/device.h>
+#include <tabos/session.h>
+#include <tabos/internal/elf_api.h>
 #include "hello_elf.h"
 
 #include <stdio.h>
@@ -24,6 +26,8 @@
 
 static char storage_root[] = "/tmp/tabos-gui-rv32-XXXXXX";
 static tabos_app_context_t* parent_context;
+static bool blocker_present;
+static tabos_process_id_t blocker_pid;
 
 static void check(bool condition, const char* message)
 {
@@ -116,7 +120,8 @@ static void await_pixel(unsigned int x, unsigned int y, uint16_t color)
 
 static void await_count(size_t count)
 {
-    const uint64_t deadline = platform_time_ms() + 20000U;
+    count                   += blocker_present ? 1U : 0U;
+    const uint64_t deadline  = platform_time_ms() + 20000U;
     while (tabos_process_count() != count && platform_time_ms() < deadline) {
         pump();
     }
@@ -230,6 +235,141 @@ static void remove_fixture_tree(const char* path)
     check(closedir(directory) == 0 && rmdir(path) == 0, "fixture directory cleanup");
 }
 
+static tabos_app_context_t* blocker_context;
+
+static bool blocker_entry(tabos_app_context_t* context)
+{
+    blocker_context = context;
+    return true;
+}
+
+static const tabos_app_descriptor_t blocker = {
+    .abi_version = TABOS_APPLICATION_ABI_VERSION,
+    .name        = "pause-blocker",
+    .version     = "1",
+    .entry       = blocker_entry,
+};
+
+static void write_legacy(const char* path)
+{
+    FILE* file = fopen(path, "wb");
+    check(file != NULL && fwrite(loader_hello_elf, 1U, loader_hello_elf_size, file) == loader_hello_elf_size &&
+              fclose(file) == 0,
+          "restore fullscreen fixture");
+}
+
+static void write_fault(const char* path)
+{
+    /* Valid RV32 ELF, illegal instruction at entry: query succeeds, execution faults. */
+    unsigned char elf[88] = {0};
+    memcpy(elf, "\177ELF\1\1\1", 7U);
+    elf[16]    = 2U;
+    elf[18]    = 243U;
+    elf[20]    = 1U;
+    elf[28]    = 52U;
+    elf[40]    = 52U;
+    elf[42]    = 32U;
+    elf[44]    = 1U;
+    elf[52]    = 1U;
+    elf[56]    = 84U;
+    elf[68]    = 4U;
+    elf[72]    = 4U;
+    elf[76]    = 7U;
+    elf[80]    = 4U;
+    FILE* file = fopen(path, "wb");
+    check(file != NULL && fwrite(elf, 1U, sizeof(elf), file) == sizeof(elf) && fclose(file) == 0,
+          "write faulting fullscreen fixture");
+}
+
+static void recovery_cases(const char* hello, const char* note)
+{
+    const uint32_t retained = surface_bytes();
+    for (unsigned int failure = 0U; failure < 3U; ++failure) {
+        fprintf(stderr, "GUI recovery case %u\n", failure);
+        /* Test-only member stays uncooperative until explicitly acknowledged. */
+        blocker_context->session_id = failure < 2U ? 2U : 0U;
+        if (failure == 2U) {
+            write_fault(hello);
+        }
+        click(428, 84);
+        int token = 0;
+        if (failure < 2U) {
+            const uint64_t deadline = platform_time_ms() + 1000U;
+            while (token <= 0 && platform_time_ms() < deadline) {
+                pump();
+                token = kernel_process_session_control(blocker_context, TABOS_SESSION_CHECKPOINT, 0U, 0U);
+            }
+            check(token > 0, "desktop began pause before injected failure");
+            if (failure == 1U) {
+                check(unlink(hello) == 0, "remove executable after successful inspection");
+                check(kernel_process_session_control(blocker_context, TABOS_SESSION_ACKNOWLEDGE, (uint32_t) token,
+                                                     0U) == TABOS_ELF_EXEC_PENDING,
+                      "release pause for missing executable launch");
+            }
+        }
+        if (failure < 2U) {
+            await_pixel(130U, 300U, 0xc618U); /* Desktop error panel over Canvas. */
+        } else {
+            int status              = 0;
+            const uint64_t deadline = platform_time_ms() + 20000U;
+            while ((!tabos_app_last_exit_status(&status) || status != 5 || tabos_process_count() != 5U) &&
+                   platform_time_ms() < deadline) {
+                pump();
+            }
+            check(status == 5, "fullscreen instruction fault reported with loader status");
+            settle();
+        }
+        check(surface_bytes() == retained, "handoff failure retains both client surfaces");
+        tabos_process_info_t info;
+        check(tabos_process_info(2U, &info) && info.state == TABOS_PROCESS_RUNNING,
+              "desktop runnable after handoff failure");
+        if (failure < 2U) {
+            check(kernel_process_session_control(blocker_context, TABOS_SESSION_CHECKPOINT, 0U, 0U) == 0,
+                  "failed transition resumes session");
+            check(kernel_process_session_control(blocker_context, TABOS_SESSION_ACKNOWLEDGE, (uint32_t) token, 0U) == 0,
+                  "late acknowledgement is harmless");
+            blocker_context->session_id = 0U;
+        }
+        check(tabos_process_count() == 5U && !tabos_process_system_panicked(), "failed fullscreen child cleaned up");
+        if (failure < 2U) {
+            click(520, 448);
+        }
+        await_pixel(400U, 300U, 0xffffU);
+        click(400 + (int32_t) failure * 60, 300);
+        await_pixel(400U + failure * 60U, 300U, 0x1082U);
+        /* Clear between rounds so both modal appearance and resumed input are observable. */
+        settle();
+        click(60, 84);
+        await_pixel(400U + failure * 60U, 300U, 0xffffU);
+        settle();
+        write_legacy(hello);
+    }
+    check(kernel_process_force_terminate(blocker_pid, 0), "remove recovery fixture member");
+    pump();
+    int blocker_status = -1;
+    check(kernel_process_reap(parent_context, blocker_pid, &blocker_status) == 1 && blocker_status == 0,
+          "reap recovery fixture member");
+    blocker_present = false;
+    click(1160, 24); /* Minimize Canvas and restore retained Editor. */
+    click(196, 680);
+    await_pixel(8U, 112U, 0x632cU);
+    settle();
+    click(220, 80); /* Save the document that was dirty through all three failures. */
+    settle();
+    FILE* file    = fopen(note, "rb");
+    char text[16] = {0};
+    check(file != NULL && fread(text, 1U, sizeof(text), file) == 9U && fclose(file) == 0 &&
+              strcmp(text, "retained!") == 0,
+          "exact dirty editor text survives all failure paths");
+    click(180, 150);
+    tabos_input_event_t input = {.type = TABOS_INPUT_TEXT, .text = "?"};
+    check(input_submit(&input), "editor accepts input after recovery");
+    settle();
+    click(1160, 24);
+    click(322, 680); /* Restore Canvas for the normal handoff regression. */
+    await_pixel(100U, 200U, 0xffffU);
+}
+
 int main(int argc, char** argv)
 {
     check(argc == 6, "pass SDK-built desktop, canvas, files, calculator and editor artifacts");
@@ -270,6 +410,9 @@ int main(int argc, char** argv)
     check(kernel_runtime_init() && platform_init(true) && kernel_runtime_start(false), "runtime startup");
     check(application_registry_register(&parent) && tabos_app_launch(parent.name) == TABOS_APP_RESULT_OK,
           "persistent root");
+    check(kernel_process_spawn_descriptor(parent_context, &blocker, NULL, NULL, &blocker_pid) == TABOS_APP_RESULT_OK,
+          "create recovery fixture before root is blocked");
+    blocker_present = true;
     check(tabos_app_exec(parent_context, "T:/bin/desktop") == TABOS_APP_RESULT_OK, "desktop launch");
     await_pixel(1279U, 300U, 0x2b8dU);
     click(1060, 180);
@@ -299,7 +442,7 @@ int main(int argc, char** argv)
     await_count(4U);
     check(surface_bytes() == 1280U * 592U * 2U, "GUI surface retained during fullscreen execution");
     tabos_process_info_t info;
-    check(tabos_process_info(1U, &info) && info.state == TABOS_PROCESS_BLOCKED,
+    check(tabos_process_info(2U, &info) && info.state == TABOS_PROCESS_BLOCKED,
           "desktop retained below fullscreen child");
     finish_optional_game();
     await_count(3U);
@@ -342,6 +485,10 @@ int main(int argc, char** argv)
     click(1060, 180);
     await_count(4U);
     await_pixel(100U, 200U, 0xffffU);
+    recovery_cases(hello, note);
+    if (game != NULL) {
+        copy_file(game, hello);
+    }
     click(428, 84);
     await_count(5U);
     check(surface_bytes() == 2U * 1280U * 592U * 2U, "dirty editor and canvas remain resident during handoff");
@@ -369,8 +516,8 @@ int main(int argc, char** argv)
     await_count(2U);
     FILE* saved_file    = fopen(note, "rb");
     char saved_text[16] = {0};
-    check(saved_file != NULL && fread(saved_text, 1U, sizeof(saved_text), saved_file) == 8U &&
-              fclose(saved_file) == 0 && strcmp(saved_text, "retained") == 0,
+    check(saved_file != NULL && fread(saved_text, 1U, sizeof(saved_text), saved_file) == 9U &&
+              fclose(saved_file) == 0 && strcmp(saved_text, "retained!") == 0,
           "discard leaves saved file unchanged");
     await_pixel(1279U, 300U, 0x2b8dU);
     click(480, 180);
