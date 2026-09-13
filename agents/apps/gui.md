@@ -409,7 +409,8 @@ host simulator launch/control, MSC copy or hardware flashing was performed.
 - [x] GUI-202/206: Add host RV32 IPC waits covering readiness before wait and after empty poll/before runtime sleep, finite deadlines under repeated unrelated wakeups, peer close, endpoint replacement and forced blocked-child cleanup.
 - [x] GUI-202/206: Add maintained SDK tester cases for empty/ready listener, channel timeout, queued control with hangup, close invalidation and stale source rejection after reuse.
 - [ ] GUI-202/206: Validate native Tab5 wait cancellation/interleavings and remaining service-contention cases.
-- [ ] GUI-206: Complete concurrent teardown/commit and remaining invalid-input failure coverage.
+- [x] GUI-206: Add service-level concurrent teardown/commit and invalid-input failure coverage.
+- [ ] GUI-206: Extend maintained real RV32 tester with invalid surface transfer and revoked-grant rejection cases.
 
 Both `unit.ipc` and `unit.surface` pass in macOS Debug (ASan/UBSan) and Release.
 Allocation interception is local to the test translation units; production services
@@ -480,3 +481,22 @@ and coordinator-failure checks, this completes GUI-508 automated coverage. Nativ
 contention, physical memory/headroom and device acceptance remain open under
 GUI-104/202 and Phase 6; injected allocation failure is not a hardware headroom
 measurement.
+
+### Surface Validation and Teardown Races
+
+`unit.surface` now rejects zero/oversized/overflowing creation dimensions and
+repeats 13 invalid rectangle/buffer cases 100 times. Failed reads leave output
+guards and staging untouched; failed uploads abort staging, preserve committed
+pixels/revision and release their allocation. Final accounting returns to zero.
+
+An additional 102 synchronized rounds cover commit/read before owner teardown,
+teardown before either operation, and all three competing for the service lock.
+Successful reads contain one coherent frame; operations after teardown reject
+stale handles. Reusing the freed slot does not revive the previous handle or
+inherit its reader grant. Every round ends with zero surface bytes and allocations.
+
+The expanded unit test passes macOS Debug with ASan/UBSan and Release. These tests
+use the existing host fixture mutex and do not establish native process stop or
+physical contention behavior. No production code changed. No Linux builds/tests,
+host simulator launch/control or Tab5 flashing were performed. Real RV32 SDK
+rejection cases remain the next GUI-206 increment.

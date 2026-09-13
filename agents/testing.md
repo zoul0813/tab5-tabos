@@ -2067,3 +2067,17 @@ checked afterward; shutdown leaves zero images and endpoints.
 The complete standalone workflow passes macOS Debug with ASan/UBSan and Release.
 These are deterministic fault-injection results, not physical Tab5 memory or
 contention measurements. Production APIs and behavior are unchanged.
+
+### Surface Invalid-Input and Owner-Teardown Coverage
+
+`unit.surface` repeats invalid rectangle, dimension, null-buffer and short-buffer
+requests with guard pixels and checks transaction semantics: failed reads preserve
+staging/output, failed uploads discard staging, and committed pixels/revision stay
+unchanged. Creation rejects zero, excessive and overflowing dimensions.
+
+A condition-variable start gate coordinates commit and granted-reader threads with
+owner teardown. Deterministic before/after orderings accompany simultaneous lock
+contention across 102 rounds. Reads must be coherent or return EBADF; old handles
+and revoked grants remain invalid after slot reuse. Each round checks zero live
+allocations and surface bytes. macOS Debug ASan/UBSan and Release pass; native
+process-stop/service contention requires separate acceptance.
