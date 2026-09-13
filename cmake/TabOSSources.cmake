@@ -77,6 +77,8 @@ set(TABOS_ESP32P4_PLATFORM_SOURCES
     "${TABOS_ROOT}/platform/common/work.c"
     "${TABOS_ROOT}/platform/esp32p4/application_task.c"
     "${TABOS_ROOT}/platform/esp32p4/runtime.c"
+    "${TABOS_ROOT}/platform/esp32p4/wifi_driver.c"
+    "${TABOS_ROOT}/platform/esp32p4/wifi_startup.c"
     "${TABOS_ROOT}/platform/esp32p4/activity.c"
     "${TABOS_ROOT}/platform/esp32p4/power.c"
     "${TABOS_ROOT}/platform/esp32p4/audio.c"

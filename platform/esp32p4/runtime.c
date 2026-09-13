@@ -1,4 +1,6 @@
 #include "internal.h"
+#include "wifi_driver.h"
+#include "wifi_startup.h"
 
 #include <tabos/platform/platform.h>
 
@@ -27,8 +29,8 @@ static const char* const TAG = TABOS_PLATFORM_LOG_TAG;
 static atomic_bool stop_requested;
 static bool hosted_initialized;
 static atomic_bool wifi_initialized;
-static TaskHandle_t wifi_start_task;
-static atomic_bool wifi_starting;
+static tab5_wifi_driver_t wifi_driver;
+static tab5_wifi_startup_t wifi_startup;
 static atomic_int wifi_state;
 static atomic_bool wifi_disconnect_requested;
 static SemaphoreHandle_t wifi_status_mutex;
@@ -118,28 +120,7 @@ bool platform_init(bool headless)
 
 static bool wifi_driver_init(void)
 {
-    if (esp_netif_init() != ESP_OK) {
-        return false;
-    }
-    const esp_err_t loop_result = esp_event_loop_create_default();
-    if (loop_result != ESP_OK && loop_result != ESP_ERR_INVALID_STATE) {
-        return false;
-    }
-
-    esp_netif_t* netif = esp_netif_create_default_wifi_sta();
-    if (netif == NULL) {
-        return false;
-    }
-
-    if (esp_netif_set_hostname(netif, wifi_hostname) != ESP_OK) {
-        return false;
-    }
-
-    const wifi_init_config_t init = WIFI_INIT_CONFIG_DEFAULT();
-    if (esp_wifi_init(&init) != ESP_OK ||
-        esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, network_event, NULL) != ESP_OK ||
-        esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, network_event, NULL) != ESP_OK ||
-        esp_wifi_set_mode(WIFI_MODE_STA) != ESP_OK || esp_wifi_start() != ESP_OK) {
+    if (!tab5_wifi_driver_init(&wifi_driver, wifi_hostname, network_event)) {
         return false;
     }
     set_wifi_state(PLATFORM_NETWORK_OFFLINE);
@@ -148,14 +129,23 @@ static bool wifi_driver_init(void)
     return true;
 }
 
+static void wifi_start_finish(void)
+{
+    tab5_wifi_startup_finish(&wifi_startup);
+    vTaskDelete(NULL);
+}
+
 static void wifi_start(void* argument)
 {
     (void) argument;
     if (esp_hosted_slave_reset() != ESP_OK) {
         ESP_LOGW(TAG, "ESP32-C6 hosted transport did not become ready");
         set_wifi_state(PLATFORM_NETWORK_FAILED);
-        atomic_store_explicit(&wifi_starting, false, memory_order_release);
-        vTaskDelete(NULL);
+        wifi_start_finish();
+        return;
+    }
+    if (tab5_wifi_startup_cancelled(&wifi_startup)) {
+        wifi_start_finish();
         return;
     }
     esp_hosted_coprocessor_fwver_t version;
@@ -168,8 +158,14 @@ static void wifi_start(void* argument)
     if (!wifi_driver_init()) {
         ESP_LOGW(TAG, "ESP32-C6 Wi-Fi initialization failed");
         set_wifi_state(PLATFORM_NETWORK_FAILED);
-        atomic_store_explicit(&wifi_starting, false, memory_order_release);
-        vTaskDelete(NULL);
+        wifi_start_finish();
+        return;
+    }
+
+    if (tab5_wifi_startup_cancelled(&wifi_startup)) {
+        tab5_wifi_driver_shutdown(&wifi_driver);
+        atomic_store_explicit(&wifi_initialized, false, memory_order_release);
+        wifi_start_finish();
         return;
     }
 
@@ -194,8 +190,7 @@ static void wifi_start(void* argument)
     } else {
         set_wifi_state(PLATFORM_NETWORK_OFFLINE);
     }
-    atomic_store_explicit(&wifi_starting, false, memory_order_release);
-    vTaskDelete(NULL);
+    wifi_start_finish();
 }
 
 bool platform_network_init(const char* hostname, platform_network_event_fn event)
@@ -207,13 +202,18 @@ bool platform_network_init(const char* hostname, platform_network_event_fn event
     if (wifi_status_mutex == NULL) {
         return false;
     }
+    if (!tab5_wifi_startup_prepare(&wifi_startup)) {
+        vSemaphoreDelete(wifi_status_mutex);
+        wifi_status_mutex = NULL;
+        return false;
+    }
     wifi_connect_pending = false;
     wifi_event_callback  = event;
     (void) snprintf(wifi_hostname, sizeof(wifi_hostname), "%s", hostname);
     set_wifi_state(PLATFORM_NETWORK_STARTING);
-    atomic_store_explicit(&wifi_starting, true, memory_order_release);
-    if (xTaskCreate(wifi_start, "tabos_wifi_start", 4096U, NULL, 5U, &wifi_start_task) != pdPASS) {
-        atomic_store_explicit(&wifi_starting, false, memory_order_release);
+    if (xTaskCreate(wifi_start, "tabos_wifi_start", 4096U, NULL, 5U, NULL) != pdPASS) {
+        tab5_wifi_startup_finish(&wifi_startup);
+        tab5_wifi_startup_stop_and_join(&wifi_startup);
         vSemaphoreDelete(wifi_status_mutex);
         wifi_status_mutex   = NULL;
         wifi_event_callback = NULL;
@@ -224,24 +224,13 @@ bool platform_network_init(const char* hostname, platform_network_event_fn event
 
 void platform_network_shutdown(void)
 {
-    if (atomic_exchange_explicit(&wifi_starting, false, memory_order_acq_rel)) {
-        vTaskDelete(wifi_start_task);
-    }
-    if (!atomic_load_explicit(&wifi_initialized, memory_order_acquire)) {
-        if (wifi_status_mutex != NULL) {
-            vSemaphoreDelete(wifi_status_mutex);
-            wifi_status_mutex = NULL;
-        }
-        wifi_event_callback = NULL;
-        return;
-    }
-    (void) esp_event_handler_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, network_event);
-    (void) esp_event_handler_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, network_event);
-    (void) esp_wifi_stop();
-    (void) esp_wifi_deinit();
-    vSemaphoreDelete(wifi_status_mutex);
-    wifi_status_mutex = NULL;
+    tab5_wifi_startup_stop_and_join(&wifi_startup);
+    tab5_wifi_driver_shutdown(&wifi_driver);
     atomic_store_explicit(&wifi_initialized, false, memory_order_release);
+    if (wifi_status_mutex != NULL) {
+        vSemaphoreDelete(wifi_status_mutex);
+        wifi_status_mutex = NULL;
+    }
     wifi_event_callback = NULL;
 }
 
@@ -249,8 +238,8 @@ bool platform_network_connect(const char* ssid, const char* password)
 {
     if (!atomic_load_explicit(&wifi_initialized, memory_order_acquire) || ssid == NULL || password == NULL ||
         strlen(ssid) > 32U || strlen(password) > 64U) {
-        if (!atomic_load_explicit(&wifi_starting, memory_order_acquire) || ssid == NULL || password == NULL ||
-            strlen(ssid) > 32U || strlen(password) > 64U) {
+        if (!tab5_wifi_startup_running(&wifi_startup) || ssid == NULL || password == NULL || strlen(ssid) > 32U ||
+            strlen(password) > 64U) {
             return false;
         }
         if (xSemaphoreTake(wifi_status_mutex, portMAX_DELAY) == pdTRUE) {
