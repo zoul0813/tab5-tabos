@@ -10,6 +10,7 @@ This directory contains user and contributor documentation for TabOS.
 - [Keyboard Input](input.md): public events, SDL3 translation, and Tab5 Keyboard protocol.
 - [Touch and Pointer Input](pointer.md): process-owned pointer streams, logical coordinates, and host/Tab5 backends.
 - [Starfall](starfall.md): build, run, controls, storage, and asset provenance for the demo game.
+- [Soccer](soccer.md): six-a-side timed arcade soccer with controls, rules, sound, and profiling.
 - [Console Service](console.md): foreground ownership, terminal controls, input, and diagnostic app.
 - [Application Lifecycle](applications.md): descriptors, built-in registry, foreground execution, and current limits.
 - [SDK Tester Application](tester.md): end-to-end public SDK and ABI validation on host and Tab5.
