@@ -1,5 +1,7 @@
 #include "wifi_startup.h"
 
+#include <stddef.h>
+
 bool tab5_wifi_startup_prepare(tab5_wifi_startup_t* startup)
 {
     if (startup == NULL || startup->done != NULL) {
