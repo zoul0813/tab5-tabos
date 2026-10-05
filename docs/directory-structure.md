@@ -18,6 +18,7 @@ tabos/
 │   ├── hello_elf/       Independently built ELF example application
 │   ├── coreutils/       Independently built small command-line utilities
 │   │   └── src/<name>/   Separate utility source and executable target
+│   ├── pool/            House 8-ball application, computer player, rules, sound, and tests
 │   ├── shell/           Independently built command shell application
 │   └── tester/          Modular end-to-end SDK and ABI test application
 ├── audio/               Portable audio subsystem
