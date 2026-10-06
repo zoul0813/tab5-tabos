@@ -1983,3 +1983,13 @@ Makefile, including future applications; core-owned `apps/diag` is not an SDK cl
 `architecture.check_regressions` creates isolated forbidden-header, private-ABI, and
 naming fixtures in previously omitted areas, requires each check to reject its fixture,
 then verifies the same location accepts valid source.
+
+## Directory transport validation (2026-10-05)
+
+`unit.sdk_posix_filesystem` checks length-prefixed records for every non-NUL,
+non-slash filename byte, file/directory type, maximum length, malformed/truncated
+records, and returned-size bounds. `component.sdk_directory_listing` connects the
+production loader producer to the application SDK parser over real temporary host
+storage, including newline/CR/tab/colon names and exact-capacity buffers. Directory
+overflow remains an error rather than truncated success. Private ELF API version 22
+requires bundled application rebuilds and regenerated loader fixtures.

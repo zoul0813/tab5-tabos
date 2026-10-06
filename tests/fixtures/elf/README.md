@@ -10,6 +10,6 @@ whenever the application ABI or private ELF API version changes, then update onl
 parser assertions tied to the resulting ELF layout.
 
 The fixture uses the same RV32 compiler flags and `sdk/linker/app-riscv32.ld`
-as applications, but links only `guest.c` with `-nostdlib`. Strip debug data,
-convert the result with `xxd -i`, and retain the public array names declared in
+as applications, but links only `guest.c` with `-nostdlib`. Link with `--emit-relocs` and strip only debug data (`--strip-debug`) so the
+relocation-rejection regression retains its input. Convert the result with `xxd -i`, and retain the public array names declared in
 `hello_elf.h`.

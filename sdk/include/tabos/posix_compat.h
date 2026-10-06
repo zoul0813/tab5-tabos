@@ -17,6 +17,7 @@ typedef struct tabos_posix_dir {
         bool allocated;
         bool runtime_backed;
         size_t listing_offset;
+        size_t listing_size;
         char listing[4096];
 } tabos_posix_dir_t;
 

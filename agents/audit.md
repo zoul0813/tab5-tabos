@@ -4,7 +4,7 @@ Audit date: 2026-09-06. Accuracy verification: 2026-09-06. All 44 original findi
 
 Findings use P1 (high impact), P2 (normal defect), and P3 (maintenance). Each checkbox represents a tracked repair task. Static findings include the triggering path and suggested validation; hardware-dependent concerns are identified explicitly. Planned features are not counted as dead code or defects merely because they are unfinished.
 
-3 open findings: 1 P2, 2 P3; 43 resolved findings. Checklist entries below are authoritative.
+2 open findings: 0 P2, 2 P3; 44 resolved findings. Checklist entries below are authoritative.
 
 ## Scope and validation
 
@@ -120,13 +120,17 @@ Passing existing tests does not invalidate the uncovered failure paths. This is 
 
 - [x] **AUD-045 — P2: Tab5 FAT rename cannot replace existing files, breaking repeated saves.** Resolved: same-drive rename now promises replacement. After a backend `EEXIST`, the platform reserves a drive-root recovery name, moves the old destination aside, installs the source, and rolls the old file back on installation failure. The documented fallback is recoverable but not power-loss atomic.
 
-- [ ] **AUD-046 — P2: Directory listing serialization splits legal host filenames into false entries.** `loader/elf_application.c:724-728` serializes each name as unescaped `F:<name>\n` or `D:<name>\n`; `sdk/lib/posix_filesystem.c:149-164` treats every newline as a record boundary. `fs/path.c:consume_path()` permits embedded newlines and the host POSIX backend supports them. A single regular file named `a\nF:b` is therefore exposed to SDK `readdir()` as two files, `a` and `b`, neither representing its actual name. This breaks enumeration and programs that subsequently open those entries, independently of AUD-029’s capacity bug. Use bounded length-prefixed records or unambiguous escaping, and validate round trips for every permitted filename byte. If such names are intentionally unsupported, reject them consistently at the filesystem boundary and define how imported host entries are handled. An isolated probe of the current SDK parser confirmed the split; Tab5 FAT filename support is not assumed.
+- [x] **AUD-046 — P2: Directory listing serialization splits legal host filenames into false entries.** Directory transport now returns a byte count and bounded records containing type, little-endian name length, and exact filename bytes. The SDK validates record boundaries/types/names before copying. Private ELF API 22 requires matching rebuilt applications.
 
 - [ ] **AUD-028 — P3: Remove or explicitly justify unused internal code and state.** Tracked-source reference scan found declaration/definition only for `console_redraw()` (`console/console.c:365`), `font_draw_text()` (`graphics/font.c:74`), `network_config_save()` (`net/config.c:352`), and `platform_pointer_health()` (host, Tab5, and fake implementations plus platform declaration). `CAMERA_LEASE_INDEX_MASK` (`camera/camera.c:18`) is never used. These are internal surfaces, not third-party callbacks or public SDK entry points. Remove unused code or wire it to a concrete maintained caller/test; preserve intentional future functionality only with an explicit reason. In particular, the unused pointer-health hook helps explain why runtime touch faults currently become offline/removal rather than a reported fault.
 
 - [ ] **AUD-043 — P3: Agent context still lists settled architecture as active unresolved work.** `agents/TABOS_CONTEXT.md` sections 7, 9, 11, and 16 retain open questions about cwd, framebuffer format/buffering, executable format, ABI, libc, socket API, and embedded RV32 execution despite implemented and `[DECIDED]` choices elsewhere. Its keyboard implementation also says HID-mode reports although the driver configures Normal mode. Reconcile the authoritative context with current decisions, explicitly separating historical questions from genuinely open work, so future agents do not reintroduce incompatible designs. Cross-check with `agents/architecture.md`, public `docs/`, and current build/driver constants.
 
 ## Resolved findings
+
+- **AUD-046 — Resolved 2026-10-05.** Directory transport now returns a byte count and bounded records containing type, little-endian name length, and exact filename bytes. The SDK validates record boundaries/types/names before copying. Private ELF API 22 requires matching rebuilt applications.
+
+  Validation: unit.sdk_posix_filesystem covers all non-NUL/non-slash bytes, 255-byte names, malformed and truncated records, empty listings and oversized gate results. component.sdk_directory_listing round-trips newline/CR/tab/colon file and directory names through the production loader and SDK on real host storage, including exact-capacity and overflow cases. The old parser fails the new regression. All 93 macOS Debug tests validated: 91 passed in the full run, then corrected fixture regeneration and an explicit installed SDKROOT passed the two failed checks. Bundled RV32 applications, the rebuilt shell restart harness, and Tab5 Debug cross-build pass. Linux execution and physical hardware were not run.
 
 - **AUD-044 — Resolved 2026-10-05.** Portable-header and naming checks now cover the omitted subsystems and SDK implementation. Application ABI checks discover all Makefile-backed applications, with isolated negative fixtures for omitted and future areas.
 

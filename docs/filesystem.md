@@ -152,3 +152,10 @@ and removes test contents. Each step prints `[OK]` or `[FAIL]` with TabOS error 
 Successful run ends with `Filesystem diagnostic passed`. Failure leaves remaining
 test contents available for inspection; next run removes old diagnostic contents
 before starting.
+
+SDK directory enumeration preserves filename bytes, including embedded newlines on
+host storage. `readdir()` returns each filename as one entry. Application directory
+snapshots remain bounded to 4096 transport bytes; an oversized listing fails with
+`ENOSPC`. Tab5 filenames remain subject to FAT restrictions. The private directory
+transport changed with ELF API version 22; rebuild bundled applications together with
+the system before running them.

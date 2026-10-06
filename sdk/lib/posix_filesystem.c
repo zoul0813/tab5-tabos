@@ -118,8 +118,11 @@ tabos_posix_dir_t* tabos_posix_opendir(const char* path)
                 tabos_runtime_api->fs_list(path, directory_pool[index].listing, sizeof(directory_pool[index].listing));
             if (result < 0) {
                 errno = -result;
+            } else if ((size_t) result > sizeof(directory_pool[index].listing)) {
+                errno = EIO;
             } else {
-                handle = 0;
+                directory_pool[index].listing_size = (size_t) result;
+                handle                             = 0;
             }
         } else {
             errno = ENOSYS;
@@ -147,24 +150,28 @@ void* tabos_posix_readdir(tabos_posix_dir_t* directory)
 #ifdef TABOS_APPLICATION
     if (directory->runtime_backed) {
         const size_t start = directory->listing_offset;
-        if (directory->listing[start] == '\0') {
+        if (start == directory->listing_size) {
             return NULL;
         }
-        const char type         = directory->listing[start];
-        const size_t name_start = start + 2U;
-        size_t end              = name_start;
-        while (directory->listing[end] != '\0' && directory->listing[end] != '\n') {
-            ++end;
+        if (start > directory->listing_size || directory->listing_size - start < 3U) {
+            errno = EIO;
+            return NULL;
         }
-        const size_t length = end - name_start;
-        if (length > TABOS_FS_NAME_MAX) {
-            errno = TABOS_ENAMETOOLONG;
+        const char type = directory->listing[start];
+        const size_t length =
+            (uint8_t) directory->listing[start + 1U] | (size_t) (uint8_t) directory->listing[start + 2U] << 8U;
+        const size_t name_start = start + 3U;
+        if ((type != 'F' && type != 'D') || length == 0U || length > TABOS_FS_NAME_MAX ||
+            length > directory->listing_size - name_start ||
+            memchr(directory->listing + name_start, '\0', length) != NULL ||
+            memchr(directory->listing + name_start, '/', length) != NULL) {
+            errno = EIO;
             return NULL;
         }
         memcpy(directory->entry.d_name, directory->listing + name_start, length);
         directory->entry.d_name[length] = '\0';
         directory->entry.d_type         = type == 'D' ? 2U : 1U;
-        directory->listing_offset       = directory->listing[end] == '\n' ? end + 1U : end;
+        directory->listing_offset = name_start + length;
         return &directory->entry;
     }
 #else

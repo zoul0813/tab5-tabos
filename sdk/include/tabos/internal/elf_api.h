@@ -11,7 +11,7 @@
 
 #include <stdint.h>
 
-#define TABOS_ELF_API_VERSION  21U
+#define TABOS_ELF_API_VERSION  22U
 #define TABOS_ELF_EXEC_PENDING (-2147483647 - 1)
 
 enum {
@@ -110,6 +110,8 @@ typedef struct {
         int (*console_clear)(void);
         int (*fs_getcwd)(char* buffer, uint32_t capacity);
         int (*fs_chdir)(const char* path);
+        /* Returns byte count or negative errno. Each record contains 'F'/'D',
+         * a little-endian uint16 name length, and unterminated filename bytes. */
         int (*fs_list)(const char* path, char* buffer, uint32_t capacity);
         int (*exec)(const char* path, uint32_t argc, const char* const* argv);
         void (*yield)(void);

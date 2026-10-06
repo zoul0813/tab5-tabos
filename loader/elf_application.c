@@ -754,21 +754,20 @@ int loader_elf_application_list_directory(loader_elf_application_t* application,
             break;
         }
         const size_t length = strlen(entry.name);
-        if (length + 3U >= (size_t) capacity - used) {
+        if (length + 3U > (size_t) capacity - used) {
             result = -TABOS_ENOSPC;
             break;
         }
         buffer[used++] = (entry.mode & TABOS_S_IFDIR) != 0U ? 'D' : 'F';
-        buffer[used++] = ':';
+        buffer[used++] = (char) (length & 0xffU);
+        buffer[used++] = (char) (length >> 8U);
         memcpy(buffer + used, entry.name, length);
-        used           += length;
-        buffer[used++]  = '\n';
+        used += length;
     }
     if (tabos_fs_closedir(directory) != 0 && result == 0) {
         result = -*tabos_errno_location();
     }
-    buffer[used] = '\0';
-    return result;
+    return result == 0 ? (int) used : result;
 }
 
 static int elf_fs_list(const char* path, char* buffer, uint32_t capacity)

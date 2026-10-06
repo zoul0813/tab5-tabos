@@ -1167,3 +1167,20 @@ add_test(NAME architecture.check_regressions
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_LIST_DIR}/check_architecture_regressions.py"
         "${CMAKE_COMMAND}" "${CMAKE_CURRENT_LIST_DIR}"
 )
+
+add_executable(tabos_sdk_directory_listing
+    component/sdk_directory_listing.c
+    "${TABOS_ROOT}/sdk/lib/posix_filesystem.c"
+    fakes/platform_display.c fakes/storage_backend.c
+    "${TABOS_ROOT}/platform/posix/storage.c"
+)
+target_compile_definitions(tabos_sdk_directory_listing PRIVATE TABOS_APPLICATION=1)
+target_include_directories(tabos_sdk_directory_listing PRIVATE
+    "${TABOS_ROOT}/fs/include" "${TABOS_ROOT}/loader/include"
+    "${TABOS_ROOT}/platform/include" "${TABOS_ROOT}/sdk/include"
+    "${CMAKE_CURRENT_LIST_DIR}/fakes"
+)
+target_link_libraries(tabos_sdk_directory_listing PRIVATE tabos_core)
+tabos_enable_warnings(tabos_sdk_directory_listing)
+tabos_enable_sanitizers(tabos_sdk_directory_listing)
+add_test(NAME component.sdk_directory_listing COMMAND tabos_sdk_directory_listing)
