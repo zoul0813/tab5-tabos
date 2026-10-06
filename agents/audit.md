@@ -4,7 +4,7 @@ Audit date: 2026-09-06. Accuracy verification: 2026-09-06. All 44 original findi
 
 Findings use P1 (high impact), P2 (normal defect), and P3 (maintenance). Each checkbox represents a tracked repair task. Static findings include the triggering path and suggested validation; hardware-dependent concerns are identified explicitly. Planned features are not counted as dead code or defects merely because they are unfinished.
 
-2 open findings: 0 P2, 2 P3; 44 resolved findings. Checklist entries below are authoritative.
+1 open findings: 0 P2, 1 P3; 45 resolved findings. Checklist entries below are authoritative.
 
 ## Scope and validation
 
@@ -122,11 +122,15 @@ Passing existing tests does not invalidate the uncovered failure paths. This is 
 
 - [x] **AUD-046 — P2: Directory listing serialization splits legal host filenames into false entries.** Directory transport now returns a byte count and bounded records containing type, little-endian name length, and exact filename bytes. The SDK validates record boundaries/types/names before copying. Private ELF API 22 requires matching rebuilt applications.
 
-- [ ] **AUD-028 — P3: Remove or explicitly justify unused internal code and state.** Tracked-source reference scan found declaration/definition only for `console_redraw()` (`console/console.c:365`), `font_draw_text()` (`graphics/font.c:74`), `network_config_save()` (`net/config.c:352`), and `platform_pointer_health()` (host, Tab5, and fake implementations plus platform declaration). `CAMERA_LEASE_INDEX_MASK` (`camera/camera.c:18`) is never used. These are internal surfaces, not third-party callbacks or public SDK entry points. Remove unused code or wire it to a concrete maintained caller/test; preserve intentional future functionality only with an explicit reason. In particular, the unused pointer-health hook helps explain why runtime touch faults currently become offline/removal rather than a reported fault.
+- [x] **AUD-028 — P3: Remove or explicitly justify unused internal code and state.** Removed unused console_redraw, font_draw_text, platform_pointer_health declarations/backends/fake, and CAMERA_LEASE_INDEX_MASK. Retained network_config_save explicitly for planned interactive profile editing, with a maintained real-filesystem caller in component.network_config_file.
 
 - [ ] **AUD-043 — P3: Agent context still lists settled architecture as active unresolved work.** `agents/TABOS_CONTEXT.md` sections 7, 9, 11, and 16 retain open questions about cwd, framebuffer format/buffering, executable format, ABI, libc, socket API, and embedded RV32 execution despite implemented and `[DECIDED]` choices elsewhere. Its keyboard implementation also says HID-mode reports although the driver configures Normal mode. Reconcile the authoritative context with current decisions, explicitly separating historical questions from genuinely open work, so future agents do not reintroduce incompatible designs. Cross-check with `agents/architecture.md`, public `docs/`, and current build/driver constants.
 
 ## Resolved findings
+
+- **AUD-028 — Resolved 2026-10-05.** Removed unused console_redraw, font_draw_text, platform_pointer_health declarations/backends/fake, and CAMERA_LEASE_INDEX_MASK. Retained network_config_save explicitly for planned interactive profile editing, with a maintained real-filesystem caller in component.network_config_file.
+
+  Validation: Tracked-source reference scans confirm the removed symbols have no remaining code references. Seventeen affected console/raster/pointer/camera/network-config and architecture tests pass under host Debug sanitizers; the retained writer covers first/replacement saves, unknown-field preservation, failure retaining the prior profile, and recovery. macOS Debug build and Tab5 Debug cross-build pass. Linux execution and physical hardware were not run.
 
 - **AUD-046 — Resolved 2026-10-05.** Directory transport now returns a byte count and bounded records containing type, little-endian name length, and exact filename bytes. The SDK validates record boundaries/types/names before copying. Private ELF API 22 requires matching rebuilt applications.
 

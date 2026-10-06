@@ -1993,3 +1993,9 @@ production loader producer to the application SDK parser over real temporary hos
 storage, including newline/CR/tab/colon names and exact-capacity buffers. Directory
 overflow remains an error rather than truncated success. Private ELF API version 22
 requires bundled application rebuilds and regenerated loader fixtures.
+
+`component.network_config_file` exercises the retained internal Wi-Fi profile writer
+for the planned interactive credential workflow. It uses real temporary host storage
+for initial/replacement saves, unknown-field preservation, temporary-file open failure,
+prior-profile retention, and recovery on the next save. It does not enable a public
+credential-writing operation.

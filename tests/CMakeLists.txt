@@ -1184,3 +1184,17 @@ target_link_libraries(tabos_sdk_directory_listing PRIVATE tabos_core)
 tabos_enable_warnings(tabos_sdk_directory_listing)
 tabos_enable_sanitizers(tabos_sdk_directory_listing)
 add_test(NAME component.sdk_directory_listing COMMAND tabos_sdk_directory_listing)
+
+add_executable(tabos_network_config_file
+    component/network_config_file.c fakes/platform_display.c
+    "${TABOS_ROOT}/platform/posix/storage.c"
+)
+target_include_directories(tabos_network_config_file PRIVATE
+    "${TABOS_ROOT}/fs/include" "${TABOS_ROOT}/net/include"
+    "${TABOS_ROOT}/platform/include" "${TABOS_ROOT}/sdk/include"
+    "${CMAKE_CURRENT_LIST_DIR}/fakes"
+)
+target_link_libraries(tabos_network_config_file PRIVATE tabos_core)
+tabos_enable_warnings(tabos_network_config_file)
+tabos_enable_sanitizers(tabos_network_config_file)
+add_test(NAME component.network_config_file COMMAND tabos_network_config_file)

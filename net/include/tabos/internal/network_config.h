@@ -34,6 +34,8 @@ network_config_result_t network_config_load(network_config_t* config);
 network_config_result_t network_config_format_update(const char* existing, size_t existing_length,
                                                      const network_config_t* config, char* output,
                                                      size_t output_capacity, size_t* output_length);
+/* Retained for the planned netctl credential-editing workflow. Its persistence
+ * contract is exercised by component.network_config_file; no public write gate yet. */
 network_config_result_t network_config_save(const network_config_t* config);
 const char* network_config_result_name(network_config_result_t result);
 

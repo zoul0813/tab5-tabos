@@ -248,7 +248,6 @@ bool platform_audio_set_route(uint32_t route);
 bool platform_pointer_init(const char** driver, int* error);
 void platform_pointer_update(void);
 void platform_pointer_shutdown(void);
-bool platform_pointer_health(int* error);
 bool platform_camera_init(platform_camera_frame_fn frame, platform_camera_error_fn error,
                           platform_camera_capture_ready_fn capture_ready, platform_camera_info_t* info);
 bool platform_camera_start(const tabos_camera_config_t* config);

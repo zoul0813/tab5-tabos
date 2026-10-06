@@ -403,16 +403,6 @@ uint64_t console_next_deadline(void)
     return deadline;
 }
 
-void console_redraw(void)
-{
-    lock_console();
-    if (!graphics_active && active_terminal != NULL) {
-        terminal_redraw(active_terminal);
-        (void) present_console();
-    }
-    unlock_console();
-}
-
 void console_set_graphics_active(bool active)
 {
     lock_console();

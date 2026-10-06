@@ -233,11 +233,3 @@ void platform_pointer_shutdown(void)
     }
     tab5_touch_interrupt_state_init(&touch_state);
 }
-
-bool platform_pointer_health(int* error)
-{
-    if (error != NULL) {
-        *error = touch_error;
-    }
-    return touch_ready && touch_error == 0;
-}

@@ -70,21 +70,3 @@ bool font_draw_char(platform_framebuffer_t* framebuffer, int x, int y, char char
     }
     return true;
 }
-
-size_t font_draw_text(platform_framebuffer_t* framebuffer, int x, int y, const char* text, unsigned int scale,
-                      platform_pixel_t foreground, platform_pixel_t background)
-{
-    if (text == NULL || scale == 0U) {
-        return 0U;
-    }
-    size_t count      = 0U;
-    const int advance = (int) (FONT_GLYPH_WIDTH * scale);
-    while (*text != '\0') {
-        if (!font_draw_char(framebuffer, x + (int) count * advance, y, *text, scale, foreground, background)) {
-            break;
-        }
-        ++count;
-        ++text;
-    }
-    return count;
-}

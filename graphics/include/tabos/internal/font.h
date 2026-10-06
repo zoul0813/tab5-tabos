@@ -17,7 +17,5 @@ enum {
 size_t font_glyph_index(unsigned int character);
 bool font_draw_char(platform_framebuffer_t* framebuffer, int x, int y, char character, unsigned int scale,
                     platform_pixel_t foreground, platform_pixel_t background);
-size_t font_draw_text(platform_framebuffer_t* framebuffer, int x, int y, const char* text, unsigned int scale,
-                      platform_pixel_t foreground, platform_pixel_t background);
 
 #endif

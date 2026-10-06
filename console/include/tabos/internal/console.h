@@ -21,7 +21,6 @@ bool console_write_panic(const char* text);
 void console_shutdown(void);
 void console_update(void);
 uint64_t console_next_deadline(void);
-void console_redraw(void);
 void console_set_graphics_active(bool active);
 bool console_graphics_active(void);
 
