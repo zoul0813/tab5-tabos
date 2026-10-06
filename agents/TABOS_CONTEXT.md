@@ -1,6 +1,6 @@
 # TabOS Codex Context
 
-> Status: project context distilled from TabOS planning discussions through 2026-08-10.
+> Status: current implementation context reconciled on 2026-10-05; historical planning retained only where labeled.
 > Purpose: give Codex a stable architectural baseline. Treat items marked **Decision** as the current direction, **Proposed** as a likely design that still needs validation, and **Open** as unresolved.
 
 ## 1. Project Goal
@@ -183,7 +183,7 @@ restores parent with child status after process-owned ELF resources are cleaned.
 filesystem, and ELF launcher diagnostics persist as temporary root processes. ELF
 launcher runs configured child twice, avoiding process-0 exit.
 
-Experimental ELF ABI version 2 passes `argc`/`argv` at entry and through nested `exec`.
+Application ABI version 3 passes `argc`/`argv` at entry and through nested `exec`.
 Loader owns bounded copies of up to 16 arguments and 512 total bytes for child lifetime.
 Shell alone parses spaces, single/double quotes, and backslash escapes; kernel never
 interprets command-line quoting syntax.
@@ -191,10 +191,10 @@ Loaded C applications use `<tabos/process.h>` synchronous `tabos_exec()` wrapper
 nested foreground execution. Wrapper drives pending ELF call protocol and returns child
 status only after cleanup and parent restoration; it does not parse command strings.
 
-Filesystem-backed shell implementation loads `T:/bin/shell.bin` as process 0. ELF API
+Filesystem-backed shell implementation loads `T:/bin/shell` as process 0. ELF API
 now includes console input/raw output/clear, working-directory and directory listing,
 child execution, cooperative yield, and exit request. Shell implements `help`, `clear`,
-`pwd`, `cd`, `ls`, named `T:/bin/<name>.bin` execution, and explicit path execution.
+`pwd`, `cd`, `ls`, named `T:/bin/<name>` execution, and explicit path execution.
 Host retains interpreter state; Tab5 native ELF entry runs in managed FreeRTOS application
 task so runtime services remain scheduled. Tab5 task and interactive hardware behavior
 still require device validation.
@@ -228,20 +228,16 @@ forced-termination causes. Panic output bypasses ordinary console-session owners
 Shared console/terminal state uses an SDL mutex on host and a priority-inheriting FreeRTOS
 mutex on Tab5; portable code does not expose either native mutex type.
 
-Experimental loader now accepts bounded little-endian RV32 `ET_EXEC` ELF with loadable
-segments, executable entry, and no dynamic segment or relocations. It can read a bounded
-ELF file through TabOS filesystem API; checked-in hello bytes remain loader/test fixture
-only. Hello is independently compiled by GCC for RV32IMA/`ilp32`, stripped to 420 bytes,
-loads 199 bytes, and calls versioned API table containing console, argument, and exit services.
-Host executes same artifact through RV32 interpretation and reserved API call gates;
-guest CPU and memory state persist across bounded runtime-update instruction slices, so
-no application-lifetime instruction ceiling exists. Tab5 executes it natively.
-`TABOS_ENABLE_ELF_LOADER_EXPERIMENT=ON` selects filesystem-backed `elf-hello` startup
-application on either target; `TABOS_ELF_STARTUP_PATH` defaults to `T:/bin/hello.bin`.
-Hardware validation proved execution from PSRAM by loading through writable data mapping,
-synchronizing cache, and creating read/execute MMU alias for same physical pages. API
-string pointers are translated back to readable data alias. This is proven experiment,
-not yet final loader/process ABI.
+The loader accepts bounded little-endian RV32 ET_EXEC ELF, supported static
+SHT_RELA relocations, and no dynamic linking. The embedded freestanding hello image
+is only a maintained test fixture; normal hello/shell applications build independently
+through the SDK. Host executes the same artifacts in bounded resumable RV32 slices.
+Tab5 loads writable PSRAM, maps a read/execute alias of the same pages, applies
+load-bias relocations, and synchronizes caches before native task entry. Guest
+API pointers map through platform translation back to readable data aliases.
+Optional elf-hello startup remains a diagnostic; normal startup is T:/bin/shell.
+The pre-release application ABI is 3 and current private transport is 22; neither
+promises compatibility for independently released third-party binaries yet.
 
 ## 4. Multitasking and CPU Cores
 
@@ -297,23 +293,18 @@ A TabOS SDK should provide headers, libraries, linker configuration, executable 
 
 Application source should normally include TabOS APIs rather than ESP-IDF/FreeRTOS APIs.
 
-### Proposed: executable loader
+### Decision: current executable loader
 
-TabOS needs a loader capable of loading independently built application binaries from storage.
-
-The exact executable format is not settled.
-
-Likely requirements include:
-
-- architecture/version marker
-- entry point
-- loadable code/data
-- BSS description
-- relocation support if applications are not linked to fixed addresses
-- imported TabOS symbols or a stable syscall/API mechanism
-- optional metadata such as name/version/icon/capabilities
-
-ELF is attractive during development because GCC/binutils already support it. A smaller TabOS-specific executable format could be introduced later if ELF parsing/storage overhead proves undesirable.
+[DECIDED] Independently built applications use little-endian RISC-V ELF32 `ET_EXEC`
+with loadable segments and supported static `SHT_RELA` relocations. Dynamic linking
+and imported-symbol resolution are unsupported. The SDK builds non-compressed RV32I
+`ilp32` artifacts through Make rules and `sdk/linker/app-riscv32.ld`; normal programs
+implement C17 `main(argc, argv)` with newlib and private CRT/API-table transport.
+Host executes the same RV32 artifact through a retained interpreter. Tab5 loads it
+into writable PSRAM and maps an executable alias of the same pages, applying load
+bias and final cache synchronization before execution. Optional ELF metadata carries
+bounded heap, stack, and capability requests. See `docs/elf-loader.md` and `docs/sdk.md`.
+The pre-release ABI remains changeable; a custom executable format is not active work.
 
 ### Open: application isolation
 
@@ -321,7 +312,11 @@ It has not yet been established whether independently loaded programs will have 
 
 Do not assume Unix-style process isolation.
 
-The ESP32-P4/ESP-IDF memory architecture, executable-from-PSRAM capabilities, MMU/cache behavior, and available protection mechanisms need investigation before locking isolation and fault-containment guarantees. Initial nested foreground process/task model does not imply Unix-style memory protection.
+Executable PSRAM aliases are implemented and physically validated. Hardware memory
+protection and a recoverable native trap boundary remain unresolved; native Tab5
+faults are device-fatal. Host invalid-memory/instruction faults terminate the child
+and restore its parent; a process-0 fault panics. Nested foreground tasks do not
+imply Unix-style memory protection.
 
 ## 6. Public API / ABI
 
@@ -365,9 +360,10 @@ deferred.
 - its errno state
 - a bounded heap arena, initially unused and grown by `sbrk`
 
-The default maximum application heap is 1 MiB and the current stack remains
-16 KiB. ELF segments determine static image memory, not dynamic heap demand.
-Future executable metadata may override heap and stack limits. All descriptors,
+The default application heap limit is 256 KiB and the default stack is 16 KiB,
+as defined in the SDK Make rules and loader defaults. Optional TABOS ELF metadata
+can override resource limits within loader bounds. ELF segments determine static
+image memory, not dynamic heap demand. All descriptors,
 heap memory, and other runtime resources are reclaimed deterministically at
 process exit.
 
@@ -456,17 +452,25 @@ Potential logical areas include:
 
 These names are illustrative, not yet frozen.
 
+### Current implementation
+
+[DECIDED] Each process owns its working directory; children inherit a value copy.
+Relative paths and current-drive absolute paths resolve against that directory.
+Host exposes controlled A:/T: roots; Tab5 mounts microSD FAT as T:. Internal-flash
+A: storage is still pending. Extensionless programs install under T:/bin and shell
+PATH defaults there. SDK provides the documented POSIX-style filesystem subset
+with TabOS-owned descriptors and errors; full POSIX behavior is not promised.
+
 ### Open
 
 Still to decide:
 
-- primary on-disk filesystem
+- additional filesystem choices beyond the current microSD FAT backend
 - internal flash vs microSD responsibilities
 - drive registration and assignment policy for storage beyond `A:` and `T:`
-- current-working-directory semantics
 - device namespace
 - removable-media behavior
-- package/application installation layout
+- application distribution/package format beyond current bin/data installation
 - permissions/security model
 
 ## 8. Shell and Terminal
@@ -526,21 +530,28 @@ and presentation transforms, PIE SIMD handles measured-beneficial CPU RGB565 spa
 and scalar C provides exact fallback and host behavior. Applications never receive
 PPA/PIE handles or accelerator-specific APIs.
 
+### Current implementation and decisions
+
+[DECIDED] Public drawing uses clipped immediate/queued RGB565 primitives and bitmap
+operations with explicit present. The OS owns display hardware; native fullscreen
+and SDK-owned logical canvases are implemented. Terminal rendering is suspended
+while fullscreen graphics owns the display. Nested ELF execution returns -EBUSY
+until the caller closes graphics; reopen/redraw after child return.
+
+Tab5 retains a logical landscape framebuffer in PSRAM and two native portrait
+scanout buffers, with VSYNC-paced double buffering and direct fullscreen drawing.
+PPA and PIE acceleration remain private with scalar fallback. The shared bitmap
+font/CP437 terminal is implemented. These are current choices, not unresolved
+pixel-format or application-API questions.
+
 ### Open
 
-Still to determine:
+Remaining design/measurement work:
 
-- framebuffer pixel format
-- single vs double/triple buffering
-- where framebuffers live
-- direct framebuffer access vs surfaces
-- compositor architecture
-- damage tracking
-- application graphics API level
-- 2D acceleration opportunities
-- text/font system
-- whether fullscreen applications can bypass composition safely
-- achievable frame rates and PSRAM/display bandwidth
+- compositor, window surfaces, and damage tracking
+- further placement/buffering changes justified by measured bandwidth and latency
+- frame-rate and acceleration measurements on each physical panel revision
+- safe retained-buffer scanout quiescence for power management
 
 ## 10. Keyboard, Touch, and Input
 
@@ -598,16 +609,17 @@ The public `<tabos/input.h>` API exposes physical key-down/key-up events, modifi
 repeat state, CP437 text events, and polling/waiting through a thread-safe 64-event queue.
 Queue and repeat state use the platform mutex abstraction; Tab5 therefore uses priority
 inheritance rather than a task-level spinlock that could starve its runtime owner.
-Loaded ELF applications receive this raw API through ABI v6. Terminal stdin preserves
+Loaded ELF applications receive this raw API through private SDK transport. Terminal stdin preserves
 ANSI arrow sequences; raw and terminal reads share one foreground queue and an application
 must choose one. SDL3 supplies host physical/text events. Tab5 uses ExtPort1 I2C controller
-0 on GPIO0/GPIO1, probes address `0x6D`, reports firmware register `0xFE`, and reads HID-mode
-reports. GPIO50 interrupt delivery wakes runtime task context, where queued reports are
+0 on GPIO0/GPIO1, probes address `0x6D`, reports firmware register `0xFE`, and
+selects Normal mode at register `0x10`, reading matrix press/release reports from
+`0x20`. GPIO50 interrupt delivery wakes runtime task context, where queued reports are
 drained over I2C. Tab5 text translation is currently US ANSI. Missing keyboard
 hardware is a boot warning, not a fatal initialization error. Optional CMake flag
 `TABOS_ENABLE_KEYBOARD_DIAGNOSTICS` logs normalized events without consuming them and
 defaults off. USB HID keyboards on Tab5 are a future backend; they should coexist with the
-I2C keyboard through the same queue. Touch remains excluded.
+I2C keyboard through the same queue. Touch uses the separate pointer stream API.
 
 ## 11. Networking
 
@@ -619,15 +631,19 @@ Networking is mediated through the ESP32-C6 companion hardware rather than being
 
 Applications should consume TabOS networking APIs rather than depending directly on the C6 transport or ESP-IDF implementation.
 
+### Current implementation and decisions
+
+[DECIDED] Pinned ESP-IDF v5.4.4 uses ESP-Hosted SDIO to the ESP32-C6 companion.
+The portable network service owns copied status, serialized connect/disconnect,
+autoconnect retries, and version-1 T:/etc/wifi.conf profiles. Applications use
+TabOS-owned BSD-like sockets, DNS, ICMP echo, bounded waits, and certificate-verified
+TLS through SDK services; native driver/socket objects remain below the boundary.
+Host supplies corresponding socket/TLS services and simulated Wi-Fi status.
+
 ### Open
 
-Determine:
-
-- how ESP-IDF exposes P4<->C6 networking on the selected SDK
-- socket API compatibility
-- whether TabOS exposes BSD-like sockets or a smaller abstraction
-- Wi-Fi configuration/user experience
-- background network service ownership
+- Wi-Fi scanning, forgetting profiles, and interactive credential editing
+- physical coexistence, latency, and stop/cancellation measurements
 
 ## 12. Host Development and Emulation
 
@@ -637,9 +653,11 @@ A major project goal is to make most TabOS development possible locally on macOS
 
 The system architecture should deliberately support this.
 
-### Proposed: native host build/simulator
+### Current implementation: native host build/simulator
 
-A large portion of TabOS can be designed so the same higher-level code builds as a **native macOS process**, with a host abstraction replacing ESP-IDF-specific hardware services.
+Shared TabOS code builds as native macOS and Linux processes using SDL3 and POSIX
+platform adapters. Independently built RV32 applications run through the host
+interpreter; native application-source tests supplement this binary execution.
 
 This is preferable for rapid work on:
 
@@ -666,13 +684,14 @@ TabOS core/API ---->| ESP32-P4 backend     |--> hardware
 
 Keep platform-dependent code behind narrow interfaces.
 
-### Proposed: QEMU is secondary, not the main workflow
+### Decision: QEMU is secondary, not the main workflow
 
 QEMU may be useful where ESP32-P4 support is sufficient, but it should not be assumed to emulate the complete Tab5 board, MIPI display, keyboard controller, C6 networking arrangement, and other peripherals accurately.
 
 A purpose-built native host backend is likely to provide much faster and more productive iteration for most OS/application behavior.
 
-QEMU or another CPU-level emulator can later be useful for validating actual RISC-V binaries and lower-level behavior.
+The current embedded RV32 interpreter already validates actual target binaries.
+QEMU is optional future tooling, not a prerequisite for this execution path.
 
 ### Important constraint
 
@@ -762,40 +781,53 @@ POSIX concepts may be borrowed when useful, but compatibility is not the primary
 
 Do not block development on complete board emulation. Native host simulation should cover the majority of portable OS behavior.
 
-## 16. Major Unresolved Questions
+## Implementation Evidence
 
-These should be treated as active design work rather than silently assumed by Codex.
+Current choices above were cross-checked against `docs/input.md`,
+`docs/filesystem.md`, `docs/graphics-api.md`, `docs/networking.md`,
+`docs/elf-loader.md`, and `docs/sdk.md`, plus:
 
-1. **Executable format:** ELF directly, converted ELF, or a compact TabOS format?
-2. **Loader/relocations:** how are independently linked applications placed and relocated?
-3. **ABI:** API table, dynamic symbols, trap/syscall ABI, or another mechanism?
-4. **Memory execution:** what memory regions can safely and efficiently hold loaded executable code on ESP32-P4?
-5. **Isolation:** what practical memory/process protection can the P4 provide?
-6. **Future threading:** when, if ever, may one process own worker tasks beyond its decided initial single managed application task?
-7. **Failure containment:** what happens when an application crashes?
-8. **libc:** use/newlib wrapper, custom small libc, or hybrid?
-9. **filesystem:** which filesystems and mount conventions should be standard?
-10. **stdio/handles:** file descriptors, object handles, streams, or a TabOS-specific model?
-11. **IPC:** queues/messages/pipes/shared memory and how much FreeRTOS is exposed internally?
-12. **graphics API:** framebuffer, retained surfaces, immediate 2D API, or layers of these?
-13. **compositor:** whether/when TabOS gets windows and composition.
-14. **display buffering:** exact formats, memory placement, bandwidth, and buffering strategy.
-15. **network API:** BSD sockets vs a smaller TabOS API.
-16. **C6 integration:** exact P4/C6 networking architecture and SDK dependencies.
-17. **audio API:** mixer ownership, streaming model, formats, latency.
-18. **device API:** whether `/dev`-style objects are useful or unnecessarily Unix-like.
-19. **application packaging:** executable plus resources/metadata format and install locations.
-20. **security model:** application capabilities, permissions, signing, or no isolation initially.
-21. **host runner:** how host-built applications and actual RISC-V TabOS binaries relate.
-22. **binary emulation:** whether a RISC-V emulator should be embedded in the host environment for running target binaries.
-23. **debugging:** source-level debugging story for native TabOS applications.
-24. **SDK build system:** CMake, Meson, Make, or a thin TabOS command wrapping the underlying toolchain.
-25. **C++ support:** whether it is first-class initially or follows the C ABI later.
-26. **boot UX:** shell directly, launcher, desktop, or configurable startup program.
+- `sdk/make/application.mk` and `loader/include/tabos/internal/elf_loader.h`: RV32I/ilp32, 256 KiB heap, 16 KiB stack, optional metadata.
+- `sdk/include/tabos/internal/elf_api.h`: current private transport version 22.
+- `platform/esp32p4/keyboard.c`: Normal-mode selection and matrix reports.
+- `platform/esp32p4/display.c`: RGB565 logical PSRAM and double native scanout buffers.
+- `platform/esp32p4/executable.c`: writable/executable PSRAM aliases.
+- `targets/tab5/sdkconfig.defaults` and `tools/tabos_tools/common.py`: ESP-Hosted SDIO and pinned ESP-IDF v5.4.4.
 
-## 17. Near-Term Architectural Validation
+## 16. Remaining Design Questions
 
-Before building large subsystems, validate these assumptions with small spikes:
+Settled choices are described above and in `agents/architecture.md`; do not reopen
+ELF format, API-table transport, newlib, process-local cwd, RGB565, double-buffered
+Tab5 scanout, BSD-like sockets, ESP-Hosted SDIO, or host RV32 execution merely because
+they appeared in the original planning question list.
+
+Active unresolved work is:
+
+1. Recoverable native Tab5 faults and practical user-mode/PMP memory protection.
+2. Future per-process worker tasks beyond one managed foreground application task.
+3. IPC, pipes, environment variables, and background execution when concrete clients need them.
+4. Internal-flash A: storage, removable-media recovery, and additional filesystem policy.
+5. Package/distribution format, application discovery, and permissions/security policy.
+6. Window/compositor surfaces, damage tracking, and measured graphics/memory tuning.
+7. Safe reversible display/peripheral lifecycle for system sleep and physical wake validation.
+8. Remaining physical audio, camera, pointer, network, RTC, and concurrency acceptance.
+9. Source-level native/RV32 debugging and host compressed-instruction support.
+10. C++ language/runtime support timing.
+11. Alternative launcher/desktop startup UX beyond the implemented default persistent shell.
+
+## Historical Planning Questions
+
+The original 2026-08-10 questions about executable format, relocation, ABI, libc,
+descriptors/cwd, fullscreen graphics, sockets/C6 integration, host runner/emulation,
+and SDK tools drove the implemented decisions above. They are historical rationale,
+not active design tasks. Their implementations remain pre-release and require the
+validation tracked in `agents/roadmap.md`.
+
+## 17. Historical Architectural Validation Sequence
+
+The sequence below is the historical foundation plan, retained as rationale.
+Implemented choices are described above; remaining acceptance is tracked in
+`agents/roadmap.md`, including hardware work that must not be claimed complete:
 
 1. Build and boot a minimal TabOS firmware under ESP-IDF.
 2. Bring up Tab5 display, keyboard, touch, microSD, and basic C6 networking independently.

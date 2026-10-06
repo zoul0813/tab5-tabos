@@ -762,6 +762,8 @@ but is not a substitute for this execution path.
 
 ## Maintenance and Technical Debt
 
+- [x] Resolve AUD-043: reconcile current context/architecture, retain historical questions as history, and align keyboard mode, loader/SDK defaults, and public transport documentation with source.
+
 - [x] Resolve AUD-028: remove unused redraw/font/pointer-health helpers and camera constant; retain the planned Wi-Fi profile writer with explicit rationale and real persistence coverage.
 
 - [x] Resolve AUD-046: use bounded binary directory records, validate SDK parsing and real host filename round trips, and rebuild bundled apps for private API 22.

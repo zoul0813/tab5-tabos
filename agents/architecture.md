@@ -346,7 +346,7 @@ callback after successful request. Filesystem ELF image, execution context, path
 descriptor belong to child process and are released only during child cleanup. Persistent
 `elf-hello` diagnostic runs configured ELF twice as children without exiting process 0.
 
-Filesystem-backed shell now loads `T:/bin/shell.bin` directly as process 0. Experimental
+Filesystem-backed shell now loads `T:/bin/shell` directly as process 0. Experimental
 ELF API provides console input/output, terminal clear, current-directory and directory
 listing operations, child execution, yield, and exit request. Host advances shell through
 retained RV32 interpreter slices. Tab5 platform starts native ELF entry in managed FreeRTOS
@@ -456,8 +456,8 @@ execute
 Applications should normally include headers such as:
 
 ```c
-#include <tabos/io.h>
-#include <tabos/fs.h>
+#include <tabos/console.h>
+#include <tabos/filesystem.h>
 #include <tabos/input.h>
 #include <tabos/graphics.h>
 ```
@@ -490,10 +490,10 @@ the parent's working directory, and exit closes all descriptors. Blocking
 stdin is default, with `fcntl(..., O_NONBLOCK)` supported immediately and
 empty nonblocking reads returning `EAGAIN`.
 
-[DECIDED] Each process has a 16 KiB stack and a lazily used, contiguous heap
-arena capped at 1 MiB by default. `_sbrk` advances within that arena. ELF
-describes static load/BSS requirements only; later executable metadata may
-override resource limits.
+[DECIDED] Loader and SDK defaults are a 16 KiB stack and a lazily used contiguous
+heap capped at 256 KiB. `_sbrk` advances within that arena. ELF segments describe
+static load/BSS requirements; optional TABOS metadata overrides resource limits
+within loader bounds.
 
 [DECIDED] Runtime text is single-byte CP437. Standard streams and files carry
 bytes without UTF-8 decoding or newline translation. stdin is unbuffered,
@@ -680,10 +680,9 @@ Tab5 FAT uses heap-backed long-filename buffers with a 255-character maximum so
 the backend honors the public filesystem name limit instead of silently imposing
 8.3 names.
 
-Current built-in startup applications execute synchronously on ESP-IDF main task.
-Tab5 reserves an 8192-byte main-task stack because nested TabOS filesystem calls
-enter FatFs VFS formatting code that exceeds ESP-IDF's 3584-byte default. Future
-application-task model must assign explicit per-application stack budgets instead.
+Tab5 reserves an 8192-byte main-task stack for boot/filesystem setup. Loaded
+applications run in managed native tasks with explicit stack budgets from loader
+defaults or optional ELF metadata; they do not run synchronously on runtime task.
 
 ---
 
@@ -860,7 +859,8 @@ MIPI-DSI hardware
 
 ### 11.1 Initial Graphics Model
 
-The precise API is still unresolved, but the architecture should allow several levels:
+The current API is immediate/queued fullscreen RGB565 drawing plus optional
+SDK-owned logical canvases. Future windowed surfaces may add layers above it:
 
 ```text
 high-level drawing API
@@ -870,7 +870,8 @@ surface API
 framebuffer/display service
 ```
 
-Fullscreen applications may eventually receive optimized paths, but must not own the display hardware in a way that breaks the OS.
+Fullscreen applications already use optimized native scanout on Tab5 while the OS
+retains display ownership and VSYNC-paced double buffering.
 
 ### 11.2 Hardware Acceleration
 
@@ -917,7 +918,10 @@ ESP32-P4 / ESP32-C6 transport
 Wi-Fi / network
 ```
 
-The public API may eventually resemble BSD sockets, but this should be chosen based on usefulness rather than compatibility alone.
+[DECIDED] Applications use bounded BSD-like sockets with TabOS-owned types,
+wait sources, DNS, ICMP, and verified TLS. ESP-Hosted SDIO to the C6 companion
+is selected by the pinned ESP-IDF configuration; host adapters implement the
+same service contracts. Interactive Wi-Fi profile workflows remain pending.
 
 ---
 
@@ -965,7 +969,9 @@ DMA-compatible memory
 
 The loader must not assume arbitrary PSRAM is executable until this has been verified experimentally.
 
-The exact executable-memory strategy is one of the highest-priority architecture questions.
+The current Tab5 loader uses writable and executable PSRAM aliases with load-bias
+relocations and cache synchronization. Native memory protection and recoverable
+fault handling remain unresolved; executable PSRAM itself is physically validated.
 
 ---
 
@@ -1191,9 +1197,9 @@ It should not be assumed to emulate the complete Tab5 hardware platform.
 
 Native host simulation remains the preferred rapid-development path.
 
-A future host environment may also embed or invoke a RISC-V emulator so actual target binaries can run inside the host environment.
-
-That is not yet an established design.
+The current host environment embeds a resumable RV32IMA interpreter behind the
+platform executable boundary and runs the same independently built artifacts as
+Tab5. Native application-source tests remain supplemental.
 
 ---
 
@@ -1219,7 +1225,9 @@ startup program
 shell / launcher / desktop
 ```
 
-The exact user-facing startup program is configurable and remains unresolved.
+Normal startup defaults to the persistent filesystem-backed T:/bin/shell.
+Built-in diagnostic applications are selectable through project configuration;
+future launcher/desktop UX remains separate work.
 
 The shell should always remain available as a basic recovery and development environment.
 
@@ -1292,70 +1300,33 @@ The following are currently considered established:
 
 ---
 
-## 25. Unresolved Architectural Decisions
+## 25. Remaining Architectural Decisions
 
-Do not silently resolve these while implementing unrelated work.
+The original planning list is historical. Current settled foundations include ELF32
+ET_EXEC and supported static relocations, API-table SDK transport, C17/newlib,
+process-owned descriptors/cwd/errno, native PSRAM aliases, nested foreground tasks,
+RGB565 fullscreen/logical canvases with Tab5 double buffering, BSD-like sockets and
+ESP-Hosted SDIO, and host RV32 interpretation. These choices remain pre-release but
+are not unresolved alternatives.
 
-They require deliberate design or experiments.
+Do not silently resolve the remaining questions during unrelated work:
 
-### Program execution
+- native memory protection and recoverable Tab5 faults
+- per-process threading, IPC/pipes, background execution, and environment variables
+- internal-flash storage, additional filesystems, removable-media recovery, and device namespace
+- package/distribution format, discovery, permissions, and application security policy
+- window/compositor surfaces, damage tracking, measured framebuffer/memory optimization
+- safe reversible peripheral lifecycle and physical wake routes for system sleep
+- source-level debugging, compressed RV32 host execution, and C++ runtime support
+- future launcher/desktop UX beyond the implemented default shell
 
-- executable format
-- relocation model
-- runtime symbol resolution
-- API/syscall ABI
-- executable memory placement
-- application memory protection
-- crash containment
-- process/task relationship
+Current validation and hardware acceptance gaps remain in `agents/roadmap.md`.
 
-### Runtime APIs
+## 26. Historical Architecture Validation Order
 
-- handle model
-- error representation
-- libc strategy
-- IPC model
-- environment variables
-- stdio/file descriptor model
-
-### Filesystem
-
-- default filesystem
-- mount layout
-- flash vs SD responsibilities
-- `/dev`-style model
-- package/install format
-
-### Graphics
-
-- pixel format
-- framebuffer placement
-- buffering strategy
-- surface model
-- compositor model
-- fullscreen optimization
-- fonts/text rendering
-- hardware acceleration opportunities
-
-### Networking
-
-- BSD sockets vs TabOS-native interface
-- ESP32-C6 ownership and transport
-- Wi-Fi configuration model
-
-### Development
-
-- SDK build tooling
-- host/target binary compatibility strategy
-- RISC-V binary emulation
-- debugger integration
-- C++ support
-
----
-
-## 26. Architecture Validation Order
-
-The following experiments should drive unresolved architecture decisions.
+The following initial experiments drove the implemented foundation. Current
+remaining work and hardware acceptance live in `agents/roadmap.md`; this sequence
+is rationale rather than an active list of unresolved executable/ABI choices.
 
 ### Phase 1 — Hardware
 

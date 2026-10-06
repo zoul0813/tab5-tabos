@@ -4,7 +4,7 @@ Audit date: 2026-09-06. Accuracy verification: 2026-09-06. All 44 original findi
 
 Findings use P1 (high impact), P2 (normal defect), and P3 (maintenance). Each checkbox represents a tracked repair task. Static findings include the triggering path and suggested validation; hardware-dependent concerns are identified explicitly. Planned features are not counted as dead code or defects merely because they are unfinished.
 
-1 open findings: 0 P2, 1 P3; 45 resolved findings. Checklist entries below are authoritative.
+0 open findings: 0 P2, 0 P3; 46 resolved findings. Checklist entries below are authoritative.
 
 ## Scope and validation
 
@@ -124,9 +124,13 @@ Passing existing tests does not invalidate the uncovered failure paths. This is 
 
 - [x] **AUD-028 — P3: Remove or explicitly justify unused internal code and state.** Removed unused console_redraw, font_draw_text, platform_pointer_health declarations/backends/fake, and CAMERA_LEASE_INDEX_MASK. Retained network_config_save explicitly for planned interactive profile editing, with a maintained real-filesystem caller in component.network_config_file.
 
-- [ ] **AUD-043 — P3: Agent context still lists settled architecture as active unresolved work.** `agents/TABOS_CONTEXT.md` sections 7, 9, 11, and 16 retain open questions about cwd, framebuffer format/buffering, executable format, ABI, libc, socket API, and embedded RV32 execution despite implemented and `[DECIDED]` choices elsewhere. Its keyboard implementation also says HID-mode reports although the driver configures Normal mode. Reconcile the authoritative context with current decisions, explicitly separating historical questions from genuinely open work, so future agents do not reintroduce incompatible designs. Cross-check with `agents/architecture.md`, public `docs/`, and current build/driver constants.
+- [x] **AUD-043 — P3: Agent context still lists settled architecture as active unresolved work.** Reconciled current context and architecture with implemented ELF/static relocation, SDK/newlib, process-local cwd, graphics buffering/API, networking and host execution choices. Historical planning is labeled separately from remaining design/hardware work. Corrected Normal-mode keyboard reporting, resource defaults, extensionless paths and public transport documentation.
 
 ## Resolved findings
+
+- **AUD-043 — Resolved 2026-10-05.** Reconciled current context and architecture with implemented ELF/static relocation, SDK/newlib, process-local cwd, graphics buffering/API, networking and host execution choices. Historical planning is labeled separately from remaining design/hardware work. Corrected Normal-mode keyboard reporting, resource defaults, extensionless paths and public transport documentation.
+
+  Validation: Read-only cross-checks covered public input/filesystem/graphics/networking/loader/SDK docs and owning keyboard/display/executable, SDK Make, loader default, ESP-Hosted and pinned-IDF sources. Document fact/evidence-path and code-fence checks plus git diff --check pass. All five architecture checks pass. Final combined macOS Debug ASan/UBSan suite passes 94/94 with the installed macOS SDKROOT and loopback access. No new hardware results are claimed.
 
 - **AUD-028 — Resolved 2026-10-05.** Removed unused console_redraw, font_draw_text, platform_pointer_health declarations/backends/fake, and CAMERA_LEASE_INDEX_MASK. Retained network_config_save explicitly for planned interactive profile editing, with a maintained real-filesystem caller in component.network_config_file.
 
