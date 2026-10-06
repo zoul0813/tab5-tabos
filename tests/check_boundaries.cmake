@@ -5,14 +5,18 @@ endif()
 set(PORTABLE_DIRECTORIES
     kernel
     fs
-    shell
+    console
+    process
+    time
+    pointer
+    camera
     graphics
     input
     audio
     net
     loader
     apps
-    sdk/include
+    sdk
 )
 
 set(FORBIDDEN_INCLUDE_PATTERN

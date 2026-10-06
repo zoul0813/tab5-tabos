@@ -4,6 +4,10 @@ endif()
 
 set(PRODUCTION_DIRECTORIES
     apps
+    audio
+    camera
+    net
+    pointer
     console
     fs
     graphics
@@ -19,6 +23,10 @@ set(PRODUCTION_DIRECTORIES
 
 set(INTERNAL_HEADER_DIRECTORIES
     apps
+    audio
+    camera
+    net
+    pointer
     console
     fs
     graphics
@@ -26,6 +34,7 @@ set(INTERNAL_HEADER_DIRECTORIES
     kernel
     loader
     process
+    time
 )
 
 foreach(directory IN LISTS PRODUCTION_DIRECTORIES)

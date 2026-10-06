@@ -1162,3 +1162,8 @@ add_test(NAME component.lua_touch
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_LIST_DIR}/lua_touch.py"
         "$<TARGET_FILE:tabos_lua_native>" "${TABOS_ROOT}/apps/lua/examples/touch.lua")
 set_tests_properties(component.lua_touch PROPERTIES TIMEOUT 30)
+
+add_test(NAME architecture.check_regressions
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_LIST_DIR}/check_architecture_regressions.py"
+        "${CMAKE_COMMAND}" "${CMAKE_CURRENT_LIST_DIR}"
+)

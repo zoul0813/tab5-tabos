@@ -762,6 +762,8 @@ but is not a substitute for this execution path.
 
 ## Maintenance and Technical Debt
 
+- [x] Resolve AUD-044: complete portable and naming directory coverage, discover Makefile-backed applications, and validate omitted areas with isolated negative fixtures.
+
 - [x] Make `wc` propagate open, read, and close failures through its process status,
   with deterministic injected stream-error regression coverage.
 - [x] Release provisional POSIX `DIR*` wrapper entries after failed opens in both

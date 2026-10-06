@@ -4,7 +4,7 @@ Audit date: 2026-09-06. Accuracy verification: 2026-09-06. All 44 original findi
 
 Findings use P1 (high impact), P2 (normal defect), and P3 (maintenance). Each checkbox represents a tracked repair task. Static findings include the triggering path and suggested validation; hardware-dependent concerns are identified explicitly. Planned features are not counted as dead code or defects merely because they are unfinished.
 
-4 open findings: 2 P2, 2 P3; 42 resolved findings. Checklist entries below are authoritative.
+3 open findings: 1 P2, 2 P3; 43 resolved findings. Checklist entries below are authoritative.
 
 ## Scope and validation
 
@@ -116,7 +116,7 @@ Passing existing tests does not invalidate the uncovered failure paths. This is 
 
 - [x] **AUD-042 — P2: Partial Tab5 Wi-Fi initialization is not unwound.** Resolved with explicit ownership for the default event loop, station netif, Wi-Fi driver, exact event-handler instances, and started driver. Every failed stage unwinds reversible acquired resources in reverse order, and normal shutdown destroys the retained station netif. The pinned ESP-NETIF TCP/IP foundation cannot deinitialize after startup and remains boot-lifetime. Shutdown now requests cooperative startup cancellation and joins its completion before unregistering handlers or deleting shared status state. Sanitized host regression injects all nine initialization failures, verifies owned/shared infrastructure cleanup, and proves shutdown waits for a startup worker to release shared state; the real Tab5 backend cross-builds.
 
-- [ ] **AUD-044 — P2: Architecture checks omit several current portable subsystems and applications.** `tests/check_boundaries.cmake` still lists nonexistent top-level `shell` but omits `console`, `process`, `time`, `pointer`, `camera`, and SDK implementation sources. `tests/check_application_api_boundary.cmake` covers only shell/tester/hello/coreutils, excluding netutils, games, and graphical apps. `check_naming.cmake` also omits audio/net/pointer/camera. CI can therefore pass when platform headers/private ABI or prohibited naming enter these maintained areas. Derive coverage from maintained source inventories or keep explicit lists complete; validate each previously omitted area with in-memory/isolated negative fixtures when implementing the fix.
+- [x] **AUD-044 — P2: Architecture checks omit several current portable subsystems and applications.** Portable-header and naming checks now cover the omitted subsystems and SDK implementation. Application ABI checks discover all Makefile-backed applications, with isolated negative fixtures for omitted and future areas.
 
 - [x] **AUD-045 — P2: Tab5 FAT rename cannot replace existing files, breaking repeated saves.** Resolved: same-drive rename now promises replacement. After a backend `EEXIST`, the platform reserves a drive-root recovery name, moves the old destination aside, installs the source, and rolls the old file back on installation failure. The documented fallback is recoverable but not power-loss atomic.
 
@@ -127,6 +127,10 @@ Passing existing tests does not invalidate the uncovered failure paths. This is 
 - [ ] **AUD-043 — P3: Agent context still lists settled architecture as active unresolved work.** `agents/TABOS_CONTEXT.md` sections 7, 9, 11, and 16 retain open questions about cwd, framebuffer format/buffering, executable format, ABI, libc, socket API, and embedded RV32 execution despite implemented and `[DECIDED]` choices elsewhere. Its keyboard implementation also says HID-mode reports although the driver configures Normal mode. Reconcile the authoritative context with current decisions, explicitly separating historical questions from genuinely open work, so future agents do not reintroduce incompatible designs. Cross-check with `agents/architecture.md`, public `docs/`, and current build/driver constants.
 
 ## Resolved findings
+
+- **AUD-044 — Resolved 2026-10-05.** Portable-header and naming checks now cover the omitted subsystems and SDK implementation. Application ABI checks discover all Makefile-backed applications, with isolated negative fixtures for omitted and future areas.
+
+  Validation: All five architecture CTests pass. architecture.check_regressions rejects platform headers across six omitted locations, private ABI use across games/network/graphical and future applications, and both naming violations across five subsystems, then accepts valid source in each location. Against the previous checks it fails because console platform leakage is accepted.
 
 - **AUD-041 — Resolved 2026-10-05.** ELF exec returns -EBUSY while the caller has fullscreen graphics open. Callers close graphics before nested execution and reopen/redraw afterward; rejection preserves ownership and queued drawing.
 

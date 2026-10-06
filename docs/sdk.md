@@ -118,3 +118,8 @@ through `ioctl` on foreground console descriptors. `<tabos/wait.h>` adds
 `tabos_input_wait_source()` for non-consuming keyboard readiness. See
 [console controls](console.md) and [keyboard waits](input.md). These extend private
 pre-release transport; rebuild bundled applications and firmware together.
+
+Architecture CTest checks enforce platform-header and symbol boundaries across the
+portable subsystems and SDK. Private-ABI checks cover every application directory with
+a Makefile. Run `ctest --test-dir build/macos-debug -R '^architecture\.' --output-on-failure`
+after building host tests; use the corresponding Linux build directory on Linux.

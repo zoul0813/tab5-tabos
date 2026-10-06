@@ -1973,3 +1973,13 @@ portable/host filesystem loading and the real runtime with fake time/display: pe
 settings apply after restart, exact custom deadlines and restoration use custom brightness,
 edits do not hot-reload, invalid saved files survive default fallback, and dimming cannot
 raise brightness. Physical microSD reboot loading remains a separate validation check.
+
+## Architecture-check coverage (2026-10-05)
+
+Portable-header checks include console, process, time, pointer, camera, and all SDK
+sources. Naming checks include audio, net, pointer, camera, and their internal headers.
+Application private-ABI checks discover every independently built application by its
+Makefile, including future applications; core-owned `apps/diag` is not an SDK client.
+`architecture.check_regressions` creates isolated forbidden-header, private-ABI, and
+naming fixtures in previously omitted areas, requires each check to reject its fixture,
+then verifies the same location accepts valid source.
