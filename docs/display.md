@@ -55,6 +55,14 @@ or pixels left by an earlier overlay.
 
 The BSP integration deliberately excludes LVGL. UI composition remains owned by TabOS and will be designed separately.
 
+VSYNC and accepted PPA operations have a two-second completion deadline. An immediate
+PPA submission error retains software fallback. Missing completion enters ESP-IDF's
+fatal-error path (the default firmware policy logs and reboots): the pinned drivers
+cannot cancel accepted DMA safely, so TabOS must not reuse buffers, resume the application,
+or reclaim borrowed memory after that timeout. This replaces an indefinite wait with
+a bounded failure; it does not promise display recovery without a restart. Physical
+missing/late-interrupt validation remains required.
+
 ## Validation
 
 Build and test the host path:

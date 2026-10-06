@@ -1,4 +1,5 @@
 #include "activity.h"
+#include "display_completion.h"
 
 #include <tabos/platform/platform.h>
 
@@ -80,7 +81,7 @@ static bool IRAM_ATTR display_refresh_done(esp_lcd_panel_handle_t panel, esp_lcd
 
 static bool wait_for_vsync(void)
 {
-    return vsync_done != NULL && xSemaphoreTake(vsync_done, portMAX_DELAY) == pdTRUE;
+    return vsync_done != NULL && tab5_display_wait_completion(vsync_done, "VSYNC");
 }
 
 static bool submit_native_frame(void)
@@ -196,7 +197,7 @@ static bool present_with_ppa(const platform_framebuffer_t* framebuffer)
         .user_data      = ppa_done,
     };
     return ppa_do_scale_rotate_mirror(ppa_srm_client, &config) == ESP_OK &&
-           xSemaphoreTake(ppa_done, portMAX_DELAY) == pdTRUE;
+           tab5_display_wait_completion(ppa_done, "PPA rotation");
 }
 
 typedef enum {
@@ -381,7 +382,7 @@ bool platform_graphics_present(platform_framebuffer_t* framebuffer)
 
 static bool wait_for_ppa(esp_err_t result)
 {
-    if (result == ESP_OK && xSemaphoreTake(ppa_done, portMAX_DELAY) == pdTRUE) {
+    if (result == ESP_OK && tab5_display_wait_completion(ppa_done, "PPA graphics")) {
         return true;
     }
     if (ppa_ready) {

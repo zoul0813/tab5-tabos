@@ -129,6 +129,17 @@ tabos_enable_warnings(tabos_camera_ccm)
 tabos_enable_sanitizers(tabos_camera_ccm)
 add_test(NAME unit.camera_ccm COMMAND tabos_camera_ccm)
 
+add_executable(tabos_display_completion unit/display_completion.c
+    "${TABOS_ROOT}/platform/esp32p4/display_completion.c")
+target_include_directories(tabos_display_completion PRIVATE
+    "${CMAKE_CURRENT_LIST_DIR}/fakes/display_completion"
+    "${TABOS_ROOT}/platform/esp32p4"
+    "${TABOS_GENERATED_INCLUDE_DIR}")
+tabos_enable_warnings(tabos_display_completion)
+tabos_enable_sanitizers(tabos_display_completion)
+add_test(NAME unit.display_completion COMMAND tabos_display_completion)
+set_tests_properties(unit.display_completion PROPERTIES TIMEOUT 10)
+
 add_executable(tabos_keyboard_interrupt
     unit/keyboard_interrupt.c
     "${TABOS_ROOT}/platform/esp32p4/keyboard_interrupt.c"
