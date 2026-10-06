@@ -179,6 +179,10 @@ but cannot touch the graphics framebuffer. Raw input reaches the graphics applic
 applications do not manage TTY policy merely because they enter graphics mode. Closing or
 exiting graphics redraws and presents the retained terminal once.
 
+[DECIDED] ELF nested execution returns `-EBUSY` while the caller owns fullscreen
+graphics. Close graphics before launching a child; reopen/redraw after return.
+Rejection preserves the caller's graphics session and queued commands.
+
 ESP-IDF and FreeRTOS are implementation foundations, not the application programming model.
 
 ---

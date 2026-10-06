@@ -4,7 +4,7 @@ Audit date: 2026-09-06. Accuracy verification: 2026-09-06. All 44 original findi
 
 Findings use P1 (high impact), P2 (normal defect), and P3 (maintenance). Each checkbox represents a tracked repair task. Static findings include the triggering path and suggested validation; hardware-dependent concerns are identified explicitly. Planned features are not counted as dead code or defects merely because they are unfinished.
 
-5 open findings: 3 P2, 2 P3; 41 resolved findings. Checklist entries below are authoritative.
+4 open findings: 2 P2, 2 P3; 42 resolved findings. Checklist entries below are authoritative.
 
 ## Scope and validation
 
@@ -112,7 +112,7 @@ Passing existing tests does not invalidate the uncovered failure paths. This is 
 
 - [x] **AUD-040 — P2: Application build argument forwarding reparses user data as shell code.** Resolved by rotating the original positional parameters once, removing script-only options, and passing the retained arguments directly to every `make` invocation without constructing or evaluating shell code. A harmless make/compiler substitute verifies exact preservation of spaces, single and double quotes, literal dollar signs, `$()` syntax, and backticks, and proves neither command-substitution form executes.
 
-- [ ] **AUD-041 — P2: Nested exec does not transfer or restore fullscreen graphics ownership.** `loader/elf_application.c:elf_exec()` permits launching a child while the parent has an active graphics context; `process/process.c:launch_child_descriptor()` transfers console/pointer ownership only. The global graphics suspension remains set, hiding a text child's output. A graphics child can instead close the shared backend and clear suspension while the parent still believes its graphics session is active. Define and implement suspension/restoration of graphics ownership across nested execution (or explicitly reject unsupported nesting). Validate graphics parent → text child and graphics parent → graphics child → parent, including failed child startup.
+- [x] **AUD-041 — P2: Nested exec does not transfer or restore fullscreen graphics ownership.** ELF exec returns -EBUSY while the caller has fullscreen graphics open. Callers close graphics before nested execution and reopen/redraw afterward; rejection preserves ownership and queued drawing.
 
 - [x] **AUD-042 — P2: Partial Tab5 Wi-Fi initialization is not unwound.** Resolved with explicit ownership for the default event loop, station netif, Wi-Fi driver, exact event-handler instances, and started driver. Every failed stage unwinds reversible acquired resources in reverse order, and normal shutdown destroys the retained station netif. The pinned ESP-NETIF TCP/IP foundation cannot deinitialize after startup and remains boot-lifetime. Shutdown now requests cooperative startup cancellation and joins its completion before unregistering handlers or deleting shared status state. Sanitized host regression injects all nine initialization failures, verifies owned/shared infrastructure cleanup, and proves shutdown waits for a startup worker to release shared state; the real Tab5 backend cross-builds.
 
@@ -127,6 +127,10 @@ Passing existing tests does not invalidate the uncovered failure paths. This is 
 - [ ] **AUD-043 — P3: Agent context still lists settled architecture as active unresolved work.** `agents/TABOS_CONTEXT.md` sections 7, 9, 11, and 16 retain open questions about cwd, framebuffer format/buffering, executable format, ABI, libc, socket API, and embedded RV32 execution despite implemented and `[DECIDED]` choices elsewhere. Its keyboard implementation also says HID-mode reports although the driver configures Normal mode. Reconcile the authoritative context with current decisions, explicitly separating historical questions from genuinely open work, so future agents do not reintroduce incompatible designs. Cross-check with `agents/architecture.md`, public `docs/`, and current build/driver constants.
 
 ## Resolved findings
+
+- **AUD-041 — Resolved 2026-10-05.** ELF exec returns -EBUSY while the caller has fullscreen graphics open. Callers close graphics before nested execution and reopen/redraw afterward; rejection preserves ownership and queued drawing.
+
+  Validation: The expanded component.elf_graphics_cleanup executes real RV32 requests for text, graphics, and missing children, requires -EBUSY, presents the retained queued blit, closes graphics, and verifies parent restoration, repeated twice under ASan/UBSan. The new case failed against the prior implementation. unit.application_lifecycle and Tab5 Debug cross-build pass. Physical hardware and Linux execution were not run.
 
 - **AUD-038 — Resolved 2026-10-05.** Kernel and SDK calendar conversions reject epochs outside 1970–9999 before civil-date arithmetic, leaving output untouched on failure.
 

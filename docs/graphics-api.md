@@ -119,3 +119,9 @@ Run `graphics-demo` to exercise a 320×240 logical canvas automatically scaled 3
 pillarboxing; use E/A/S/D to move, R to rotate, Up/Down to cycle the 16-color VGA
 letterbox palette, and Q to exit. Run
 `graphics-benchmark` to measure 120 queued frames and report active acceleration.
+
+Nested foreground execution is rejected while the caller has fullscreen graphics open:
+`tabos_exec()` and `tabos_spawn()` return `-EBUSY` without launching a child or changing
+the graphics session. Close graphics before executing a text or graphics child, then
+reopen and redraw when the child returns. The caller's pending drawing remains usable
+after a rejected execution request.

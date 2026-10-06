@@ -2146,6 +2146,9 @@ static int elf_exec(const char* path, uint32_t argc, const char* const* argv)
     if (atomic_load_explicit(&application->exec_in_flight, memory_order_acquire)) {
         return TABOS_ELF_EXEC_PENDING;
     }
+    if (application->graphics_active) {
+        return -TABOS_EBUSY;
+    }
     const char* readable_path = platform_executable_data_pointer(path, TABOS_FS_PATH_MAX);
     if (readable_path == NULL) {
         return -TABOS_EIO;

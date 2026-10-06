@@ -81,6 +81,9 @@ typedef enum {
     CHILD_FAULT,
     CHILD_FORCED,
     CHILD_PRESENT,
+    CHILD_EXEC_TEXT,
+    CHILD_EXEC_GRAPHICS,
+    CHILD_EXEC_MISSING,
 } child_end_t;
 
 static void write_child(const char* path, child_end_t ending)
@@ -135,6 +138,27 @@ static void write_child(const char* path, child_end_t ending)
         write_u32(tail, 0xffffffffU);
     } else if (ending == CHILD_FORCED) {
         write_u32(tail, 0x0000006fU);
+    } else if (ending >= CHILD_EXEC_TEXT) {
+        const char* target = ending == CHILD_EXEC_TEXT ? "T:/text" : "T:/child";
+        if (ending == CHILD_EXEC_MISSING) {
+            target = "T:/missing";
+        }
+        strcpy((char*) code + 192U, target);
+        write_u32(code + 224U, 192U);
+        static const uint32_t exec_instructions[] = {
+            0x0c000513U,              /* li a0, 192: target */
+            0x00100593U,              /* li a1, 1: argc */
+            0x0e000613U,              /* li a2, 224: argv */
+            0x02042283U,              /* lw t0, 32(s0): exec */
+            0x000280e7U, 0x01050913U, /* addi s2, a0, 16: zero only for -EBUSY */
+            0x07c42283U,              /* graphics_present must still work */
+            0x000280e7U, 0x08042283U, /* explicit graphics_close */
+            0x000280e7U, 0x00790513U, /* addi a0, s2, 7: expected child status */
+            0x00048067U,
+        };
+        for (size_t index = 0U; index < sizeof(exec_instructions) / sizeof(exec_instructions[0]); ++index) {
+            write_u32(tail + index * 4U, exec_instructions[index]);
+        }
     } else if (ending == CHILD_PRESENT) {
         write_u32(tail, 0x07c42283U); /* graphics_present: flush and yield */
         write_u32(tail + 4U, 0x000280e7U);
@@ -171,8 +195,17 @@ int main(void)
     check(application_registry_register(&parent) && tabos_app_launch(parent.name) == TABOS_APP_RESULT_OK, "parent");
     char path[512];
     (void) snprintf(path, sizeof(path), "%s/child", storage_root);
+    char text_path[512];
+    (void) snprintf(text_path, sizeof(text_path), "%s/text", storage_root);
+    write_child(text_path, CHILD_RETURN);
+    FILE* text = fopen(text_path, "r+b");
+    check(text != NULL && fseek(text, 84L, SEEK_SET) == 0, "text child fixture");
+    uint8_t text_code[8];
+    write_u32(text_code, 0x00700513U);      /* li a0, 7 */
+    write_u32(text_code + 4U, 0x00008067U); /* ret */
+    check(fwrite(text_code, 1U, sizeof(text_code), text) == sizeof(text_code) && fclose(text) == 0, "text child");
     for (unsigned int round = 0U; round < 2U; ++round) {
-        for (child_end_t ending = CHILD_RETURN; ending <= CHILD_PRESENT; ++ending) {
+        for (child_end_t ending = CHILD_RETURN; ending <= CHILD_EXEC_MISSING; ++ending) {
             write_child(path, ending);
             check(tabos_console_clear(tabos_app_console(parent_context)), "clear parent terminal");
             check(tabos_app_exec(parent_context, "T:/child") == TABOS_APP_RESULT_OK, "launch child");
@@ -182,9 +215,9 @@ int main(void)
             check(tabos_process_count() == 2U && console_next_deadline() == UINT64_MAX, "child yielded in graphics");
             check(framebuffer->pixels[pixel] == 0U, "queued blit has not rendered");
             if (ending == CHILD_FORCED) {
-                check(kernel_process_force_terminate((tabos_process_id_t) (round * 5U + (unsigned int) ending + 1U), 9),
+                check(kernel_process_force_terminate((tabos_process_id_t) (round * 8U + (unsigned int) ending + 1U), 9),
                       "force child termination");
-            } else if (ending == CHILD_PRESENT) {
+            } else if (ending == CHILD_PRESENT || ending >= CHILD_EXEC_TEXT) {
                 kernel_application_system_update();
                 check(framebuffer->pixels[pixel] == 0x123U, "explicit present flushes live guest pixels");
             }
@@ -206,6 +239,6 @@ int main(void)
     }
     kernel_runtime_shutdown();
     platform_shutdown();
-    check(unlink(path) == 0 && rmdir(storage_root) == 0, "clean storage");
+    check(unlink(path) == 0 && unlink(text_path) == 0 && rmdir(storage_root) == 0, "clean storage");
     return EXIT_SUCCESS;
 }
