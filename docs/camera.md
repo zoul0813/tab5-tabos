@@ -109,6 +109,16 @@ preprocessing failures sharing that error code. Other dequeue errors warn immedi
 Free-memory snapshots exclude allocations made after camera open, such as the preview
 application's graphics buffer; they are not peak-memory measurements.
 
+The Tab5 backend reads back the negotiated format and accepts only its native packed
+RGB565/YUV420 layout. Zero stride/size fields retain the pinned driver's implicit
+packed-layout contract; explicit padded row strides are rejected. Every mapping must
+hold a complete input image. Completed frames must contain that image and fit the
+mapping before conversion or encoding. Only image bytes are forwarded, excluding
+trailing allocation padding. Empty or oversized encoded results fault the stream before
+submission. Invalid buffers remain owned by the backend until ordinary stop joins the
+worker and releases them; invalid payload lengths or indices are never processed or
+requeued. Driver error-flagged warmup frames retain the existing skip/requeue behavior.
+
 Capture start wakes a dedicated worker. It blocks in the camera driver until a frame or
 the slow watchdog deadline, then performs conversion, encoding, and frame-pool submission
 in task context. H.264 pool exhaustion blocks before dequeue and frame release wakes the

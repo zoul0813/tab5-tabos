@@ -129,6 +129,19 @@ tabos_enable_warnings(tabos_camera_ccm)
 tabos_enable_sanitizers(tabos_camera_ccm)
 add_test(NAME unit.camera_ccm COMMAND tabos_camera_ccm)
 
+add_executable(tabos_camera_backend unit/camera_backend.c
+    "${TABOS_ROOT}/platform/esp32p4/camera_ccm.c")
+target_include_directories(tabos_camera_backend PRIVATE
+    "${CMAKE_CURRENT_LIST_DIR}/fakes/camera_backend"
+    "${TABOS_ROOT}/platform/esp32p4"
+    "${TABOS_ROOT}/platform/include"
+    "${TABOS_ROOT}/sdk/include"
+    "${TABOS_GENERATED_INCLUDE_DIR}")
+tabos_enable_warnings(tabos_camera_backend)
+tabos_enable_sanitizers(tabos_camera_backend)
+add_test(NAME unit.camera_backend COMMAND tabos_camera_backend)
+set_tests_properties(unit.camera_backend PROPERTIES TIMEOUT 10)
+
 add_executable(tabos_display_completion unit/display_completion.c
     "${TABOS_ROOT}/platform/esp32p4/display_completion.c")
 target_include_directories(tabos_display_completion PRIVATE

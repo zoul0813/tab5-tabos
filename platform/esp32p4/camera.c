@@ -48,6 +48,7 @@ static platform_camera_frame_fn submit_frame;
 static platform_camera_error_fn submit_error;
 static platform_camera_capture_ready_fn capture_ready;
 static tabos_camera_config_t active_config;
+static uint32_t capture_frame_bytes;
 static TaskHandle_t capture_task;
 static SemaphoreHandle_t capture_idle;
 static SemaphoreHandle_t capture_exited;
@@ -134,6 +135,7 @@ static void release_buffers(void)
         h264_output      = NULL;
         h264_output_size = 0U;
     }
+    capture_frame_bytes = 0U;
 }
 
 static bool configure_jpeg(void)
@@ -181,17 +183,36 @@ static bool configure_capture(void)
     if (active_config.format == TABOS_CAMERA_FORMAT_H264) {
         pixel_format = V4L2_PIX_FMT_YUV420;
     }
-    struct v4l2_format format  = {.type = V4L2_BUF_TYPE_VIDEO_CAPTURE};
-    format.fmt.pix.width       = active_config.width;
-    format.fmt.pix.height      = active_config.height;
-    format.fmt.pix.pixelformat = pixel_format;
-    if (ioctl(camera_fd, VIDIOC_S_FMT, &format) != 0 || format.fmt.pix.width != active_config.width ||
-        format.fmt.pix.height != active_config.height || format.fmt.pix.pixelformat != pixel_format) {
+    const uint64_t pixels = (uint64_t) active_config.width * active_config.height;
+    const bool yuv420     = pixel_format == V4L2_PIX_FMT_YUV420;
+    if (pixels == 0U || pixels > UINT32_MAX / 2U ||
+        (yuv420 && ((active_config.width & 1U) != 0U || (active_config.height & 1U) != 0U))) {
+        return false;
+    }
+    const uint32_t expected_bytes  = (uint32_t) (yuv420 ? pixels + pixels / 2U : pixels * 2U);
+    const uint32_t expected_stride = yuv420 ? active_config.width : active_config.width * 2U;
+    struct v4l2_format format      = {.type = V4L2_BUF_TYPE_VIDEO_CAPTURE};
+    format.fmt.pix.width           = active_config.width;
+    format.fmt.pix.height          = active_config.height;
+    format.fmt.pix.pixelformat     = pixel_format;
+    // S_FMT is input-only in pinned esp_video. Read the retained format explicitly;
+    // zero stride/size fields mean its native tightly packed CSI layout.
+    if (ioctl(camera_fd, VIDIOC_S_FMT, &format) != 0 || ioctl(camera_fd, VIDIOC_G_FMT, &format) != 0 ||
+        format.fmt.pix.width != active_config.width || format.fmt.pix.height != active_config.height ||
+        format.fmt.pix.pixelformat != pixel_format) {
         ESP_LOGE(TAG, "unsupported capture format %lux%lu fourcc=0x%08lx: errno=%d",
                  (unsigned long) active_config.width, (unsigned long) active_config.height,
                  (unsigned long) pixel_format, errno);
         return false;
     }
+    if ((format.fmt.pix.bytesperline != 0U && format.fmt.pix.bytesperline != expected_stride) ||
+        (format.fmt.pix.sizeimage != 0U && format.fmt.pix.sizeimage < expected_bytes)) {
+        ESP_LOGE(TAG, "unsupported capture layout: stride=%lu size=%lu expected=%lu",
+                 (unsigned long) format.fmt.pix.bytesperline, (unsigned long) format.fmt.pix.sizeimage,
+                 (unsigned long) expected_bytes);
+        return false;
+    }
+    capture_frame_bytes                              = expected_bytes;
     struct v4l2_streamparm parameters                = {.type = V4L2_BUF_TYPE_VIDEO_CAPTURE};
     parameters.parm.capture.capability               = V4L2_CAP_TIMEPERFRAME;
     parameters.parm.capture.timeperframe.numerator   = 1U;
@@ -215,6 +236,11 @@ static bool configure_capture(void)
         struct v4l2_buffer buffer = {.type = V4L2_BUF_TYPE_VIDEO_CAPTURE, .memory = V4L2_MEMORY_MMAP, .index = index};
         if (ioctl(camera_fd, VIDIOC_QUERYBUF, &buffer) != 0) {
             ESP_LOGE(TAG, "failed to query capture buffer %lu: errno=%d", (unsigned long) index, errno);
+            return false;
+        }
+        if (buffer.length < capture_frame_bytes || buffer.length < format.fmt.pix.sizeimage) {
+            ESP_LOGE(TAG, "capture buffer %lu is too small: size=%lu expected=%lu", (unsigned long) index,
+                     (unsigned long) buffer.length, (unsigned long) capture_frame_bytes);
             return false;
         }
         buffers[index].data = mmap(NULL, buffer.length, PROT_READ | PROT_WRITE, MAP_SHARED, camera_fd, buffer.m.offset);
@@ -279,9 +305,9 @@ bool platform_camera_init(platform_camera_frame_fn frame, platform_camera_error_
         }
     }
     *info = (platform_camera_info_t) {
-        .driver  = "SC2356 (SC202CS-compatible)",
-        .formats = TABOS_CAMERA_FORMAT_FLAG_RAW8 | TABOS_CAMERA_FORMAT_FLAG_RGB565 | TABOS_CAMERA_FORMAT_FLAG_JPEG |
-                   TABOS_CAMERA_FORMAT_FLAG_H264,
+        .driver     = "SC2356 (SC202CS-compatible)",
+        .formats    = TABOS_CAMERA_FORMAT_FLAG_RAW8 | TABOS_CAMERA_FORMAT_FLAG_RGB565 | TABOS_CAMERA_FORMAT_FLAG_JPEG |
+                      TABOS_CAMERA_FORMAT_FLAG_H264,
         .max_width  = 1600U,
         .max_height = 1200U,
         .max_fps    = 30U,
@@ -391,6 +417,7 @@ static bool capture_one_frame(void)
         ESP_LOGE(TAG, "invalid dequeued buffer: index=%lu flags=0x%08lx bytes=%lu", (unsigned long) buffer.index,
                  (unsigned long) buffer.flags, (unsigned long) buffer.bytesused);
         report_error(EIO);
+        return false;
     } else if ((buffer.flags & V4L2_BUF_FLAG_ERROR) != 0U) {
         ++consecutive_capture_errors;
         if (consecutive_capture_errors == 1U) {
@@ -402,6 +429,14 @@ static bool capture_one_frame(void)
             report_error(EIO);
         }
     } else if ((buffer.flags & V4L2_BUF_FLAG_DONE) != 0U) {
+        const camera_buffer_t* source = &buffers[buffer.index];
+        if (capture_frame_bytes == 0U || source->data == NULL || source->size < capture_frame_bytes ||
+            buffer.bytesused < capture_frame_bytes || buffer.bytesused > source->size) {
+            ESP_LOGE(TAG, "invalid camera payload: bytes=%lu mapped=%lu expected=%lu", (unsigned long) buffer.bytesused,
+                     (unsigned long) source->size, (unsigned long) capture_frame_bytes);
+            report_error(EIO);
+            return false;
+        }
         consecutive_capture_errors           = 0U;
         const uint64_t timestamp             = platform_time_ms();
         const uint64_t processing_started_us = (uint64_t) esp_timer_get_time();
@@ -421,7 +456,7 @@ static bool capture_one_frame(void)
             submit_frame(output, pixels, active_config.width, active_config.height, active_config.width,
                          TABOS_CAMERA_FORMAT_RAW8, timestamp);
         } else if (active_config.format == TABOS_CAMERA_FORMAT_RGB565) {
-            submit_frame(buffers[buffer.index].data, buffer.bytesused, active_config.width, active_config.height,
+            submit_frame(buffers[buffer.index].data, capture_frame_bytes, active_config.width, active_config.height,
                          active_config.width * 2U, TABOS_CAMERA_FORMAT_RGB565, timestamp);
         } else if (active_config.format == TABOS_CAMERA_FORMAT_JPEG) {
             const jpeg_encode_cfg_t config = {.src_type      = JPEG_ENCODE_IN_FORMAT_RGB565,
@@ -431,10 +466,14 @@ static bool capture_one_frame(void)
                                               .height        = active_config.height};
             uint32_t encoded_size          = 0U;
             const esp_err_t result =
-                jpeg_encoder_process(jpeg_encoder, &config, buffers[buffer.index].data, buffer.bytesused, jpeg_output,
-                                     jpeg_output_size, &encoded_size);
+                jpeg_encoder_process(jpeg_encoder, &config, buffers[buffer.index].data, capture_frame_bytes,
+                                     jpeg_output, jpeg_output_size, &encoded_size);
             encoding_us += (uint64_t) esp_timer_get_time() - processing_started_us;
             if (result == ESP_OK) {
+                if (encoded_size == 0U || encoded_size > jpeg_output_size) {
+                    report_error(EIO);
+                    return false;
+                }
                 submit_frame(jpeg_output, encoded_size, active_config.width, active_config.height, 0U,
                              TABOS_CAMERA_FORMAT_JPEG, timestamp);
             } else {
@@ -446,7 +485,7 @@ static bool capture_one_frame(void)
             }
         } else {
             esp_h264_enc_in_frame_t input = {
-                .raw_data = {.buffer = buffers[buffer.index].data, .len = buffer.bytesused},
+                .raw_data = {.buffer = buffers[buffer.index].data, .len = capture_frame_bytes},
                   .pts = timestamp
             };
             esp_h264_enc_out_frame_t output = {
@@ -455,6 +494,10 @@ static bool capture_one_frame(void)
             const esp_h264_err_t result  = esp_h264_enc_process(h264_encoder, &input, &output);
             encoding_us                 += (uint64_t) esp_timer_get_time() - processing_started_us;
             if (result == ESP_H264_ERR_OK) {
+                if (output.length == 0U || output.length > h264_output_size) {
+                    report_error(EIO);
+                    return false;
+                }
                 submit_frame(h264_output, output.length, active_config.width, active_config.height, 0U,
                              TABOS_CAMERA_FORMAT_H264, timestamp);
             } else {
