@@ -52,7 +52,7 @@ bool wall_clock_datetime_to_epoch(const tabos_datetime_t* datetime, int64_t* sec
 
 bool wall_clock_epoch_to_datetime(int64_t seconds, tabos_datetime_t* datetime)
 {
-    if (datetime == NULL || seconds < 0) {
+    if (datetime == NULL || seconds < 0 || seconds > INT64_C(253402300799)) {
         return false;
     }
     int64_t days                = seconds / 86400;

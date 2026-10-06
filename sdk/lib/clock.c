@@ -56,7 +56,7 @@ static bool datetime_to_epoch(const tabos_datetime_t* datetime, int64_t* seconds
 
 static bool epoch_to_datetime(int64_t seconds, tabos_datetime_t* datetime)
 {
-    if (seconds < 0 || datetime == NULL) {
+    if (seconds < 0 || seconds > INT64_C(253402300799) || datetime == NULL) {
         return false;
     }
     int64_t days                = seconds / 86400;

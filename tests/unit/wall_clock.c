@@ -61,5 +61,18 @@ int main(void)
     invalid.month = 13U;
     assert(!wall_clock_datetime_valid(&invalid));
     assert(!wall_clock_epoch_to_datetime(-1, &invalid));
+    const tabos_datetime_t last = {
+        .year    = 9999,
+        .month   = 12U,
+        .day     = 31U,
+        .weekday = 5U,
+        .hour    = 23U,
+        .minute  = 59U,
+        .second  = 59U,
+    };
+    expect_round_trip(&last, INT64_C(253402300799));
+    assert(!wall_clock_epoch_to_datetime(INT64_C(253402300800), &invalid));
+    assert(!wall_clock_epoch_to_datetime(INT64_MAX, &invalid));
+    assert(!wall_clock_epoch_to_datetime(INT64_MIN, &invalid));
     return 0;
 }

@@ -182,6 +182,8 @@
 
 ### RTC and Wall Clock
 
+- [x] Resolve AUD-038: reject unsupported epochs before kernel/SDK calendar arithmetic; sanitizer boundary regressions pass.
+
 - [x] Add validated Gregorian calendar and signed Unix-epoch conversion.
 - [x] Implement host wall clock and Tab5 RX8130CE backend.
 - [x] Expose portable calendar read/write and libc wall-clock functions.

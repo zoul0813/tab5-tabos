@@ -504,6 +504,12 @@ tabos_enable_warnings(tabos_wall_clock)
 tabos_enable_sanitizers(tabos_wall_clock)
 add_test(NAME unit.wall_clock COMMAND tabos_wall_clock)
 
+add_executable(tabos_sdk_clock unit/sdk_clock.c "${TABOS_ROOT}/sdk/lib/clock.c")
+target_include_directories(tabos_sdk_clock PRIVATE "${TABOS_ROOT}/sdk/include")
+tabos_enable_warnings(tabos_sdk_clock)
+tabos_enable_sanitizers(tabos_sdk_clock)
+add_test(NAME unit.sdk_clock COMMAND tabos_sdk_clock)
+
 add_executable(tabos_network_config unit/network_config.c ${TABOS_TEST_PLATFORM_FAKES})
 target_include_directories(tabos_network_config PRIVATE
     "${TABOS_ROOT}/net/include"

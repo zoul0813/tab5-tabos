@@ -4,7 +4,7 @@ Audit date: 2026-09-06. Accuracy verification: 2026-09-06. All 44 original findi
 
 Findings use P1 (high impact), P2 (normal defect), and P3 (maintenance). Each checkbox represents a tracked repair task. Static findings include the triggering path and suggested validation; hardware-dependent concerns are identified explicitly. Planned features are not counted as dead code or defects merely because they are unfinished.
 
-8 open findings: 6 P2, 2 P3; 38 resolved findings (AUD-001 through AUD-027, AUD-029 through AUD-037, AUD-042, and AUD-045). Original findings retain corrected scope where needed; AUD-045 and AUD-046 are additional findings. Findings below are ordered by severity, then stable ID. Repair epoch conversion overflow next.
+5 open findings: 3 P2, 2 P3; 41 resolved findings. Checklist entries below are authoritative.
 
 ## Scope and validation
 
@@ -106,7 +106,7 @@ Passing existing tests does not invalidate the uncovered failure paths. This is 
 
 - [x] **AUD-037 — P2: Terminal resize loses reverse-video attributes.** Resolved by replaying each retained cell with its stored reverse-video bit and restoring the active reverse rendition after reflow. Existing and subsequent output now retain their styling across scale changes.
 
-- [ ] **AUD-038 — P2: Out-of-range epoch conversion overflows before rejecting the date.** `time/wall_clock.c:wall_clock_epoch_to_datetime()` and `sdk/lib/clock.c:epoch_to_datetime()` narrow `era` to `int32_t` and multiply by 400 before checking the supported 1970–9999 year range. Large positive epochs cause signed overflow; host `platform_wall_clock_set()` accepts these values. Reject epochs above the supported maximum before civil-date arithmetic, or retain wide arithmetic until validation. Validate the last second of 9999, its successor, and `INT64_MAX` under UBSan in both implementations.
+- [x] **AUD-038 — P2: Out-of-range epoch conversion overflows before rejecting the date.** Kernel and SDK calendar conversions reject epochs outside 1970–9999 before civil-date arithmetic, leaving output untouched on failure.
 
 - [x] **AUD-039 — P2: Host setup omits a required OpenSSL development dependency.** Resolved by detecting OpenSSL through pkg-config, installing Homebrew `openssl@3` or Debian/Ubuntu `libssl-dev` when absent, and passing the keg-only Homebrew prefix to host CMake configuration. Contributor prerequisites now name OpenSSL explicitly. Automated clean-host setup simulations verify the macOS install-to-configure path and Linux development-package selection, while both host CI jobs exercise real configuration.
 
@@ -127,6 +127,10 @@ Passing existing tests does not invalidate the uncovered failure paths. This is 
 - [ ] **AUD-043 — P3: Agent context still lists settled architecture as active unresolved work.** `agents/TABOS_CONTEXT.md` sections 7, 9, 11, and 16 retain open questions about cwd, framebuffer format/buffering, executable format, ABI, libc, socket API, and embedded RV32 execution despite implemented and `[DECIDED]` choices elsewhere. Its keyboard implementation also says HID-mode reports although the driver configures Normal mode. Reconcile the authoritative context with current decisions, explicitly separating historical questions from genuinely open work, so future agents do not reintroduce incompatible designs. Cross-check with `agents/architecture.md`, public `docs/`, and current build/driver constants.
 
 ## Resolved findings
+
+- **AUD-038 — Resolved 2026-10-05.** Kernel and SDK calendar conversions reject epochs outside 1970–9999 before civil-date arithmetic, leaving output untouched on failure.
+
+  Validation: Fresh unit.wall_clock and unit.sdk_clock pass under ASan/UBSan for the last second of 9999, its successor, INT64_MAX, INT64_MIN, and the Unix epoch. The SDK probe reproduced signed overflow before repair. macOS Debug build and Tab5 Debug cross-build pass; physical hardware and Linux execution were not run.
 
 - **AUD-042 — Resolved 2026-09-13.** Tab5 Wi-Fi initialization now records ownership at every reversible event-loop, station-netif, Wi-Fi, handler, mode, and start stage. One idempotent reverse-order shutdown path handles partial failure and normal shutdown, unregistering exact handler instances and destroying the retained default station netif. A pre-existing shared event loop is not destroyed. The global ESP-NETIF TCP/IP foundation remains boot-lifetime because the pinned implementation explicitly does not support deinitializing lwIP after startup. The asynchronous startup task uses cooperative cancellation and a completion semaphore; shutdown joins it before driver teardown, handler quiescence, status-mutex deletion, or callback release.
 

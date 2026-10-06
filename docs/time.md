@@ -60,6 +60,8 @@ if (tabos_clock_get(&now) == 0) {
 
 `tabos_clock_get_epoch()` and `tabos_clock_set_epoch()` use signed Unix seconds
 since `1970-01-01 00:00:00 UTC`. `tabos_clock_set()` accepts a calendar value.
+Calendar conversion supports years 1970 through 9999. `tabos_clock_get()`
+returns `EOVERFLOW` for an epoch outside that calendar range.
 Tab5 supports RX8130CE years 2000 through 2099. Values outside that range cannot
 be written to its RTC.
 
