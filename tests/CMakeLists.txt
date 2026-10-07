@@ -263,6 +263,87 @@ tabos_enable_warnings(tabos_sdk_tls)
 tabos_enable_sanitizers(tabos_sdk_tls)
 add_test(NAME unit.sdk_tls COMMAND tabos_sdk_tls)
 
+add_executable(tabos_pool_table unit/pool_table.c "${TABOS_ROOT}/apps/pool/src/table.c")
+target_include_directories(tabos_pool_table PRIVATE "${TABOS_ROOT}/apps/pool/include")
+tabos_enable_warnings(tabos_pool_table)
+tabos_enable_sanitizers(tabos_pool_table)
+add_test(NAME unit.pool_table COMMAND tabos_pool_table)
+
+add_executable(tabos_pool_game unit/pool_game.c
+    "${TABOS_ROOT}/apps/pool/src/game.c" "${TABOS_ROOT}/apps/pool/src/rules.c" "${TABOS_ROOT}/apps/pool/src/physics.c"
+    "${TABOS_ROOT}/apps/pool/src/clock.c" "${TABOS_ROOT}/apps/pool/src/input.c"
+    "${TABOS_ROOT}/apps/pool/src/table.c")
+target_include_directories(tabos_pool_game PRIVATE
+    "${TABOS_ROOT}/apps/pool/include" "${TABOS_ROOT}/sdk/include")
+tabos_enable_warnings(tabos_pool_game)
+tabos_enable_sanitizers(tabos_pool_game)
+add_test(NAME unit.pool_game COMMAND tabos_pool_game)
+
+add_executable(tabos_pool_physics unit/pool_physics.c
+    "${TABOS_ROOT}/apps/pool/src/game.c" "${TABOS_ROOT}/apps/pool/src/rules.c" "${TABOS_ROOT}/apps/pool/src/physics.c"
+    "${TABOS_ROOT}/apps/pool/src/clock.c" "${TABOS_ROOT}/apps/pool/src/input.c"
+    "${TABOS_ROOT}/apps/pool/src/table.c")
+target_include_directories(tabos_pool_physics PRIVATE
+    "${TABOS_ROOT}/apps/pool/include" "${TABOS_ROOT}/sdk/include")
+tabos_enable_warnings(tabos_pool_physics)
+tabos_enable_sanitizers(tabos_pool_physics)
+add_test(NAME unit.pool_physics COMMAND tabos_pool_physics)
+
+add_executable(tabos_pool_contacts unit/pool_contacts.c
+    "${TABOS_ROOT}/apps/pool/src/game.c" "${TABOS_ROOT}/apps/pool/src/rules.c" "${TABOS_ROOT}/apps/pool/src/physics.c"
+    "${TABOS_ROOT}/apps/pool/src/table.c")
+target_include_directories(tabos_pool_contacts PRIVATE "${TABOS_ROOT}/apps/pool/include")
+tabos_enable_warnings(tabos_pool_contacts)
+tabos_enable_sanitizers(tabos_pool_contacts)
+add_test(NAME unit.pool_contacts COMMAND tabos_pool_contacts)
+
+add_executable(tabos_pool_pockets unit/pool_pockets.c
+    "${TABOS_ROOT}/apps/pool/src/game.c" "${TABOS_ROOT}/apps/pool/src/rules.c" "${TABOS_ROOT}/apps/pool/src/physics.c"
+    "${TABOS_ROOT}/apps/pool/src/input.c" "${TABOS_ROOT}/apps/pool/src/table.c")
+target_include_directories(tabos_pool_pockets PRIVATE
+    "${TABOS_ROOT}/apps/pool/include" "${TABOS_ROOT}/sdk/include")
+tabos_enable_warnings(tabos_pool_pockets)
+tabos_enable_sanitizers(tabos_pool_pockets)
+add_test(NAME unit.pool_pockets COMMAND tabos_pool_pockets)
+
+add_executable(tabos_pool_rules unit/pool_rules.c
+    "${TABOS_ROOT}/apps/pool/src/game.c" "${TABOS_ROOT}/apps/pool/src/rules.c"
+    "${TABOS_ROOT}/apps/pool/src/physics.c" "${TABOS_ROOT}/apps/pool/src/input.c"
+    "${TABOS_ROOT}/apps/pool/src/table.c")
+target_include_directories(tabos_pool_rules PRIVATE
+    "${TABOS_ROOT}/apps/pool/include" "${TABOS_ROOT}/sdk/include")
+tabos_enable_warnings(tabos_pool_rules)
+tabos_enable_sanitizers(tabos_pool_rules)
+add_test(NAME unit.pool_rules COMMAND tabos_pool_rules)
+
+add_executable(tabos_pool_ai unit/pool_ai.c
+    "${TABOS_ROOT}/apps/pool/src/game.c" "${TABOS_ROOT}/apps/pool/src/rules.c"
+    "${TABOS_ROOT}/apps/pool/src/physics.c" "${TABOS_ROOT}/apps/pool/src/input.c"
+    "${TABOS_ROOT}/apps/pool/src/table.c" "${TABOS_ROOT}/apps/pool/src/ai.c")
+target_include_directories(tabos_pool_ai PRIVATE
+    "${TABOS_ROOT}/apps/pool/include" "${TABOS_ROOT}/sdk/include")
+tabos_enable_warnings(tabos_pool_ai)
+tabos_enable_sanitizers(tabos_pool_ai)
+add_test(NAME unit.pool_ai COMMAND tabos_pool_ai)
+
+add_executable(tabos_pool_sound unit/pool_sound.c "${TABOS_ROOT}/apps/pool/src/sound.c")
+target_include_directories(tabos_pool_sound PRIVATE
+    "${TABOS_ROOT}/apps/pool/include" "${TABOS_ROOT}/sdk/include")
+tabos_enable_warnings(tabos_pool_sound)
+tabos_enable_sanitizers(tabos_pool_sound)
+add_test(NAME unit.pool_sound COMMAND tabos_pool_sound)
+
+add_executable(tabos_pool_render unit/pool_render.c
+    "${TABOS_ROOT}/apps/pool/src/table.c" "${TABOS_ROOT}/apps/pool/src/render.c"
+    "${TABOS_ROOT}/apps/pool/src/game.c" "${TABOS_ROOT}/apps/pool/src/rules.c" "${TABOS_ROOT}/apps/pool/src/physics.c"
+    "${TABOS_ROOT}/apps/pool/src/clock.c"
+    "${TABOS_ROOT}/sdk/lib/graphics.c")
+target_include_directories(tabos_pool_render PRIVATE
+    "${TABOS_ROOT}/apps/pool/include" "${TABOS_ROOT}/sdk/include")
+tabos_enable_warnings(tabos_pool_render)
+tabos_enable_sanitizers(tabos_pool_render)
+add_test(NAME unit.pool_render COMMAND tabos_pool_render)
+
 add_executable(tabos_starfall_game
     unit/starfall_game.c
     "${TABOS_ROOT}/apps/starfall/src/game.c"
@@ -1068,6 +1149,22 @@ else()
 endif()
 tabos_enable_warnings(tabos_kilo_rv32)
 tabos_enable_sanitizers(tabos_kilo_rv32)
+
+add_executable(tabos_pool_rv32 component/pool_rv32.c)
+target_include_directories(tabos_pool_rv32 PRIVATE
+    "${TABOS_ROOT}/apps/pool/include"
+    "${TABOS_ROOT}/graphics/include" "${TABOS_ROOT}/console/include"
+    "${TABOS_ROOT}/kernel/include" "${TABOS_ROOT}/input/include" "${TABOS_ROOT}/platform/include"
+)
+if(TABOS_TARGET STREQUAL "linux")
+    target_link_libraries(tabos_pool_rv32 PRIVATE
+        "-Wl,--start-group" tabos_core tabos_platform_host "-Wl,--end-group" SDL3::SDL3
+    )
+else()
+    target_link_libraries(tabos_pool_rv32 PRIVATE tabos_core tabos_platform_host SDL3::SDL3)
+endif()
+tabos_enable_warnings(tabos_pool_rv32)
+tabos_enable_sanitizers(tabos_pool_rv32)
 
 add_executable(tabos_gpio_interrupt
     unit/gpio_interrupt.c
