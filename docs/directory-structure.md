@@ -19,6 +19,7 @@ tabos/
 │   ├── coreutils/       Independently built small command-line utilities
 │   │   └── src/<name>/   Separate utility source and executable target
 │   ├── pool/            House 8-ball application, computer player, rules, sound, and tests
+│   ├── soccer/          Six-a-side arcade soccer, graphics, sound, gameplay, and tests
 │   ├── shell/           Independently built command shell application
 │   └── tester/          Modular end-to-end SDK and ABI test application
 ├── audio/               Portable audio subsystem

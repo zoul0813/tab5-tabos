@@ -344,6 +344,29 @@ tabos_enable_warnings(tabos_pool_render)
 tabos_enable_sanitizers(tabos_pool_render)
 add_test(NAME unit.pool_render COMMAND tabos_pool_render)
 
+add_executable(tabos_soccer_game unit/soccer_game.c "${TABOS_ROOT}/apps/soccer/src/game.c"
+    "${TABOS_ROOT}/apps/soccer/src/camera.c")
+target_include_directories(tabos_soccer_game PRIVATE "${TABOS_ROOT}/apps/soccer/include")
+tabos_enable_warnings(tabos_soccer_game)
+tabos_enable_sanitizers(tabos_soccer_game)
+add_test(NAME unit.soccer_game COMMAND tabos_soccer_game)
+
+add_executable(tabos_soccer_visuals unit/soccer_visuals.c "${TABOS_ROOT}/apps/soccer/src/visuals.c")
+target_include_directories(tabos_soccer_visuals PRIVATE "${TABOS_ROOT}/apps/soccer/include")
+tabos_enable_warnings(tabos_soccer_visuals)
+tabos_enable_sanitizers(tabos_soccer_visuals)
+add_test(NAME unit.soccer_visuals COMMAND tabos_soccer_visuals)
+
+add_executable(tabos_soccer_sound
+    unit/soccer_sound.c
+    "${TABOS_ROOT}/apps/soccer/src/sound.c"
+)
+target_include_directories(tabos_soccer_sound PRIVATE
+    "${TABOS_ROOT}/apps/soccer/include" "${TABOS_ROOT}/sdk/include")
+tabos_enable_warnings(tabos_soccer_sound)
+tabos_enable_sanitizers(tabos_soccer_sound)
+add_test(NAME unit.soccer_sound COMMAND tabos_soccer_sound)
+
 add_executable(tabos_starfall_game
     unit/starfall_game.c
     "${TABOS_ROOT}/apps/starfall/src/game.c"
@@ -1165,6 +1188,22 @@ else()
 endif()
 tabos_enable_warnings(tabos_pool_rv32)
 tabos_enable_sanitizers(tabos_pool_rv32)
+
+add_executable(tabos_soccer_rv32 component/soccer_rv32.c)
+target_include_directories(tabos_soccer_rv32 PRIVATE
+    "${TABOS_ROOT}/audio/include"
+    "${TABOS_ROOT}/graphics/include" "${TABOS_ROOT}/console/include"
+    "${TABOS_ROOT}/kernel/include" "${TABOS_ROOT}/input/include" "${TABOS_ROOT}/platform/include"
+)
+if(TABOS_TARGET STREQUAL "linux")
+    target_link_libraries(tabos_soccer_rv32 PRIVATE
+        "-Wl,--start-group" tabos_core tabos_platform_host "-Wl,--end-group" SDL3::SDL3
+    )
+else()
+    target_link_libraries(tabos_soccer_rv32 PRIVATE tabos_core tabos_platform_host SDL3::SDL3)
+endif()
+tabos_enable_warnings(tabos_soccer_rv32)
+tabos_enable_sanitizers(tabos_soccer_rv32)
 
 add_executable(tabos_gpio_interrupt
     unit/gpio_interrupt.c
