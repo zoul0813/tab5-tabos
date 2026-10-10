@@ -1,6 +1,7 @@
 #include <tabos/console.h>
 
 #include <tabos/internal/console.h>
+#include <tabos/internal/input.h>
 #include <tabos/internal/display.h>
 #include <tabos/internal/time.h>
 #include <tabos/time.h>
@@ -158,6 +159,7 @@ bool tabos_console_acquire(tabos_console_session_t* session)
     if (next_token == 0U) {
         ++next_token;
     }
+    input_reset(false);
     foreground_token = next_token++;
     session->token   = foreground_token;
     terminal_set_cursor_visible(active_terminal, true);
@@ -188,6 +190,7 @@ void tabos_console_release(tabos_console_session_t* session)
         terminal_set_cursor_visible(active_terminal, false);
         tabos_timer_cancel(&cursor_timer);
         (void) present_console();
+        input_reset(false);
         foreground_token = 0U;
         deadline_changed = true;
     }

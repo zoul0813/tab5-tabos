@@ -13,6 +13,8 @@ static bool screenshot_shortcut_active;
 static bool sym_down;
 static bool sym_latched;
 static bool sym_used;
+static tabos_key_t logical_keys[TABOS_INPUT_KEY_COUNT];
+static uint8_t logical_modifiers[TABOS_INPUT_KEY_COUNT];
 
 static tabos_key_t sym_key(tabos_key_t key, uint8_t* modifiers)
 {
@@ -119,7 +121,15 @@ static void dispatch_event(const SDL_Event* event)
     if (host_pointer_event(event)) {
         return;
     }
-    if (event->type == SDL_EVENT_QUIT) {
+    if (event->type == SDL_EVENT_WINDOW_FOCUS_LOST) {
+        input_reset(true);
+        memset(logical_keys, 0, sizeof(logical_keys));
+        sym_down    = false;
+        sym_latched = false;
+        sym_used    = false;
+        return;
+    }
+    if (event->type == SDL_EVENT_QUIT || event->type == SDL_EVENT_WINDOW_CLOSE_REQUESTED) {
         host_request_quit();
         return;
     }
@@ -127,13 +137,23 @@ static void dispatch_event(const SDL_Event* event)
         if (handle_screenshot_shortcut(&event->key)) {
             return;
         }
-        const tabos_key_t key                 = input_key(event->key.scancode);
-        const uint8_t modifiers               = input_modifiers(event->key.mod);
+        const tabos_key_t key   = input_key(event->key.scancode);
+        const uint8_t modifiers = input_modifiers(event->key.mod);
+        if (key > TABOS_KEY_UNKNOWN && key < TABOS_INPUT_KEY_COUNT && event->type == SDL_EVENT_KEY_DOWN &&
+            !event->key.repeat) {
+            logical_modifiers[key] = modifiers;
+            logical_keys[key]      = key;
+            if (key != TABOS_KEY_SYM && (sym_down || sym_latched)) {
+                logical_keys[key] = sym_key(key, &logical_modifiers[key]);
+            }
+        }
         const tabos_input_event_t input_event = {
-            .type      = event->type == SDL_EVENT_KEY_DOWN ? TABOS_INPUT_KEY_DOWN : TABOS_INPUT_KEY_UP,
-            .key       = key,
-            .modifiers = modifiers,
-            .repeat    = event->key.repeat,
+            .type              = event->type == SDL_EVENT_KEY_DOWN ? TABOS_INPUT_KEY_DOWN : TABOS_INPUT_KEY_UP,
+            .key               = key,
+            .logical_key       = key < TABOS_INPUT_KEY_COUNT ? logical_keys[key] : key,
+            .logical_modifiers = key < TABOS_INPUT_KEY_COUNT ? logical_modifiers[key] : modifiers,
+            .modifiers         = modifiers,
+            .repeat            = event->key.repeat,
         };
         (void) input_submit(&input_event);
         if (key == TABOS_KEY_SYM && !event->key.repeat) {

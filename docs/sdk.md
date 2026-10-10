@@ -132,3 +132,17 @@ applications keep the default RV32I instruction set unless explicitly overridden
 Newlib `_fcntl` and public `fcntl` share descriptor flags, including `fdopen()`
 access-mode validation. The SDK error-string fallback is weak so newlib can
 supply its normal implementation when linked.
+
+## Input recovery and additional application build flags
+
+`tabos_input_event_t` includes physical `key`/`modifiers`, a stable `logical_key`/
+`logical_modifiers` binding (including Tab5 Aa/Sym translation), and `generation`.
+Bindings last from initial press through repeats and release. Raw input still delivers
+physical key events; the logical fields allow applications to use the same text layout.
+
+Foreground applications may call `tabos_input_get_state(&state, resynchronize)`.
+The snapshot contains authoritative physical pressed keys and the queue generation.
+Overflow, focus changes and explicit resynchronization advance that generation.
+Passing `true` atomically discards queued events and returns the new generation and
+pressed state. Applications should release their guest keys on a generation change,
+resynchronize, and ignore already-held physical keys until released.

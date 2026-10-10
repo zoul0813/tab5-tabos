@@ -449,6 +449,16 @@ bool loader_elf_application_queue_input_event(loader_elf_application_t* applicat
     return true;
 }
 
+static int elf_input_get_state(tabos_input_state_t* state, int resynchronize)
+{
+    loader_elf_application_t* application = platform_riscv32_current_user_data();
+    if (application == NULL || application->console == NULL || state == NULL ||
+        !tabos_console_is_foreground(application->console)) {
+        return -TABOS_EINVAL;
+    }
+    return input_get_state(state, resynchronize != 0);
+}
+
 static int elf_input_poll(tabos_input_event_t* event)
 {
     loader_elf_application_t* application = platform_riscv32_current_user_data();
@@ -2244,6 +2254,7 @@ static bool elf_entry(tabos_app_context_t* context)
         .tty_get_mode                    = elf_tty_get_mode,
         .tty_set_mode                    = elf_tty_set_mode,
         .input_poll                      = elf_input_poll,
+        .input_get_state                 = elf_input_get_state,
         .wall_time_get                   = elf_wall_time_get,
         .wall_time_set                   = elf_wall_time_set,
         .system_action                   = elf_system_action,

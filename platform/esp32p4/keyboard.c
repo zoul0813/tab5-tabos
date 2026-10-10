@@ -83,6 +83,7 @@ static int keyboard_error;
 static bool pressed_keys[KEYBOARD_KEY_COUNT];
 static uint8_t pressed_usages[KEYBOARD_KEY_COUNT];
 static uint8_t pressed_modifiers[KEYBOARD_KEY_COUNT];
+static key_mapping_t logical_bindings[KEYBOARD_KEY_COUNT];
 static bool sym_latched;
 static bool shift_latched;
 static bool sym_used;
@@ -193,10 +194,21 @@ static void submit_matrix_event(uint8_t report)
     if (usage == 0U) {
         return;
     }
+    if (pressed) {
+        const bool cooked_sym = pressed_keys[KEYBOARD_SYM_INDEX] || sym_latched;
+        key_mapping_t logical = cooked_sym ? sym_mapping[index] : base_mapping[index];
+        logical.modifiers     = modifiers | logical.modifiers;
+        if (pressed_keys[KEYBOARD_SHIFT_INDEX] || shift_latched) {
+            logical.modifiers |= TABOS_MODIFIER_SHIFT;
+        }
+        logical_bindings[index] = logical;
+    }
     const tabos_input_event_t key_event = {
-        .type      = pressed ? TABOS_INPUT_KEY_DOWN : TABOS_INPUT_KEY_UP,
-        .key       = normalized_key(usage),
-        .modifiers = modifiers,
+        .type              = pressed ? TABOS_INPUT_KEY_DOWN : TABOS_INPUT_KEY_UP,
+        .key               = normalized_key(usage),
+        .logical_key       = normalized_key(logical_bindings[index].usage),
+        .logical_modifiers = logical_bindings[index].modifiers,
+        .modifiers         = current_modifiers(),
     };
     (void) input_submit(&key_event);
     if (pressed) {
@@ -331,6 +343,7 @@ void tab5_keyboard_shutdown(void)
         (void) i2c_del_master_bus(keyboard_bus);
         keyboard_bus = NULL;
     }
+    input_reset(true);
     keyboard_present = false;
     for (size_t index = 0U; index < KEYBOARD_KEY_COUNT; ++index) {
         pressed_keys[index]      = false;
@@ -440,7 +453,8 @@ void tab5_keyboard_poll(void)
     bool still_pending = false;
     if (!tab5_keyboard_interrupt_drain(&ops, KEYBOARD_DRAIN_PASSES, &still_pending)) {
         ESP_LOGW(TAG, "Tab5 Keyboard interrupt drain failed");
-        keyboard_error   = EIO;
+        keyboard_error = EIO;
+        input_reset(true);
         keyboard_present = false;
         (void) gpio_intr_disable(KEYBOARD_INTERRUPT_PIN);
         return;

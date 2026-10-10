@@ -183,6 +183,41 @@ int main(void)
     if (!input_init() || input_next_deadline() != UINT64_MAX) {
         return 1;
     }
+    tabos_input_state_t snapshot;
+    if (input_get_state(NULL, false) == 0 || input_get_state(&snapshot, false) != 0) {
+        return 1;
+    }
+    uint32_t generation         = snapshot.generation;
+    tabos_input_event_t binding = {.type              = TABOS_INPUT_KEY_DOWN,
+                                   .key               = TABOS_KEY_1,
+                                   .logical_key       = TABOS_KEY_F1,
+                                   .logical_modifiers = TABOS_MODIFIER_SHIFT};
+    if (!input_submit(&binding) || !tabos_input_poll(&received) || received.logical_key != TABOS_KEY_F1) {
+        return 1;
+    }
+    test_platform_advance_time_ms(TABOS_KEY_REPEAT_DELAY_MS);
+    input_update();
+    if (!tabos_input_poll(&received) || !received.repeat || received.logical_key != TABOS_KEY_F1 ||
+        received.logical_modifiers != TABOS_MODIFIER_SHIFT) {
+        return 1;
+    }
+    for (unsigned i = 0; i < 70; ++i) {
+        if (!input_submit(&binding)) {
+            return 1;
+        }
+    }
+    if (input_get_state(&snapshot, false) != 0 || snapshot.generation == generation || !snapshot.pressed[TABOS_KEY_1]) {
+        return 1;
+    }
+    generation = snapshot.generation;
+    if (input_get_state(&snapshot, true) != 0 || snapshot.generation == generation || !snapshot.pressed[TABOS_KEY_1] ||
+        tabos_input_poll(&received)) {
+        return 1;
+    }
+    input_reset(true);
+    if (input_get_state(&snapshot, false) != 0 || snapshot.pressed[TABOS_KEY_1]) {
+        return 1;
+    }
     input_shutdown();
     return 0;
 }

@@ -40,3 +40,17 @@ bool tabos_input_wait(tabos_input_event_t* event)
         }
     }
 }
+
+int tabos_input_get_state(tabos_input_state_t* state, bool resynchronize)
+{
+    if (state == NULL || tabos_runtime_api == NULL || tabos_runtime_api->input_get_state == NULL) {
+        errno = state == NULL ? EINVAL : ENOSYS;
+        return -1;
+    }
+    int result = tabos_runtime_api->input_get_state(state, resynchronize);
+    if (result < 0) {
+        errno = -result;
+        return -1;
+    }
+    return 0;
+}

@@ -2006,3 +2006,10 @@ Native task tests assert 4/16/64 KiB byte arguments and idle-window gate ownersh
 Application tracking covers extra C/preprocessor flags. Tester filesystem checks
 exercise real newlib fdopen access validation and descriptor ownership. RV32
 execution and containment tests retain bounds, API gate and slice assertions.
+
+Input transport 23 adds foreground-only authoritative pressed snapshots and
+atomic queue resynchronization. Physical events retain logical modifier bindings
+through release/repeat. Overflow and focus changes advance queue generations;
+console handoff drops pending events while retaining physical held state, and
+SDL focus loss clears it. Rebuild SDK applications with firmware. Input queue
+tests cover overflow, logical repeat and snapshot recovery.

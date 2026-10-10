@@ -119,7 +119,8 @@ static _Thread_local uint32_t host_rv32_active_ram_size;
     X(CAMERA_RELEASE, 384U)                  \
     X(CAMERA_WAIT_SOURCE, 388U)              \
     X(TTY_GET_SIZE, 392U)                    \
-    X(INPUT_WAIT_SOURCE, 396U)
+    X(INPUT_WAIT_SOURCE, 396U)               \
+    X(INPUT_GET_STATE, 400U)
 
 enum {
 #define HOST_RV32_GATE_INDEX(name, api_offset) HOST_RV32_GATE_INDEX_##name,
@@ -681,6 +682,17 @@ static platform_riscv32_result_t step_inner(platform_riscv32_context_t* context,
                 (uint32_t) context->api.tty_set_mode((int) context->state.regs[10], context->state.regs[11]);
             current_user_data = NULL;
             context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_INPUT_GET_STATE) {
+            tabos_input_state_t* state = guest_buffer(context->memory, context->state.regs[10], sizeof(*state));
+            if (state == NULL || context->api.input_get_state == NULL) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data       = context->user_data;
+            context->state.regs[10] = (uint32_t) context->api.input_get_state(state, (int) context->state.regs[11]);
+            current_user_data       = NULL;
+            context->state.pc       = context->state.regs[1];
             continue;
         }
         if (context->state.pc == HOST_RV32_INPUT_POLL) {

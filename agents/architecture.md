@@ -1584,3 +1584,10 @@ CPU/RAM storage and pass the immutable RAM bound; instruction budgets and guest
 address checks remain unchanged. Native gate exits allow a one-tick idle window
 every 500 ms while retaining gate ownership, preserving safe stop/drain. Task
 stack sizes are passed in ESP-IDF bytes; allocation remains in PSRAM.
+
+Input transport 23 adds foreground-only authoritative pressed snapshots and
+atomic queue resynchronization. Physical events retain logical modifier bindings
+through release/repeat. Overflow and focus changes advance queue generations;
+console handoff drops pending events while retaining physical held state, and
+SDL focus loss clears it. Rebuild SDK applications with firmware. Input queue
+tests cover overflow, logical repeat and snapshot recovery.

@@ -8,6 +8,8 @@
 #include <tabos/input.h>
 
 bool input_pending(void);
+int input_get_state(tabos_input_state_t* state, bool resynchronize);
+void input_reset(bool clear_pressed);
 void input_wait_ready(uint32_t timeout_ms);
 void input_wake_waiter(void);
 bool input_init(void);

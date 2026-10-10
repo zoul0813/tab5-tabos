@@ -890,7 +890,7 @@ add_test(NAME component.elf_graphics_cleanup COMMAND tabos_elf_graphics_cleanup)
 set_tests_properties(component.elf_graphics_cleanup PROPERTIES TIMEOUT 30)
 
 add_executable(tabos_elf_wait component/elf_wait.c)
-target_include_directories(tabos_elf_wait PRIVATE
+target_include_directories(tabos_elf_wait PRIVATE "${TABOS_ROOT}/input/include"
     "${TABOS_ROOT}/net/include"
     "${TABOS_ROOT}/kernel/include"
     "${TABOS_ROOT}/console/include"
