@@ -1,4 +1,5 @@
 #include <tabos/platform/platform.h>
+#include <tabos/filesystem.h>
 #include <tabos/wait.h>
 #include "../../posix/host_io.h"
 
@@ -119,7 +120,14 @@ static _Thread_local uint32_t host_rv32_active_ram_size;
     X(CAMERA_RELEASE, 384U)                  \
     X(CAMERA_WAIT_SOURCE, 388U)              \
     X(TTY_GET_SIZE, 392U)                    \
-    X(INPUT_WAIT_SOURCE, 396U)
+    X(INPUT_WAIT_SOURCE, 396U)               \
+    X(INPUT_GET_STATE, 400U)                 \
+    X(GRAPHICS_SUBMIT, 404U)                 \
+    X(GRAPHICS_SUBMIT_BORROWED, 408U)        \
+    X(GRAPHICS_WAIT, 412U)                   \
+    X(COMPUTE_SUBMIT, 416U)                  \
+    X(COMPUTE_WAIT, 420U)                    \
+    X(COMPUTE_POLL, 424U)
 
 enum {
 #define HOST_RV32_GATE_INDEX(name, api_offset) HOST_RV32_GATE_INDEX_##name,
@@ -137,7 +145,7 @@ HOST_RV32_API_GATES(HOST_RV32_GATE_VALUE)
 #define HOST_RV32_API_GATE_FIRST HOST_RV32_API_GATE_BASE
 #define HOST_RV32_API_GATE_LAST \
     (HOST_RV32_API_GATE_BASE + ((uint32_t) HOST_RV32_API_GATE_COUNT - 1U) * sizeof(uint32_t))
-#define MINI_RV32_RAM_SIZE        host_rv32_active_ram_size
+#define MINI_RV32_RAM_SIZE        ram_size
 #define MINIRV32_RAM_IMAGE_OFFSET 0U
 #define MINIRV32_POSTEXEC(pc, ir, trap)                                                                      \
     do {                                                                                                     \
@@ -146,6 +154,12 @@ HOST_RV32_API_GATES(HOST_RV32_GATE_VALUE)
             icount = count - 1;                                                                              \
         }                                                                                                    \
     } while (0)
+/* The CPU context and guest RAM are separately allocated and never overlap.
+ * Use the interpreter's prototype hook to let the compiler retain CPU state
+ * across guest memory stores without weakening guest address checks. */
+#define MINIRV32_STEPPROTO                                                                           \
+    static int32_t MiniRV32IMAStep(struct MiniRV32IMAState* restrict state, uint8_t* restrict image, \
+                                   uint32_t vProcAddress, uint32_t elapsedUs, int count, uint32_t ram_size)
 #define MINIRV32_IMPLEMENTATION
 #if defined(__clang__)
 #pragma clang diagnostic push
@@ -675,6 +689,17 @@ static platform_riscv32_result_t step_inner(platform_riscv32_context_t* context,
                 (uint32_t) context->api.tty_set_mode((int) context->state.regs[10], context->state.regs[11]);
             current_user_data = NULL;
             context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_INPUT_GET_STATE) {
+            tabos_input_state_t* state = guest_buffer(context->memory, context->state.regs[10], sizeof(*state));
+            if (state == NULL || context->api.input_get_state == NULL) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data       = context->user_data;
+            context->state.regs[10] = (uint32_t) context->api.input_get_state(state, (int) context->state.regs[11]);
+            current_user_data       = NULL;
+            context->state.pc       = context->state.regs[1];
             continue;
         }
         if (context->state.pc == HOST_RV32_INPUT_POLL) {
@@ -1237,14 +1262,24 @@ static platform_riscv32_result_t step_inner(platform_riscv32_context_t* context,
             continue;
         }
         if (context->state.pc == HOST_RV32_GRAPHICS_CLEAR || context->state.pc == HOST_RV32_GRAPHICS_PRESENT ||
-            context->state.pc == HOST_RV32_GRAPHICS_CLOSE) {
-            const bool presented = context->state.pc == HOST_RV32_GRAPHICS_PRESENT;
+            context->state.pc == HOST_RV32_GRAPHICS_CLOSE || context->state.pc == HOST_RV32_GRAPHICS_SUBMIT ||
+            context->state.pc == HOST_RV32_GRAPHICS_SUBMIT_BORROWED || context->state.pc == HOST_RV32_GRAPHICS_WAIT) {
+            const bool presented = context->state.pc == HOST_RV32_GRAPHICS_PRESENT ||
+                                   context->state.pc == HOST_RV32_GRAPHICS_SUBMIT ||
+                                   context->state.pc == HOST_RV32_GRAPHICS_SUBMIT_BORROWED;
             int result;
             current_user_data = context->user_data;
             if (context->state.pc == HOST_RV32_GRAPHICS_CLEAR && context->api.graphics_clear != NULL) {
                 result = context->api.graphics_clear(context->state.regs[10]);
             } else if (context->state.pc == HOST_RV32_GRAPHICS_PRESENT && context->api.graphics_present != NULL) {
                 result = context->api.graphics_present();
+            } else if (context->state.pc == HOST_RV32_GRAPHICS_SUBMIT && context->api.graphics_submit != NULL) {
+                result = context->api.graphics_submit();
+            } else if (context->state.pc == HOST_RV32_GRAPHICS_SUBMIT_BORROWED &&
+                       context->api.graphics_submit_borrowed != NULL) {
+                result = context->api.graphics_submit_borrowed();
+            } else if (context->state.pc == HOST_RV32_GRAPHICS_WAIT && context->api.graphics_wait != NULL) {
+                result = context->api.graphics_wait();
             } else if (context->state.pc == HOST_RV32_GRAPHICS_CLOSE && context->api.graphics_close != NULL) {
                 result = context->api.graphics_close();
             } else {
@@ -1257,6 +1292,12 @@ static platform_riscv32_result_t step_inner(platform_riscv32_context_t* context,
             if (presented) {
                 return PLATFORM_RISCV32_YIELDED;
             }
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_COMPUTE_SUBMIT || context->state.pc == HOST_RV32_COMPUTE_WAIT ||
+            context->state.pc == HOST_RV32_COMPUTE_POLL) {
+            context->state.regs[10] = (uint32_t) -TABOS_ENOTSUP;
+            context->state.pc       = context->state.regs[1];
             continue;
         }
         if (context->state.pc == HOST_RV32_GRAPHICS_FILL_RECT) {
@@ -1376,7 +1417,7 @@ static platform_riscv32_result_t step_inner(platform_riscv32_context_t* context,
         if (remaining_budget <= (unsigned int) INT_MAX) {
             batch_budget = (int) remaining_budget;
         }
-        (void) MiniRV32IMAStep(&context->state, context->memory, 0U, 0U, batch_budget);
+        (void) MiniRV32IMAStep(&context->state, context->memory, 0U, 0U, batch_budget, context->memory_size);
         const uint64_t cycle_after = ((uint64_t) context->state.cycleh << 32U) | context->state.cyclel;
         const uint64_t executed    = cycle_after - cycle_before;
         if (context->state.mcause != 0U) {
@@ -1455,4 +1496,20 @@ void platform_riscv32_stop(platform_riscv32_context_t* context, void (*cancel)(v
 bool platform_riscv32_current_cancelled(void)
 {
     return false;
+}
+
+int platform_riscv32_compute_submit(uintptr_t callback, void* data)
+{
+    (void) callback;
+    (void) data;
+    return -TABOS_ENOTSUP;
+}
+int platform_riscv32_compute_wait(void)
+{
+    return -TABOS_ENOTSUP;
+}
+
+int platform_riscv32_compute_poll(void)
+{
+    return -TABOS_ENOTSUP;
 }

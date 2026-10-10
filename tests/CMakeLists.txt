@@ -142,6 +142,12 @@ tabos_enable_sanitizers(tabos_camera_backend)
 add_test(NAME unit.camera_backend COMMAND tabos_camera_backend)
 set_tests_properties(unit.camera_backend PROPERTIES TIMEOUT 10)
 
+add_executable(tabos_display_clear unit/display_clear.c)
+target_include_directories(tabos_display_clear PRIVATE "${TABOS_ROOT}/platform/esp32p4" "${TABOS_ROOT}/sdk/include")
+tabos_enable_warnings(tabos_display_clear)
+tabos_enable_sanitizers(tabos_display_clear)
+add_test(NAME unit.display_clear COMMAND tabos_display_clear)
+
 add_executable(tabos_display_completion unit/display_completion.c
     "${TABOS_ROOT}/platform/esp32p4/display_completion.c")
 target_include_directories(tabos_display_completion PRIVATE
@@ -634,6 +640,7 @@ add_test(NAME unit.wall_clock COMMAND tabos_wall_clock)
 
 add_executable(tabos_sdk_clock unit/sdk_clock.c "${TABOS_ROOT}/sdk/lib/clock.c")
 target_include_directories(tabos_sdk_clock PRIVATE "${TABOS_ROOT}/sdk/include")
+target_compile_definitions(tabos_sdk_clock PRIVATE _POSIX_C_SOURCE=200809L)
 tabos_enable_warnings(tabos_sdk_clock)
 tabos_enable_sanitizers(tabos_sdk_clock)
 add_test(NAME unit.sdk_clock COMMAND tabos_sdk_clock)
@@ -889,7 +896,7 @@ add_test(NAME component.elf_graphics_cleanup COMMAND tabos_elf_graphics_cleanup)
 set_tests_properties(component.elf_graphics_cleanup PROPERTIES TIMEOUT 30)
 
 add_executable(tabos_elf_wait component/elf_wait.c)
-target_include_directories(tabos_elf_wait PRIVATE
+target_include_directories(tabos_elf_wait PRIVATE "${TABOS_ROOT}/input/include"
     "${TABOS_ROOT}/net/include"
     "${TABOS_ROOT}/kernel/include"
     "${TABOS_ROOT}/console/include"
@@ -1358,3 +1365,17 @@ target_link_libraries(tabos_network_config_file PRIVATE tabos_core)
 tabos_enable_warnings(tabos_network_config_file)
 tabos_enable_sanitizers(tabos_network_config_file)
 add_test(NAME component.network_config_file COMMAND tabos_network_config_file)
+
+add_executable(tabos_tab5_msc_control unit/tab5_msc_control.c)
+tabos_enable_warnings(tabos_tab5_msc_control)
+tabos_enable_sanitizers(tabos_tab5_msc_control)
+add_test(NAME unit.tab5_msc_control COMMAND tabos_tab5_msc_control)
+add_test(NAME tools.msc_upload COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/msc_upload_test.py")
+
+add_test(NAME tools.device_test COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/device_test_test.py")
+
+add_executable(tabos_sdk_compute unit/sdk_compute.c "${TABOS_ROOT}/sdk/lib/compute.c")
+target_include_directories(tabos_sdk_compute PRIVATE "${TABOS_ROOT}/sdk/include")
+tabos_enable_warnings(tabos_sdk_compute)
+tabos_enable_sanitizers(tabos_sdk_compute)
+add_test(NAME unit.sdk_compute COMMAND tabos_sdk_compute)

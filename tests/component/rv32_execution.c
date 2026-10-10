@@ -1,4 +1,5 @@
 #include <tabos/internal/elf_api.h>
+#include <tabos/filesystem.h>
 #include <tabos/internal/elf_loader.h>
 #include <tabos/platform/platform.h>
 
@@ -143,6 +144,20 @@ static platform_riscv32_result_t execute_raw(const uint32_t* instructions, size_
 
 int main(void)
 {
+    /* Optional compute transport is present, but never calls RV32 code as a
+     * host function pointer. All compute gates must return an explicit fallback. */
+    const uint32_t compute_submit[] = {0x1a052283U, 0x00028067U};
+    const uint32_t compute_wait[]   = {0x1a452283U, 0x00028067U};
+    const uint32_t compute_poll[]   = {0x1a852283U, 0x00028067U};
+    if (execute_raw(compute_submit, sizeof(compute_submit), 32U) != PLATFORM_RISCV32_RETURNED ||
+        raw_returned_status != -TABOS_ENOTSUP ||
+        execute_raw(compute_wait, sizeof(compute_wait), 32U) != PLATFORM_RISCV32_RETURNED ||
+        raw_returned_status != -TABOS_ENOTSUP ||
+        execute_raw(compute_poll, sizeof(compute_poll), 32U) != PLATFORM_RISCV32_RETURNED ||
+        raw_returned_status != -TABOS_ENOTSUP) {
+        return 1;
+    }
+
     loader_elf_image_t image;
     if (loader_elf_load(loader_hello_elf, loader_hello_elf_size, &image) != LOADER_ELF_OK) {
         return 1;
@@ -270,8 +285,8 @@ int main(void)
                                 16U * 1024U, &api, 0U, NULL, NULL);
     int resumable_status = -1;
     const bool resumed   = resumable != NULL &&
-                         platform_riscv32_step(resumable, 2U, &resumable_status) == PLATFORM_RISCV32_YIELDED &&
-                         platform_riscv32_step(resumable, 2U, &resumable_status) == PLATFORM_RISCV32_RETURNED;
+                           platform_riscv32_step(resumable, 2U, &resumable_status) == PLATFORM_RISCV32_YIELDED &&
+                           platform_riscv32_step(resumable, 2U, &resumable_status) == PLATFORM_RISCV32_RETURNED;
     platform_riscv32_destroy(resumable);
 
     const bool batched = execute_raw(batched_program, sizeof(batched_program), 8U) == PLATFORM_RISCV32_RETURNED &&
@@ -284,9 +299,9 @@ int main(void)
     const bool stopped_at_api_boundary =
         yielding != NULL && platform_riscv32_step(yielding, 4U, &yield_status) == PLATFORM_RISCV32_YIELDED &&
         yield_count == 0U;
-    const bool yielded_at_api = yielding != NULL &&
-                                platform_riscv32_step(yielding, 1U, &yield_status) == PLATFORM_RISCV32_YIELDED &&
-                                yield_count == 1U;
+    const bool yielded_at_api      = yielding != NULL &&
+                                     platform_riscv32_step(yielding, 1U, &yield_status) == PLATFORM_RISCV32_YIELDED &&
+                                     yield_count == 1U;
     const bool resumed_after_yield = yielding != NULL &&
                                      platform_riscv32_step(yielding, 8U, &yield_status) == PLATFORM_RISCV32_RETURNED &&
                                      yield_status == 7;
@@ -296,7 +311,7 @@ int main(void)
                                                                   256U * 1024U, 16U * 1024U, &api, 0U, NULL, NULL);
     int wait_status                     = -1;
     wait_count                          = 0U;
-    const bool yielded_after_wait       = waiting != NULL &&
+    const bool yielded_after_wait = waiting != NULL &&
                                     platform_riscv32_step(waiting, 20U, &wait_status) == PLATFORM_RISCV32_YIELDED &&
                                     wait_count == 1U;
     const bool resumed_after_wait = waiting != NULL &&

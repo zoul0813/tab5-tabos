@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <tabos/tty.h>
+#include <tabos/input.h>
 #include <tabos/wait.h>
 #include <tabos/process.h>
 #include <tabos/runtime_time.h>
@@ -13,6 +14,12 @@
 
 void tester_test_input(tester_context_t* context)
 {
+    tabos_input_state_t state;
+    tester_expect(context, tabos_input_get_state(&state, false) == 0, "foreground key snapshot");
+    const uint32_t generation = state.generation;
+    tester_expect(context, tabos_input_get_state(&state, true) == 0 && state.generation != generation,
+                  "atomic input resynchronization advances generation");
+    const uint32_t before_child = state.generation;
     tabos_tty_size_t size;
     tester_expect(context, ioctl(0, TABOS_TTY_GET_SIZE, &size) == 0 && size.rows > 0U && size.columns > 0U,
                   "TTY copied geometry");
@@ -65,6 +72,8 @@ void tester_test_input(tester_context_t* context)
     uint32_t restored = UINT32_MAX;
     tester_expect(context, ioctl(0, TABOS_TTY_GET_MODE, &restored) == 0 && restored == inherited,
                   "child TTY changes preserve parent policy");
+    tester_expect(context, tabos_input_get_state(&state, false) == 0 && state.generation != before_child,
+                  "nested focus handoff advances input generation");
     item.source = source;
     tester_expect(context, tabos_wait(&item, 1U, 0U) >= 0, "parent source still valid after child");
     // Operator input can make a finite wait immediately ready; timeout must never

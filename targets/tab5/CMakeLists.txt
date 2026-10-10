@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
+option(TABOS_ENABLE_DEVICE_TEST_CONTROL "Enable local USB hardware test controls" OFF)
+
 set(TABOS_ROOT "${CMAKE_CURRENT_LIST_DIR}/../..")
 include("${TABOS_ROOT}/config/Identity.cmake")
 include("${TABOS_ROOT}/config/Display.cmake")

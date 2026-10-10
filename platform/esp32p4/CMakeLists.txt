@@ -18,3 +18,7 @@ idf_component_register(
 
 # Bound post-white-balance matrices without modifying managed components.
 target_link_options(${COMPONENT_LIB} INTERFACE "-Wl,--wrap=esp_isp_ccm_configure")
+
+if(TABOS_ENABLE_DEVICE_TEST_CONTROL)
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE TABOS_ENABLE_DEVICE_TEST_CONTROL=1)
+endif()

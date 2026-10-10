@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 200809L
 #include <tester/test.h>
 
 #include <errno.h>
@@ -49,6 +50,31 @@ void tester_test_filesystem(tester_context_t* context)
                           status.st_size == (off_t) sizeof(payload),
                       "fstat reports regular file size");
         tester_expect(context, close(descriptor) == 0, "close releases descriptor");
+        descriptor = -1;
+    }
+
+    descriptor = open(test_file, O_RDONLY);
+    tester_expect(context, descriptor >= 0, "open for fdopen access validation");
+    if (descriptor >= 0) {
+        errno = 0;
+        FILE* rejected = fdopen(descriptor, "w");
+        tester_expect(context, rejected == NULL && errno == EBADF, "fdopen rejects incompatible access");
+        if (rejected != NULL) {
+            (void) fclose(rejected);
+        } else {
+            tester_expect(context, fcntl(descriptor, F_GETFL) >= 0, "failed fdopen retains descriptor");
+            FILE* stream = fdopen(descriptor, "r");
+            tester_expect(context, stream != NULL, "fdopen accepts matching access");
+            if (stream != NULL) {
+                tester_expect(context, fgetc(stream) == payload[0], "fdopen reads existing data");
+                tester_expect(context, fclose(stream) == 0, "fclose owns descriptor");
+                errno = 0;
+                tester_expect(context, fcntl(descriptor, F_GETFL) == -1 && errno == EBADF,
+                              "fclose releases descriptor exactly once");
+            } else {
+                (void) close(descriptor);
+            }
+        }
         descriptor = -1;
     }
 

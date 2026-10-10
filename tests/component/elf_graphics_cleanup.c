@@ -84,6 +84,9 @@ typedef enum {
     CHILD_EXEC_TEXT,
     CHILD_EXEC_GRAPHICS,
     CHILD_EXEC_MISSING,
+    CHILD_SUBMIT,
+    CHILD_BORROWED,
+    CHILD_WAIT,
 } child_end_t;
 
 static void write_child(const char* path, child_end_t ending)
@@ -138,7 +141,7 @@ static void write_child(const char* path, child_end_t ending)
         write_u32(tail, 0xffffffffU);
     } else if (ending == CHILD_FORCED) {
         write_u32(tail, 0x0000006fU);
-    } else if (ending >= CHILD_EXEC_TEXT) {
+    } else if (ending >= CHILD_EXEC_TEXT && ending <= CHILD_EXEC_MISSING) {
         const char* target = ending == CHILD_EXEC_TEXT ? "T:/text" : "T:/child";
         if (ending == CHILD_EXEC_MISSING) {
             target = "T:/missing";
@@ -159,8 +162,28 @@ static void write_child(const char* path, child_end_t ending)
         for (size_t index = 0U; index < sizeof(exec_instructions) / sizeof(exec_instructions[0]); ++index) {
             write_u32(tail + index * 4U, exec_instructions[index]);
         }
-    } else if (ending == CHILD_PRESENT) {
-        write_u32(tail, 0x07c42283U); /* graphics_present: flush and yield */
+    } else if (ending == CHILD_WAIT) {
+        static const uint32_t wait_instructions[] = {
+            0x19c42283U, 0x000280e7U, /* wait must not consume queued pixels */
+            0x02442283U, 0x000280e7U, /* yield to inspect still blank */
+            0x19442283U, 0x000280e7U, /* submit */
+            0x08042283U, 0x000280e7U, /* close */
+            0x00700513U, 0x00048067U,
+        };
+        for (size_t index = 0; index < sizeof(wait_instructions) / sizeof(wait_instructions[0]); ++index) {
+            write_u32(tail + index * 4, wait_instructions[index]);
+        }
+    } else if (ending == CHILD_BORROWED) {
+        write_u32(tail, ending == CHILD_WAIT ? 0x19c42283U : 0x19842283U); /* wait / borrowed submit */
+        write_u32(tail + 4U, 0x000280e7U);
+        write_u32(tail + 8U, ending == CHILD_WAIT ? 0x19442283U : 0x19c42283U); /* submit / wait */
+        write_u32(tail + 12U, 0x000280e7U);
+        write_u32(tail + 16U, 0x08042283U); /* close */
+        write_u32(tail + 20U, 0x000280e7U);
+        write_u32(tail + 24U, 0x00700513U);
+        write_u32(tail + 28U, 0x00048067U);
+    } else if (ending == CHILD_PRESENT || ending == CHILD_SUBMIT) {
+        write_u32(tail, ending == CHILD_SUBMIT ? 0x19442283U : 0x07c42283U); /* submit/present: flush and yield */
         write_u32(tail + 4U, 0x000280e7U);
         write_u32(tail + 8U, 0x08042283U); /* explicit graphics_close */
         write_u32(tail + 12U, 0x000280e7U);
@@ -205,7 +228,7 @@ int main(void)
     write_u32(text_code + 4U, 0x00008067U); /* ret */
     check(fwrite(text_code, 1U, sizeof(text_code), text) == sizeof(text_code) && fclose(text) == 0, "text child");
     for (unsigned int round = 0U; round < 2U; ++round) {
-        for (child_end_t ending = CHILD_RETURN; ending <= CHILD_EXEC_MISSING; ++ending) {
+        for (child_end_t ending = CHILD_RETURN; ending <= CHILD_WAIT; ++ending) {
             write_child(path, ending);
             check(tabos_console_clear(tabos_app_console(parent_context)), "clear parent terminal");
             check(tabos_app_exec(parent_context, "T:/child") == TABOS_APP_RESULT_OK, "launch child");
@@ -215,11 +238,16 @@ int main(void)
             check(tabos_process_count() == 2U && console_next_deadline() == UINT64_MAX, "child yielded in graphics");
             check(framebuffer->pixels[pixel] == 0U, "queued blit has not rendered");
             if (ending == CHILD_FORCED) {
-                check(kernel_process_force_terminate((tabos_process_id_t) (round * 8U + (unsigned int) ending + 1U), 9),
-                      "force child termination");
+                check(
+                    kernel_process_force_terminate((tabos_process_id_t) (round * 11U + (unsigned int) ending + 1U), 9),
+                    "force child termination");
             } else if (ending == CHILD_PRESENT || ending >= CHILD_EXEC_TEXT) {
                 kernel_application_system_update();
-                check(framebuffer->pixels[pixel] == 0x123U, "explicit present flushes live guest pixels");
+                if (ending == CHILD_WAIT) {
+                    check(framebuffer->pixels[pixel] == 0U, "wait does not drain unsubmitted commands");
+                    kernel_application_system_update();
+                }
+                check(framebuffer->pixels[pixel] == 0x123U, "explicit submission flushes live guest pixels");
             }
             for (unsigned int step = 0U; step < 10U && tabos_process_count() > 1U; ++step) {
                 kernel_application_system_update();

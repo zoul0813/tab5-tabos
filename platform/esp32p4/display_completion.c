@@ -19,3 +19,28 @@ bool tab5_display_wait_completion(SemaphoreHandle_t completion, const char* oper
     // software fallback, guest code, or teardown while DMA can access its buffers.
     abort();
 }
+
+bool tab5_display_scanout_finish(tab5_display_scanout_t* scanout, SemaphoreHandle_t completion)
+{
+    if (!scanout->pending) {
+        return true;
+    }
+    if (!tab5_display_wait_completion(completion, "VSYNC")) {
+        return false;
+    }
+    uint16_t* presented = scanout->back;
+    scanout->back       = scanout->front;
+    scanout->front      = presented;
+    scanout->pending    = false;
+    return true;
+}
+
+bool tab5_display_work_finish(tab5_display_work_t* work, SemaphoreHandle_t completion)
+{
+    if (!work->pending) {
+        return true;
+    }
+    (void) tab5_display_wait_completion(completion, "display worker");
+    work->pending = false;
+    return work->succeeded;
+}

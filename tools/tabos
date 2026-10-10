@@ -16,6 +16,7 @@ from tabos_tools.build import (
 from tabos_tools.common import ESP_IDF_VERSION, fail, identity_value
 from tabos_tools.config import command_config
 from tabos_tools.environment import command_activate_idf, command_setup
+from tabos_tools.upload import command_upload
 
 
 def command_target(args: argparse.Namespace) -> None:
@@ -25,6 +26,7 @@ def command_target(args: argparse.Namespace) -> None:
         "run": command_run,
         "flash": command_flash,
         "monitor": command_monitor,
+        "upload": command_upload,
     }
     handlers[args.action](args)
 
@@ -41,9 +43,11 @@ def normalize_target_arguments(args: argparse.Namespace) -> None:
 
     if args.configuration not in CONFIGURATIONS:
         fail("configuration must be debug or release")
-    actions = {"build", "flash", "monitor"} if args.target == "tab5" else {"build", "test", "run"}
+    actions = {"build", "flash", "monitor", "upload"} if args.target == "tab5" else {"build", "test", "run"}
     if args.action not in actions:
         fail(f"target '{args.target}' action must be one of: {', '.join(sorted(actions))}")
+    if args.action != "upload" and (args.upload_files or args.port):
+        fail("--file and --port apply only to tab5 upload")
 
 
 def parse_args() -> argparse.Namespace:
@@ -55,7 +59,10 @@ def parse_args() -> argparse.Namespace:
 
     for target in ("macos", "linux", "tab5"):
         target_parser = subparsers.add_parser(target, help=f"operate on {target} target")
-        actions = ("build", "flash", "monitor") if target == "tab5" else ("build", "test", "run")
+        actions = ("build", "flash", "monitor", "upload") if target == "tab5" else ("build", "test", "run")
+        target_parser.add_argument("--file", dest="upload_files", nargs=2, action="append",
+                                   metavar=("SOURCE", "DESTINATION"), default=[])
+        target_parser.add_argument("--port", help="USB-C serial port for MSC control")
         target_parser.add_argument(
             "target_arguments",
             nargs="+",

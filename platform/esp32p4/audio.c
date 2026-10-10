@@ -1,4 +1,7 @@
 #include "activity.h"
+#ifdef TABOS_ENABLE_DEVICE_TEST_CONTROL
+#include <tabos/platform/esp32p4.h>
+#endif
 
 #include <tabos/audio.h>
 #include <tabos/platform/platform.h>
@@ -40,6 +43,20 @@ static bool audio_hardware_active;
 static bool speaker_route_requested;
 static bool headphones_inserted;
 static bool speaker_enabled;
+#ifdef TABOS_ENABLE_DEVICE_TEST_CONTROL
+/* Codec gain only: PCM generation, mixing and I2S writes remain unchanged. */
+static atomic_bool test_output_muted;
+
+void tab5_test_audio_set_muted(bool muted)
+{
+    atomic_store_explicit(&test_output_muted, muted, memory_order_release);
+}
+
+bool tab5_test_audio_muted(void)
+{
+    return atomic_load_explicit(&test_output_muted, memory_order_acquire);
+}
+#endif
 
 static size_t chunk_frames(uint32_t sample_rate)
 {
@@ -234,7 +251,13 @@ static bool configure_codecs(uint32_t sample_rate)
         (void) esp_codec_dev_close(speaker_codec);
         return false;
     }
-    if (esp_codec_dev_set_out_vol(speaker_codec, 70) != ESP_CODEC_DEV_OK) {
+    int result = esp_codec_dev_set_out_vol(speaker_codec, 70);
+#ifdef TABOS_ENABLE_DEVICE_TEST_CONTROL
+    if (result == ESP_CODEC_DEV_OK) {
+        result = esp_codec_dev_set_out_mute(speaker_codec, tab5_test_audio_muted());
+    }
+#endif
+    if (result != ESP_CODEC_DEV_OK) {
         (void) esp_codec_dev_close(microphone_codec);
         (void) esp_codec_dev_close(speaker_codec);
         return false;

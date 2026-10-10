@@ -127,6 +127,18 @@ static int run_process_fixture(int argc, char** argv)
 
 int main(int argc, char** argv)
 {
+    if (argc == 2 && strcmp(argv[1], "--compute") == 0) {
+        tester_context_t context = {.argc = argc, .argv = argv};
+        tester_test_compute(&context);
+        printf("Compute assertions: %u; failures: %u\n", context.assertions, context.failures);
+        return context.failures == 0U ? 0 : 1;
+    }
+    if (argc == 2 && strcmp(argv[1], "--filesystem") == 0) {
+        tester_context_t context = {.argc = argc, .argv = argv};
+        tester_test_filesystem(&context);
+        printf("Filesystem assertions: %u; failures: %u\n", context.assertions, context.failures);
+        return context.failures == 0U ? 0 : 1;
+    }
     if (argc == 2 && strcmp(argv[1], "--input") == 0) {
         tester_context_t context = {.argc = argc, .argv = argv};
         tester_test_input(&context);
@@ -173,6 +185,7 @@ int main(int argc, char** argv)
         {             "Pointer integration",    tester_test_pointer},
         {              "Camera integration",     tester_test_camera},
         {              "TCP/UDP networking",    tester_test_network},
+        {                 "Bounded compute",    tester_test_compute},
         {             "Fullscreen graphics",   tester_test_graphics},
     };
     tester_context_t context = {.argc = argc, .argv = argv};

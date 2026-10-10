@@ -130,6 +130,38 @@ disk through the host operating system before disconnecting it. A safe eject or
 USB disconnect ends storage mode and restarts the Tab5; normal boot then mounts
 the card as `T:` again. Internal flash is not exported.
 
+### Automated app uploads on macOS
+
+Firmware accepts the exact line `TABOS MSC` on the USB-C programming serial
+interface. It replies `TABOS MSC OK` only when the shell is the sole process;
+otherwise it replies `TABOS MSC BUSY`. Exit foreground applications first so
+their writable data is flushed. The accepted request uses ordinary shutdown,
+then sets a one-shot RTC marker consumed on the next software reset. Power-on,
+watchdog resets, and later reboots do not reuse that request. Delete-at-boot
+remains available.
+
+Keep both cables connected: USB-C for control, USB-A for the removable disk.
+Stop the serial monitor before uploading. After building the app, run from the
+repository root:
+
+```sh
+./tools/tabos tab5 upload --file build/apps/tester/tester bin/tester
+```
+
+Repeat `--file SOURCE DESTINATION` for additional files. Destinations are relative
+to the card root. `--port /dev/cu.usbmodem101` selects a serial device when auto
+detection is ambiguous. The uploader uses the existing ESP-IDF Python environment,
+waits for the writable external USB volume `/Volumes/TAB5`, backs up replaced
+files under `.local/msc-backups`, stages replacements, checks SHA-256, and ejects
+only after success. A failed upload leaves the volume available for inspection;
+eject it safely before retrying. This workflow currently supports macOS and cards
+named `TAB5`.
+
+Firmware flashes and uploads are separate commands suitable for an automation
+script: run `./tools/tabos tab5 flash`, then the upload command. Upload waits for
+the freshly booted shell. Flashing resets the board, so exit writable applications
+before flashing as well. This control channel does not run arbitrary shell commands.
+
 ## Platform Diagnostic
 
 Select `filesystem-test` as startup application with:

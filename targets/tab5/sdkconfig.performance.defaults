@@ -1,0 +1,7 @@
+# Optional memory-intensive application firmware optimization; use after sdkconfig.defaults.
+# Retain the stable 360 MHz setting on this ESP-IDF/Tab5 revision.
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_360=y
+
+# Trade 128 KiB of internal SRAM for a larger shared native-code/data cache.
+CONFIG_CACHE_L2_CACHE_256KB=y

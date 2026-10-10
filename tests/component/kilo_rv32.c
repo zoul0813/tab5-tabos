@@ -228,6 +228,12 @@ int main(int argc, char** argv)
           "near-limit RV32 heap and streaming save");
     check(unlink(large_path) == 0, "remove large fixture");
     if (argc == 4) {
+        text("tester --compute");
+        key(TABOS_KEY_ENTER, 0U);
+        parent();
+        text("tester --filesystem");
+        key(TABOS_KEY_ENTER, 0U);
+        parent();
         text("tester --input");
         key(TABOS_KEY_ENTER, 0U);
         for (size_t i = 0U; i < 500U && tabos_process_count() != 1U; ++i) {

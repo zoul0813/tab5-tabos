@@ -68,10 +68,20 @@ int main(void)
     pthread_mutex_unlock(&mutex);
 
     request = (request_t) {.input = "copied input"};
-    host_io_enter(&scopes[0]);
-    int result = host_io_call(&request, sizeof(request), work, dispose);
+    int result;
+    do {
+        host_io_enter(&scopes[0]);
+        result = host_io_call(&request, sizeof(request), work, dispose);
+        host_io_leave();
+        if (result == -1) {
+            /* Disposal callbacks precede slot release. Wait for actual capacity;
+             * CTest's timeout bounds a failure to reclaim the cancelled jobs. */
+            assert(scopes[0].job == NULL && !scopes[0].pending);
+            const struct timespec delay = {.tv_nsec = 1000000};
+            nanosleep(&delay, NULL);
+        }
+    } while (result == -1);
     assert(result == 0);
-    host_io_leave();
     while (result == 0) {
         const struct timespec delay = {.tv_nsec = 1000000};
         nanosleep(&delay, NULL);

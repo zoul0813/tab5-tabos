@@ -150,7 +150,15 @@ static void refresh_overlay(void)
     overlay_refresh_at = now + OVERLAY_REFRESH_MS;
 }
 
-static bool present_with_overlay(bool graphics)
+static bool finish_display(bool graphics, bool wait_for_scanout)
+{
+    if (!graphics) {
+        return platform_display_present(&framebuffer);
+    }
+    return wait_for_scanout ? platform_graphics_present(&framebuffer) : platform_graphics_submit(&framebuffer);
+}
+
+static bool present_with_overlay(bool graphics, bool wait_for_scanout)
 {
     if (!display_initialized) {
         return false;
@@ -167,7 +175,7 @@ static bool present_with_overlay(bool graphics)
         if (graphics && !platform_graphics_overlay(&framebuffer, NULL)) {
             return false;
         }
-        return graphics ? platform_graphics_present(&framebuffer) : platform_display_present(&framebuffer);
+        return finish_display(graphics, wait_for_scanout);
     }
     const int left = (int) framebuffer.width - OVERLAY_MARGIN - OVERLAY_WIDTH;
     const int top  = OVERLAY_MARGIN;
@@ -205,8 +213,7 @@ static bool present_with_overlay(bool graphics)
         .height     = OVERLAY_HEIGHT,
     };
     const bool overlay_result = !graphics || platform_graphics_overlay(&framebuffer, &overlay);
-    const bool result =
-        overlay_result && (graphics ? platform_graphics_present(&framebuffer) : platform_display_present(&framebuffer));
+    const bool result         = overlay_result && finish_display(graphics, wait_for_scanout);
     for (int row = 0; row < OVERLAY_HEIGHT; ++row) {
         memcpy(framebuffer.pixels + (size_t) (top + row) * framebuffer.stride_pixels + (size_t) left,
                overlay_saved + row * OVERLAY_WIDTH, sizeof(platform_pixel_t) * OVERLAY_WIDTH);
@@ -237,12 +244,17 @@ bool display_init(void)
 
 bool display_present(void)
 {
-    return present_with_overlay(false);
+    return present_with_overlay(false, true);
 }
 
 bool display_graphics_present(void)
 {
-    return present_with_overlay(true);
+    return present_with_overlay(true, true);
+}
+
+bool display_graphics_submit(void)
+{
+    return present_with_overlay(true, false);
 }
 
 void display_overlay_set_flags(uint32_t flags)

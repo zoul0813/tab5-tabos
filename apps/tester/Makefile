@@ -16,6 +16,7 @@ SOURCES := src/main.c \
            src/tests/camera.c \
            src/tests/camera_services.c \
            src/tests/network.c \
+           src/tests/compute.c \
            src/tests/graphics.c
 
 include ../../sdk/make/application.mk

@@ -77,5 +77,11 @@ void tester_test_graphics(tester_context_t* context)
                       tabos_graphics_fill_rect(&graphics, 1, 1, 4U, 4U, TABOS_RGB565(255, 0, 0)) == 0 &&
                       tabos_graphics_blit_ex(&graphics, &transformed) == 0 && tabos_graphics_present(&graphics) == 0,
                   "scaled canvas draws and presents");
+    tester_expect(context, tabos_graphics_submit(&graphics) == 0, "scaled submit snapshots source");
+    tester_expect(context, tabos_graphics_clear(&graphics, TABOS_RGB565(0, 0, 255)) == 0,
+                  "canvas may change after ordinary submit");
+    tester_expect(context, tabos_graphics_submit_borrowed(&graphics) == 0, "scaled borrowed submit");
+    tester_expect(context, tabos_graphics_wait(&graphics) == 0, "borrowed source wait completes");
+    tester_expect(context, tabos_graphics_clear(&graphics, 0U) == 0, "canvas may change after wait");
     tester_expect(context, tabos_graphics_close(&graphics) == 0, "scaled graphics closes and restores terminal");
 }

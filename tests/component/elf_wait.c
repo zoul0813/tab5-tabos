@@ -4,6 +4,7 @@
 #include <tabos/application.h>
 #include <tabos/internal/application.h>
 #include <tabos/internal/console.h>
+#include <tabos/internal/input.h>
 #include <tabos/internal/display.h>
 #include <tabos/internal/runtime.h>
 #include <tabos/platform/storage_backend.h>
@@ -321,15 +322,27 @@ int main(void)
 
     launch(path, POINTER_WAIT, -1, 0U);
     enter_wait();
-    SDL_Event quit = {.type = SDL_EVENT_QUIT};
-    check(SDL_PushEvent(&quit), "queue SDL shutdown");
+    SDL_Event press = {.type = SDL_EVENT_KEY_DOWN};
+    press.key.scancode = SDL_SCANCODE_A;
+    check(SDL_PushEvent(&press), "queue SDL key down");
+    kernel_runtime_update(platform_runtime_wait_until(platform_time_ms()));
+    tabos_input_state_t input_state;
+    check(input_get_state(&input_state, false) == 0 && input_state.pressed[TABOS_KEY_A], "SDL held key snapshot");
+    const uint32_t input_generation = input_state.generation;
+    SDL_Event focus = {.type = SDL_EVENT_WINDOW_FOCUS_LOST};
+    check(SDL_PushEvent(&focus), "queue SDL focus loss");
+    kernel_runtime_update(platform_runtime_wait_until(platform_time_ms()));
+    check(input_get_state(&input_state, false) == 0 && !input_state.pressed[TABOS_KEY_A] &&
+              input_state.generation != input_generation, "focus loss clears held keys and changes generation");
+    SDL_Event quit = {.type = SDL_EVENT_WINDOW_CLOSE_REQUESTED};
+    check(SDL_PushEvent(&quit), "queue SDL window close");
     const uint64_t stop_start        = platform_time_ms();
     platform_runtime_events_t events = 0U;
     while ((events & PLATFORM_RUNTIME_EVENT_SHUTDOWN) == 0U && platform_time_ms() - stop_start < 500U) {
         events = platform_runtime_wait_until(kernel_runtime_next_deadline());
         kernel_runtime_update(events);
     }
-    check((events & PLATFORM_RUNTIME_EVENT_SHUTDOWN) != 0U, "SDL shutdown reaches blocked guest");
+    check((events & PLATFORM_RUNTIME_EVENT_SHUTDOWN) != 0U, "SDL window close reaches blocked guest");
     kernel_runtime_shutdown();
     check(platform_time_ms() - stop_start < 500U, "shutdown cancels infinite wait promptly");
     platform_shutdown();

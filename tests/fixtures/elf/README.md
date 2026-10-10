@@ -13,3 +13,5 @@ The fixture uses the same RV32 compiler flags and `sdk/linker/app-riscv32.ld`
 as applications, but links only `guest.c` with `-nostdlib`. Link with `--emit-relocs` and strip only debug data (`--strip-debug`) so the
 relocation-rejection regression retains its input. Convert the result with `xxd -i`, and retain the public array names declared in
 `hello_elf.h`.
+
+With the SDK toolchain on PATH, run `python3 tests/fixtures/elf/regenerate.py`.

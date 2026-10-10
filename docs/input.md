@@ -136,3 +136,12 @@ child return `EBADF`; writable readiness is invalid. Repeated source lookup does
 consume additional source slots. This change does not replace legacy polling behavior
 for mixed or unrelated generic service waits, or the existing `tabos_input_wait()`
 convenience wrapper.
+
+## Logical key bindings and recovery
+
+Key events carry the physical key and a logical US keyboard binding, preserving
+one-shot and held Aa/Sym choices through repeat and release. Queue generation changes
+on overflow, foreground console handoff, and SDL focus loss. The public pressed-key
+snapshot/resynchronization API lets stateful clients release stuck guest keys and
+ignore keys held across a handoff. SDL focus loss clears physical pressed state;
+foreground handoff discards queued events while retaining physical held state.

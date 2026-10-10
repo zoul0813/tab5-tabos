@@ -167,7 +167,7 @@ and parent restoration notify runtime through a pointer-free coalesced readiness
 Process state remains authoritative and late wakeups cannot target reused process slots.
 ELF teardown cancels waits and stops native execution before releasing process-owned
 resources. Native task lifetime now lives in `platform/esp32p4/application_task.c`.
-All 97 private ABI gates track active depth. Stop waits for cross-core suspension,
+All 104 private ABI gates track active depth. Stop waits for cross-core suspension,
 resumes active gates to drain cancelled work and release locks, then deletes only a
 stopped task outside every gate. Native workers return their replies before the calling
 gate exits; DNS and bounded driver calls may delay safe shutdown. Teardown discards queued graphics commands without reading borrowed guest
@@ -236,7 +236,7 @@ Tab5 loads writable PSRAM, maps a read/execute alias of the same pages, applies
 load-bias relocations, and synchronizes caches before native task entry. Guest
 API pointers map through platform translation back to readable data aliases.
 Optional elf-hello startup remains a diagnostic; normal startup is T:/bin/shell.
-The pre-release application ABI is 3 and current private transport is 22; neither
+The pre-release application ABI is 3 and current private transport is 26; neither
 promises compatibility for independently released third-party binaries yet.
 
 ## 4. Multitasking and CPU Cores
@@ -788,7 +788,7 @@ Current choices above were cross-checked against `docs/input.md`,
 `docs/elf-loader.md`, and `docs/sdk.md`, plus:
 
 - `sdk/make/application.mk` and `loader/include/tabos/internal/elf_loader.h`: RV32I/ilp32, 256 KiB heap, 16 KiB stack, optional metadata.
-- `sdk/include/tabos/internal/elf_api.h`: current private transport version 22.
+- `sdk/include/tabos/internal/elf_api.h`: current private transport version 26.
 - `platform/esp32p4/keyboard.c`: Normal-mode selection and matrix reports.
 - `platform/esp32p4/display.c`: RGB565 logical PSRAM and double native scanout buffers.
 - `platform/esp32p4/executable.c`: writable/executable PSRAM aliases.
@@ -949,3 +949,52 @@ brightness. Defaults remain 60/180/300 seconds and 75/20 percent. File is read-o
 the service; reboot applies user edits. Invalid files fall back atomically with a log
 warning; absent storage/file remains nonfatal. Template and user instructions live in
 `etc/power.conf` and `docs/power.md`; no configuration polling or system sleep is added.
+
+Runtime optimization preserves RV32 guest bounds and slice budgets through the
+interpreter prototype hook. Native SDK gate exits give idle tasks one tick every
+500 ms while retaining the teardown guard. SDK extra build flags are tracked;
+newlib `_fcntl` shares public descriptor handling.
+
+Input transport 23 adds foreground-only authoritative pressed snapshots and
+atomic queue resynchronization. Physical events retain logical modifier bindings
+through release/repeat. Overflow and focus changes advance queue generations;
+console handoff drops pending events while retaining physical held state, and
+SDL focus loss clears it. Rebuild SDK applications with firmware. Input queue
+tests cover overflow, logical repeat and snapshot recovery.
+
+## Asynchronous graphics (transport 25)
+
+Present blocks through source reads, drawing and scanout. Submit finishes source
+reads but may overlap one bounded display-worker/scanout job. Borrowed submit
+retains every source until wait/close succeeds, including after submission errors.
+Wait fences readers/drawing without draining unsubmitted commands or waiting for
+scanout. Teardown joins submitted readers before reclaiming guest memory and
+discards unsubmitted commands. SDL implements the contract synchronously.
+Tab5 uses existing scratch for snapshots, AXI DMA/PIE with CPU fallback, and
+elides only clear regions fully replaced by eligible exact-scale opaque blits.
+Native buffers remain OS-owned; cores are not reserved. Host coverage checks
+SDK contracts, clipping pixels, completion ownership and real RV32 cleanup.
+
+## Device development controls
+
+Target composition owns serial MSC requests and runtime-thread acceptance only
+for the sole shell. Orderly shutdown precedes a consumed software-reset marker.
+Normal firmware waits indefinitely for serial input. Opt-in device-test firmware
+adds bounded console capture, key injection/expiry, completed-frame screenshots,
+display/memory/clock/stack counters and codec mute. App-owned tester and graphics
+benchmark workloads use the shared runner. Upload remains macOS-only, explicit
+files with backups/hash verification/eject; see docs/device-testing.md. Standard
+firmware defaults stay unchanged; sdkconfig.performance.defaults is optional.
+
+## Experimental bounded compute (transport 26)
+
+One process-owned pure-compute job may run on a lazily allocated, normally
+scheduled 16 KiB PSRAM worker. Heap/image ranges are validated; callbacks may
+use only private preallocated data and stateless C operations. SDK gates abort
+a callback before service entry with EPERM. Wait acquires results and consumes
+completion; poll does not consume it. Nested execution waits for completion.
+Teardown drains main gates, suspends/checks both tasks, fences display readers,
+then frees stacks/code/heap. No core affinity or general threading is exposed.
+Host RV32 returns ENOTSUP; the caller may execute the callback synchronously.
+Test native worker completion, repeated jobs, allocation failure, invalid ranges,
+forbidden gates and cross-core forced stop; tester exercises the public API.

@@ -83,6 +83,15 @@ int tabos_graphics_blit(tabos_graphics_t* graphics, int32_t x, int32_t y, uint32
 uint32_t tabos_graphics_capabilities(const tabos_graphics_t* graphics);
 int tabos_graphics_blit_ex(tabos_graphics_t* graphics, const tabos_graphics_blit_options_t* options);
 int tabos_graphics_present(tabos_graphics_t* graphics);
+/* Completes borrowed-source reads; scanout may continue after return. */
+int tabos_graphics_submit(tabos_graphics_t* graphics);
+/* Opt-in asynchronous source reads. Keep every submitted bitmap (including
+ * a scaled context's canvas) alive and unchanged until wait or close succeeds,
+ * even if submission reports an error. Normal submit retains its copy semantics. */
+int tabos_graphics_submit_borrowed(tabos_graphics_t* graphics);
+/* Fence prior source reads/drawing, without submitting queued commands or
+ * waiting for LCD scanout. Does not release sources of unsubmitted blits. */
+int tabos_graphics_wait(tabos_graphics_t* graphics);
 int tabos_graphics_set_overlays(tabos_graphics_t* graphics, uint32_t flags);
 int tabos_graphics_close(tabos_graphics_t* graphics);
 

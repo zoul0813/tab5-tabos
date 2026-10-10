@@ -35,6 +35,7 @@ void tester_test_camera(tester_context_t* context);
 void tester_test_camera_cleanup(tester_context_t* context);
 int tester_camera_leak_fixture(void);
 void tester_test_camera_services(tester_context_t* context);
+void tester_test_compute(tester_context_t* context);
 void tester_test_graphics(tester_context_t* context);
 void tester_test_network(tester_context_t* context);
 

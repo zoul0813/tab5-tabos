@@ -1177,3 +1177,32 @@ unsigned int test_platform_activity_reports(void)
 {
     return activity_reports;
 }
+
+bool platform_graphics_submit(platform_framebuffer_t* framebuffer)
+{
+    return platform_graphics_present(framebuffer);
+}
+
+bool platform_graphics_blit_retained(platform_framebuffer_t* framebuffer, const tabos_graphics_blit_options_t* options)
+{
+    return platform_graphics_blit(framebuffer, options);
+}
+bool platform_graphics_wait(platform_framebuffer_t* framebuffer)
+{
+    return framebuffer != NULL;
+}
+
+int platform_riscv32_compute_submit(uintptr_t callback, void* data)
+{
+    (void) callback;
+    (void) data;
+    return -TABOS_ENOTSUP;
+}
+int platform_riscv32_compute_wait(void)
+{
+    return -TABOS_ENOTSUP;
+}
+int platform_riscv32_compute_poll(void)
+{
+    return -TABOS_ENOTSUP;
+}

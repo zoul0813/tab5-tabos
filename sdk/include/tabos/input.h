@@ -111,9 +111,23 @@ typedef struct {
         tabos_key_t key;
         uint8_t modifiers;
         bool repeat;
+        /* Logical US keyboard binding, including Tab5 one-shot Aa/Sym. */
+        tabos_key_t logical_key;
+        uint8_t logical_modifiers;
+        uint32_t generation;
         char text[TABOS_INPUT_TEXT_MAX_BYTES + 1U];
 } tabos_input_event_t;
 
+enum {
+    TABOS_INPUT_KEY_COUNT = TABOS_KEY_SYM + 1U
+};
+typedef struct {
+        uint32_t generation;
+        bool pressed[TABOS_INPUT_KEY_COUNT];
+} tabos_input_state_t;
+
+/* Foreground-only. resynchronize atomically discards pending events. */
+int tabos_input_get_state(tabos_input_state_t* state, bool resynchronize);
 bool tabos_input_poll(tabos_input_event_t* event);
 bool tabos_input_wait(tabos_input_event_t* event);
 

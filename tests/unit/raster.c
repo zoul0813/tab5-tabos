@@ -5,8 +5,82 @@
 #include <stdlib.h>
 #include <string.h>
 
+static void check_scaled_sampling(void)
+{
+    tabos_color_t source[35];
+    platform_pixel_t actual[119];
+    platform_pixel_t expected[119];
+    for (unsigned i = 0U; i < 35U; ++i) {
+        source[i] = (tabos_color_t) (i * 1733U);
+    }
+    platform_framebuffer_t framebuffer = {.pixels = actual, .width = 11U, .height = 9U, .stride_pixels = 13U};
+    const uint32_t widths[]            = {1U, 3U, 8U, 17U, UINT32_MAX};
+    const uint32_t heights[]           = {1U, 4U, 13U, UINT32_MAX};
+    const int32_t positions[]          = {-7, 0, 9, INT32_MIN, INT32_MAX};
+    for (unsigned variant = 0U; variant < 16U; ++variant) {
+        for (unsigned trial = 0U; trial < 100U; ++trial) {
+            tabos_graphics_blit_options_t options = {
+                .pixels        = source,
+                .bitmap_width  = 7U,
+                .bitmap_height = 5U,
+                .destination   = {.x      = positions[trial % 5U],
+                                  .y      = positions[(trial / 5U) % 5U],
+                                  .width  = widths[(trial / 4U) % 5U],
+                                  .height = heights[trial % 4U]},
+                .rotation      = variant % 4U,
+                .mirror_x      = (variant & 4U) != 0U,
+                .mirror_y      = (variant & 8U) != 0U,
+                .opacity       = 255U,
+            };
+            options.source.x      = 1;
+            options.source.y      = 1;
+            options.source.width  = 5U;
+            options.source.height = 3U;
+            for (unsigned i = 0U; i < 119U; ++i) {
+                actual[i] = expected[i] = 0xa55aU;
+            }
+            const bool swap_axes =
+                options.rotation == TABOS_GRAPHICS_ROTATE_90 || options.rotation == TABOS_GRAPHICS_ROTATE_270;
+            for (unsigned y = 0U; y < 9U; ++y) {
+                for (unsigned x = 0U; x < 11U; ++x) {
+                    const int64_t dx = (int64_t) x - options.destination.x;
+                    const int64_t dy = (int64_t) y - options.destination.y;
+                    if (dx < 0 || dy < 0 || (uint64_t) dx >= options.destination.width ||
+                        (uint64_t) dy >= options.destination.height) {
+                        continue;
+                    }
+                    unsigned sx = (unsigned) ((uint64_t) dx * (swap_axes ? 3U : 5U) / options.destination.width);
+                    unsigned sy = (unsigned) ((uint64_t) dy * (swap_axes ? 5U : 3U) / options.destination.height);
+                    if (swap_axes) {
+                        const unsigned temporary = sx;
+                        sx                       = sy;
+                        sy                       = temporary;
+                    }
+                    if (options.rotation == TABOS_GRAPHICS_ROTATE_90 || options.rotation == TABOS_GRAPHICS_ROTATE_180) {
+                        sx = 4U - sx;
+                    }
+                    if (options.rotation == TABOS_GRAPHICS_ROTATE_180 ||
+                        options.rotation == TABOS_GRAPHICS_ROTATE_270) {
+                        sy = 2U - sy;
+                    }
+                    if (options.mirror_x) {
+                        sx = 4U - sx;
+                    }
+                    if (options.mirror_y) {
+                        sy = 2U - sy;
+                    }
+                    expected[y * 13U + x] = source[(sy + 1U) * 7U + sx + 1U];
+                }
+            }
+            assert(raster_blit(&framebuffer, &options));
+            assert(memcmp(actual, expected, sizeof(actual)) == 0);
+        }
+    }
+}
+
 int main(void)
 {
+    check_scaled_sampling();
     platform_pixel_t* storage = malloc(18U * sizeof(*storage));
     assert(storage != NULL);
     platform_pixel_t* pixels           = storage + 1U;

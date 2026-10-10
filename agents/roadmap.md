@@ -807,3 +807,53 @@ but is not a substitute for this execution path.
 - [ ] Dedicated graphics CPU core unless profiling proves need.
 - [ ] Complete QEMU Tab5 emulation.
 - [ ] Bare-metal replacement for FreeRTOS unless demonstrated limitation requires reconsideration.
+
+## General TabOS improvements
+
+- [x] Improve runtime execution and SDK integration.
+- [x] Integrate input recovery, asynchronous graphics, device tooling and compute.
+- [ ] Complete matched main/candidate hardware measurements and Linux CI validation.
+
+Input transport 23 adds foreground-only authoritative pressed snapshots and
+atomic queue resynchronization. Physical events retain logical modifier bindings
+through release/repeat. Overflow and focus changes advance queue generations;
+console handoff drops pending events while retaining physical held state, and
+SDL focus loss clears it. Rebuild SDK applications with firmware. Input queue
+tests cover overflow, logical repeat and snapshot recovery.
+
+## Asynchronous graphics (transport 25)
+
+Present blocks through source reads, drawing and scanout. Submit finishes source
+reads but may overlap one bounded display-worker/scanout job. Borrowed submit
+retains every source until wait/close succeeds, including after submission errors.
+Wait fences readers/drawing without draining unsubmitted commands or waiting for
+scanout. Teardown joins submitted readers before reclaiming guest memory and
+discards unsubmitted commands. SDL implements the contract synchronously.
+Tab5 uses existing scratch for snapshots, AXI DMA/PIE with CPU fallback, and
+elides only clear regions fully replaced by eligible exact-scale opaque blits.
+Native buffers remain OS-owned; cores are not reserved. Host coverage checks
+SDK contracts, clipping pixels, completion ownership and real RV32 cleanup.
+
+## Device development controls
+
+Target composition owns serial MSC requests and runtime-thread acceptance only
+for the sole shell. Orderly shutdown precedes a consumed software-reset marker.
+Normal firmware waits indefinitely for serial input. Opt-in device-test firmware
+adds bounded console capture, key injection/expiry, completed-frame screenshots,
+display/memory/clock/stack counters and codec mute. App-owned tester and graphics
+benchmark workloads use the shared runner. Upload remains macOS-only, explicit
+files with backups/hash verification/eject; see docs/device-testing.md. Standard
+firmware defaults stay unchanged; sdkconfig.performance.defaults is optional.
+
+## Experimental bounded compute (transport 26)
+
+One process-owned pure-compute job may run on a lazily allocated, normally
+scheduled 16 KiB PSRAM worker. Heap/image ranges are validated; callbacks may
+use only private preallocated data and stateless C operations. SDK gates abort
+a callback before service entry with EPERM. Wait acquires results and consumes
+completion; poll does not consume it. Nested execution waits for completion.
+Teardown drains main gates, suspends/checks both tasks, fences display readers,
+then frees stacks/code/heap. No core affinity or general threading is exposed.
+Host RV32 returns ENOTSUP; the caller may execute the callback synchronously.
+Test native worker completion, repeated jobs, allocation failure, invalid ranges,
+forbidden gates and cross-core forced stop; tester exercises the public API.

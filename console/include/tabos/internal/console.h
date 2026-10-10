@@ -24,4 +24,8 @@ uint64_t console_next_deadline(void);
 void console_set_graphics_active(bool active);
 bool console_graphics_active(void);
 
+bool console_capture_start(void);
+size_t console_capture_read(char* output, size_t capacity, bool* overflow);
+void console_capture_stop(void);
+
 #endif

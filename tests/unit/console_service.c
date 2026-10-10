@@ -227,6 +227,23 @@ int main(void)
         return 1;
     }
 
+    char captured[16];
+    bool overflow;
+    if (!console_capture_start() || !tabos_console_write(&background, "capture") ||
+        console_capture_read(captured, 3U, &overflow) != 3U || overflow || memcmp(captured, "cap", 3U) != 0 ||
+        console_capture_read(captured, sizeof(captured), &overflow) != 4U || memcmp(captured, "ture", 4U) != 0) {
+        return 1;
+    }
+    console_set_graphics_active(true);
+    char large[8193];
+    memset(large, 'x', sizeof(large));
+    if (!tabos_console_write_bytes(&background, large, sizeof(large)) ||
+        console_capture_read(captured, sizeof(captured), &overflow) != sizeof(captured) || !overflow ||
+        !console_capture_start() || console_capture_read(captured, sizeof(captured), &overflow) != 0U || overflow) {
+        return 1;
+    }
+    console_capture_stop();
+    console_set_graphics_active(false);
     tabos_console_release(&background);
     console_shutdown();
     terminal_shutdown(&terminal);

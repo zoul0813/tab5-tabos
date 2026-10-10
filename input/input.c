@@ -21,6 +21,8 @@ static uint8_t held_text_modifiers;
 static tabos_timer_t repeat_timer;
 static platform_mutex_t* queue_mutex;
 static platform_signal_t* queue_signal;
+static uint32_t input_generation;
+static tabos_input_event_t held_binding;
 static bool power_keys[INPUT_POWER_KEY_LIMIT];
 static size_t power_held_count;
 static size_t power_unknown_held_count;
@@ -70,6 +72,7 @@ bool input_init(void)
         }
     }
     (void) lock_queue();
+    ++input_generation;
     queue_head          = 0U;
     queue_count         = 0U;
     held_key            = TABOS_KEY_UNKNOWN;
@@ -90,6 +93,7 @@ void input_shutdown(void)
     if (!lock_queue()) {
         return;
     }
+    ++input_generation;
     queue_head          = 0U;
     queue_count         = 0U;
     held_key            = TABOS_KEY_UNKNOWN;
@@ -139,6 +143,11 @@ bool input_submit(const tabos_input_event_t* event)
         }
     }
     if (event->type == TABOS_INPUT_KEY_DOWN && !modifier_key(event->key)) {
+        held_binding = *event;
+        if (held_binding.logical_key == TABOS_KEY_UNKNOWN) {
+            held_binding.logical_key       = event->key;
+            held_binding.logical_modifiers = event->modifiers;
+        }
         held_key            = event->key;
         held_modifiers      = event->modifiers;
         held_text[0]        = '\0';
@@ -161,9 +170,15 @@ bool input_submit(const tabos_input_event_t* event)
     if (queue_count == INPUT_QUEUE_CAPACITY) {
         queue_head = (queue_head + 1U) % INPUT_QUEUE_CAPACITY;
         --queue_count;
+        ++input_generation;
     }
     const size_t tail = (queue_head + queue_count) % INPUT_QUEUE_CAPACITY;
     event_queue[tail] = *event;
+    if (event_queue[tail].logical_key == TABOS_KEY_UNKNOWN) {
+        event_queue[tail].logical_key       = event->key;
+        event_queue[tail].logical_modifiers = event->modifiers;
+    }
+    event_queue[tail].generation = input_generation;
     ++queue_count;
     unlock_queue();
     platform_runtime_notify(PLATFORM_RUNTIME_EVENT_INPUT);
@@ -195,17 +210,21 @@ void input_update(void)
     }
 
     tabos_input_event_t key_event = {
-        .type      = TABOS_INPUT_KEY_DOWN,
-        .key       = held_key,
-        .modifiers = held_modifiers,
-        .repeat    = true,
+        .type              = TABOS_INPUT_KEY_DOWN,
+        .key               = held_key,
+        .modifiers         = held_modifiers,
+        .repeat            = true,
+        .logical_key       = held_binding.logical_key,
+        .logical_modifiers = held_binding.logical_modifiers,
     };
     if (queue_count == INPUT_QUEUE_CAPACITY) {
         queue_head = (queue_head + 1U) % INPUT_QUEUE_CAPACITY;
         --queue_count;
+        ++input_generation;
     }
-    size_t tail       = (queue_head + queue_count) % INPUT_QUEUE_CAPACITY;
-    event_queue[tail] = key_event;
+    size_t tail          = (queue_head + queue_count) % INPUT_QUEUE_CAPACITY;
+    key_event.generation = input_generation;
+    event_queue[tail]    = key_event;
     ++queue_count;
 
     bool text_repeated             = false;
@@ -216,14 +235,16 @@ void input_update(void)
             .modifiers = held_text_modifiers,
             .repeat    = true,
         };
-        (void) strncpy(text_event.text, held_text, sizeof(text_event.text) - 1U);
-        text_event.text[sizeof(text_event.text) - 1U] = '\0';
+        /* held_text has the same bounded, terminated representation. */
+        memcpy(text_event.text, held_text, sizeof(text_event.text));
         if (queue_count == INPUT_QUEUE_CAPACITY) {
             queue_head = (queue_head + 1U) % INPUT_QUEUE_CAPACITY;
             --queue_count;
+            ++input_generation;
         }
-        tail              = (queue_head + queue_count) % INPUT_QUEUE_CAPACITY;
-        event_queue[tail] = text_event;
+        tail                  = (queue_head + queue_count) % INPUT_QUEUE_CAPACITY;
+        text_event.generation = input_generation;
+        event_queue[tail]     = text_event;
         ++queue_count;
         text_repeated = true;
     }
@@ -335,4 +356,38 @@ void input_wait_ready(uint32_t timeout_ms)
 void input_wake_waiter(void)
 {
     platform_signal_notify(queue_signal);
+}
+
+int input_get_state(tabos_input_state_t* state, bool resynchronize)
+{
+    if (state == NULL || !lock_queue()) {
+        return -1;
+    }
+    if (resynchronize) {
+        queue_count = 0U;
+        queue_head  = 0U;
+        ++input_generation;
+    }
+    state->generation = input_generation;
+    memcpy(state->pressed, power_keys, sizeof(power_keys));
+    unlock_queue();
+    return 0;
+}
+void input_reset(bool clear_pressed)
+{
+    if (!lock_queue()) {
+        return;
+    }
+    queue_count = 0U;
+    queue_head  = 0U;
+    ++input_generation;
+    held_key = TABOS_KEY_UNKNOWN;
+    tabos_timer_cancel(&repeat_timer);
+    if (clear_pressed) {
+        memset(power_keys, 0, sizeof(power_keys));
+        power_held_count         = 0U;
+        power_unknown_held_count = 0U;
+    }
+    unlock_queue();
+    input_wake_waiter();
 }
