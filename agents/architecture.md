@@ -1576,3 +1576,11 @@ Missing fields use defaults; invalid complete policy or I/O failure leaves defau
 No hot reload, periodic storage access, automatic writes, public ABI, or sleep enablement
 is added. Normal brightness must remain nonzero; dim brightness is capped at normal by
 existing policy. The checked-in `etc/power.conf` is a user-copyable template.
+
+## Native runtime optimization
+
+Host interpretation uses the upstream prototype hook to express non-overlapping
+CPU/RAM storage and pass the immutable RAM bound; instruction budgets and guest
+address checks remain unchanged. Native gate exits allow a one-tick idle window
+every 500 ms while retaining gate ownership, preserving safe stop/drain. Task
+stack sizes are passed in ESP-IDF bytes; allocation remains in PSRAM.

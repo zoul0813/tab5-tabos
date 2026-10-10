@@ -158,3 +158,13 @@ run_build("TABOS_LDLIBS=-lm")
 expect_links(11 "trailing application libraries change")
 run_build("TABOS_LDLIBS=-lm")
 expect_links(11 "unchanged trailing application libraries")
+
+run_build("TABOS_EXTRA_CPPFLAGS=-DPORT_FEATURE=1")
+expect_links(12 "extra application definitions change")
+run_build("TABOS_EXTRA_CPPFLAGS=-DPORT_FEATURE=1")
+expect_links(12 "unchanged extra application definitions")
+
+run_build("TABOS_EXTRA_CFLAGS=-O3")
+expect_links(13 "application optimization change")
+run_build("TABOS_EXTRA_CFLAGS=-O3")
+expect_links(13 "unchanged application optimization")

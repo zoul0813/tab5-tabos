@@ -13,7 +13,7 @@
 #include <tabos/tty.h>
 #include <unistd.h>
 
-const char* strerror(int error)
+__attribute__((weak)) const char* strerror(int error)
 {
     switch (error) {
         case EPERM: return "Operation not permitted";
@@ -305,7 +305,7 @@ void _exit(int status)
     }
 }
 
-int fcntl(int descriptor, int command, ...)
+int _fcntl(int descriptor, int command, int flags)
 {
     if (command == F_GETFL) {
         const int result = tabos_runtime_api->fd_get_flags(descriptor);
@@ -321,14 +321,22 @@ int fcntl(int descriptor, int command, ...)
         return flags;
     }
     if (command == F_SETFL) {
-        va_list arguments;
-        va_start(arguments, command);
-        const int flags = va_arg(arguments, int);
-        va_end(arguments);
         return fail_result(tabos_runtime_api->fd_set_flags(descriptor, runtime_flags(flags)));
     }
     errno = EINVAL;
     return -1;
+}
+
+int fcntl(int descriptor, int command, ...)
+{
+    int flags = 0;
+    if (command == F_SETFL) {
+        va_list arguments;
+        va_start(arguments, command);
+        flags = va_arg(arguments, int);
+        va_end(arguments);
+    }
+    return _fcntl(descriptor, command, flags);
 }
 
 int ioctl(int descriptor, unsigned long request, ...)

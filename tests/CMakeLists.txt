@@ -634,6 +634,7 @@ add_test(NAME unit.wall_clock COMMAND tabos_wall_clock)
 
 add_executable(tabos_sdk_clock unit/sdk_clock.c "${TABOS_ROOT}/sdk/lib/clock.c")
 target_include_directories(tabos_sdk_clock PRIVATE "${TABOS_ROOT}/sdk/include")
+target_compile_definitions(tabos_sdk_clock PRIVATE _POSIX_C_SOURCE=200809L)
 tabos_enable_warnings(tabos_sdk_clock)
 tabos_enable_sanitizers(tabos_sdk_clock)
 add_test(NAME unit.sdk_clock COMMAND tabos_sdk_clock)

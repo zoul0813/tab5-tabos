@@ -123,3 +123,12 @@ Architecture CTest checks enforce platform-header and symbol boundaries across t
 portable subsystems and SDK. Private-ABI checks cover every application directory with
 a Makefile. Run `ctest --test-dir build/macos-debug -R '^architecture\.' --output-on-failure`
 after building host tests; use the corresponding Linux build directory on Linux.
+
+## Application build and libc integration
+
+`TABOS_EXTRA_CPPFLAGS` and `TABOS_EXTRA_CFLAGS` extend application build flags
+without discarding SDK defaults. Both participate in rebuild tracking. Native
+applications keep the default RV32I instruction set unless explicitly overridden.
+Newlib `_fcntl` and public `fcntl` share descriptor flags, including `fdopen()`
+access-mode validation. The SDK error-string fallback is weak so newlib can
+supply its normal implementation when linked.

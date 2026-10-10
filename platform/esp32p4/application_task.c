@@ -22,6 +22,7 @@ struct platform_riscv32_context {
         void* user_data;
         size_t stack_bytes;
         TaskHandle_t task;
+        TickType_t last_idle_window;
         atomic_bool started;
         atomic_bool finished;
         atomic_bool stop_requested;
@@ -51,6 +52,14 @@ static platform_riscv32_context_t* gate_enter(void)
 
 static void gate_leave(platform_riscv32_context_t* context)
 {
+    /* A continuously runnable app must still allow idle reclamation and the
+     * existing watchdog on both cores. Keep the gate owned while blocking. */
+    const TickType_t now = xTaskGetTickCount();
+    if (atomic_load_explicit(&context->gate_depth, memory_order_acquire) == 1U &&
+        (TickType_t) (now - context->last_idle_window) >= pdMS_TO_TICKS(500U)) {
+        vTaskDelay(1U);
+        context->last_idle_window = xTaskGetTickCount();
+    }
     if (atomic_fetch_sub_explicit(&context->gate_depth, 1U, memory_order_acq_rel) == 1U) {
         park_if_stopping(context);
     }
@@ -95,7 +104,8 @@ static void elf_task_main(void* argument)
 {
     platform_riscv32_context_t* context = argument;
     vTaskSetThreadLocalStoragePointer(NULL, 0, context);
-    context->returned_status = context->entry(&context->guarded_api, (int) context->argc, context->argv);
+    context->last_idle_window = xTaskGetTickCount();
+    context->returned_status  = context->entry(&context->guarded_api, (int) context->argc, context->argv);
     atomic_store_explicit(&context->finished, true, memory_order_release);
     platform_runtime_notify(PLATFORM_RUNTIME_EVENT_APPLICATION);
     vTaskSuspend(NULL);
@@ -143,8 +153,8 @@ platform_riscv32_result_t platform_riscv32_step(platform_riscv32_context_t* cont
         return PLATFORM_RISCV32_FAULT;
     }
     if (!atomic_load_explicit(&context->started, memory_order_acquire)) {
-        if (xTaskCreateWithCaps(elf_task_main, "tabos-app", context->stack_bytes / sizeof(StackType_t), context,
-                                ELF_TASK_PRIORITY, &context->task, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) != pdPASS) {
+        if (xTaskCreateWithCaps(elf_task_main, "tabos-app", context->stack_bytes, context, ELF_TASK_PRIORITY,
+                                &context->task, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) != pdPASS) {
             ESP_LOGE(TAG, "Could not create ELF task; free internal=%u, PSRAM=%u",
                      (unsigned) heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
                      (unsigned) heap_caps_get_free_size(MALLOC_CAP_SPIRAM));

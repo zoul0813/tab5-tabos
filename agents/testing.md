@@ -1999,3 +1999,10 @@ for the planned interactive credential workflow. It uses real temporary host sto
 for initial/replacement saves, unknown-field preservation, temporary-file open failure,
 prior-profile retention, and recovery on the next save. It does not enable a public
 credential-writing operation.
+
+## Runtime/SDK improvement validation
+
+Native task tests assert 4/16/64 KiB byte arguments and idle-window gate ownership.
+Application tracking covers extra C/preprocessor flags. Tester filesystem checks
+exercise real newlib fdopen access validation and descriptor ownership. RV32
+execution and containment tests retain bounds, API gate and slice assertions.

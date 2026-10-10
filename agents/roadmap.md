@@ -807,3 +807,8 @@ but is not a substitute for this execution path.
 - [ ] Dedicated graphics CPU core unless profiling proves need.
 - [ ] Complete QEMU Tab5 emulation.
 - [ ] Bare-metal replacement for FreeRTOS unless demonstrated limitation requires reconsideration.
+
+## General TabOS improvements
+
+- [x] Improve runtime execution and SDK integration.
+- [ ] Integrate input recovery, asynchronous graphics, device tooling and compute.

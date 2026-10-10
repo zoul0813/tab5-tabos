@@ -949,3 +949,8 @@ brightness. Defaults remain 60/180/300 seconds and 75/20 percent. File is read-o
 the service; reboot applies user edits. Invalid files fall back atomically with a log
 warning; absent storage/file remains nonfatal. Template and user instructions live in
 `etc/power.conf` and `docs/power.md`; no configuration polling or system sleep is added.
+
+Runtime optimization preserves RV32 guest bounds and slice budgets through the
+interpreter prototype hook. Native SDK gate exits give idle tasks one tick every
+500 ms while retaining the teardown guard. SDK extra build flags are tracked;
+newlib `_fcntl` shares public descriptor handling.

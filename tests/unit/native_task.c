@@ -34,10 +34,13 @@ static atomic_bool guest_entered;
 static atomic_bool returned;
 static atomic_bool guest_after_gate;
 static bool fail_create;
+static size_t expected_stack_bytes = 4096U;
 static unsigned int cancellations;
 static unsigned int deletions;
 static unsigned int running_observations;
 static int owner;
+static atomic_uint tick_offset;
+static atomic_uint native_delays;
 
 static void checkpoint(void)
 {
@@ -55,10 +58,18 @@ static void checkpoint(void)
     }
 }
 
+TickType_t xTaskGetTickCount(void)
+{
+    struct timespec now;
+    assert(clock_gettime(CLOCK_MONOTONIC, &now) == 0);
+    return (TickType_t) ((uint64_t) now.tv_sec * 1000U + (uint64_t) now.tv_nsec / 1000000U) + atomic_load(&tick_offset);
+}
+
 void vTaskDelay(TickType_t ticks)
 {
     (void) ticks;
     if (self != NULL) {
+        atomic_fetch_add(&native_delays, 1U);
         checkpoint();
     }
     const struct timespec delay = {.tv_nsec = 1000000};
@@ -125,7 +136,7 @@ BaseType_t xTaskCreateWithCaps(void (*entry)(void*), const char* name, size_t st
     (void) name;
     (void) priority;
     (void) capabilities;
-    assert(stack_depth > 0U);
+    assert(stack_depth == expected_stack_bytes);
     if (fail_create) {
         return pdFAIL;
     }
@@ -236,6 +247,22 @@ static int computing_entry(const tabos_elf_api_t* api, int argc, const char* con
     }
 }
 
+static int fairness_entry(const tabos_elf_api_t* api, int argc, const char* const* argv)
+{
+    (void) argc;
+    (void) argv;
+    assert(atomic_load(&native_delays) == 0U);
+    atomic_fetch_add(&tick_offset, 500U);
+    (void) api->fd_get_flags(17);
+    assert(atomic_load(&native_delays) == 1U);
+    (void) api->fd_get_flags(17);
+    assert(atomic_load(&native_delays) == 1U);
+    atomic_fetch_add(&tick_offset, 500U);
+    (void) api->fd_get_flags(17);
+    assert(atomic_load(&native_delays) == 2U);
+    return 0;
+}
+
 static int flags_gate(int descriptor)
 {
     assert(descriptor == 17);
@@ -253,7 +280,7 @@ static void* heap_gate(int32_t increment)
     return &owner;
 }
 
-static platform_riscv32_context_t* create(tabos_elf_entry_fn entry)
+static platform_riscv32_context_t* create_with_stack(tabos_elf_entry_fn entry, size_t stack_bytes)
 {
     const void* address = NULL;
     memcpy(&address, &entry, sizeof(address));
@@ -263,9 +290,14 @@ static platform_riscv32_context_t* create(tabos_elf_entry_fn entry)
                                  .monotonic_ms  = clock_gate,
                                  .heap_sbrk     = heap_gate};
     platform_riscv32_context_t* context =
-        platform_riscv32_create(address, NULL, 0U, 0U, 128U, 4096U, &api, 0U, NULL, &owner);
+        platform_riscv32_create(address, NULL, 0U, 0U, 128U, stack_bytes, &api, 0U, NULL, &owner);
     assert(context != NULL);
     return context;
+}
+
+static platform_riscv32_context_t* create(tabos_elf_entry_fn entry)
+{
+    return create_with_stack(entry, 4096U);
 }
 
 int main(void)
@@ -309,5 +341,25 @@ int main(void)
         assert(!atomic_load(&guest_after_gate));
     }
     assert(deletions == 60U && cancellations >= 20U && running_observations >= 120U);
+    atomic_store(&native_delays, 0U);
+    atomic_store(&returned, false);
+    platform_riscv32_context_t* fair = create(fairness_entry);
+    assert(platform_riscv32_step(fair, 1U, &status) == PLATFORM_RISCV32_YIELDED);
+    while (!atomic_load(&returned)) {
+        vTaskDelay(1U);
+    }
+    assert(platform_riscv32_step(fair, 1U, &status) == PLATFORM_RISCV32_RETURNED && status == 0);
+    platform_riscv32_destroy(fair);
+    for (size_t bytes = 16384U; bytes <= 65536U; bytes *= 4U) {
+        expected_stack_bytes = bytes;
+        atomic_store(&returned, false);
+        platform_riscv32_context_t* sized = create_with_stack(normal_entry, bytes);
+        assert(platform_riscv32_step(sized, 1U, &status) == PLATFORM_RISCV32_YIELDED);
+        while (!atomic_load(&returned)) {
+            vTaskDelay(1U);
+        }
+        assert(platform_riscv32_step(sized, 1U, &status) == PLATFORM_RISCV32_RETURNED && status == 7);
+        platform_riscv32_destroy(sized);
+    }
     return 0;
 }

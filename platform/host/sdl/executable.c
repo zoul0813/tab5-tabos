@@ -137,7 +137,7 @@ HOST_RV32_API_GATES(HOST_RV32_GATE_VALUE)
 #define HOST_RV32_API_GATE_FIRST HOST_RV32_API_GATE_BASE
 #define HOST_RV32_API_GATE_LAST \
     (HOST_RV32_API_GATE_BASE + ((uint32_t) HOST_RV32_API_GATE_COUNT - 1U) * sizeof(uint32_t))
-#define MINI_RV32_RAM_SIZE        host_rv32_active_ram_size
+#define MINI_RV32_RAM_SIZE        ram_size
 #define MINIRV32_RAM_IMAGE_OFFSET 0U
 #define MINIRV32_POSTEXEC(pc, ir, trap)                                                                      \
     do {                                                                                                     \
@@ -146,6 +146,12 @@ HOST_RV32_API_GATES(HOST_RV32_GATE_VALUE)
             icount = count - 1;                                                                              \
         }                                                                                                    \
     } while (0)
+/* The CPU context and guest RAM are separately allocated and never overlap.
+ * Use the interpreter's prototype hook to let the compiler retain CPU state
+ * across guest memory stores without weakening guest address checks. */
+#define MINIRV32_STEPPROTO                                                                           \
+    static int32_t MiniRV32IMAStep(struct MiniRV32IMAState* restrict state, uint8_t* restrict image, \
+                                   uint32_t vProcAddress, uint32_t elapsedUs, int count, uint32_t ram_size)
 #define MINIRV32_IMPLEMENTATION
 #if defined(__clang__)
 #pragma clang diagnostic push
@@ -1376,7 +1382,7 @@ static platform_riscv32_result_t step_inner(platform_riscv32_context_t* context,
         if (remaining_budget <= (unsigned int) INT_MAX) {
             batch_budget = (int) remaining_budget;
         }
-        (void) MiniRV32IMAStep(&context->state, context->memory, 0U, 0U, batch_budget);
+        (void) MiniRV32IMAStep(&context->state, context->memory, 0U, 0U, batch_budget, context->memory_size);
         const uint64_t cycle_after = ((uint64_t) context->state.cycleh << 32U) | context->state.cyclel;
         const uint64_t executed    = cycle_after - cycle_before;
         if (context->state.mcause != 0U) {

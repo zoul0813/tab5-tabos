@@ -322,7 +322,12 @@ void power_manager_complete(power_manager_t* manager, power_completion_token_t t
 static void trace(power_manager_t* manager, power_participant_t* participant, power_operation_t operation)
 {
     if (manager->trace_count < POWER_TRACE_CAPACITY) {
-        (void) snprintf(manager->trace[manager->trace_count++], POWER_NAME_CAPACITY + 8, "%s:%s", participant->name,
+        /* Keep snprintf's restricted source separate from the manager that
+         * owns both participant names and the trace destination. */
+        char name[POWER_NAME_CAPACITY];
+        memcpy(name, participant->name, sizeof(name));
+        name[sizeof(name) - 1U] = '\0';
+        (void) snprintf(manager->trace[manager->trace_count++], POWER_NAME_CAPACITY + 8, "%s:%s", name,
                         operation == POWER_OPERATION_SUSPEND ? "down" : "up");
     }
 }
