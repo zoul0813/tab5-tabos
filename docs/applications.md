@@ -74,6 +74,15 @@ file and provides search, C/C++ highlighting, and recoverable staged saves. See
 [Kilo](kilo.md). Installed license materials under `T:/share/licenses/` are also copied
 by `--msc`; separate binary distributions must preserve their notices.
 
+Pool is included as `T:/bin/pool`: house 8-ball against the computer or a second
+local player. See [Pool](pool.md) for controls and [house rules](pool-rules.md).
+Its MIT notice is installed at `T:/share/licenses/pool/LICENSE`.
+
+Soccer is included as `T:/bin/soccer`. It provides six-a-side timed arcade
+matches with passing, tackling, goalkeepers, difficulty selection, sound, and
+scrolling. See [Soccer](soccer.md) for controls and current limitations. Its MIT
+notice is installed at `T:/share/licenses/soccer/LICENSE`.
+
 Individual application commands such as `make -C apps/shell` remain available.
 
 Published macOS and Linux host archives include the maintained application set under
