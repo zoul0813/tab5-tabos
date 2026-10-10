@@ -51,9 +51,13 @@ bool esp32p4_pie_fill16(uint16_t* destination, size_t count, const uint16_t* col
 bool esp32p4_pie_copy16(uint16_t* destination, const uint16_t* source, size_t count)
 {
 #if TABOS_ENABLE_PIE
-    if (destination == NULL || source == NULL || count < PIE_COPY_MIN_PIXELS || !aligned16(destination) ||
-        !aligned16(source)) {
+    if (destination == NULL || source == NULL || count < PIE_COPY_MIN_PIXELS || ((uintptr_t) destination & 1U) != 0U ||
+        ((uintptr_t) destination & 15U) != ((uintptr_t) source & 15U)) {
         return false;
+    }
+    while (!aligned16(destination) && count != 0U) {
+        *destination++ = *source++;
+        --count;
     }
     esp32p4_pie_copy16_asm(destination, source, count);
     return true;

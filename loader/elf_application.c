@@ -1956,7 +1956,7 @@ static int elf_graphics_open(uint32_t* width, uint32_t* height)
     return 0;
 }
 
-static bool elf_graphics_execute_one(loader_elf_application_t* application)
+static bool elf_graphics_execute_one(loader_elf_application_t* application, bool retain_sources)
 {
     if (application == NULL || application->graphics_command_count == 0U) {
         return true;
@@ -1974,19 +1974,23 @@ static bool elf_graphics_execute_one(loader_elf_application_t* application)
                         command->data.fill.height, command->data.fill.color);
         }
     } else {
-        result =
-            platform_graphics_blit(framebuffer, &command->data.blit) || raster_blit(framebuffer, &command->data.blit);
+        if (retain_sources) {
+            result = platform_graphics_blit_retained(framebuffer, &command->data.blit);
+        } else {
+            result = platform_graphics_blit(framebuffer, &command->data.blit);
+        }
+        result = result || raster_blit(framebuffer, &command->data.blit);
     }
     application->graphics_command_head = (application->graphics_command_head + 1U) % ELF_GRAPHICS_COMMAND_CAPACITY;
     --application->graphics_command_count;
     return result;
 }
 
-static bool elf_graphics_drain(loader_elf_application_t* application)
+static bool elf_graphics_drain(loader_elf_application_t* application, bool retain_sources)
 {
     bool result = true;
     while (application != NULL && application->graphics_command_count != 0U) {
-        if (!elf_graphics_execute_one(application)) {
+        if (!elf_graphics_execute_one(application, retain_sources)) {
             result = false;
         }
     }
@@ -1999,7 +2003,7 @@ static bool elf_graphics_enqueue(loader_elf_application_t* application, const el
         return false;
     }
     if (application->graphics_command_count == ELF_GRAPHICS_COMMAND_CAPACITY &&
-        !elf_graphics_execute_one(application)) {
+        !elf_graphics_execute_one(application, false)) {
         return false;
     }
     const size_t tail =
@@ -2046,8 +2050,7 @@ static int elf_graphics_blit(int32_t x, int32_t y, uint32_t width, uint32_t heig
     loader_elf_application_t* application = platform_riscv32_current_user_data();
     platform_framebuffer_t* framebuffer   = display_framebuffer();
     if (application == NULL || !application->graphics_active || framebuffer == NULL || pixels == NULL || width == 0U ||
-        height == 0U || width > SIZE_MAX / height ||
-        (size_t) width * height > SIZE_MAX / sizeof(*pixels)) {
+        height == 0U || width > SIZE_MAX / height || (size_t) width * height > SIZE_MAX / sizeof(*pixels)) {
         return -TABOS_EINVAL;
     }
     const size_t pixel_bytes = (size_t) width * height * sizeof(*pixels);
@@ -2106,8 +2109,34 @@ static int elf_graphics_blit_ex(const tabos_graphics_blit_options_t* options)
 static int elf_graphics_present(void)
 {
     loader_elf_application_t* application = platform_riscv32_current_user_data();
-    return application != NULL && application->graphics_active && elf_graphics_drain(application) &&
+    return application != NULL && application->graphics_active && elf_graphics_drain(application, false) &&
                    display_graphics_present() ?
+               0 :
+               -TABOS_EIO;
+}
+
+static int elf_graphics_submit(void)
+{
+    loader_elf_application_t* application = platform_riscv32_current_user_data();
+    return application != NULL && application->graphics_active && elf_graphics_drain(application, false) &&
+                   display_graphics_submit() ?
+               0 :
+               -TABOS_EIO;
+}
+
+static int elf_graphics_submit_borrowed(void)
+{
+    loader_elf_application_t* application = platform_riscv32_current_user_data();
+    return application != NULL && application->graphics_active && elf_graphics_drain(application, true) &&
+                   display_graphics_submit() ?
+               0 :
+               -TABOS_EIO;
+}
+
+static int elf_graphics_wait(void)
+{
+    loader_elf_application_t* application = platform_riscv32_current_user_data();
+    return application != NULL && application->graphics_active && platform_graphics_wait(display_framebuffer()) ?
                0 :
                -TABOS_EIO;
 }
@@ -2118,7 +2147,7 @@ static int elf_graphics_close(void)
     if (application == NULL || !application->graphics_active) {
         return -TABOS_EINVAL;
     }
-    if (!elf_graphics_drain(application) || !display_graphics_present()) {
+    if (!elf_graphics_drain(application, false) || !display_graphics_present()) {
         return -TABOS_EIO;
     }
     application->graphics_active        = false;
@@ -2248,6 +2277,9 @@ static bool elf_entry(tabos_app_context_t* context)
         .graphics_fill_rect              = elf_graphics_fill_rect,
         .graphics_blit                   = elf_graphics_blit,
         .graphics_present                = elf_graphics_present,
+        .graphics_submit                 = elf_graphics_submit,
+        .graphics_submit_borrowed        = elf_graphics_submit_borrowed,
+        .graphics_wait                   = elf_graphics_wait,
         .graphics_close                  = elf_graphics_close,
         .graphics_capabilities           = elf_graphics_capabilities,
         .graphics_blit_ex                = elf_graphics_blit_ex,
@@ -2416,11 +2448,8 @@ static void elf_release_resources(loader_elf_application_t* application)
     platform_riscv32_stop(application->execution, elf_cancel_execution, application);
     /* Stop concurrent native execution before releasing any process-owned
      * object that an application call gate could still access. */
-    platform_riscv32_destroy(application->execution);
-    application->execution = NULL;
-    /* Queued blits borrow guest memory, including the execution stack just
-     * released above. Teardown discards unfinished drawing rather than
-     * dereferencing those buffers or presenting a final application frame. */
+    /* Discard unsubmitted blits without reading their sources. Submitted
+     * readers must finish below before task destruction releases its stack. */
     application->graphics_command_head  = 0U;
     application->graphics_command_count = 0U;
     audio_service_close_owner(application);
@@ -2445,6 +2474,8 @@ static void elf_release_resources(loader_elf_application_t* application)
         platform_graphics_end();
         console_set_graphics_active(false);
     }
+    platform_riscv32_destroy(application->execution);
+    application->execution = NULL;
     for (size_t index = 0U; index < ELF_SOCKET_CAPACITY; ++index) {
         if (application->sockets[index].open) {
             platform_network_socket_interrupt(application->sockets[index].platform_socket);

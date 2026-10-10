@@ -11,7 +11,7 @@
 
 #include <stdint.h>
 
-#define TABOS_ELF_API_VERSION  23U
+#define TABOS_ELF_API_VERSION  25U
 #define TABOS_ELF_EXEC_PENDING (-2147483647 - 1)
 
 enum {
@@ -207,6 +207,9 @@ typedef struct {
         int (*tty_get_size)(int descriptor, tabos_tty_size_t* size);
         int (*input_wait_source)(void);
         int (*input_get_state)(tabos_input_state_t* state, int resynchronize);
+        int (*graphics_submit)(void);
+        int (*graphics_submit_borrowed)(void);
+        int (*graphics_wait)(void);
 } tabos_elf_api_t;
 
 typedef int (*tabos_elf_entry_fn)(const tabos_elf_api_t* api, int argc, const char* const* argv);

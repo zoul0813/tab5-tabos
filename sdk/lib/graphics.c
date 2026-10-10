@@ -476,13 +476,13 @@ int tabos_graphics_blit_ex(tabos_graphics_t* graphics, const tabos_graphics_blit
     }
     return result(tabos_runtime_api->graphics_blit_ex(options));
 }
-int tabos_graphics_present(tabos_graphics_t* graphics)
+static int finish_frame(tabos_graphics_t* graphics, int (*finish)(void))
 {
     if (!valid(graphics)) {
         errno = EINVAL;
         return -1;
     }
-    if (tabos_runtime_api->graphics_present == NULL) {
+    if (finish == NULL) {
         errno = ENOSYS;
         return -1;
     }
@@ -520,7 +520,35 @@ int tabos_graphics_present(tabos_graphics_t* graphics)
             return -1;
         }
     }
-    return result(tabos_runtime_api->graphics_present());
+    return result(finish());
+}
+
+int tabos_graphics_present(tabos_graphics_t* graphics)
+{
+    return finish_frame(graphics, tabos_runtime_api == NULL ? NULL : tabos_runtime_api->graphics_present);
+}
+
+int tabos_graphics_submit(tabos_graphics_t* graphics)
+{
+    return finish_frame(graphics, tabos_runtime_api == NULL ? NULL : tabos_runtime_api->graphics_submit);
+}
+
+int tabos_graphics_submit_borrowed(tabos_graphics_t* graphics)
+{
+    return finish_frame(graphics, tabos_runtime_api == NULL ? NULL : tabos_runtime_api->graphics_submit_borrowed);
+}
+
+int tabos_graphics_wait(tabos_graphics_t* graphics)
+{
+    if (!valid(graphics)) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (tabos_runtime_api->graphics_wait == NULL) {
+        errno = ENOSYS;
+        return -1;
+    }
+    return result(tabos_runtime_api->graphics_wait());
 }
 
 int tabos_graphics_set_overlays(tabos_graphics_t* graphics, uint32_t flags)

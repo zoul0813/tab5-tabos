@@ -167,7 +167,7 @@ and parent restoration notify runtime through a pointer-free coalesced readiness
 Process state remains authoritative and late wakeups cannot target reused process slots.
 ELF teardown cancels waits and stops native execution before releasing process-owned
 resources. Native task lifetime now lives in `platform/esp32p4/application_task.c`.
-All 98 private ABI gates track active depth. Stop waits for cross-core suspension,
+All 101 private ABI gates track active depth. Stop waits for cross-core suspension,
 resumes active gates to drain cancelled work and release locks, then deletes only a
 stopped task outside every gate. Native workers return their replies before the calling
 gate exits; DNS and bounded driver calls may delay safe shutdown. Teardown discards queued graphics commands without reading borrowed guest
@@ -236,7 +236,7 @@ Tab5 loads writable PSRAM, maps a read/execute alias of the same pages, applies
 load-bias relocations, and synchronizes caches before native task entry. Guest
 API pointers map through platform translation back to readable data aliases.
 Optional elf-hello startup remains a diagnostic; normal startup is T:/bin/shell.
-The pre-release application ABI is 3 and current private transport is 23; neither
+The pre-release application ABI is 3 and current private transport is 25; neither
 promises compatibility for independently released third-party binaries yet.
 
 ## 4. Multitasking and CPU Cores
@@ -788,7 +788,7 @@ Current choices above were cross-checked against `docs/input.md`,
 `docs/elf-loader.md`, and `docs/sdk.md`, plus:
 
 - `sdk/make/application.mk` and `loader/include/tabos/internal/elf_loader.h`: RV32I/ilp32, 256 KiB heap, 16 KiB stack, optional metadata.
-- `sdk/include/tabos/internal/elf_api.h`: current private transport version 23.
+- `sdk/include/tabos/internal/elf_api.h`: current private transport version 25.
 - `platform/esp32p4/keyboard.c`: Normal-mode selection and matrix reports.
 - `platform/esp32p4/display.c`: RGB565 logical PSRAM and double native scanout buffers.
 - `platform/esp32p4/executable.c`: writable/executable PSRAM aliases.
@@ -961,3 +961,16 @@ through release/repeat. Overflow and focus changes advance queue generations;
 console handoff drops pending events while retaining physical held state, and
 SDL focus loss clears it. Rebuild SDK applications with firmware. Input queue
 tests cover overflow, logical repeat and snapshot recovery.
+
+## Asynchronous graphics (transport 25)
+
+Present blocks through source reads, drawing and scanout. Submit finishes source
+reads but may overlap one bounded display-worker/scanout job. Borrowed submit
+retains every source until wait/close succeeds, including after submission errors.
+Wait fences readers/drawing without draining unsubmitted commands or waiting for
+scanout. Teardown joins submitted readers before reclaiming guest memory and
+discards unsubmitted commands. SDL implements the contract synchronously.
+Tab5 uses existing scratch for snapshots, AXI DMA/PIE with CPU fallback, and
+elides only clear regions fully replaced by eligible exact-scale opaque blits.
+Native buffers remain OS-owned; cores are not reserved. Host coverage checks
+SDK contracts, clipping pixels, completion ownership and real RV32 cleanup.

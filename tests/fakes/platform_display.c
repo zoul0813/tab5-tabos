@@ -1177,3 +1177,17 @@ unsigned int test_platform_activity_reports(void)
 {
     return activity_reports;
 }
+
+bool platform_graphics_submit(platform_framebuffer_t* framebuffer)
+{
+    return platform_graphics_present(framebuffer);
+}
+
+bool platform_graphics_blit_retained(platform_framebuffer_t* framebuffer, const tabos_graphics_blit_options_t* options)
+{
+    return platform_graphics_blit(framebuffer, options);
+}
+bool platform_graphics_wait(platform_framebuffer_t* framebuffer)
+{
+    return framebuffer != NULL;
+}

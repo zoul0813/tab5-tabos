@@ -7,6 +7,10 @@
 
 static unsigned int close_count;
 static unsigned int present_count;
+static unsigned int submit_count;
+static unsigned int borrowed_count;
+static unsigned int wait_count;
+static int submit_result;
 static unsigned int clear_count;
 static tabos_color_t cleared_color;
 static bool upscale_valid;
@@ -42,6 +46,23 @@ static int graphics_present(void)
 {
     ++present_count;
     return 0;
+}
+
+static int graphics_submit(void)
+{
+    ++submit_count;
+    return submit_result;
+}
+
+static int graphics_submit_borrowed(void)
+{
+    ++borrowed_count;
+    return submit_result;
+}
+static int graphics_wait(void)
+{
+    ++wait_count;
+    return submit_result;
 }
 
 static int graphics_clear(uint32_t color)
@@ -101,16 +122,19 @@ static int graphics_set_overlays(uint32_t flags)
 }
 
 static const tabos_elf_api_t api = {
-    .abi_version           = TABOS_ELF_API_VERSION,
-    .graphics_open         = graphics_open,
-    .graphics_clear        = graphics_clear,
-    .graphics_fill_rect    = graphics_fill_rect,
-    .graphics_present      = graphics_present,
-    .graphics_close        = graphics_close,
-    .graphics_capabilities = graphics_capabilities,
-    .graphics_blit         = graphics_blit,
-    .graphics_blit_ex      = graphics_blit_ex,
-    .graphics_set_overlays = graphics_set_overlays,
+    .abi_version              = TABOS_ELF_API_VERSION,
+    .graphics_open            = graphics_open,
+    .graphics_clear           = graphics_clear,
+    .graphics_fill_rect       = graphics_fill_rect,
+    .graphics_present         = graphics_present,
+    .graphics_submit          = graphics_submit,
+    .graphics_submit_borrowed = graphics_submit_borrowed,
+    .graphics_wait            = graphics_wait,
+    .graphics_close           = graphics_close,
+    .graphics_capabilities    = graphics_capabilities,
+    .graphics_blit            = graphics_blit,
+    .graphics_blit_ex         = graphics_blit_ex,
+    .graphics_set_overlays    = graphics_set_overlays,
 };
 
 const tabos_elf_api_t* tabos_runtime_api = &api;
@@ -215,7 +239,62 @@ int main(void)
         fill_count != 2U || first_fill_x != 0 || first_fill_y != 10 || last_fill_x != 0 || last_fill_y != 11) {
         return 1;
     }
+    if (tabos_graphics_submit(&graphics) != 0 || submit_count != 1U) {
+        return 1;
+    }
+    if (tabos_graphics_submit_borrowed(&graphics) != 0 || borrowed_count != 1U || tabos_graphics_wait(&graphics) != 0 ||
+        wait_count != 1U || submit_count != 1U) {
+        return 1;
+    }
+    submit_result = -EIO;
+    if (tabos_graphics_submit(&graphics) != -1 || errno != EIO) {
+        return 1;
+    }
+    if (tabos_graphics_submit_borrowed(&graphics) != -1 || errno != EIO || tabos_graphics_wait(&graphics) != -1 ||
+        errno != EIO) {
+        return 1;
+    }
+    submit_result = 0;
     if (tabos_graphics_close(&graphics) != 0 || close_count != 3U) {
+        return 1;
+    }
+    graphics               = (tabos_graphics_t) {.width = 320U, .height = 240U};
+    expected_width         = 320U;
+    expected_height        = 240U;
+    expected_x             = 160;
+    expected_y             = 0;
+    expected_output_width  = 960U;
+    expected_output_height = 720U;
+    if (tabos_graphics_open(&graphics) != 0 || tabos_graphics_submit(&graphics) != 0 || !upscale_valid ||
+        submit_count != 3U || tabos_graphics_submit_borrowed(&graphics) != 0 || !upscale_valid ||
+        borrowed_count != 3U || tabos_graphics_wait(&graphics) != 0 || wait_count != 3U ||
+        tabos_graphics_close(&graphics) != 0) {
+        return 1;
+    }
+    if (tabos_graphics_submit_borrowed(&graphics) != -1 || errno != EINVAL || tabos_graphics_wait(&graphics) != -1 ||
+        errno != EINVAL) {
+        return 1;
+    }
+    if (tabos_graphics_submit(&graphics) != -1 || errno != EINVAL) {
+        return 1;
+    }
+    graphics.open                        = true;
+    tabos_elf_api_t unavailable          = api;
+    unavailable.graphics_submit          = NULL;
+    unavailable.graphics_submit_borrowed = NULL;
+    unavailable.graphics_wait            = NULL;
+    tabos_runtime_api                    = &unavailable;
+    if (tabos_graphics_submit(&graphics) != -1 || errno != ENOSYS) {
+        return 1;
+    }
+    if (tabos_graphics_submit_borrowed(&graphics) != -1 || errno != ENOSYS || tabos_graphics_wait(&graphics) != -1 ||
+        errno != ENOSYS) {
+        return 1;
+    }
+    tabos_runtime_api = NULL;
+    if (tabos_graphics_submit_borrowed(&graphics) != -1 || errno != EINVAL || tabos_graphics_submit(&graphics) != -1 ||
+        errno != EINVAL || tabos_graphics_present(&graphics) != -1 || errno != EINVAL ||
+        tabos_graphics_wait(&graphics) != -1 || errno != EINVAL) {
         return 1;
     }
     return 0;

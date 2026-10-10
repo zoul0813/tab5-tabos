@@ -68,9 +68,32 @@ int main(void)
     assert(tab5_display_wait_completion(&semaphore, "PPA rotation"));
     assert(tab5_display_wait_completion(&semaphore, "PPA graphics"));
     assert(wait_calls == 3U && !fault_logged);
+    uint16_t first = 1U, second = 2U;
+    tab5_display_scanout_t scanout = {.front = &first, .back = &second};
+    assert(tab5_display_scanout_finish(&scanout, &semaphore));
+    assert(wait_calls == 3U && scanout.front == &first && scanout.back == &second);
+    scanout.pending = true;
+    assert(tab5_display_scanout_finish(&scanout, &semaphore));
+    assert(wait_calls == 4U && !scanout.pending && scanout.front == &second && scanout.back == &first);
+    assert(tab5_display_scanout_finish(&scanout, &semaphore));
+    assert(wait_calls == 4U); /* No second swap or completion consumption. */
+    scanout.pending = true;
+    assert(tab5_display_scanout_finish(&scanout, &semaphore));
+    assert(wait_calls == 5U && scanout.front == &first && scanout.back == &second);
+    tab5_display_work_t work = {0};
+    assert(tab5_display_work_finish(&work, &semaphore) && wait_calls == 5U);
+    work.pending   = true;
+    work.succeeded = true;
+    assert(tab5_display_work_finish(&work, &semaphore) && wait_calls == 6U && !work.pending);
+    assert(tab5_display_work_finish(&work, &semaphore) && wait_calls == 6U);
+    work.pending   = true;
+    work.succeeded = false;
+    assert(!tab5_display_work_finish(&work, &semaphore) && wait_calls == 7U && !work.pending);
+    assert(tab5_display_work_finish(&work, &semaphore) && wait_calls == 7U);
+    test_missing_completion("display worker");
     test_missing_completion("VSYNC");
     test_missing_completion("PPA rotation");
     test_missing_completion("PPA graphics");
-    assert(wait_calls == 3U && !fault_logged);
+    assert(wait_calls == 7U && !fault_logged);
     return 0;
 }

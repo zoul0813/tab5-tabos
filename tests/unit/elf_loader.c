@@ -164,7 +164,7 @@ int main(void)
         !expect_mutation(68U, 260U, LOADER_ELF_INVALID_SEGMENT) ||
         !expect_mutation(24U, 260U, LOADER_ELF_INVALID_ENTRY) ||
         !expect_mutation(72U, (1024U * 1024U) + 1U, LOADER_ELF_IMAGE_TOO_LARGE) ||
-        !expect_mutation(656U, 9U, LOADER_ELF_UNSUPPORTED_RELOCATION)) {
+        !expect_mutation(668U, 9U, LOADER_ELF_UNSUPPORTED_RELOCATION)) {
         return 1;
     }
 

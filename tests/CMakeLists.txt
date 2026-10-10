@@ -142,6 +142,12 @@ tabos_enable_sanitizers(tabos_camera_backend)
 add_test(NAME unit.camera_backend COMMAND tabos_camera_backend)
 set_tests_properties(unit.camera_backend PROPERTIES TIMEOUT 10)
 
+add_executable(tabos_display_clear unit/display_clear.c)
+target_include_directories(tabos_display_clear PRIVATE "${TABOS_ROOT}/platform/esp32p4" "${TABOS_ROOT}/sdk/include")
+tabos_enable_warnings(tabos_display_clear)
+tabos_enable_sanitizers(tabos_display_clear)
+add_test(NAME unit.display_clear COMMAND tabos_display_clear)
+
 add_executable(tabos_display_completion unit/display_completion.c
     "${TABOS_ROOT}/platform/esp32p4/display_completion.c")
 target_include_directories(tabos_display_completion PRIVATE

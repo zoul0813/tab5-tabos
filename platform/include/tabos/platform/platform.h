@@ -299,9 +299,12 @@ bool platform_graphics_begin(void);
 void platform_graphics_end(void);
 bool platform_graphics_overlay(platform_framebuffer_t* framebuffer, const platform_graphics_overlay_t* overlay);
 bool platform_graphics_present(platform_framebuffer_t* framebuffer);
+bool platform_graphics_submit(platform_framebuffer_t* framebuffer);
+bool platform_graphics_wait(platform_framebuffer_t* framebuffer);
 bool platform_graphics_fill(platform_framebuffer_t* framebuffer, int32_t x, int32_t y, uint32_t width, uint32_t height,
                             platform_pixel_t color);
 bool platform_graphics_blit(platform_framebuffer_t* framebuffer, const tabos_graphics_blit_options_t* options);
+bool platform_graphics_blit_retained(platform_framebuffer_t* framebuffer, const tabos_graphics_blit_options_t* options);
 bool platform_raster_fill_span(platform_pixel_t* destination, size_t count, platform_pixel_t color);
 bool platform_raster_copy_span(platform_pixel_t* destination, const platform_pixel_t* source, size_t count);
 void platform_raster_diagnostics(void);

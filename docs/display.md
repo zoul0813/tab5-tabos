@@ -55,6 +55,15 @@ or pixels left by an earlier overlay.
 
 The BSP integration deliberately excludes LVGL. UI composition remains owned by TabOS and will be designed separately.
 
+Large contiguous native blits snapshot borrowed pixels into the existing PPA
+scratch buffer with ESP-IDF AXI GDMA using 128-byte bursts. Short CPU prefix/tail copies handle source
+alignment. The snapshot waits for completion before returning, so the app may
+overwrite its input immediately afterward. Small or strided snapshots and
+rejected DMA requests retain the existing PIE/CPU copy path. Driver installation
+failure is nonfatal. Accepted snapshot copies use the same bounded fatal timeout
+as PPA; uncertain DMA ownership never falls back to CPU or resumes the app.
+No application API or frame ownership contract changes.
+
 VSYNC and accepted PPA operations have a two-second completion deadline. An immediate
 PPA submission error retains software fallback. Missing completion enters ESP-IDF's
 fatal-error path (the default firmware policy logs and reboots): the pinned drivers

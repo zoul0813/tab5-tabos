@@ -149,18 +149,29 @@ bool raster_blit(platform_framebuffer_t* framebuffer, const tabos_graphics_blit_
         options->rotation == TABOS_GRAPHICS_ROTATE_90 || options->rotation == TABOS_GRAPHICS_ROTATE_270 ?
             options->source.width :
             options->source.height;
-    for (uint32_t dy = 0U; dy < options->destination.height; ++dy) {
-        const int64_t output_y = (int64_t) options->destination.y + dy;
-        if (output_y < 0 || output_y >= (int64_t) framebuffer->height) {
-            continue;
-        }
-        const uint32_t ry = (uint32_t) ((uint64_t) dy * rotated_height / options->destination.height);
-        for (uint32_t dx = 0U; dx < options->destination.width; ++dx) {
-            const int64_t output_x = (int64_t) options->destination.x + dx;
-            if (output_x < 0 || output_x >= (int64_t) framebuffer->width) {
-                continue;
-            }
-            const uint32_t rx = (uint32_t) ((uint64_t) dx * rotated_width / options->destination.width);
+    /* Clip before traversal. Scaled coordinates remain relative to the full
+     * destination, so clipping does not change nearest-neighbor sampling. */
+    const int64_t left           = options->destination.x;
+    const int64_t top            = options->destination.y;
+    const int64_t right          = left + options->destination.width;
+    const int64_t bottom         = top + options->destination.height;
+    const int64_t clipped_left   = left < 0 ? 0 : left;
+    const int64_t clipped_top    = top < 0 ? 0 : top;
+    const int64_t clipped_right  = right > (int64_t) framebuffer->width ? (int64_t) framebuffer->width : right;
+    const int64_t clipped_bottom = bottom > (int64_t) framebuffer->height ? (int64_t) framebuffer->height : bottom;
+    if (clipped_left >= clipped_right || clipped_top >= clipped_bottom) {
+        return true;
+    }
+    const uint32_t first_x = (uint32_t) (clipped_left - left);
+    const uint32_t end_x   = (uint32_t) (clipped_right - left);
+    const uint32_t first_y = (uint32_t) (clipped_top - top);
+    const uint32_t end_y   = (uint32_t) (clipped_bottom - top);
+    for (uint32_t dy = first_y; dy < end_y; ++dy) {
+        const int64_t output_y = top + dy;
+        const uint32_t ry      = (uint32_t) ((uint64_t) dy * rotated_height / options->destination.height);
+        for (uint32_t dx = first_x; dx < end_x; ++dx) {
+            const int64_t output_x = left + dx;
+            const uint32_t rx      = (uint32_t) ((uint64_t) dx * rotated_width / options->destination.width);
             uint32_t sx = rx, sy = ry;
             if (options->rotation == TABOS_GRAPHICS_ROTATE_90) {
                 sx = options->source.width - 1U - ry;

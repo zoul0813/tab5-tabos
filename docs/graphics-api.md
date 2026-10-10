@@ -64,12 +64,27 @@ color-key range. Query portable behavior and active acceleration with
 `tabos_graphics_capabilities()`.
 
 Drawing calls enqueue commands. Their source buffers must remain valid and unchanged
-until `tabos_graphics_present()` returns. Present is the completion fence and scanout
-boundary. A full command queue drains old work until room exists. Explicitly closing
+until `tabos_graphics_present()` or `tabos_graphics_submit()` returns. Both complete
+all borrowed-source reads. Present also completes drawing and waits for scanout;
+submit allows OS-owned drawing and scanout to continue while the application computes
+its next frame. Submit
+may block when the backend cannot overlap work (the SDL host currently uses present). A full command queue drains old work until room exists. Explicitly closing
 the graphics context also completes pending work before restoring the terminal.
 Process teardown (return, exit request, fault, forced termination, or system shutdown)
-discards queued drawing and restores the terminal without presenting a final application
-frame. Teardown never reads borrowed bitmap buffers after execution memory is released.
+fences previously submitted work (including retained sources), discards unsubmitted queued drawing,
+and restores the terminal. Teardown never reads borrowed bitmap buffers after
+execution memory is released.
+
+`tabos_graphics_submit_borrowed()` opts into asynchronous bitmap reads to avoid
+snapshot copies. Every submitted source must remain alive and unchanged until
+`tabos_graphics_wait()` or graphics close succeeds, even if submission returns an
+error. This includes the SDK-owned canvas in scaled mode: do not draw into it
+while it is borrowed. The wait fences prior source reads and drawing, without
+submitting newly queued commands or waiting for LCD scanout. Unsubmitted blits
+still borrow their sources until a finish operation drains them. SDL consumes
+sources synchronously; Tab5 may retain eligible sources for its display worker.
+Normal submit and present retain their existing source-lifetime contracts.
+Process teardown joins submitted readers before reclaiming application memory.
 
 The SDL host uses native surface fills and nearest-neighbor scaled blits for operations
 matching its accelerated path, with the portable renderer preserving all other pixel
@@ -82,6 +97,11 @@ may transparently use ESP32-P4 PIE SIMD. Unsupported operations, small spans, un
 alignment, and disabled or failed acceleration use pixel-identical scalar rendering.
 PPA, PIE, SDL, and framebuffer pointers are never exposed to applications.
 
+The Tab5 backend may defer a fullscreen clear and omit pixels immediately
+replaced by an opaque, in-bounds accelerated blit with exact half/integer scaling.
+Other drawing, overlays and presentation flush pending clears. This preserves
+command order and avoids redundant full-frame memory traffic.
+
 Tab5 may choose CPU rendering for operations unsupported by PPA. Applications see the
 same queued API and output regardless of which backend executes an individual command.
 
@@ -93,7 +113,15 @@ PPA operation. Terminal rendering keeps its separate logical framebuffer and pre
 path.
 
 Tab5 uses two native scanout framebuffers. Commands render into the back buffer, and
-`tabos_graphics_present()` submits it at VSYNC before exchanging front and back buffers.
+`tabos_graphics_present()` submits it and waits for VSYNC before exchanging front and
+back buffers. `tabos_graphics_submit()` leaves at most one frame pending; the next
+write, blocking present, graphics close, or shutdown fences that frame before
+reusing its buffer. For an eligible fullscreen clear plus opaque PPA blit, Tab5
+copies the cropped source and overlays into its existing scratch allocation, then
+a bounded display task executes drawing and submits scanout. Only one job is
+pending; unsupported operations remain synchronous. No guest pixel buffer is
+retained after submit returns. The display task is scheduled normally across the
+two cores, without permanent core affinity.
 This caps visible presentation at the panel refresh rate and prevents partial frames and
 terminal contents from appearing during graphics applications. Status overlays are
 composited into that native back buffer immediately before submission. TabOS retains the

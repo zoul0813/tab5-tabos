@@ -120,7 +120,10 @@ static _Thread_local uint32_t host_rv32_active_ram_size;
     X(CAMERA_WAIT_SOURCE, 388U)              \
     X(TTY_GET_SIZE, 392U)                    \
     X(INPUT_WAIT_SOURCE, 396U)               \
-    X(INPUT_GET_STATE, 400U)
+    X(INPUT_GET_STATE, 400U)                 \
+    X(GRAPHICS_SUBMIT, 404U)                 \
+    X(GRAPHICS_SUBMIT_BORROWED, 408U)        \
+    X(GRAPHICS_WAIT, 412U)
 
 enum {
 #define HOST_RV32_GATE_INDEX(name, api_offset) HOST_RV32_GATE_INDEX_##name,
@@ -1255,14 +1258,24 @@ static platform_riscv32_result_t step_inner(platform_riscv32_context_t* context,
             continue;
         }
         if (context->state.pc == HOST_RV32_GRAPHICS_CLEAR || context->state.pc == HOST_RV32_GRAPHICS_PRESENT ||
-            context->state.pc == HOST_RV32_GRAPHICS_CLOSE) {
-            const bool presented = context->state.pc == HOST_RV32_GRAPHICS_PRESENT;
+            context->state.pc == HOST_RV32_GRAPHICS_CLOSE || context->state.pc == HOST_RV32_GRAPHICS_SUBMIT ||
+            context->state.pc == HOST_RV32_GRAPHICS_SUBMIT_BORROWED || context->state.pc == HOST_RV32_GRAPHICS_WAIT) {
+            const bool presented = context->state.pc == HOST_RV32_GRAPHICS_PRESENT ||
+                                   context->state.pc == HOST_RV32_GRAPHICS_SUBMIT ||
+                                   context->state.pc == HOST_RV32_GRAPHICS_SUBMIT_BORROWED;
             int result;
             current_user_data = context->user_data;
             if (context->state.pc == HOST_RV32_GRAPHICS_CLEAR && context->api.graphics_clear != NULL) {
                 result = context->api.graphics_clear(context->state.regs[10]);
             } else if (context->state.pc == HOST_RV32_GRAPHICS_PRESENT && context->api.graphics_present != NULL) {
                 result = context->api.graphics_present();
+            } else if (context->state.pc == HOST_RV32_GRAPHICS_SUBMIT && context->api.graphics_submit != NULL) {
+                result = context->api.graphics_submit();
+            } else if (context->state.pc == HOST_RV32_GRAPHICS_SUBMIT_BORROWED &&
+                       context->api.graphics_submit_borrowed != NULL) {
+                result = context->api.graphics_submit_borrowed();
+            } else if (context->state.pc == HOST_RV32_GRAPHICS_WAIT && context->api.graphics_wait != NULL) {
+                result = context->api.graphics_wait();
             } else if (context->state.pc == HOST_RV32_GRAPHICS_CLOSE && context->api.graphics_close != NULL) {
                 result = context->api.graphics_close();
             } else {

@@ -1591,3 +1591,16 @@ through release/repeat. Overflow and focus changes advance queue generations;
 console handoff drops pending events while retaining physical held state, and
 SDL focus loss clears it. Rebuild SDK applications with firmware. Input queue
 tests cover overflow, logical repeat and snapshot recovery.
+
+## Asynchronous graphics (transport 25)
+
+Present blocks through source reads, drawing and scanout. Submit finishes source
+reads but may overlap one bounded display-worker/scanout job. Borrowed submit
+retains every source until wait/close succeeds, including after submission errors.
+Wait fences readers/drawing without draining unsubmitted commands or waiting for
+scanout. Teardown joins submitted readers before reclaiming guest memory and
+discards unsubmitted commands. SDL implements the contract synchronously.
+Tab5 uses existing scratch for snapshots, AXI DMA/PIE with CPU fallback, and
+elides only clear regions fully replaced by eligible exact-scale opaque blits.
+Native buffers remain OS-owned; cores are not reserved. Host coverage checks
+SDK contracts, clipping pixels, completion ownership and real RV32 cleanup.

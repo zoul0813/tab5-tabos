@@ -1,5 +1,6 @@
 #include "activity.h"
 #include "display_completion.h"
+#include "display_clear.h"
 
 #include <tabos/platform/platform.h>
 
@@ -10,6 +11,7 @@
 #include <driver/i2c_master.h>
 #include <driver/ppa.h>
 #include "include/pie.h"
+#include <esp_async_memcpy.h>
 #include <esp_cache.h>
 #include <esp_heap_caps.h>
 #include <esp_lcd_mipi_dsi.h>
@@ -45,8 +47,7 @@ static const char* const TAG = TABOS_PLATFORM_LOG_TAG;
 static bsp_lcd_handles_t display_handles;
 static esp_ldo_channel_handle_t display_phy_power;
 static platform_pixel_t* logical_pixels;
-static platform_pixel_t* native_pixels;
-static platform_pixel_t* native_front_pixels;
+static tab5_display_scanout_t scanout;
 static platform_pixel_t* native_framebuffers[2];
 static bool display_created;
 static bool display_uses_bsp;
@@ -57,16 +58,35 @@ static ppa_client_handle_t ppa_srm_client;
 static ppa_client_handle_t ppa_fill_client;
 static ppa_client_handle_t ppa_blend_client;
 static SemaphoreHandle_t ppa_done;
+static async_memcpy_handle_t snapshot_copy;
+static SemaphoreHandle_t snapshot_copy_done;
 static SemaphoreHandle_t vsync_done;
 static bool ppa_ready;
 static platform_pixel_t* ppa_scratch;
 static bool direct_graphics_active;
 static bool direct_frame_prepared;
 static bool direct_frame_dirty;
+static bool direct_clear_pending;
+static platform_pixel_t direct_clear_color;
 static direct_overlay_state_t direct_overlays[2];
+/* One immutable frame snapshot in the existing PPA scratch allocation. */
+static TaskHandle_t render_worker_task;
+static SemaphoreHandle_t render_worker_done;
+static tab5_display_work_t render_work;
+static bool staged_blit_pending;
+static tabos_graphics_blit_options_t staged_blit;
+static bool staged_overlay_pending;
+static bool staged_overlay_visible;
+static platform_graphics_overlay_t staged_overlay;
+static platform_pixel_t* staged_overlay_pixels;
+static platform_pixel_t* staged_overlay_background;
 
 static size_t native_framebuffer_index(const platform_pixel_t* pixels);
 static void copy_saved_overlay(platform_pixel_t* destination, const direct_overlay_state_t* overlay);
+static bool flush_direct_clear(const tabos_graphics_rect_t* covered);
+static bool finish_staged_drawing(void);
+static bool wait_render_worker(void);
+static void render_worker(void* argument);
 
 static bool IRAM_ATTR display_refresh_done(esp_lcd_panel_handle_t panel, esp_lcd_dpi_panel_event_data_t* event_data,
                                            void* user_data)
@@ -84,18 +104,30 @@ static bool wait_for_vsync(void)
     return vsync_done != NULL && tab5_display_wait_completion(vsync_done, "VSYNC");
 }
 
-static bool submit_native_frame(void)
+
+static bool complete_native_frame(void)
 {
-    while (xSemaphoreTake(vsync_done, 0) == pdTRUE) {}
-    const esp_err_t result =
-        esp_lcd_panel_draw_bitmap(display_handles.panel, 0, 0, BSP_LCD_H_RES, BSP_LCD_V_RES, native_pixels);
-    if (result != ESP_OK || !wait_for_vsync()) {
+    const bool pending = scanout.pending;
+    if (!tab5_display_scanout_finish(&scanout, vsync_done)) {
         return false;
     }
-    platform_pixel_t* presented = native_pixels;
-    native_pixels               = native_front_pixels;
-    native_front_pixels         = presented;
+    (void) pending;
     return true;
+}
+
+static bool submit_native_frame(bool wait_for_scanout)
+{
+    if (!complete_native_frame()) {
+        return false;
+    }
+    while (xSemaphoreTake(vsync_done, 0) == pdTRUE) {}
+    const esp_err_t result =
+        esp_lcd_panel_draw_bitmap(display_handles.panel, 0, 0, BSP_LCD_H_RES, BSP_LCD_V_RES, scanout.back);
+    if (result != ESP_OK) {
+        return false;
+    }
+    scanout.pending = true;
+    return !wait_for_scanout || complete_native_frame();
 }
 
 static bool ppa_transaction_done(ppa_client_handle_t client, ppa_event_data_t* event_data, void* user_data)
@@ -106,6 +138,31 @@ static bool ppa_transaction_done(ppa_client_handle_t client, ppa_event_data_t* e
     BaseType_t task_woken = pdFALSE;
     xSemaphoreGiveFromISR((SemaphoreHandle_t) user_data, &task_woken);
     return task_woken == pdTRUE;
+}
+
+static bool snapshot_copy_completed(async_memcpy_handle_t handle, async_memcpy_event_t* event, void* argument)
+{
+    (void) handle;
+    (void) event;
+    BaseType_t task_woken = pdFALSE;
+    xSemaphoreGiveFromISR((SemaphoreHandle_t) argument, &task_woken);
+    return task_woken == pdTRUE;
+}
+
+static void initialize_snapshot_copy(void)
+{
+    snapshot_copy_done = xSemaphoreCreateBinary();
+    if (snapshot_copy_done == NULL) {
+        return;
+    }
+    const async_memcpy_config_t config = {.backlog = 1U, .dma_burst_size = 128U};
+    const esp_err_t result             = esp_async_memcpy_install_gdma_axi(&config, &snapshot_copy);
+    if (result != ESP_OK) {
+        ESP_LOGW(TAG, "Frame snapshot DMA unavailable: %s", esp_err_to_name(result));
+        vSemaphoreDelete(snapshot_copy_done);
+        snapshot_copy_done = NULL;
+        snapshot_copy      = NULL;
+    }
 }
 
 static bool initialize_ppa(void)
@@ -164,6 +221,7 @@ static bool initialize_ppa(void)
         ppa_scratch = NULL;
         return false;
     }
+    initialize_snapshot_copy();
     ESP_LOGI(TAG, "PPA framebuffer rotation enabled");
     return true;
 }
@@ -184,7 +242,7 @@ static bool present_with_ppa(const platform_framebuffer_t* framebuffer)
                  },
         .out =
             {
-                 .buffer      = native_pixels,
+                 .buffer      = scanout.back,
                  .buffer_size = (uint32_t) buffer_size,
                  .pic_w       = TABOS_DISPLAY_HEIGHT,
                  .pic_h       = TABOS_DISPLAY_WIDTH,
@@ -337,13 +395,18 @@ const char* platform_display_name(void)
 
 uint32_t platform_graphics_capabilities(void)
 {
+    (void) wait_render_worker();
     return ppa_ready ? TABOS_GRAPHICS_CAP_HARDWARE_ACCELERATED : 0U;
 }
 
 bool platform_graphics_begin(void)
 {
+    if (!wait_render_worker() || !complete_native_frame()) {
+        return false;
+    }
     direct_graphics_active =
-        native_pixels != NULL && direct_overlays[0].saved != NULL && direct_overlays[1].saved != NULL;
+        scanout.back != NULL && direct_overlays[0].saved != NULL && direct_overlays[1].saved != NULL;
+    direct_clear_pending      = false;
     direct_frame_prepared     = false;
     direct_frame_dirty        = false;
     direct_overlays[0].active = false;
@@ -353,24 +416,37 @@ bool platform_graphics_begin(void)
 
 void platform_graphics_end(void)
 {
+    /* Join submitted readers before guest memory is freed. Discard unsubmitted
+     * commands without reading their borrowed pixels. */
+    (void) wait_render_worker();
+    (void) complete_native_frame();
+    staged_blit_pending    = false;
+    staged_overlay_pending = false;
+    direct_clear_pending   = false;
     direct_graphics_active = false;
 }
 
-bool platform_graphics_present(platform_framebuffer_t* framebuffer)
+static bool graphics_present_impl(platform_framebuffer_t* framebuffer, bool wait_for_scanout)
 {
     if (!direct_graphics_active) {
         return platform_display_present(framebuffer);
     }
-    if (!direct_frame_dirty) {
-        return wait_for_vsync();
+    if (!flush_direct_clear(NULL)) {
+        return false;
     }
-    if (!submit_native_frame()) {
-        direct_overlay_state_t* overlay = &direct_overlays[native_framebuffer_index(native_pixels)];
+    if (!direct_frame_dirty) {
+        if (scanout.pending) {
+            return !wait_for_scanout || complete_native_frame();
+        }
+        return !wait_for_scanout || wait_for_vsync();
+    }
+    if (!submit_native_frame(wait_for_scanout)) {
+        direct_overlay_state_t* overlay = &direct_overlays[native_framebuffer_index(scanout.back)];
         if (overlay->active) {
-            copy_saved_overlay(native_pixels, overlay);
+            copy_saved_overlay(scanout.back, overlay);
             overlay->active = false;
-            (void) esp_cache_msync(native_pixels,
-                                   (size_t) TABOS_DISPLAY_WIDTH * TABOS_DISPLAY_HEIGHT * sizeof(*native_pixels),
+            (void) esp_cache_msync(scanout.back,
+                                   (size_t) TABOS_DISPLAY_WIDTH * TABOS_DISPLAY_HEIGHT * sizeof(*scanout.back),
                                    ESP_CACHE_MSYNC_FLAG_DIR_C2M);
         }
         return false;
@@ -408,7 +484,7 @@ static void native_fill_cpu(int32_t left, int32_t top, int32_t right, int32_t bo
     const int32_t native_right  = bottom;
     const int32_t native_bottom = TABOS_DISPLAY_WIDTH - left;
     for (int32_t row = native_y; row < native_bottom; ++row) {
-        platform_pixel_t* destination = native_pixels + (size_t) row * TABOS_DISPLAY_HEIGHT + (size_t) native_x;
+        platform_pixel_t* destination = scanout.back + (size_t) row * TABOS_DISPLAY_HEIGHT + (size_t) native_x;
         const size_t count            = (size_t) (native_right - native_x);
         if (!esp32p4_pie_fill16(destination, count, &color)) {
             for (size_t column = 0U; column < count; ++column) {
@@ -418,7 +494,7 @@ static void native_fill_cpu(int32_t left, int32_t top, int32_t right, int32_t bo
     }
     const size_t first = (size_t) native_y * TABOS_DISPLAY_HEIGHT + (size_t) native_x;
     const size_t last  = (size_t) (native_bottom - 1) * TABOS_DISPLAY_HEIGHT + (size_t) native_right;
-    (void) esp_cache_msync(native_pixels + first, (last - first) * sizeof(*native_pixels),
+    (void) esp_cache_msync(scanout.back + first, (last - first) * sizeof(*scanout.back),
                            ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_UNALIGNED);
 }
 
@@ -459,29 +535,96 @@ static void copy_saved_overlay(platform_pixel_t* destination, const direct_overl
 
 static bool prepare_direct_back_buffer(bool replaces_entire_frame)
 {
+    if (!complete_native_frame()) {
+        return false;
+    }
     if (direct_frame_prepared) {
         return true;
     }
     direct_frame_prepared                = true;
-    direct_overlay_state_t* back_overlay = &direct_overlays[native_framebuffer_index(native_pixels)];
+    direct_overlay_state_t* back_overlay = &direct_overlays[native_framebuffer_index(scanout.back)];
     if (replaces_entire_frame) {
         back_overlay->active = false;
         return true;
     }
-    const size_t bytes  = (size_t) TABOS_DISPLAY_WIDTH * TABOS_DISPLAY_HEIGHT * sizeof(*native_pixels);
-    const size_t pixels = bytes / sizeof(*native_pixels);
-    if (!esp32p4_pie_copy16(native_pixels, native_front_pixels, pixels)) {
-        memcpy(native_pixels, native_front_pixels, bytes);
+    const size_t bytes  = (size_t) TABOS_DISPLAY_WIDTH * TABOS_DISPLAY_HEIGHT * sizeof(*scanout.back);
+    const size_t pixels = bytes / sizeof(*scanout.back);
+    if (!esp32p4_pie_copy16(scanout.back, scanout.front, pixels)) {
+        memcpy(scanout.back, scanout.front, bytes);
     }
     back_overlay->active                        = false;
-    const direct_overlay_state_t* front_overlay = &direct_overlays[native_framebuffer_index(native_front_pixels)];
+    const direct_overlay_state_t* front_overlay = &direct_overlays[native_framebuffer_index(scanout.front)];
     if (front_overlay->active) {
-        copy_saved_overlay(native_pixels, front_overlay);
+        copy_saved_overlay(scanout.back, front_overlay);
     }
-    return esp_cache_msync(native_pixels, bytes, ESP_CACHE_MSYNC_FLAG_DIR_C2M) == ESP_OK;
+    return esp_cache_msync(scanout.back, bytes, ESP_CACHE_MSYNC_FLAG_DIR_C2M) == ESP_OK;
 }
 
-bool platform_graphics_overlay(platform_framebuffer_t* framebuffer, const platform_graphics_overlay_t* overlay)
+static void fill_direct_region(int32_t left, int32_t top, int32_t clipped_right, int32_t clipped_bottom,
+                               platform_pixel_t color)
+{
+    if (left >= clipped_right || top >= clipped_bottom) {
+        return;
+    }
+    const uint32_t native_x      = (uint32_t) top;
+    const uint32_t native_y      = TABOS_DISPLAY_WIDTH - (uint32_t) clipped_right;
+    const uint32_t native_width  = (uint32_t) (clipped_bottom - top);
+    const uint32_t native_height = (uint32_t) (clipped_right - left);
+    if (ppa_ready) {
+        while (xSemaphoreTake(ppa_done, 0) == pdTRUE) {}
+        const ppa_fill_oper_config_t direct = {
+            .out =
+                {
+                      .buffer         = scanout.back,
+                      .buffer_size    = TABOS_DISPLAY_WIDTH * TABOS_DISPLAY_HEIGHT * sizeof(*scanout.back),
+                      .pic_w          = TABOS_DISPLAY_HEIGHT,
+                      .pic_h          = TABOS_DISPLAY_WIDTH,
+                      .block_offset_x = native_x,
+                      .block_offset_y = native_y,
+                      .fill_cm        = PPA_FILL_COLOR_MODE_RGB565,
+                      },
+            .fill_block_w = native_width,
+            .fill_block_h = native_height,
+            .fill_argb_color =
+                {
+                      .a = 255U,
+                      .r = (uint8_t) (((color >> 11U) & 0x1fU) << 3U),
+                      .g = (uint8_t) (((color >> 5U) & 0x3fU) << 2U),
+                      .b = (uint8_t) ((color & 0x1fU) << 3U),
+                      },
+            .mode      = PPA_TRANS_MODE_NON_BLOCKING,
+            .user_data = ppa_done,
+        };
+        if (wait_for_ppa(ppa_do_fill(ppa_fill_client, &direct))) {
+            direct_frame_dirty = true;
+            return;
+        }
+    }
+    native_fill_cpu(left, top, clipped_right, clipped_bottom, color);
+    direct_frame_dirty = true;
+}
+
+static bool flush_direct_clear(const tabos_graphics_rect_t* covered)
+{
+    if (!direct_clear_pending) {
+        return true;
+    }
+    if (!prepare_direct_back_buffer(true)) {
+        return false;
+    }
+    direct_clear_pending = false;
+    tabos_graphics_rect_t regions[4];
+    const size_t count = tab5_display_clear_regions(TABOS_DISPLAY_WIDTH, TABOS_DISPLAY_HEIGHT, covered, regions);
+    for (size_t i = 0U; i < count; ++i) {
+        const tabos_graphics_rect_t* region = &regions[i];
+        fill_direct_region(region->x, region->y, region->x + (int32_t) region->width,
+                           region->y + (int32_t) region->height, direct_clear_color);
+    }
+    return true;
+}
+
+static bool graphics_overlay_impl(platform_framebuffer_t* framebuffer, const platform_graphics_overlay_t* overlay,
+                                  const platform_pixel_t* foreground)
 {
     if (!direct_graphics_active) {
         return framebuffer != NULL;
@@ -489,7 +632,10 @@ bool platform_graphics_overlay(platform_framebuffer_t* framebuffer, const platfo
     if (framebuffer == NULL || framebuffer->pixels != logical_pixels) {
         return false;
     }
-    const direct_overlay_state_t* front_overlay = &direct_overlays[native_framebuffer_index(native_front_pixels)];
+    if (!flush_direct_clear(NULL) || !complete_native_frame()) {
+        return false;
+    }
+    const direct_overlay_state_t* front_overlay = &direct_overlays[native_framebuffer_index(scanout.front)];
     if (overlay == NULL) {
         if (!front_overlay->active) {
             return true;
@@ -508,7 +654,7 @@ bool platform_graphics_overlay(platform_framebuffer_t* framebuffer, const platfo
         return false;
     }
 
-    direct_overlay_state_t* back_overlay = &direct_overlays[native_framebuffer_index(native_pixels)];
+    direct_overlay_state_t* back_overlay = &direct_overlays[native_framebuffer_index(scanout.back)];
     back_overlay->x                      = overlay->x;
     back_overlay->y                      = overlay->y;
     back_overlay->width                  = overlay->width;
@@ -518,11 +664,13 @@ bool platform_graphics_overlay(platform_framebuffer_t* framebuffer, const platfo
             const int32_t logical_x = overlay->x + (int32_t) column;
             const int32_t logical_y = overlay->y + (int32_t) row;
             platform_pixel_t* destination =
-                native_pixels + (size_t) (TABOS_DISPLAY_WIDTH - 1 - logical_x) * TABOS_DISPLAY_HEIGHT + logical_y;
+                scanout.back + (size_t) (TABOS_DISPLAY_WIDTH - 1 - logical_x) * TABOS_DISPLAY_HEIGHT + logical_y;
             const size_t overlay_index         = (size_t) row * overlay->width + column;
             back_overlay->saved[overlay_index] = *destination;
             const platform_pixel_t source =
-                framebuffer->pixels[(size_t) logical_y * framebuffer->stride_pixels + (size_t) logical_x];
+                foreground != NULL ?
+                    foreground[overlay_index] :
+                    framebuffer->pixels[(size_t) logical_y * framebuffer->stride_pixels + (size_t) logical_x];
             if (source != overlay->background[overlay_index]) {
                 *destination = source;
             }
@@ -533,11 +681,11 @@ bool platform_graphics_overlay(platform_framebuffer_t* framebuffer, const platfo
                          (size_t) overlay->y;
     const size_t last =
         (size_t) (TABOS_DISPLAY_WIDTH - overlay->x - 1) * TABOS_DISPLAY_HEIGHT + (size_t) overlay->y + overlay->height;
-    if (esp_cache_msync(native_pixels + first, (last - first) * sizeof(*native_pixels),
+    if (esp_cache_msync(scanout.back + first, (last - first) * sizeof(*scanout.back),
                         ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_UNALIGNED) != ESP_OK) {
-        copy_saved_overlay(native_pixels, back_overlay);
+        copy_saved_overlay(scanout.back, back_overlay);
         back_overlay->active = false;
-        (void) esp_cache_msync(native_pixels + first, (last - first) * sizeof(*native_pixels),
+        (void) esp_cache_msync(scanout.back + first, (last - first) * sizeof(*scanout.back),
                                ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_UNALIGNED);
         return false;
     }
@@ -555,7 +703,7 @@ static bool native_blit_cpu(const tabos_graphics_blit_options_t* options)
         options->rotation > TABOS_GRAPHICS_ROTATE_270) {
         return false;
     }
-    if (!prepare_direct_back_buffer(false)) {
+    if (!flush_direct_clear(NULL) || !prepare_direct_back_buffer(false)) {
         return false;
     }
     const uint32_t rotated_width =
@@ -602,19 +750,19 @@ static bool native_blit_cpu(const tabos_graphics_blit_options_t* options)
                 native_color_keyed(source, options->color_key_low, options->color_key_high)) {
                 continue;
             }
-            platform_pixel_t* destination = native_pixels +
+            platform_pixel_t* destination = scanout.back +
                                             (size_t) (TABOS_DISPLAY_WIDTH - 1 - logical_x) * TABOS_DISPLAY_HEIGHT +
                                             (size_t) logical_y;
             *destination = options->opacity == 255U ? source : native_blend(source, *destination, options->opacity);
         }
     }
-    (void) esp_cache_msync(native_pixels, (size_t) TABOS_DISPLAY_WIDTH * TABOS_DISPLAY_HEIGHT * sizeof(*native_pixels),
+    (void) esp_cache_msync(scanout.back, (size_t) TABOS_DISPLAY_WIDTH * TABOS_DISPLAY_HEIGHT * sizeof(*scanout.back),
                            ESP_CACHE_MSYNC_FLAG_DIR_C2M);
     direct_frame_dirty = true;
     return true;
 }
 
-static bool native_blit_ppa(const tabos_graphics_blit_options_t* options)
+static bool native_blit_ppa_supported(const tabos_graphics_blit_options_t* options)
 {
     if (!ppa_ready || options == NULL || options->pixels == NULL || options->source.x < 0 || options->source.y < 0 ||
         options->source.width == 0U || options->source.height == 0U || options->destination.width == 0U ||
@@ -628,7 +776,19 @@ static bool native_blit_ppa(const tabos_graphics_blit_options_t* options)
         (uint64_t) options->destination.width * options->destination.height < TAB5_PPA_BLIT_MIN_PIXELS) {
         return false;
     }
-    if (!prepare_direct_back_buffer(false)) {
+    return true;
+}
+
+static bool native_blit_ppa(const tabos_graphics_blit_options_t* options)
+{
+    if (!native_blit_ppa_supported(options)) {
+        return false;
+    }
+    /* Restrict clear elision to exact half/integer scales. PPA quantizes other
+     * ratios, so their requested destination can include pixels it never writes. */
+    const bool exact_coverage = ((uint64_t) options->destination.width * 2U) % options->source.width == 0U &&
+                                ((uint64_t) options->destination.height * 2U) % options->source.height == 0U;
+    if (!flush_direct_clear(exact_coverage ? &options->destination : NULL) || !prepare_direct_back_buffer(false)) {
         return false;
     }
 
@@ -649,8 +809,8 @@ static bool native_blit_ppa(const tabos_graphics_blit_options_t* options)
                  },
         .out =
             {
-                 .buffer         = native_pixels,
-                 .buffer_size    = TABOS_DISPLAY_WIDTH * TABOS_DISPLAY_HEIGHT * sizeof(*native_pixels),
+                 .buffer         = scanout.back,
+                 .buffer_size    = TABOS_DISPLAY_WIDTH * TABOS_DISPLAY_HEIGHT * sizeof(*scanout.back),
                  .pic_w          = TABOS_DISPLAY_HEIGHT,
                  .pic_h          = TABOS_DISPLAY_WIDTH,
                  .block_offset_x = native_x,
@@ -670,8 +830,104 @@ static bool native_blit_ppa(const tabos_graphics_blit_options_t* options)
     return true;
 }
 
-bool platform_graphics_fill(platform_framebuffer_t* framebuffer, int32_t x, int32_t y, uint32_t width, uint32_t height,
-                            platform_pixel_t color)
+static bool wait_render_worker(void)
+{
+    return tab5_display_work_finish(&render_work, render_worker_done);
+}
+
+static bool finish_staged_drawing(void)
+{
+    if (staged_blit_pending) {
+        staged_blit_pending    = false;
+        const bool accelerated = native_blit_ppa(&staged_blit);
+        if (!accelerated && !native_blit_cpu(&staged_blit)) {
+            return false;
+        }
+    }
+    if (staged_overlay_pending) {
+        staged_overlay_pending             = false;
+        platform_framebuffer_t framebuffer = {.pixels        = logical_pixels,
+                                              .width         = TABOS_DISPLAY_WIDTH,
+                                              .height        = TABOS_DISPLAY_HEIGHT,
+                                              .stride_pixels = TABOS_DISPLAY_WIDTH};
+        if (!graphics_overlay_impl(&framebuffer, staged_overlay_visible ? &staged_overlay : NULL,
+                                   staged_overlay_visible ? staged_overlay_pixels : NULL)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static void render_worker(void* argument)
+{
+    (void) argument;
+    for (;;) {
+        (void) ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        platform_framebuffer_t framebuffer = {.pixels        = logical_pixels,
+                                              .width         = TABOS_DISPLAY_WIDTH,
+                                              .height        = TABOS_DISPLAY_HEIGHT,
+                                              .stride_pixels = TABOS_DISPLAY_WIDTH};
+        render_work.succeeded              = finish_staged_drawing() && graphics_present_impl(&framebuffer, false);
+        xSemaphoreGive(render_worker_done);
+    }
+}
+
+static bool stage_native_blit(const tabos_graphics_blit_options_t* options, bool retain_sources)
+{
+    const size_t capacity =
+        (size_t) TABOS_DISPLAY_WIDTH * TABOS_DISPLAY_HEIGHT - 2U * TAB5_GRAPHICS_OVERLAY_MAX_PIXELS - 8U;
+    if (render_worker_task == NULL || !direct_clear_pending || !native_blit_ppa_supported(options) ||
+        (uint64_t) options->source.width * options->source.height > capacity) {
+        return false;
+    }
+    if (retain_sources) {
+        staged_blit         = *options;
+        staged_blit_pending = true;
+        return true;
+    }
+    const platform_pixel_t* first =
+        options->pixels + (size_t) (uint32_t) options->source.y * options->bitmap_width + (uint32_t) options->source.x;
+    /* Matching alignment permits a scalar prefix followed by vector copies. */
+    platform_pixel_t* packed = ppa_scratch + (((uintptr_t) first & 15U) / sizeof(*ppa_scratch));
+    size_t copy_rows         = options->source.height;
+    size_t copy_pixels       = options->source.width;
+    if (options->source.x == 0 && options->source.width == options->bitmap_width) {
+        copy_rows    = 1U;
+        copy_pixels *= options->source.height;
+    }
+    bool copied = false;
+    if (snapshot_copy != NULL && copy_rows == 1U && copy_pixels >= TAB5_PPA_BLIT_MIN_PIXELS) {
+        /* Source and snapshot share their offset, so both become DMA-aligned. */
+        const size_t prefix = ((16U - ((uintptr_t) first & 15U)) & 15U) / sizeof(*packed);
+        const size_t body   = (copy_pixels - prefix) & ~(size_t) 7U;
+        memcpy(packed, first, prefix * sizeof(*packed));
+        while (xSemaphoreTake(snapshot_copy_done, 0) == pdTRUE) {}
+        if (esp_async_memcpy(snapshot_copy, packed + prefix, (void*) (first + prefix), body * sizeof(*packed),
+                             snapshot_copy_completed, snapshot_copy_done) == ESP_OK) {
+            /* Never release borrowed input or use fallback until accepted DMA finishes. */
+            copied = tab5_display_wait_completion(snapshot_copy_done, "frame snapshot");
+            memcpy(packed + prefix + body, first + prefix + body, (copy_pixels - prefix - body) * sizeof(*packed));
+        }
+    }
+    for (size_t row = 0U; !copied && row < copy_rows; ++row) {
+        platform_pixel_t* destination  = packed + row * copy_pixels;
+        const platform_pixel_t* source = first + row * options->bitmap_width;
+        if (!esp32p4_pie_copy16(destination, source, copy_pixels)) {
+            memcpy(destination, source, copy_pixels * sizeof(*destination));
+        }
+    }
+    staged_blit               = *options;
+    staged_blit.pixels        = packed;
+    staged_blit.bitmap_width  = options->source.width;
+    staged_blit.bitmap_height = options->source.height;
+    staged_blit.source.x      = 0;
+    staged_blit.source.y      = 0;
+    staged_blit_pending       = true;
+    return true;
+}
+
+static bool graphics_fill_impl(platform_framebuffer_t* framebuffer, int32_t x, int32_t y, uint32_t width,
+                               uint32_t height, platform_pixel_t color)
 {
     if (framebuffer == NULL || framebuffer->pixels != logical_pixels || width == 0U || height == 0U) {
         return false;
@@ -687,45 +943,16 @@ bool platform_graphics_fill(platform_framebuffer_t* framebuffer, int32_t x, int3
     if (direct_graphics_active) {
         const bool fullscreen =
             left == 0 && top == 0 && clipped_right == TABOS_DISPLAY_WIDTH && clipped_bottom == TABOS_DISPLAY_HEIGHT;
-        if (!prepare_direct_back_buffer(fullscreen)) {
+        if (fullscreen) {
+            direct_clear_pending = true;
+            direct_clear_color   = color;
+            direct_frame_dirty   = true;
+            return true;
+        }
+        if (!flush_direct_clear(NULL) || !prepare_direct_back_buffer(false)) {
             return false;
         }
-        const uint32_t native_x      = (uint32_t) top;
-        const uint32_t native_y      = TABOS_DISPLAY_WIDTH - (uint32_t) clipped_right;
-        const uint32_t native_width  = (uint32_t) (clipped_bottom - top);
-        const uint32_t native_height = (uint32_t) (clipped_right - left);
-        if (ppa_ready) {
-            while (xSemaphoreTake(ppa_done, 0) == pdTRUE) {}
-            const ppa_fill_oper_config_t direct = {
-                .out =
-                    {
-                          .buffer         = native_pixels,
-                          .buffer_size    = TABOS_DISPLAY_WIDTH * TABOS_DISPLAY_HEIGHT * sizeof(*native_pixels),
-                          .pic_w          = TABOS_DISPLAY_HEIGHT,
-                          .pic_h          = TABOS_DISPLAY_WIDTH,
-                          .block_offset_x = native_x,
-                          .block_offset_y = native_y,
-                          .fill_cm        = PPA_FILL_COLOR_MODE_RGB565,
-                          },
-                .fill_block_w = native_width,
-                .fill_block_h = native_height,
-                .fill_argb_color =
-                    {
-                          .a = 255U,
-                          .r = (uint8_t) (((color >> 11U) & 0x1fU) << 3U),
-                          .g = (uint8_t) (((color >> 5U) & 0x3fU) << 2U),
-                          .b = (uint8_t) ((color & 0x1fU) << 3U),
-                          },
-                .mode      = PPA_TRANS_MODE_NON_BLOCKING,
-                .user_data = ppa_done,
-            };
-            if (wait_for_ppa(ppa_do_fill(ppa_fill_client, &direct))) {
-                direct_frame_dirty = true;
-                return true;
-            }
-        }
-        native_fill_cpu(left, top, clipped_right, clipped_bottom, color);
-        direct_frame_dirty = true;
+        fill_direct_region(left, top, clipped_right, clipped_bottom, color);
         return true;
     }
     if (!ppa_ready) {
@@ -758,10 +985,11 @@ bool platform_graphics_fill(platform_framebuffer_t* framebuffer, int32_t x, int3
     return wait_for_ppa(ppa_do_fill(ppa_fill_client, &config));
 }
 
-bool platform_graphics_blit(platform_framebuffer_t* framebuffer, const tabos_graphics_blit_options_t* options)
+static bool graphics_blit_impl(platform_framebuffer_t* framebuffer, const tabos_graphics_blit_options_t* options)
 {
     if (direct_graphics_active) {
-        return native_blit_ppa(options) || native_blit_cpu(options);
+        const bool accelerated = native_blit_ppa(options);
+        return accelerated || native_blit_cpu(options);
     }
     if (!ppa_ready || framebuffer == NULL || options == NULL || options->pixels == NULL || options->source.x < 0 ||
         options->source.y < 0 || options->destination.x < 0 || options->destination.y < 0 ||
@@ -964,8 +1192,8 @@ bool platform_display_init(platform_framebuffer_t* framebuffer)
         platform_display_shutdown();
         return false;
     }
-    native_front_pixels = native_framebuffers[0];
-    native_pixels       = native_framebuffers[1];
+    scanout.front = native_framebuffers[0];
+    scanout.back  = native_framebuffers[1];
     vTaskDelay(pdMS_TO_TICKS(100));
     ppa_ready    = initialize_ppa();
     *framebuffer = (platform_framebuffer_t) {
@@ -974,6 +1202,16 @@ bool platform_display_init(platform_framebuffer_t* framebuffer)
         .height        = TABOS_DISPLAY_HEIGHT,
         .stride_pixels = TABOS_DISPLAY_WIDTH,
     };
+    if (ppa_ready) {
+        render_worker_done = xSemaphoreCreateBinary();
+        staged_overlay_pixels =
+            ppa_scratch + (size_t) TABOS_DISPLAY_WIDTH * TABOS_DISPLAY_HEIGHT - 2U * TAB5_GRAPHICS_OVERLAY_MAX_PIXELS;
+        staged_overlay_background = staged_overlay_pixels + TAB5_GRAPHICS_OVERLAY_MAX_PIXELS;
+        if (render_worker_done != NULL &&
+            xTaskCreate(render_worker, "tabos-display", 4096U, NULL, 6U, &render_worker_task) != pdPASS) {
+            render_worker_task = NULL;
+        }
+    }
     ESP_LOGI(TAG, "Tab5 display initialized at %dx%d RGB565", TABOS_DISPLAY_WIDTH, TABOS_DISPLAY_HEIGHT);
     platform_raster_diagnostics();
     return true;
@@ -981,7 +1219,8 @@ bool platform_display_init(platform_framebuffer_t* framebuffer)
 
 bool platform_display_present(const platform_framebuffer_t* framebuffer)
 {
-    if (!display_created || framebuffer == NULL || framebuffer->pixels != logical_pixels) {
+    if (!display_created || framebuffer == NULL || framebuffer->pixels != logical_pixels || !wait_render_worker() ||
+        !complete_native_frame()) {
         return false;
     }
     bool hardware_presented = false;
@@ -991,21 +1230,21 @@ bool platform_display_present(const platform_framebuffer_t* framebuffer)
     } else if (ppa_ready) {
         hardware_presented = true;
     }
-    if (!ppa_ready && !platform_framebuffer_rotate_counter_clockwise(framebuffer, native_pixels, TABOS_DISPLAY_HEIGHT,
+    if (!ppa_ready && !platform_framebuffer_rotate_counter_clockwise(framebuffer, scanout.back, TABOS_DISPLAY_HEIGHT,
                                                                      TABOS_DISPLAY_WIDTH)) {
         ESP_LOGE(TAG, "Could not rotate Tab5 framebuffer");
         return false;
     }
-    const size_t buffer_size = (size_t) TABOS_DISPLAY_WIDTH * TABOS_DISPLAY_HEIGHT * sizeof(*native_pixels);
+    const size_t buffer_size = (size_t) TABOS_DISPLAY_WIDTH * TABOS_DISPLAY_HEIGHT * sizeof(*scanout.back);
     if (!hardware_presented) {
-        const esp_err_t sync_result = esp_cache_msync(native_pixels, buffer_size, ESP_CACHE_MSYNC_FLAG_DIR_C2M);
+        const esp_err_t sync_result = esp_cache_msync(scanout.back, buffer_size, ESP_CACHE_MSYNC_FLAG_DIR_C2M);
         if (sync_result != ESP_OK) {
             ESP_LOGE(TAG, "Could not synchronize Tab5 framebuffer: %s", esp_err_to_name(sync_result));
             return false;
         }
     }
-    direct_overlays[native_framebuffer_index(native_pixels)].active = false;
-    if (!submit_native_frame()) {
+    direct_overlays[native_framebuffer_index(scanout.back)].active = false;
+    if (!submit_native_frame(true)) {
         ESP_LOGE(TAG, "Could not submit Tab5 framebuffer at VSYNC");
         return false;
     }
@@ -1055,6 +1294,18 @@ bool platform_power_set_panel_enabled(bool enabled)
 
 void platform_display_shutdown(void)
 {
+    (void) wait_render_worker();
+    if (render_worker_task != NULL) {
+        vTaskDelete(render_worker_task);
+        render_worker_task = NULL;
+    }
+    if (render_worker_done != NULL) {
+        vSemaphoreDelete(render_worker_done);
+        render_worker_done = NULL;
+    }
+    staged_blit_pending    = false;
+    staged_overlay_pending = false;
+    (void) complete_native_frame();
     ppa_ready = false;
     if (ppa_srm_client != NULL) {
         (void) ppa_unregister_client(ppa_srm_client);
@@ -1071,6 +1322,25 @@ void platform_display_shutdown(void)
     if (ppa_done != NULL) {
         vSemaphoreDelete(ppa_done);
         ppa_done = NULL;
+    }
+    if (snapshot_copy != NULL) {
+        /* The completion callback can wake another core before the driver
+         * finishes returning its transaction to the idle queue. */
+        const TickType_t started = xTaskGetTickCount();
+        esp_err_t result;
+        do {
+            result = esp_async_memcpy_uninstall(snapshot_copy);
+            if (result != ESP_ERR_INVALID_STATE) {
+                break;
+            }
+            vTaskDelay(1U);
+        } while ((TickType_t) (xTaskGetTickCount() - started) < pdMS_TO_TICKS(2000U));
+        ESP_ERROR_CHECK(result);
+        snapshot_copy = NULL;
+    }
+    if (snapshot_copy_done != NULL) {
+        vSemaphoreDelete(snapshot_copy_done);
+        snapshot_copy_done = NULL;
     }
     free(ppa_scratch);
     ppa_scratch = NULL;
@@ -1102,8 +1372,9 @@ void platform_display_shutdown(void)
         display_created  = false;
         display_uses_bsp = false;
     }
-    native_pixels             = NULL;
-    native_front_pixels       = NULL;
+    direct_clear_pending      = false;
+    scanout.back              = NULL;
+    scanout.front             = NULL;
     native_framebuffers[0]    = NULL;
     native_framebuffers[1]    = NULL;
     direct_overlays[0].active = false;
@@ -1118,4 +1389,88 @@ void platform_display_shutdown(void)
     }
     free(logical_pixels);
     logical_pixels = NULL;
+}
+
+bool platform_graphics_fill(platform_framebuffer_t* framebuffer, int32_t x, int32_t y, uint32_t width, uint32_t height,
+                            platform_pixel_t color)
+{
+    const bool result =
+        wait_render_worker() && finish_staged_drawing() && graphics_fill_impl(framebuffer, x, y, width, height, color);
+    return result;
+}
+
+static bool graphics_blit_dispatch(platform_framebuffer_t* framebuffer, const tabos_graphics_blit_options_t* options,
+                                   bool retain_sources)
+{
+    const bool result = wait_render_worker() && finish_staged_drawing() &&
+                        ((direct_graphics_active && framebuffer != NULL && framebuffer->pixels == logical_pixels &&
+                          stage_native_blit(options, retain_sources)) ||
+                         graphics_blit_impl(framebuffer, options));
+    return result;
+}
+
+bool platform_graphics_blit(platform_framebuffer_t* framebuffer, const tabos_graphics_blit_options_t* options)
+{
+    return graphics_blit_dispatch(framebuffer, options, false);
+}
+
+bool platform_graphics_blit_retained(platform_framebuffer_t* framebuffer, const tabos_graphics_blit_options_t* options)
+{
+    return graphics_blit_dispatch(framebuffer, options, true);
+}
+
+bool platform_graphics_wait(platform_framebuffer_t* framebuffer)
+{
+    return framebuffer != NULL && framebuffer->pixels == logical_pixels && wait_render_worker() &&
+           finish_staged_drawing();
+}
+
+bool platform_graphics_overlay(platform_framebuffer_t* framebuffer, const platform_graphics_overlay_t* overlay)
+{
+    bool result = wait_render_worker();
+    if (result && staged_blit_pending && framebuffer != NULL && framebuffer->pixels == logical_pixels) {
+        if (overlay != NULL &&
+            (overlay->background == NULL || overlay->x < 0 || overlay->y < 0 || overlay->width == 0U ||
+             overlay->height == 0U || (uint64_t) (uint32_t) overlay->x + overlay->width > framebuffer->width ||
+             (uint64_t) (uint32_t) overlay->y + overlay->height > framebuffer->height ||
+             (uint64_t) overlay->width * overlay->height > TAB5_GRAPHICS_OVERLAY_MAX_PIXELS)) {
+            result = false;
+        } else {
+            staged_overlay_pending = true;
+            staged_overlay_visible = overlay != NULL;
+            if (overlay != NULL) {
+                staged_overlay = *overlay;
+                for (uint32_t row = 0U; row < overlay->height; ++row) {
+                    memcpy(staged_overlay_pixels + (size_t) row * overlay->width,
+                           framebuffer->pixels + ((size_t) (uint32_t) overlay->y + row) * framebuffer->stride_pixels +
+                               (uint32_t) overlay->x,
+                           (size_t) overlay->width * sizeof(*staged_overlay_pixels));
+                }
+                memcpy(staged_overlay_background, overlay->background,
+                       (size_t) overlay->width * overlay->height * sizeof(*staged_overlay_background));
+                staged_overlay.background = staged_overlay_background;
+            }
+        }
+    } else if (result) {
+        result = graphics_overlay_impl(framebuffer, overlay, NULL);
+    }
+    return result;
+}
+
+bool platform_graphics_present(platform_framebuffer_t* framebuffer)
+{
+    const bool result = wait_render_worker() && finish_staged_drawing() && graphics_present_impl(framebuffer, true);
+    return result;
+}
+
+bool platform_graphics_submit(platform_framebuffer_t* framebuffer)
+{
+    bool result = framebuffer != NULL && framebuffer->pixels == logical_pixels && wait_render_worker();
+    if (result && staged_blit_pending) {
+        render_work.pending = true;
+        xTaskNotifyGive(render_worker_task);
+    } else if (result) {
+        result = graphics_present_impl(framebuffer, false);
+    }
+    return result;
 }
