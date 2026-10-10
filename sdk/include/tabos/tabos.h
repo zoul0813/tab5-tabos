@@ -5,6 +5,7 @@
 #include <tabos/audio.h>
 #include <tabos/camera.h>
 #include <tabos/console.h>
+#include <tabos/compute.h>
 #include <tabos/filesystem.h>
 #include <tabos/graphics.h>
 #include <tabos/input.h>

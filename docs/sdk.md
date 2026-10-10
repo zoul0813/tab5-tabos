@@ -146,3 +146,32 @@ Overflow, focus changes and explicit resynchronization advance that generation.
 Passing `true` atomically discards queued events and returns the new generation and
 pressed state. Applications should release their guest keys on a generation change,
 resynchronize, and ignore already-held physical keys until released.
+
+## Bounded compute jobs
+
+`<tabos/compute.h>` provides one outstanding pure-compute job per application.
+`tabos_compute_submit(callback, data, bytes)` returns zero on acceptance, or a
+negative errno. The data range must lie in the calling application's allocated
+heap, and the callback must lie in its loaded executable image. A second submit
+returns `-EBUSY` until `tabos_compute_wait()` consumes the previous completion.
+`tabos_compute_poll()` returns 0 while running, 1 when idle/completed, or a
+negative errno. Poll does not consume completion; call wait to acquire results
+and release the outstanding job. Wait returns zero or a negative job error and establishes visibility of all
+callback writes. On the host RV32 interpreter submit returns `-ENOTSUP`; callers
+can run the same callback synchronously.
+
+Tab5 lazily creates one normally scheduled FreeRTOS worker with a 16 KiB PSRAM
+stack. No CPU core is reserved. Callbacks must be bounded, use preallocated
+private storage and stateless C operations, and retain all referenced storage
+until wait returns. Allocation, stdio, SDK calls, locks and concurrent mutation
+of shared inputs are forbidden. A guarded SDK call aborts the job before entering
+a service; wait returns `-EPERM`. This is not a general threading API and does
+not make newlib application state thread-safe. Application teardown suspends and
+checks both tasks before deleting either or freeing code/heap; nested execution
+consumes outstanding compute work before handing focus to a child.
+
+The compute API is experimental and optional. Native applications and firmware
+must be rebuilt together for private transport 26 (application ABI remains 3).
+Existing applications can keep blocking present and single-task execution.
+Rollback restores both matching firmware and applications; older transports
+are rejected, not run with a different call-table layout.

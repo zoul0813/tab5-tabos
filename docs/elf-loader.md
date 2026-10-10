@@ -193,3 +193,10 @@ Only completed calls publish results and advance the guest PC. Pending socket/TL
 operations and generic waits release the SDL thread; DNS/echo/TLS setup workers retain
 copied backend data, never guest RAM or process pointers. Cancelling a process discards
 its continuation before freeing guest memory.
+
+Native execution also owns the optional pure-compute worker (private transport
+26). The main task drains guarded calls before cleanup suspends/checks the
+worker on either core. Pure callbacks cannot enter SDK service gates; an attempted
+call aborts only that job. The callback image and all borrowed heap storage remain
+loaded until both tasks are quiescent. See `docs/sdk.md` for the restricted public
+compute contract and host synchronous fallback.

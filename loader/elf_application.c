@@ -2170,6 +2170,32 @@ static int elf_graphics_set_overlays(uint32_t flags)
     return 0;
 }
 
+static int elf_compute_submit(uintptr_t callback, void* data, uint32_t bytes)
+{
+    loader_elf_application_t* application = platform_riscv32_current_user_data();
+    if (application == NULL || application->context == NULL ||
+        atomic_load_explicit(&application->exec_in_flight, memory_order_acquire)) {
+        return -TABOS_EBUSY;
+    }
+    const uintptr_t base    = (uintptr_t) application->heap;
+    const uintptr_t address = (uintptr_t) data;
+    if (callback == 0U || data == NULL || bytes == 0U || address < base || address - base > application->heap_used ||
+        bytes > application->heap_used - (address - base)) {
+        return -TABOS_EINVAL;
+    }
+    return platform_riscv32_compute_submit(callback, data);
+}
+
+static int elf_compute_poll(void)
+{
+    return platform_riscv32_compute_poll();
+}
+
+static int elf_compute_wait(void)
+{
+    return platform_riscv32_compute_wait();
+}
+
 static int elf_exec(const char* path, uint32_t argc, const char* const* argv)
 {
     loader_elf_application_t* application = platform_riscv32_current_user_data();
@@ -2186,6 +2212,10 @@ static int elf_exec(const char* path, uint32_t argc, const char* const* argv)
     }
     if (application->graphics_active) {
         return -TABOS_EBUSY;
+    }
+    const int compute_result = platform_riscv32_compute_wait();
+    if (compute_result < 0 && compute_result != -TABOS_ENOTSUP) {
+        return compute_result;
     }
     const char* readable_path = platform_executable_data_pointer(path, TABOS_FS_PATH_MAX);
     if (readable_path == NULL) {
@@ -2280,6 +2310,9 @@ static bool elf_entry(tabos_app_context_t* context)
         .graphics_submit                 = elf_graphics_submit,
         .graphics_submit_borrowed        = elf_graphics_submit_borrowed,
         .graphics_wait                   = elf_graphics_wait,
+        .compute_submit                  = elf_compute_submit,
+        .compute_wait                    = elf_compute_wait,
+        .compute_poll                    = elf_compute_poll,
         .graphics_close                  = elf_graphics_close,
         .graphics_capabilities           = elf_graphics_capabilities,
         .graphics_blit_ex                = elf_graphics_blit_ex,

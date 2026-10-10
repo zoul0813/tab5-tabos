@@ -15,7 +15,7 @@ def run(device, args, configuration):
     reports = []
     outputs = []
     try:
-        for option, label in (('--filesystem', 'Filesystem'), ('--input', 'Input')):
+        for option, label in (('--filesystem', 'Filesystem'), ('--input', 'Input'), ('--compute', 'Compute')):
             device.start('tester ' + option)
             output = device.wait_shell()
             outputs.append(output)

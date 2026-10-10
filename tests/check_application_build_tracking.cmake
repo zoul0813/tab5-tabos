@@ -18,6 +18,7 @@ set(runtime_sources
     crt/crt0.c
     crt/metadata.S
     libc/syscalls.c
+    lib/compute.c
     lib/process.c
     lib/graphics.c
     lib/input.c

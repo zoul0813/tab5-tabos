@@ -167,7 +167,7 @@ and parent restoration notify runtime through a pointer-free coalesced readiness
 Process state remains authoritative and late wakeups cannot target reused process slots.
 ELF teardown cancels waits and stops native execution before releasing process-owned
 resources. Native task lifetime now lives in `platform/esp32p4/application_task.c`.
-All 101 private ABI gates track active depth. Stop waits for cross-core suspension,
+All 104 private ABI gates track active depth. Stop waits for cross-core suspension,
 resumes active gates to drain cancelled work and release locks, then deletes only a
 stopped task outside every gate. Native workers return their replies before the calling
 gate exits; DNS and bounded driver calls may delay safe shutdown. Teardown discards queued graphics commands without reading borrowed guest
@@ -236,7 +236,7 @@ Tab5 loads writable PSRAM, maps a read/execute alias of the same pages, applies
 load-bias relocations, and synchronizes caches before native task entry. Guest
 API pointers map through platform translation back to readable data aliases.
 Optional elf-hello startup remains a diagnostic; normal startup is T:/bin/shell.
-The pre-release application ABI is 3 and current private transport is 25; neither
+The pre-release application ABI is 3 and current private transport is 26; neither
 promises compatibility for independently released third-party binaries yet.
 
 ## 4. Multitasking and CPU Cores
@@ -788,7 +788,7 @@ Current choices above were cross-checked against `docs/input.md`,
 `docs/elf-loader.md`, and `docs/sdk.md`, plus:
 
 - `sdk/make/application.mk` and `loader/include/tabos/internal/elf_loader.h`: RV32I/ilp32, 256 KiB heap, 16 KiB stack, optional metadata.
-- `sdk/include/tabos/internal/elf_api.h`: current private transport version 25.
+- `sdk/include/tabos/internal/elf_api.h`: current private transport version 26.
 - `platform/esp32p4/keyboard.c`: Normal-mode selection and matrix reports.
 - `platform/esp32p4/display.c`: RGB565 logical PSRAM and double native scanout buffers.
 - `platform/esp32p4/executable.c`: writable/executable PSRAM aliases.
@@ -985,3 +985,16 @@ display/memory/clock/stack counters and codec mute. App-owned tester and graphic
 benchmark workloads use the shared runner. Upload remains macOS-only, explicit
 files with backups/hash verification/eject; see docs/device-testing.md. Standard
 firmware defaults stay unchanged; sdkconfig.performance.defaults is optional.
+
+## Experimental bounded compute (transport 26)
+
+One process-owned pure-compute job may run on a lazily allocated, normally
+scheduled 16 KiB PSRAM worker. Heap/image ranges are validated; callbacks may
+use only private preallocated data and stateless C operations. SDK gates abort
+a callback before service entry with EPERM. Wait acquires results and consumes
+completion; poll does not consume it. Nested execution waits for completion.
+Teardown drains main gates, suspends/checks both tasks, fences display readers,
+then frees stacks/code/heap. No core affinity or general threading is exposed.
+Host RV32 returns ENOTSUP; the caller may execute the callback synchronously.
+Test native worker completion, repeated jobs, allocation failure, invalid ranges,
+forbidden gates and cross-core forced stop; tester exercises the public API.

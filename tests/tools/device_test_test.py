@@ -116,8 +116,8 @@ class DeviceTest(unittest.TestCase):
             def stats(self):
                 return {'frames': 240}
         for app, outputs, expected in (
-            ('tester', ['Filesystem assertions: 24; failures: 0', 'Input assertions: 18; failures: 0'],
-             ['tester --filesystem', 'tester --input']),
+            ('tester', ['Filesystem assertions: 24; failures: 0', 'Input assertions: 18; failures: 0', 'Compute assertions: 12; failures: 0'],
+             ['tester --filesystem', 'tester --input', 'tester --compute']),
             ('graphics_benchmark', ['Present only: 60 frames in 1000 ms\nClear + present: 60 frames in 1000 ms\nScene: 120 frames in 2000 ms'], ['gbench']),
         ):
             with tempfile.TemporaryDirectory() as folder:

@@ -1,11 +1,16 @@
 #include <tabos/platform/platform.h>
+#include <tabos/filesystem.h>
 #include <tabos/config/identity.h>
 #include <esp_heap_caps.h>
 #include <esp_log.h>
+#ifdef TABOS_ENABLE_DEVICE_TEST_CONTROL
+#include <esp_timer.h>
+#endif
 #include <freertos/FreeRTOS.h>
 #include <freertos/idf_additions.h>
 #include <freertos/task.h>
 #include <stdatomic.h>
+#include <setjmp.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -28,6 +33,25 @@ struct platform_riscv32_context {
         atomic_bool stop_requested;
         atomic_uint gate_depth;
         int returned_status;
+        const void* executable_memory;
+        size_t executable_bytes;
+        TaskHandle_t compute_task;
+        platform_signal_t* compute_ready;
+        platform_signal_t* compute_finished;
+        void (*compute_callback)(void*);
+        void* compute_data;
+        jmp_buf compute_escape;
+        atomic_bool compute_submitted;
+        atomic_bool compute_complete;
+        bool compute_pending;
+        int compute_result;
+#ifdef TABOS_ENABLE_DEVICE_TEST_CONTROL
+        uint64_t compute_enqueued_us;
+        uint64_t compute_queue_us;
+        uint64_t compute_execution_us;
+        uint64_t compute_join_us;
+        uint32_t compute_jobs;
+#endif
 };
 
 static platform_riscv32_context_t* current_context(void)
@@ -45,6 +69,9 @@ static void park_if_stopping(platform_riscv32_context_t* context)
 static platform_riscv32_context_t* gate_enter(void)
 {
     platform_riscv32_context_t* context = current_context();
+    if (xTaskGetCurrentTaskHandle() == context->compute_task) {
+        longjmp(context->compute_escape, 1);
+    }
     park_if_stopping(context);
     atomic_fetch_add_explicit(&context->gate_depth, 1U, memory_order_acq_rel);
     return context;
@@ -97,8 +124,111 @@ _Static_assert(sizeof(tabos_elf_api_t) ==
                "Update native gate guards when the private ABI changes");
 
 enum {
-    ELF_TASK_PRIORITY = 5
+    ELF_TASK_PRIORITY        = 5,
+    COMPUTE_TASK_STACK_BYTES = 16384
 };
+
+static void compute_task_main(void* argument)
+{
+    platform_riscv32_context_t* context = argument;
+    vTaskSetThreadLocalStoragePointer(NULL, 0, context);
+    for (;;) {
+        platform_signal_wait(context->compute_ready, UINT32_MAX);
+        if (!atomic_exchange_explicit(&context->compute_submitted, false, memory_order_acquire)) {
+            continue;
+        }
+#ifdef TABOS_ENABLE_DEVICE_TEST_CONTROL
+        const uint64_t compute_start_us  = (uint64_t) esp_timer_get_time();
+        context->compute_queue_us       += compute_start_us - context->compute_enqueued_us;
+#endif
+        if (setjmp(context->compute_escape) == 0) {
+            context->compute_callback(context->compute_data);
+            context->compute_result = 0;
+        } else {
+            context->compute_result = -TABOS_EPERM;
+        }
+#ifdef TABOS_ENABLE_DEVICE_TEST_CONTROL
+        context->compute_execution_us += (uint64_t) esp_timer_get_time() - compute_start_us;
+        ++context->compute_jobs;
+#endif
+        atomic_store_explicit(&context->compute_complete, true, memory_order_release);
+        platform_signal_notify(context->compute_finished);
+    }
+}
+
+int platform_riscv32_compute_submit(uintptr_t callback, void* data)
+{
+    platform_riscv32_context_t* context = current_context();
+    if (context == NULL || platform_riscv32_current_cancelled()) {
+        return -TABOS_ECANCELED;
+    }
+    if (context->compute_pending) {
+        return -TABOS_EBUSY;
+    }
+    const uintptr_t base = (uintptr_t) context->executable_memory;
+    if (callback < base || callback - base >= context->executable_bytes ||
+        context->executable_bytes - (callback - base) < 4U || (callback & 3U) != 0U || data == NULL) {
+        return -TABOS_EINVAL;
+    }
+    if (context->compute_task == NULL) {
+        context->compute_ready    = platform_signal_create();
+        context->compute_finished = platform_signal_create();
+        if (context->compute_ready == NULL || context->compute_finished == NULL ||
+            xTaskCreateWithCaps(compute_task_main, "tabos-compute", COMPUTE_TASK_STACK_BYTES, context,
+                                ELF_TASK_PRIORITY, &context->compute_task,
+                                MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) != pdPASS) {
+            platform_signal_destroy(context->compute_ready);
+            platform_signal_destroy(context->compute_finished);
+            context->compute_ready    = NULL;
+            context->compute_finished = NULL;
+            return -TABOS_ENOMEM;
+        }
+    }
+    memcpy(&context->compute_callback, &callback, sizeof(context->compute_callback));
+    context->compute_data    = data;
+    context->compute_pending = true;
+    atomic_store_explicit(&context->compute_complete, false, memory_order_relaxed);
+#ifdef TABOS_ENABLE_DEVICE_TEST_CONTROL
+    context->compute_enqueued_us = (uint64_t) esp_timer_get_time();
+#endif
+    atomic_store_explicit(&context->compute_submitted, true, memory_order_release);
+    platform_signal_notify(context->compute_ready);
+    return 0;
+}
+
+int platform_riscv32_compute_poll(void)
+{
+    platform_riscv32_context_t* context = current_context();
+    if (context == NULL || platform_riscv32_current_cancelled()) {
+        return -TABOS_ECANCELED;
+    }
+    return !context->compute_pending || atomic_load_explicit(&context->compute_complete, memory_order_acquire);
+}
+
+int platform_riscv32_compute_wait(void)
+{
+    platform_riscv32_context_t* context = current_context();
+    if (context == NULL) {
+        return -TABOS_ECANCELED;
+    }
+#ifdef TABOS_ENABLE_DEVICE_TEST_CONTROL
+    const uint64_t join_start_us = (uint64_t) esp_timer_get_time();
+#endif
+    while (context->compute_pending && !atomic_load_explicit(&context->compute_complete, memory_order_acquire)) {
+        if (platform_riscv32_current_cancelled()) {
+            return -TABOS_ECANCELED;
+        }
+        platform_signal_wait(context->compute_finished, 10U);
+    }
+#ifdef TABOS_ENABLE_DEVICE_TEST_CONTROL
+    context->compute_join_us += (uint64_t) esp_timer_get_time() - join_start_us;
+#endif
+    if (!context->compute_pending) {
+        return 0;
+    }
+    context->compute_pending = false;
+    return context->compute_result;
+}
 
 static void elf_task_main(void* argument)
 {
@@ -120,8 +250,7 @@ platform_riscv32_context_t* platform_riscv32_create(const void* entry, const voi
                                                     const tabos_elf_api_t* api, size_t argc, const char* const* argv,
                                                     void* user_data)
 {
-    (void) memory;
-    (void) memory_size;
+    /* Retain the actual executable alias, not its readable data alias. */
     (void) minimum_address;
     if (entry == NULL || api == NULL || heap_bytes == 0U || stack_bytes == 0U || argc > TABOS_ELF_ARG_MAX ||
         (argc > 0U && argv == NULL) || stack_bytes > UINT32_MAX) {
@@ -134,9 +263,11 @@ platform_riscv32_context_t* platform_riscv32_create(const void* entry, const voi
     tabos_elf_entry_fn entry_function = NULL;
     _Static_assert(sizeof(entry_function) == sizeof(entry), "ELF entry pointer must match data pointer size");
     memcpy(&entry_function, &entry, sizeof(entry_function));
-    context->entry       = entry_function;
-    context->api         = *api;
-    context->guarded_api = *api;
+    context->executable_memory = memory;
+    context->executable_bytes  = memory_size;
+    context->entry             = entry_function;
+    context->api               = *api;
+    context->guarded_api       = *api;
 #define NATIVE_GATE(type, name, parameters, arguments) \
     context->guarded_api.name = api->name != NULL ? guarded_##name : NULL;
 #define NATIVE_VOID_GATE(name, parameters, arguments) NATIVE_GATE(void, name, parameters, arguments)
@@ -191,6 +322,18 @@ void platform_riscv32_destroy(platform_riscv32_context_t* context)
     if (context != NULL && atomic_load_explicit(&context->started, memory_order_acquire) && context->task != NULL) {
         vTaskDeleteWithCaps(context->task);
     }
+    if (context != NULL) {
+        if (context->compute_task != NULL) {
+#ifdef TABOS_ENABLE_DEVICE_TEST_CONTROL
+            ESP_LOGI(TAG, "ELF compute: jobs=%u queue_us=%llu execution_us=%llu join_us=%llu",
+                     (unsigned) context->compute_jobs, (unsigned long long) context->compute_queue_us,
+                     (unsigned long long) context->compute_execution_us, (unsigned long long) context->compute_join_us);
+#endif
+            vTaskDeleteWithCaps(context->compute_task);
+        }
+        platform_signal_destroy(context->compute_ready);
+        platform_signal_destroy(context->compute_finished);
+    }
     free(context);
 }
 
@@ -220,6 +363,14 @@ void platform_riscv32_stop(platform_riscv32_context_t* context, void (*cancel)(v
             vTaskDelay(1U);
         }
         if (atomic_load_explicit(&context->gate_depth, memory_order_acquire) == 0U) {
+            /* Pure workers own no service locks. Confirm cross-core suspension
+             * before any callback code or borrowed app memory can be freed. */
+            if (context->compute_task != NULL) {
+                vTaskSuspend(context->compute_task);
+                while (eTaskGetState(context->compute_task) == eRunning) {
+                    vTaskDelay(1U);
+                }
+            }
             return;
         }
         /* The suspended task cannot mutate its handles while cancellation is

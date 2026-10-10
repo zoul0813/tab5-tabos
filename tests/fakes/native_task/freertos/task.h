@@ -8,6 +8,7 @@ typedef enum {
     eDeleted,
     eInvalid
 } eTaskState;
+TaskHandle_t xTaskGetCurrentTaskHandle(void);
 void vTaskSuspend(TaskHandle_t task);
 void vTaskResume(TaskHandle_t task);
 void vTaskDelay(TickType_t ticks);

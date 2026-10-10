@@ -95,7 +95,7 @@ report. Stack allocation remains in PSRAM.
 
 ## General workloads
 
-`tester` runs the finite filesystem and input SDK checks and requires a zero
+`tester` runs the finite filesystem, input and compute SDK checks and requires a zero
 failure summary for each. `graphics_benchmark` runs the existing finite graphics
 benchmark and saves its phase timings with OS statistics. Both write `result.json`
 and console output into the new output directory. `--screenshots` additionally

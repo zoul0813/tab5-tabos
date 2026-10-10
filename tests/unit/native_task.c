@@ -1,5 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 #include <tabos/platform/platform.h>
+#include <tabos/filesystem.h>
 #include <freertos/idf_additions.h>
 
 #include <assert.h>
@@ -136,7 +137,7 @@ BaseType_t xTaskCreateWithCaps(void (*entry)(void*), const char* name, size_t st
     (void) name;
     (void) priority;
     (void) capabilities;
-    assert(stack_depth == expected_stack_bytes);
+    assert(stack_depth == (strcmp(name, "tabos-compute") == 0 ? 16384U : expected_stack_bytes));
     if (fail_create) {
         return pdFAIL;
     }
@@ -300,6 +301,122 @@ static platform_riscv32_context_t* create(tabos_elf_entry_fn entry)
     return create_with_stack(entry, 4096U);
 }
 
+
+static const tabos_elf_api_t* compute_api;
+static atomic_bool compute_entered;
+static atomic_bool compute_release;
+static atomic_bool compute_waiting;
+static unsigned compute_scenario;
+static int compute_output;
+static unsigned signal_allocations;
+static unsigned fail_signal_at;
+static unsigned live_signals;
+
+static void __attribute__((aligned(4))) compute_callback(void* data)
+{
+    assert(data == &compute_output);
+    atomic_store(&compute_entered, true);
+    while (!atomic_load(&compute_release)) {
+        vTaskDelay(1U);
+    }
+    *(int*) data = 42;
+}
+
+static void __attribute__((aligned(4))) forbidden_callback(void* data)
+{
+    (void) data;
+    (void) compute_api->fd_get_flags(99); /* Must abort before service entry. */
+    assert(false);
+}
+
+static uintptr_t callback_address(void (*callback)(void*))
+{
+    uintptr_t address;
+    memcpy(&address, &callback, sizeof(address));
+    return address;
+}
+
+static int compute_submit_gate(uintptr_t callback, void* data, uint32_t bytes)
+{
+    assert(bytes == sizeof(compute_output));
+    return platform_riscv32_compute_submit(callback, data);
+}
+
+static int compute_entry(const tabos_elf_api_t* api, int argc, const char* const* argv)
+{
+    (void) argc;
+    (void) argv;
+    compute_api = api;
+    assert(api->compute_poll() == 1);
+    assert(api->compute_wait() == 0);
+    assert(api->compute_submit(0U, &compute_output, sizeof(compute_output)) == -TABOS_EINVAL);
+    assert(api->compute_submit(callback_address(compute_callback) + 1U, &compute_output, sizeof(compute_output)) ==
+           -TABOS_EINVAL);
+    assert(api->compute_submit(UINTPTR_MAX & ~(uintptr_t) 3U, &compute_output, sizeof(compute_output)) ==
+           -TABOS_EINVAL);
+    assert(api->compute_submit(callback_address(compute_callback), NULL, sizeof(compute_output)) == -TABOS_EINVAL);
+    for (unsigned allocation = 1U; allocation <= 2U; ++allocation) {
+        signal_allocations = 0U;
+        fail_signal_at     = allocation;
+        assert(api->compute_submit(callback_address(compute_callback), &compute_output, sizeof(compute_output)) ==
+               -TABOS_ENOMEM);
+        assert(live_signals == 0U);
+    }
+    fail_signal_at = 0U;
+    fail_create    = true;
+    assert(api->compute_submit(callback_address(compute_callback), &compute_output, sizeof(compute_output)) ==
+           -TABOS_ENOMEM);
+    fail_create = false;
+    assert(live_signals == 0U);
+    assert(api->compute_submit(callback_address(compute_callback), &compute_output, sizeof(compute_output)) == 0);
+    while (!atomic_load(&compute_entered)) {
+        vTaskDelay(1U);
+    }
+    assert(api->compute_poll() == 0);
+    assert(api->compute_submit(callback_address(compute_callback), &compute_output, sizeof(compute_output)) ==
+           -TABOS_EBUSY);
+    atomic_store(&guest_entered, true);
+    if (compute_scenario == 1U) {
+        return 0; /* Deliberately leave callback running across entry return. */
+    }
+    if (compute_scenario == 2U) {
+        for (;;) {
+            vTaskDelay(1U); /* Force teardown outside all ABI gates. */
+        }
+    }
+    if (compute_scenario == 3U) {
+        atomic_store(&compute_waiting, true);
+        (void) api->compute_wait(); /* Forced stop must drain this gate. */
+        assert(false);
+    }
+    atomic_store(&compute_release, true);
+    assert(api->compute_wait() == 0 && compute_output == 42);
+    assert(api->compute_wait() == 0);
+    assert(api->compute_submit(callback_address(forbidden_callback), &compute_output, sizeof(compute_output)) == 0);
+    assert(api->compute_wait() == -TABOS_EPERM);
+    compute_output = 0;
+    assert(api->compute_submit(callback_address(compute_callback), &compute_output, sizeof(compute_output)) == 0);
+    assert(api->compute_wait() == 0 && compute_output == 42);
+    return 0;
+}
+
+static platform_riscv32_context_t* create_compute(void)
+{
+    tabos_elf_entry_fn entry = compute_entry;
+    const void* address;
+    memcpy(&address, &entry, sizeof(address));
+    const tabos_elf_api_t api = {.compute_submit = compute_submit_gate,
+                                 .compute_wait   = platform_riscv32_compute_wait,
+                                 .compute_poll   = platform_riscv32_compute_poll,
+                                 .fd_get_flags   = flags_gate};
+    const uintptr_t first     = callback_address(compute_callback);
+    const uintptr_t second    = callback_address(forbidden_callback);
+    const uintptr_t base      = first < second ? first : second;
+    const uintptr_t end       = (first > second ? first : second) + 4U;
+    return platform_riscv32_create(address, (void*) base, end - base, 0U, 128U, expected_stack_bytes, &api, 0U, NULL,
+                                   &owner);
+}
+
 int main(void)
 {
     assert(platform_riscv32_current_user_data() == NULL && !platform_riscv32_current_cancelled());
@@ -361,5 +478,76 @@ int main(void)
         assert(platform_riscv32_step(sized, 1U, &status) == PLATFORM_RISCV32_RETURNED && status == 7);
         platform_riscv32_destroy(sized);
     }
+    expected_stack_bytes = 4096U;
+    for (unsigned scenario = 0U; scenario < 4U; ++scenario) {
+        compute_scenario = scenario;
+        compute_output   = 0;
+        atomic_store(&compute_entered, false);
+        atomic_store(&compute_release, false);
+        atomic_store(&compute_waiting, false);
+        atomic_store(&guest_entered, false);
+        atomic_store(&returned, false);
+        platform_riscv32_context_t* context = create_compute();
+        assert(context != NULL);
+        assert(platform_riscv32_step(context, 1U, &status) == PLATFORM_RISCV32_YIELDED);
+        if (scenario <= 1U) {
+            while (!atomic_load(&returned)) {
+                vTaskDelay(1U);
+            }
+            assert(platform_riscv32_step(context, 1U, &status) == PLATFORM_RISCV32_RETURNED && status == 0);
+        } else {
+            while (!atomic_load(scenario == 2U ? &guest_entered : &compute_waiting)) {
+                vTaskDelay(1U);
+            }
+            platform_riscv32_stop(context, NULL, NULL);
+        }
+        platform_riscv32_destroy(context);
+        assert(live_signals == 0U);
+        if (scenario != 0U) {
+            assert(compute_output == 0);
+        }
+    }
     return 0;
+}
+
+TaskHandle_t xTaskGetCurrentTaskHandle(void)
+{
+    return self;
+}
+struct platform_signal {
+        atomic_bool notified;
+};
+platform_signal_t* platform_signal_create(void)
+{
+    ++signal_allocations;
+    if (signal_allocations == fail_signal_at) {
+        return NULL;
+    }
+    platform_signal_t* signal = calloc(1U, sizeof(platform_signal_t));
+    if (signal != NULL) {
+        ++live_signals;
+    }
+    return signal;
+}
+void platform_signal_destroy(platform_signal_t* signal)
+{
+    if (signal != NULL) {
+        assert(live_signals != 0U);
+        --live_signals;
+    }
+    free(signal);
+}
+void platform_signal_notify(platform_signal_t* signal)
+{
+    atomic_store(&signal->notified, true);
+}
+void platform_signal_wait(platform_signal_t* signal, uint32_t timeout_ms)
+{
+    const TickType_t start = xTaskGetTickCount();
+    while (!atomic_exchange(&signal->notified, false)) {
+        if (timeout_ms != UINT32_MAX && xTaskGetTickCount() - start >= timeout_ms) {
+            break;
+        }
+        vTaskDelay(1U);
+    }
 }

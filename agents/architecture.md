@@ -403,7 +403,8 @@ foreground stack:
     shell (process 0)    blocked; fully retained
 ```
 
-[DECIDED] Initial Tab5 mapping is one managed FreeRTOS task per native user process.
+[DECIDED] Tab5 maps each native process to one main FreeRTOS task, with at most
+one optional bounded pure-compute worker under the contract below.
 Parent blocks through TabOS process synchronization rather than arbitrary suspension.
 Runtime/service task continues input polling, timers, display, filesystem, network, and
 lifecycle work. Native instructions still execute directly on ESP32-P4. Host represents
@@ -412,7 +413,8 @@ in bounded instruction slices. Public application API must not expose FreeRTOS o
 thread types.
 
 Initial scope deliberately excludes background jobs, multiple runnable user processes,
-pipelines, signals, and worker threads inside one process. Process table and ownership
+pipelines, signals, and general worker threads inside one process. The bounded
+pure-compute API below is an explicitly approved exception. Process table and ownership
 model must leave room for these later.
 
 [DECIDED] Process 0 is kernel-required root shell and has liveness invariant: it cannot
@@ -1615,3 +1617,16 @@ display/memory/clock/stack counters and codec mute. App-owned tester and graphic
 benchmark workloads use the shared runner. Upload remains macOS-only, explicit
 files with backups/hash verification/eject; see docs/device-testing.md. Standard
 firmware defaults stay unchanged; sdkconfig.performance.defaults is optional.
+
+## Experimental bounded compute (transport 26)
+
+One process-owned pure-compute job may run on a lazily allocated, normally
+scheduled 16 KiB PSRAM worker. Heap/image ranges are validated; callbacks may
+use only private preallocated data and stateless C operations. SDK gates abort
+a callback before service entry with EPERM. Wait acquires results and consumes
+completion; poll does not consume it. Nested execution waits for completion.
+Teardown drains main gates, suspends/checks both tasks, fences display readers,
+then frees stacks/code/heap. No core affinity or general threading is exposed.
+Host RV32 returns ENOTSUP; the caller may execute the callback synchronously.
+Test native worker completion, repeated jobs, allocation failure, invalid ranges,
+forbidden gates and cross-core forced stop; tester exercises the public API.

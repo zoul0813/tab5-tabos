@@ -1191,3 +1191,18 @@ bool platform_graphics_wait(platform_framebuffer_t* framebuffer)
 {
     return framebuffer != NULL;
 }
+
+int platform_riscv32_compute_submit(uintptr_t callback, void* data)
+{
+    (void) callback;
+    (void) data;
+    return -TABOS_ENOTSUP;
+}
+int platform_riscv32_compute_wait(void)
+{
+    return -TABOS_ENOTSUP;
+}
+int platform_riscv32_compute_poll(void)
+{
+    return -TABOS_ENOTSUP;
+}
