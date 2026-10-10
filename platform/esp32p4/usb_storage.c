@@ -7,6 +7,7 @@
 #include <esp_err.h>
 #include <esp_log.h>
 #include <esp_system.h>
+#include <esp_attr.h>
 #include <sd_pwr_ctrl_by_on_chip_ldo.h>
 #include <sdmmc_cmd.h>
 #include <tinyusb.h>
@@ -14,6 +15,7 @@
 #include <tinyusb_msc.h>
 
 #include <stdlib.h>
+#include "msc_protocol.h"
 
 static const char* const TAG = "tabos_usb_storage";
 static sdmmc_card_t* storage_card;
@@ -21,6 +23,12 @@ static sd_pwr_ctrl_handle_t storage_power;
 static tinyusb_msc_storage_handle_t storage_handle;
 static bool usb_attached;
 static bool restart_requested;
+static RTC_NOINIT_ATTR uint32_t boot_marker;
+
+void tab5_usb_storage_request_next_boot(void)
+{
+    boot_marker = TAB5_MSC_BOOT_MAGIC;
+}
 
 bool platform_usb_port_disable_host_power(void)
 {
@@ -34,7 +42,8 @@ bool platform_usb_port_disable_host_power(void)
 
 bool tab5_boot_usb_storage_requested(uint32_t window_ms)
 {
-    return tab5_keyboard_delete_held(window_ms);
+    bool requested = tab5_msc_boot_consume(&boot_marker, esp_reset_reason() == ESP_RST_SW);
+    return requested || tab5_keyboard_delete_held(window_ms);
 }
 
 static void request_restart(void)

@@ -1365,3 +1365,11 @@ target_link_libraries(tabos_network_config_file PRIVATE tabos_core)
 tabos_enable_warnings(tabos_network_config_file)
 tabos_enable_sanitizers(tabos_network_config_file)
 add_test(NAME component.network_config_file COMMAND tabos_network_config_file)
+
+add_executable(tabos_tab5_msc_control unit/tab5_msc_control.c)
+tabos_enable_warnings(tabos_tab5_msc_control)
+tabos_enable_sanitizers(tabos_tab5_msc_control)
+add_test(NAME unit.tab5_msc_control COMMAND tabos_tab5_msc_control)
+add_test(NAME tools.msc_upload COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/msc_upload_test.py")
+
+add_test(NAME tools.device_test COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/device_test_test.py")

@@ -11,6 +11,7 @@
 #include <tabos/platform/platform.h>
 
 #include <string.h>
+#include <stdlib.h>
 
 static terminal_t* active_terminal;
 static uint32_t foreground_token;
@@ -19,6 +20,70 @@ static platform_mutex_t* console_mutex;
 static tabos_timer_t cursor_timer;
 static bool cursor_phase_visible = true;
 static bool graphics_active;
+static void lock_console(void);
+static void unlock_console(void);
+static char* capture_buffer;
+static size_t capture_count;
+static bool capture_overflow;
+
+/* Explicit development capture: no I/O in the application write path. */
+static void capture_bytes(const void* data, size_t size)
+{
+    if (capture_buffer != NULL && size != 0U) {
+        const size_t available = 8192U - capture_count;
+        const size_t copied    = size < available ? size : available;
+        memcpy(capture_buffer + capture_count, data, copied);
+        capture_count    += copied;
+        capture_overflow |= copied != size;
+    }
+}
+
+bool console_capture_start(void)
+{
+    if (console_mutex == NULL) {
+        return false;
+    }
+    lock_console();
+    if (capture_buffer == NULL) {
+        capture_buffer = malloc(8192U);
+    }
+    capture_count    = 0U;
+    capture_overflow = false;
+    const bool ready = capture_buffer != NULL;
+    unlock_console();
+    return ready;
+}
+
+size_t console_capture_read(char* output, size_t capacity, bool* overflow)
+{
+    if (console_mutex == NULL || output == NULL || overflow == NULL) {
+        return 0U;
+    }
+    lock_console();
+    const size_t count = capture_count < capacity ? capture_count : capacity;
+    if (count != 0U) {
+        memcpy(output, capture_buffer, count);
+        memmove(capture_buffer, capture_buffer + count, capture_count - count);
+        capture_count -= count;
+    }
+    *overflow = capture_overflow;
+    unlock_console();
+    return count;
+}
+
+void console_capture_stop(void)
+{
+    if (console_mutex == NULL) {
+        return;
+    }
+    lock_console();
+    free(capture_buffer);
+    capture_buffer   = NULL;
+    capture_count    = 0U;
+    capture_overflow = false;
+    unlock_console();
+}
+
 
 static bool present_console(void)
 {
@@ -123,6 +188,8 @@ bool console_write_panic(const char* text)
     active_terminal->reverse    = false;
     terminal_set_colors(active_terminal, 0xffff, 0x0000);
     terminal_clear(active_terminal);
+    capture_bytes(text, strlen(text));
+    capture_bytes("\n", 1U);
     terminal_write_line(active_terminal, text);
     const bool presented = present_console();
     unlock_console();
@@ -132,6 +199,7 @@ bool console_write_panic(const char* text)
 
 void console_shutdown(void)
 {
+    console_capture_stop();
     if (console_mutex == NULL) {
         return;
     }
@@ -220,6 +288,7 @@ bool tabos_console_write_bytes(const tabos_console_session_t* session, const voi
         unlock_console();
         return false;
     }
+    capture_bytes(data, size);
     terminal_write_bytes(active_terminal, data, size);
     restart_cursor_blink();
     const bool presented = present_console();
@@ -243,6 +312,8 @@ bool tabos_console_write_line(const tabos_console_session_t* session, const char
         unlock_console();
         return false;
     }
+    capture_bytes(text, strlen(text));
+    capture_bytes("\n", 1U);
     terminal_write_line(active_terminal, text);
     restart_cursor_blink();
     const bool presented = present_console();

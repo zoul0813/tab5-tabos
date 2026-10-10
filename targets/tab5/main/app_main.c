@@ -1,4 +1,6 @@
 #include <tabos/internal/runtime.h>
+#include <tabos/internal/application.h>
+#include "msc_control.h"
 #include <tabos/internal/display.h>
 #include <tabos/internal/terminal.h>
 #include <tabos/platform/platform.h>
@@ -11,8 +13,32 @@
 #include <esp_system.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <stdio.h>
+#include <string.h>
 
 static const char* const TAG = TABOS_SYSTEM_LOG_TAG;
+static bool msc_restart_requested;
+
+static void update_runtime(platform_runtime_events_t events)
+{
+    kernel_runtime_update(events);
+#ifdef TABOS_ENABLE_DEVICE_TEST_CONTROL
+    tab5_test_control_update();
+#endif
+    if (!tab5_msc_control_take_request()) {
+        return;
+    }
+    const tabos_app_descriptor_t* active = tabos_app_active();
+    if (tabos_process_count() != 1U || active == NULL || strcmp(active->name, "shell") != 0) {
+        puts("TABOS MSC BUSY: exit the foreground application first");
+    } else if (kernel_runtime_request_system_action(PLATFORM_SYSTEM_ACTION_REBOOT)) {
+        msc_restart_requested = true;
+        puts("TABOS MSC OK");
+    } else {
+        puts("TABOS MSC BUSY: shutdown already requested");
+    }
+    (void) fflush(stdout);
+}
 
 static void run_usb_storage_mode(void)
 {
@@ -60,7 +86,7 @@ void app_main(void)
     }
 
     if (tab5_boot_usb_storage_requested(750U)) {
-        ESP_LOGI(TAG, "Delete held during boot; entering USB storage mode");
+        ESP_LOGI(TAG, "USB storage boot requested");
         run_usb_storage_mode();
     }
 
@@ -73,9 +99,16 @@ void app_main(void)
 
     ESP_LOGI(TAG, "%s %s bootstrapped on %s", TABOS_SYSTEM_NAME, kernel_runtime_version(), platform_name());
 
-    (void) platform_run(kernel_runtime_update, kernel_runtime_next_deadline);
+    if (!tab5_msc_control_start()) {
+        ESP_LOGW(TAG, "Serial MSC control unavailable");
+    }
+    (void) platform_run(update_runtime, kernel_runtime_next_deadline);
+    tab5_msc_control_stop();
     const platform_system_action_t action = kernel_runtime_take_system_action();
     kernel_runtime_shutdown();
     platform_shutdown();
+    if (msc_restart_requested && action == PLATFORM_SYSTEM_ACTION_REBOOT) {
+        tab5_usb_storage_request_next_boot();
+    }
     platform_perform_system_action(action);
 }

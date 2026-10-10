@@ -104,6 +104,73 @@ static bool wait_for_vsync(void)
     return vsync_done != NULL && tab5_display_wait_completion(vsync_done, "VSYNC");
 }
 
+#ifdef TABOS_ENABLE_DEVICE_TEST_CONTROL
+#include <stdatomic.h>
+#include <esp_timer.h>
+#include <tabos/platform/esp32p4.h>
+static tab5_test_display_stats_t display_stats;
+static uint64_t render_worker_us;
+
+void tab5_test_display_reset(void)
+{
+    display_stats    = (tab5_test_display_stats_t) {0};
+    render_worker_us = 0U;
+}
+
+tab5_test_display_stats_t tab5_test_display_stats(void)
+{
+    tab5_test_display_stats_t result = display_stats;
+    result.worker_us                 = render_worker_us;
+    return result;
+}
+static atomic_bool snapshot_requested;
+static SemaphoreHandle_t snapshot_done;
+static uint16_t* snapshot_pixels;
+
+/* Only the display owner copies a completed frame. Timeout retains the buffer
+ * until completion, so the serial task cannot free memory being written. */
+uint16_t* tab5_test_capture_display(void)
+{
+    if (snapshot_done == NULL) {
+        snapshot_done = xSemaphoreCreateBinary();
+        if (snapshot_done == NULL) {
+            return NULL;
+        }
+    }
+    if (snapshot_pixels != NULL) {
+        if (xSemaphoreTake(snapshot_done, 0) != pdTRUE) {
+            return NULL;
+        }
+        free(snapshot_pixels);
+        snapshot_pixels = NULL;
+    }
+    snapshot_pixels = heap_caps_malloc(640U * 360U * sizeof(uint16_t), MALLOC_CAP_SPIRAM);
+    if (snapshot_pixels == NULL) {
+        return NULL;
+    }
+    atomic_store_explicit(&snapshot_requested, true, memory_order_release);
+    platform_runtime_notify(PLATFORM_RUNTIME_EVENT_APPLICATION);
+    if (xSemaphoreTake(snapshot_done, pdMS_TO_TICKS(3000)) != pdTRUE) {
+        return NULL;
+    }
+    uint16_t* result = snapshot_pixels;
+    snapshot_pixels  = NULL;
+    return result;
+}
+
+static void capture_completed_frame(void)
+{
+    if (!atomic_exchange_explicit(&snapshot_requested, false, memory_order_acquire)) {
+        return;
+    }
+    for (size_t y = 0U; y < 360U; ++y) {
+        for (size_t x = 0U; x < 640U; ++x) {
+            snapshot_pixels[y * 640U + x] = scanout.front[(1279U - x * 2U) * 720U + y * 2U];
+        }
+    }
+    xSemaphoreGive(snapshot_done);
+}
+#endif
 
 static bool complete_native_frame(void)
 {
@@ -111,7 +178,13 @@ static bool complete_native_frame(void)
     if (!tab5_display_scanout_finish(&scanout, vsync_done)) {
         return false;
     }
+#ifdef TABOS_ENABLE_DEVICE_TEST_CONTROL
+    if (pending) {
+        capture_completed_frame();
+    }
+#else
     (void) pending;
+#endif
     return true;
 }
 
@@ -843,6 +916,13 @@ static bool finish_staged_drawing(void)
         if (!accelerated && !native_blit_cpu(&staged_blit)) {
             return false;
         }
+#ifdef TABOS_ENABLE_DEVICE_TEST_CONTROL
+        if (accelerated) {
+            ++display_stats.accelerated_blits;
+        } else {
+            ++display_stats.software_blits;
+        }
+#endif
     }
     if (staged_overlay_pending) {
         staged_overlay_pending             = false;
@@ -867,7 +947,13 @@ static void render_worker(void* argument)
                                               .width         = TABOS_DISPLAY_WIDTH,
                                               .height        = TABOS_DISPLAY_HEIGHT,
                                               .stride_pixels = TABOS_DISPLAY_WIDTH};
-        render_work.succeeded              = finish_staged_drawing() && graphics_present_impl(&framebuffer, false);
+#ifdef TABOS_ENABLE_DEVICE_TEST_CONTROL
+        const uint64_t started = esp_timer_get_time();
+#endif
+        render_work.succeeded = finish_staged_drawing() && graphics_present_impl(&framebuffer, false);
+#ifdef TABOS_ENABLE_DEVICE_TEST_CONTROL
+        render_worker_us += esp_timer_get_time() - started;
+#endif
         xSemaphoreGive(render_worker_done);
     }
 }
@@ -907,6 +993,13 @@ static bool stage_native_blit(const tabos_graphics_blit_options_t* options, bool
             /* Never release borrowed input or use fallback until accepted DMA finishes. */
             copied = tab5_display_wait_completion(snapshot_copy_done, "frame snapshot");
             memcpy(packed + prefix + body, first + prefix + body, (copy_pixels - prefix - body) * sizeof(*packed));
+#ifdef TABOS_ENABLE_DEVICE_TEST_CONTROL
+            static bool copy_reported;
+            if (!copy_reported) {
+                ESP_LOGI(TAG, "Frame snapshot DMA used: %p, %u bytes", first, (unsigned) (body * sizeof(*packed)));
+                copy_reported = true;
+            }
+#endif
         }
     }
     for (size_t row = 0U; !copied && row < copy_rows; ++row) {
@@ -989,6 +1082,13 @@ static bool graphics_blit_impl(platform_framebuffer_t* framebuffer, const tabos_
 {
     if (direct_graphics_active) {
         const bool accelerated = native_blit_ppa(options);
+#ifdef TABOS_ENABLE_DEVICE_TEST_CONTROL
+        if (accelerated) {
+            ++display_stats.accelerated_blits;
+        } else {
+            ++display_stats.software_blits;
+        }
+#endif
         return accelerated || native_blit_cpu(options);
     }
     if (!ppa_ready || framebuffer == NULL || options == NULL || options->pixels == NULL || options->source.x < 0 ||
@@ -1394,18 +1494,30 @@ void platform_display_shutdown(void)
 bool platform_graphics_fill(platform_framebuffer_t* framebuffer, int32_t x, int32_t y, uint32_t width, uint32_t height,
                             platform_pixel_t color)
 {
+#ifdef TABOS_ENABLE_DEVICE_TEST_CONTROL
+    const uint64_t start = esp_timer_get_time();
+#endif
     const bool result =
         wait_render_worker() && finish_staged_drawing() && graphics_fill_impl(framebuffer, x, y, width, height, color);
+#ifdef TABOS_ENABLE_DEVICE_TEST_CONTROL
+    display_stats.clear_us += esp_timer_get_time() - start;
+#endif
     return result;
 }
 
 static bool graphics_blit_dispatch(platform_framebuffer_t* framebuffer, const tabos_graphics_blit_options_t* options,
                                    bool retain_sources)
 {
+#ifdef TABOS_ENABLE_DEVICE_TEST_CONTROL
+    const uint64_t start = esp_timer_get_time();
+#endif
     const bool result = wait_render_worker() && finish_staged_drawing() &&
                         ((direct_graphics_active && framebuffer != NULL && framebuffer->pixels == logical_pixels &&
                           stage_native_blit(options, retain_sources)) ||
                          graphics_blit_impl(framebuffer, options));
+#ifdef TABOS_ENABLE_DEVICE_TEST_CONTROL
+    display_stats.blit_us += esp_timer_get_time() - start;
+#endif
     return result;
 }
 
@@ -1427,6 +1539,9 @@ bool platform_graphics_wait(platform_framebuffer_t* framebuffer)
 
 bool platform_graphics_overlay(platform_framebuffer_t* framebuffer, const platform_graphics_overlay_t* overlay)
 {
+#ifdef TABOS_ENABLE_DEVICE_TEST_CONTROL
+    const uint64_t start = esp_timer_get_time();
+#endif
     bool result = wait_render_worker();
     if (result && staged_blit_pending && framebuffer != NULL && framebuffer->pixels == logical_pixels) {
         if (overlay != NULL &&
@@ -1454,17 +1569,30 @@ bool platform_graphics_overlay(platform_framebuffer_t* framebuffer, const platfo
     } else if (result) {
         result = graphics_overlay_impl(framebuffer, overlay, NULL);
     }
+#ifdef TABOS_ENABLE_DEVICE_TEST_CONTROL
+    display_stats.overlay_us += esp_timer_get_time() - start;
+#endif
     return result;
 }
 
 bool platform_graphics_present(platform_framebuffer_t* framebuffer)
 {
+#ifdef TABOS_ENABLE_DEVICE_TEST_CONTROL
+    const uint64_t start = esp_timer_get_time();
+#endif
     const bool result = wait_render_worker() && finish_staged_drawing() && graphics_present_impl(framebuffer, true);
+#ifdef TABOS_ENABLE_DEVICE_TEST_CONTROL
+    display_stats.submit_us += esp_timer_get_time() - start;
+    ++display_stats.frames;
+#endif
     return result;
 }
 
 bool platform_graphics_submit(platform_framebuffer_t* framebuffer)
 {
+#ifdef TABOS_ENABLE_DEVICE_TEST_CONTROL
+    const uint64_t start = esp_timer_get_time();
+#endif
     bool result = framebuffer != NULL && framebuffer->pixels == logical_pixels && wait_render_worker();
     if (result && staged_blit_pending) {
         render_work.pending = true;
@@ -1472,5 +1600,9 @@ bool platform_graphics_submit(platform_framebuffer_t* framebuffer)
     } else if (result) {
         result = graphics_present_impl(framebuffer, false);
     }
+#ifdef TABOS_ENABLE_DEVICE_TEST_CONTROL
+    display_stats.submit_us += esp_timer_get_time() - start;
+    ++display_stats.frames;
+#endif
     return result;
 }

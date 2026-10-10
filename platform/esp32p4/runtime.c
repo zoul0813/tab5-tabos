@@ -7,6 +7,7 @@
 #include <tabos/config/identity.h>
 
 #include <esp_flash.h>
+#include <esp_clk_tree.h>
 #include <esp_hosted.h>
 #include <esp_heap_caps.h>
 #include <esp_event.h>
@@ -416,13 +417,15 @@ bool platform_get_diagnostics(platform_diagnostics_t* diagnostics)
     if (diagnostics == NULL) {
         return false;
     }
+    uint32_t cpu_frequency_hz = 0U;
+    (void) esp_clk_tree_src_get_freq_hz(SOC_MOD_CLK_CPU, ESP_CLK_TREE_SRC_FREQ_PRECISION_EXACT, &cpu_frequency_hz);
     uint32_t flash_capacity = 0U;
     (void) esp_flash_get_size(NULL, &flash_capacity);
     const bool battery_present = platform_battery_monitor_init();
     *diagnostics               = (platform_diagnostics_t) {
                       .device_name                 = "ESP32-P4",
                       .cpu_cores                   = 2U,
-                      .cpu_frequency_mhz           = CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ,
+                      .cpu_frequency_mhz           = cpu_frequency_hz / 1000000U,
                       .memory_total_bytes          = heap_caps_get_total_size(MALLOC_CAP_INTERNAL),
                       .memory_free_bytes           = heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
                       .memory_free_known           = true,

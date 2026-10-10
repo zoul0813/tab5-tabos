@@ -832,3 +832,14 @@ Tab5 uses existing scratch for snapshots, AXI DMA/PIE with CPU fallback, and
 elides only clear regions fully replaced by eligible exact-scale opaque blits.
 Native buffers remain OS-owned; cores are not reserved. Host coverage checks
 SDK contracts, clipping pixels, completion ownership and real RV32 cleanup.
+
+## Device development controls
+
+Target composition owns serial MSC requests and runtime-thread acceptance only
+for the sole shell. Orderly shutdown precedes a consumed software-reset marker.
+Normal firmware waits indefinitely for serial input. Opt-in device-test firmware
+adds bounded console capture, key injection/expiry, completed-frame screenshots,
+display/memory/clock/stack counters and codec mute. App-owned tester and graphics
+benchmark workloads use the shared runner. Upload remains macOS-only, explicit
+files with backups/hash verification/eject; see docs/device-testing.md. Standard
+firmware defaults stay unchanged; sdkconfig.performance.defaults is optional.

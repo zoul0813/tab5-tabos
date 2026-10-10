@@ -106,6 +106,10 @@ static void elf_task_main(void* argument)
     vTaskSetThreadLocalStoragePointer(NULL, 0, context);
     context->last_idle_window = xTaskGetTickCount();
     context->returned_status  = context->entry(&context->guarded_api, (int) context->argc, context->argv);
+#ifdef TABOS_ENABLE_DEVICE_TEST_CONTROL
+    ESP_LOGI(TAG, "ELF stack: bytes=%u unused_min=%u", (unsigned) context->stack_bytes,
+             (unsigned) uxTaskGetStackHighWaterMark(NULL));
+#endif
     atomic_store_explicit(&context->finished, true, memory_order_release);
     platform_runtime_notify(PLATFORM_RUNTIME_EVENT_APPLICATION);
     vTaskSuspend(NULL);
