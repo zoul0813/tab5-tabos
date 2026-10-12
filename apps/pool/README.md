@@ -11,14 +11,18 @@ preview with arrows/WASD and press **Enter** to confirm a gold valid position.
 The computer handles its own shots and placement.
 R asks for a fresh rack; Enter confirms, R/Escape cancels. Enter also starts a
 new rack after a result. P pauses; H opens help and freezes play; M toggles sound.
-Q exits. Escape closes help or confirmation first, otherwise exits.
+Q exits. Escape closes help or confirmation first, otherwise exits. Launch with
+`pool --profile` to print aggregate simulation, display-wait, rendering and frame-submission timing
+after quitting; it can be combined with `--two-player`.
 
 Build from the repository root with `./apps/build.sh`, or with the RISC-V
 toolchain active, `make -C apps/pool`. See [the guide](../../docs/pool.md) for
 geometry, validation, controls and the staged development plan.
 
-`table.c` owns shared table geometry and rack positions; `render.c` draws the
-logical canvas; `game.c` owns shot state/math; `physics.c` integrates motion and contacts;
+`table.c` owns shared table geometry and rack positions; `render.c` caches the
+unchanging full-resolution table once, then composes each frame as a pure job
+suitable for TabOS's optional bounded compute worker;
+`game.c` owns shot state/math; `physics.c` integrates motion and contacts;
 `rules.c` resolves match outcomes; `ai.c` selects bounded direct shots; `clock.c` bounds fixed ticks; `input.c` handles public key events; `main.c`
 owns scheduling, waits and graphics lifetime. `sound.c` consumes observed events
 through optional bounded SDK audio. Precomputed PCM and a prepared stream keep
