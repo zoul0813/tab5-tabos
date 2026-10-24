@@ -762,6 +762,13 @@ but is not a substitute for this execution path.
 
 ## Maintenance and Technical Debt
 
+- [x] Fresh 2026-10-05 memory/performance/functionality and Tab5 configuration audit: all 94 macOS Debug/Release cases covered, both firmware builds and default RV32 builds pass, maintained host RV32 tester/cleanup/overlap pass. Evidence: `docs/validation/tabos-audit-2026-10-05.md`. Physical acceptance remains open; no flash or MSC operation authorized in this audit.
+- [x] AUD-047 source repair (`f1e2c7e`): bounded display completion waits with logged fatal failure before DMA buffer reuse, production-helper fault tests, and both Tab5 builds. Physical missing/late interrupt and restart validation remains pending.
+- [x] AUD-048 source repair (`aaa4d72`): validate camera negotiated layout, mappings, completed payloads, and encoder lengths before processing/submission; production-backend malformed-buffer/cleanup tests and both Tab5 builds pass. Physical all-format cleanup remains pending.
+
+- [ ] AUD-047 hardware acceptance: withheld/late VSYNC/PPA completions, restart behavior, and normal presentation on matched firmware.
+- [ ] AUD-048 hardware acceptance: normal RAW8/RGB565/JPEG/H.264 operation and repeated stop/cleanup on matched firmware.
+
 - [x] Resolve AUD-043: reconcile current context/architecture, retain historical questions as history, and align keyboard mode, loader/SDK defaults, and public transport documentation with source.
 
 - [x] Resolve AUD-028: remove unused redraw/font/pointer-health helpers and camera constant; retain the planned Wi-Fi profile writer with explicit rationale and real persistence coverage.

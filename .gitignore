@@ -65,3 +65,9 @@ htmlcov/
 # Editor and OS files
 # .vscode/
 .DS_Store
+
+# Personal agent setup and review workflows
+/.claude/
+/.codex/
+/.agents/
+/CLAUDE.md

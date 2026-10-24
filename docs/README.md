@@ -26,6 +26,11 @@ This directory contains user and contributor documentation for TabOS.
 - [Networking](networking.md): saved Wi-Fi configuration, network status, and connection control.
 - [Audio Service](audio.md): PCM streams, waits, mixing, routes, and the audio test utility.
 
+## Validation
+
+- [October 5 memory, performance, and hardware audit](validation/tabos-audit-2026-10-05.md): historical baseline, committed repairs, and outstanding physical acceptance.
+- [TabOS improvements validation](validation/tabos-improvements.md): later runtime, input, graphics, device-tooling, and compute evidence.
+
 ## Documentation Policy
 
 Documentation in this directory describes the current project. Update it in the same change whenever project structure, supported workflows, commands, requirements, or user-visible behavior changes.

@@ -1,10 +1,37 @@
 # TabOS audit
 
+## October 5, 2026 evaluation
+
+The fresh memory, performance, functionality, and Tab5 hardware evaluation is in
+[`docs/validation/tabos-audit-2026-10-05.md`](../docs/validation/tabos-audit-2026-10-05.md).
+Both new P2 source repairs are committed; physical acceptance remains pending.
+The earlier 46 findings remain resolved.
+
+- [x] **AUD-047 — Source repair committed in `f1e2c7e`.** VSYNC/PPA waits have a two-second bound. Missing completion logs and enters ESP-IDF's fatal/panic path without returning or reclaiming possibly DMA-owned buffers; the pinned PPA API provides no supported cancellation. Production wait-helper tests pass in Debug ASan/UBSan and Release; both Tab5 builds pass. Physical missing/late interrupt, restart, and normal presentation validation remains pending.
+- [x] **AUD-048 — Source repair committed in `aaa4d72`.** Negotiated packed layout, mapped capacity, completed payloads, and encoded output lengths are validated before processing/submission. Invalid buffers remain owned until ordinary stop. Production-backend malformed-buffer, partial-start cleanup, and valid-format tests pass in Debug ASan/UBSan and Release; both Tab5 builds pass. Physical all-format cleanup validation remains pending.
+
+At the October 5 baseline, macOS Debug ASan/UBSan and Release validation each covered all 94 CTest
+cases; `build.application_tracking` required an SDKROOT-corrected targeted rerun.
+Tab5 Debug/Release builds and default RV32 application builds passed. A temporary
+host RV32 probe ran the maintained full tester twice, camera child cleanup, and
+camera/audio/UDP/storage overlap; every run returned zero and restored the shell.
+No flash, mass-storage operation, or fresh physical acceptance ran. Native isolation,
+memory watermarks, peripheral revision checks, and known camera/power gaps remain
+separate acceptance limitations, not newly resolved features.
+
+Reconciled on October 24 against main `4b53ae0`: both repairs are present.
+The results above are historical, not a new test run. Later runtime and graphics
+validation is recorded in `docs/validation/tabos-improvements.md`; physical
+acceptance of these repairs remains open in `agents/roadmap.md`.
+
+## Historical September evaluation
+
 Audit date: 2026-09-06. Accuracy verification: 2026-09-06. All 44 original findings were checked against their implementation paths; qualifications and source references below reflect that verification. Only this tracked file was changed by the 2026-09-06 verification. Later repairs are recorded under resolved findings. The working tree was clean at its start; the original report’s statement about pre-existing power-document changes is no longer current.
 
 Findings use P1 (high impact), P2 (normal defect), and P3 (maintenance). Each checkbox represents a tracked repair task. Static findings include the triggering path and suggested validation; hardware-dependent concerns are identified explicitly. Planned features are not counted as dead code or defects merely because they are unfinished.
 
-0 open findings: 0 P2, 0 P3; 46 resolved findings. Checklist entries below are authoritative.
+The September evaluation has 0 remaining open findings and 46 resolved findings.
+Its checklist below is historical; the fresh findings and repairs are tracked above.
 
 ## Scope and validation
 
