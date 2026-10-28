@@ -46,8 +46,8 @@ def normalize_target_arguments(args: argparse.Namespace) -> None:
     actions = {"build", "flash", "monitor", "upload"} if args.target == "tab5" else {"build", "test", "run"}
     if args.action not in actions:
         fail(f"target '{args.target}' action must be one of: {', '.join(sorted(actions))}")
-    if args.action != "upload" and (args.upload_files or args.port):
-        fail("--file and --port apply only to tab5 upload")
+    if args.action != "upload" and (args.upload_files or args.port or args.mount):
+        fail("--file, --mount and --port apply only to tab5 upload")
 
 
 def parse_args() -> argparse.Namespace:
@@ -62,6 +62,7 @@ def parse_args() -> argparse.Namespace:
         actions = ("build", "flash", "monitor", "upload") if target == "tab5" else ("build", "test", "run")
         target_parser.add_argument("--file", dest="upload_files", nargs=2, action="append",
                                    metavar=("SOURCE", "DESTINATION"), default=[])
+        target_parser.add_argument("--mount", help="validated TAB5 mount override")
         target_parser.add_argument("--port", help="USB-C serial port for MSC control")
         target_parser.add_argument(
             "target_arguments",

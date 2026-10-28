@@ -17,6 +17,8 @@ def command_upload(args: argparse.Namespace) -> None:
     command = [python, str(ROOT / "tools" / "msc_upload.py")]
     if args.port:
         command += ["--port", args.port]
+    if args.mount:
+        command += ["--mount", args.mount]
     for source, destination in args.upload_files:
         command += ["--file", source, destination]
     run(command, env=environment)

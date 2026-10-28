@@ -77,11 +77,14 @@ Install SDL3 on macOS:
 brew install sdl3 openssl@3
 ```
 
-On Ubuntu 26.04 or newer:
+On Ubuntu 26.10:
 
 ```sh
 sudo apt-get install build-essential cmake ninja-build libsdl3-dev libssl-dev python3
 ```
+
+Ubuntu 24.04 LTS requires SDL3 from source. See [Linux development](docs/linux-development.md)
+for supported distributions, serial access, storage permissions, and complete prerequisites.
 
 Tab5 builds require ESP-IDF v5.4.4. Setup installs a project-local copy and its
 tools under `.local/`:
@@ -95,7 +98,7 @@ avoid downloading ESP-IDF history.
 
 Tab5 build and flash commands automatically activate this copy when a supported
 ESP-IDF environment is not already active. To activate it in the current interactive
-shell for direct use of ESP-IDF commands:
+Bash shell for direct use of ESP-IDF commands:
 
 ```sh
 eval "$(./tools/tabos activate-idf)"

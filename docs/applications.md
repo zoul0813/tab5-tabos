@@ -52,8 +52,10 @@ eject it after copying:
 ./apps/build.sh --msc
 ```
 
-The default mount point is `/Volumes/TAB5`. Use `--msc-mount=/path` or set
-`TABOS_MSC_MOUNT` to override it. Runnable extensionless outputs declared by each
+The writable USB volume labeled `TAB5` is discovered on macOS and Linux. Use `--msc-mount=/path` or set
+`TABOS_MSC_MOUNT` to select a validated mount explicitly. Both app builds and
+`tab5 upload` use staged, hash-verified copies, backups, and synchronous safe eject.
+See [Linux prerequisites and permissions](linux-development.md). Runnable extensionless outputs declared by each
 application are copied to the volume's `bin/` directory. Declared runtime assets are
 copied under `data/<application>/`; intermediate build files and source assets are excluded.
 Grouped utility outputs are flattened; for example, `build/apps/coreutils/ls/ls` is

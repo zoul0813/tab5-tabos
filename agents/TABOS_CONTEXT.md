@@ -982,8 +982,8 @@ for the sole shell. Orderly shutdown precedes a consumed software-reset marker.
 Normal firmware waits indefinitely for serial input. Opt-in device-test firmware
 adds bounded console capture, key injection/expiry, completed-frame screenshots,
 display/memory/clock/stack counters and codec mute. App-owned tester and graphics
-benchmark workloads use the shared runner. Upload remains macOS-only, explicit
-files with backups/hash verification/eject; see docs/device-testing.md. Standard
+benchmark workloads use the shared runner. Upload supports macOS and Linux with validated USB mounts, explicit
+files, backups, hash verification, and synchronous safe eject; see docs/device-testing.md. Standard
 firmware defaults stay unchanged; sdkconfig.performance.defaults is optional.
 
 ## Experimental bounded compute (transport 26)

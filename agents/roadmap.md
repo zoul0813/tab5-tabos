@@ -864,3 +864,13 @@ then frees stacks/code/heap. No core affinity or general threading is exposed.
 Host RV32 returns ENOTSUP; the caller may execute the callback synchronously.
 Test native worker completion, repeated jobs, allocation failure, invalid ranges,
 forbidden gates and cross-core forced stop; tester exercises the public API.
+
+
+## Linux development tooling (2026-10-28)
+
+- [x] Share validated Mac/Linux MSC discovery, overrides, preflight, staged verified copies and safe eject.
+- [x] Use Bash for fresh-shell application toolchain activation.
+- [x] Stop serial failures with actionable errors and no automatic request retry.
+- [x] Document Ubuntu 24.04 LTS/26.10 prerequisites, SDL3, serial and storage permissions.
+- [x] Observe physical Linux UDisks eject causing firmware software reset and microSD remount.
+- [x] Complete clean repeat upload after operator clears card dirty state; see `docs/validation/linux-tooling-2026-10-28.md`.

@@ -63,6 +63,10 @@ class HostEnvironmentTest(unittest.TestCase):
         commands: list[list[str]] = []
         available = {
             "apt-get": "/usr/bin/apt-get",
+            "lsof": "/usr/bin/lsof",
+            "lsblk": "/usr/bin/lsblk",
+            "udisksctl": "/usr/bin/udisksctl",
+            "pkcheck": "/usr/bin/pkcheck",
             "cc": "/usr/bin/cc",
             "c++": "/usr/bin/c++",
             "make": "/usr/bin/make",
@@ -91,6 +95,19 @@ class HostEnvironmentTest(unittest.TestCase):
                 ["/usr/bin/apt-get", "install", "-y", "libssl-dev"],
             ],
         )
+
+    def test_ubuntu_without_sdl3_candidate_gives_source_guidance(self) -> None:
+        with (patch.object(environment.platform, "system", return_value="Linux"),
+              patch.object(environment.shutil, "which", side_effect=lambda tool: "/usr/bin/" + tool),
+              patch.object(environment, "cmake_is_supported", return_value=True),
+              patch.object(environment, "sdl3_is_available", return_value=False),
+              patch.object(environment.subprocess, "run", return_value=subprocess.CompletedProcess(
+                  [], 0, "libsdl3-dev:\n  Candidate: (none)\n")),
+              patch.object(environment, "run") as run):
+            with self.assertRaises(SystemExit) as error:
+                environment.setup_host_tools()
+            self.assertEqual(error.exception.code, 2)
+            run.assert_not_called()
 
 
 if __name__ == "__main__":

@@ -167,7 +167,19 @@ def setup_host_tools() -> None:
         if shutil.which("ninja") is None:
             packages.append("ninja-build")
         if not sdl3_is_available():
+            apt_cache = require_tool("apt-cache", "install apt tools")
+            candidate = subprocess.run([apt_cache, "policy", "libsdl3-dev"],
+                                       env={**os.environ, "LC_ALL": "C"},
+                                       capture_output=True, text=True, check=True)
+            if not re.search(r"Candidate:\s+(?!\(none\))\S+", candidate.stdout):
+                fail("SDL3 development package unavailable in configured repositories; "
+                     "Ubuntu 24.04 needs a source install first; see docs/linux-development.md")
             packages.append("libsdl3-dev")
+        for tool, package in (("pkg-config", "pkg-config"), ("lsof", "lsof"),
+                              ("lsblk", "util-linux"), ("udisksctl", "udisks2"),
+                              ("pkcheck", "polkitd")):
+            if shutil.which(tool) is None:
+                packages.append(package)
         if not openssl_is_available(host):
             packages.append("libssl-dev")
         if shutil.which("python3") is None:

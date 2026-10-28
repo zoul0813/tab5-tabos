@@ -38,3 +38,5 @@ Documentation in this directory describes the current project. Update it in the 
 The `agents/` directory is separate. It contains background context and implementation guidance for coding agents, not user-facing documentation.
 
 - [Automated device testing and profiling](device-testing.md)
+
+- [Linux development](linux-development.md): Ubuntu prerequisites, serial access, and safe MSC uploads.

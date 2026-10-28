@@ -130,7 +130,7 @@ disk through the host operating system before disconnecting it. A safe eject or
 USB disconnect ends storage mode and restarts the Tab5; normal boot then mounts
 the card as `T:` again. Internal flash is not exported.
 
-### Automated app uploads on macOS
+### Automated app uploads on macOS and Linux
 
 Firmware accepts the exact line `TABOS MSC` on the USB-C programming serial
 interface. It replies `TABOS MSC OK` only when the shell is the sole process;
@@ -150,12 +150,13 @@ repository root:
 
 Repeat `--file SOURCE DESTINATION` for additional files. Destinations are relative
 to the card root. `--port /dev/cu.usbmodem101` selects a serial device when auto
-detection is ambiguous. The uploader uses the existing ESP-IDF Python environment,
-waits for the writable external USB volume `/Volumes/TAB5`, backs up replaced
-files under `.local/msc-backups`, stages replacements, checks SHA-256, and ejects
-only after success. A failed upload leaves the volume available for inspection;
-eject it safely before retrying. This workflow currently supports macOS and cards
-named `TAB5`.
+detection is ambiguous. On Linux, use a port such as `/dev/ttyACM0`.
+The uploader uses the existing ESP-IDF Python environment and discovers a writable
+USB volume labeled `TAB5`. Use `--mount /path` or `TABOS_MSC_MOUNT` for an explicit
+validated mount. It backs up replaced files under `.local/msc-backups`, stages
+replacements, checks SHA-256, and safely ejects only after success. A failed upload
+requires inspection and safe eject before retrying. See [Linux development](linux-development.md)
+for serial access, SDL3 installation, and UDisks2/Polkit permissions.
 
 Firmware flashes and uploads are separate commands suitable for an automation
 script: run `./tools/tabos tab5 flash`, then the upload command. Upload waits for
