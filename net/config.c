@@ -96,9 +96,10 @@ network_config_result_t network_config_parse(const char* text, size_t length, ne
         .name         = NETWORK_CONFIG_DEFAULT_NAME,
         .auto_connect = true,
     };
-    bool version_seen = false;
-    bool wifi_section = false;
-    bool ssid_seen    = false;
+    bool version_seen  = false;
+    bool wifi_section  = false;
+    bool ssid_seen     = false;
+    bool password_seen = false;
     char* cursor      = buffer;
     while (*cursor != '\0') {
         char* line = cursor;
@@ -147,6 +148,7 @@ network_config_result_t network_config_parse(const char* text, size_t length, ne
             if (!parse_quoted(value, parsed.password, sizeof(parsed.password))) {
                 return NETWORK_CONFIG_INVALID;
             }
+            password_seen = true;
         } else if (wifi_section && strcmp(key, "name") == 0) {
             if (!parse_quoted(value, parsed.name, sizeof(parsed.name)) || !valid_hostname(parsed.name)) {
                 return NETWORK_CONFIG_INVALID;
@@ -155,8 +157,16 @@ network_config_result_t network_config_parse(const char* text, size_t length, ne
             return NETWORK_CONFIG_INVALID;
         }
     }
-    if (!version_seen || !ssid_seen) {
+    if (!version_seen) {
         return NETWORK_CONFIG_INVALID;
+    }
+    if (!ssid_seen) {
+        /* A password without its network is a damaged profile, not a forgotten one. */
+        if (password_seen) {
+            return NETWORK_CONFIG_INVALID;
+        }
+        *config = parsed;
+        return NETWORK_CONFIG_NO_PROFILE;
     }
     *config = parsed;
     return NETWORK_CONFIG_OK;
@@ -257,12 +267,62 @@ static bool is_owned_line(const char* line, size_t length, bool wifi_section)
            strcmp(key, "auto_connect") == 0;
 }
 
+static bool section_header(const char* line, size_t length, bool* wifi)
+{
+    char copy[NETWORK_CONFIG_FILE_MAX + 1U];
+    if (length > NETWORK_CONFIG_FILE_MAX) {
+        return false;
+    }
+    memcpy(copy, line, length);
+    copy[length]                = '\0';
+    char* trimmed               = trim(copy);
+    const size_t trimmed_length = strlen(trimmed);
+    if (trimmed_length < 3U || trimmed[0] != '[' || trimmed[trimmed_length - 1U] != ']') {
+        return false;
+    }
+    trimmed[trimmed_length - 1U] = '\0';
+    *wifi                        = strcmp(trim(trimmed + 1U), "wifi") == 0;
+    return true;
+}
+
+static bool blank_line(const char* line, size_t length)
+{
+    for (size_t index = 0U; index < length; ++index) {
+        if (!isspace((unsigned char) line[index])) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/* A rewritten [wifi] section is appended at the end, so an existing [wifi] header
+ * whose section holds only owned keys and blank lines would otherwise accumulate
+ * as an empty header on every save. Comments and unknown keys keep their header. */
+static bool wifi_section_disposable(const char* existing, size_t existing_length, size_t offset)
+{
+    while (offset < existing_length) {
+        const char* line            = existing + offset;
+        const char* newline         = memchr(line, '\n', existing_length - offset);
+        const size_t content_length = newline != NULL ? (size_t) (newline - line) : existing_length - offset;
+        bool wifi                   = false;
+        if (section_header(line, content_length, &wifi)) {
+            return true;
+        }
+        if (!blank_line(line, content_length) && !is_owned_line(line, content_length, true)) {
+            return false;
+        }
+        offset += content_length + (newline != NULL ? 1U : 0U);
+    }
+    return true;
+}
+
 network_config_result_t network_config_format_update(const char* existing, size_t existing_length,
                                                      const network_config_t* config, char* output,
                                                      size_t output_capacity, size_t* output_length)
 {
     if ((existing == NULL && existing_length != 0U) || config == NULL || output == NULL || output_length == NULL ||
-        config->ssid[0] == '\0' || strnlen(config->ssid, sizeof(config->ssid)) > NETWORK_CONFIG_SSID_MAX ||
+        (config->ssid[0] == '\0' && config->password[0] != '\0') ||
+        strnlen(config->ssid, sizeof(config->ssid)) > NETWORK_CONFIG_SSID_MAX ||
         strnlen(config->password, sizeof(config->password)) > NETWORK_CONFIG_PASSWORD_MAX ||
         (config->name[0] != '\0' && !valid_hostname(config->name)) || existing_length > NETWORK_CONFIG_FILE_MAX) {
         return NETWORK_CONFIG_INVALID;
@@ -280,20 +340,19 @@ network_config_result_t network_config_format_update(const char* existing, size_
         const size_t content_length = newline != NULL ? (size_t) (newline - line) : existing_length - offset;
         const size_t full_length    = content_length + (newline != NULL ? 1U : 0U);
 
-        char section[NETWORK_CONFIG_FILE_MAX + 1U];
         if (content_length > NETWORK_CONFIG_FILE_MAX) {
             return NETWORK_CONFIG_TOO_LARGE;
         }
-        memcpy(section, line, content_length);
-        section[content_length]     = '\0';
-        char* trimmed               = trim(section);
-        const size_t trimmed_length = strlen(trimmed);
-        if (trimmed_length >= 3U && trimmed[0] == '[' && trimmed[trimmed_length - 1U] == ']') {
-            trimmed[trimmed_length - 1U] = '\0';
-            wifi_section                 = strcmp(trim(trimmed + 1U), "wifi") == 0;
+        bool wifi_header   = false;
+        const bool header  = section_header(line, content_length, &wifi_header);
+        bool skip          = false;
+        if (header) {
+            wifi_section = wifi_header;
+            skip         = wifi_header && wifi_section_disposable(existing, existing_length, offset + full_length);
+        } else {
+            skip = is_owned_line(line, content_length, wifi_section);
         }
-        if (!is_owned_line(line, content_length, wifi_section) &&
-            !append_bytes(output, output_capacity, &used, line, full_length)) {
+        if (!skip && !append_bytes(output, output_capacity, &used, line, full_length)) {
             return NETWORK_CONFIG_TOO_LARGE;
         }
         offset += full_length;
@@ -301,11 +360,22 @@ network_config_result_t network_config_format_update(const char* existing, size_
     if (used > 0U && output[used - 1U] != '\n' && !append_bytes(output, output_capacity, &used, "\n", 1U)) {
         return NETWORK_CONFIG_TOO_LARGE;
     }
-    if (!append_bytes(output, output_capacity, &used, "\n[wifi]\nssid=", 13U) ||
-        !append_quoted(output, output_capacity, &used, config->ssid) ||
-        !append_bytes(output, output_capacity, &used, "password=", 9U) ||
-        !append_quoted(output, output_capacity, &used, config->password) ||
-        !append_bytes(output, output_capacity, &used, "name=", 5U) ||
+    /* Keep exactly one blank line before the rewritten section across saves. */
+    while (used >= 2U && output[used - 1U] == '\n' && output[used - 2U] == '\n') {
+        --used;
+    }
+    if (!append_bytes(output, output_capacity, &used, "\n[wifi]\n", 8U)) {
+        return NETWORK_CONFIG_TOO_LARGE;
+    }
+    if (config->ssid[0] != '\0') {
+        if (!append_bytes(output, output_capacity, &used, "ssid=", 5U) ||
+            !append_quoted(output, output_capacity, &used, config->ssid) ||
+            !append_bytes(output, output_capacity, &used, "password=", 9U) ||
+            !append_quoted(output, output_capacity, &used, config->password)) {
+            return NETWORK_CONFIG_TOO_LARGE;
+        }
+    }
+    if (!append_bytes(output, output_capacity, &used, "name=", 5U) ||
         !append_quoted(output, output_capacity, &used, name)) {
         return NETWORK_CONFIG_TOO_LARGE;
     }
@@ -404,6 +474,7 @@ const char* network_config_result_name(network_config_result_t result)
         case NETWORK_CONFIG_INVALID: return "invalid configuration";
         case NETWORK_CONFIG_TOO_LARGE: return "configuration too large";
         case NETWORK_CONFIG_IO_ERROR: return "I/O error";
+        case NETWORK_CONFIG_NO_PROFILE: return "no saved network";
     }
     return "unknown error";
 }

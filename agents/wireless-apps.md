@@ -76,6 +76,8 @@ existing `network.h` pattern (copied status, process-owned handles, bounded data
    - [x] `wifiscan` — nearby-AP lister, filters, bounded repeat, channel survey.
    - [ ] `wifimon` — watch APs over time, track signal/channel (site-survey assist).
      `wifiscan -r` covers simple repeats; a diffing monitor remains open.
+   - [x] Join a scanned or hidden network: `netctl connect --prompt` (private ELF
+     API 28), saving only after success.
    - [ ] A GUI "available networks" picker later.
 
 2. **SoftAP / AP-mode service** — bring up a local access point (portable config,

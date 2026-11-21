@@ -27,8 +27,10 @@ Use `build-netctl`, `build-ping`, `build-nettest`, `build-ntpdate`,
 installing.
 Runnable binaries install to `.local/rootfs/T/bin/` without filename extensions.
 
-`netctl` reports and controls the saved Wi-Fi connection and lists nearby access
-points with `netctl scan`. `wifiscan` filters, repeats, and surveys channel
+`netctl` reports and controls Wi-Fi: it lists nearby access points with
+`netctl scan`, joins a scanned or hidden network with `netctl connect --prompt`
+(hidden password, saved only after success), and edits the saved profile with
+`save`, `forget`, and `autoconnect on|off`. `wifiscan` filters, repeats, and surveys channel
 congestion from the same scan API. `ping` performs DNS and
 bounded ICMP echo checks. `nettest` validates TCP and UDP interoperability with a
 LAN peer; see `docs/networking.md` for its client and listener workflows. `ntpdate`

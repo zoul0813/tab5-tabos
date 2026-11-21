@@ -836,8 +836,8 @@ static int elf_system_action(uint32_t action)
 
 static int elf_network_status(tabos_elf_network_status_t* status)
 {
-    tabos_elf_network_status_t* writable_status =
-        (tabos_elf_network_status_t*) platform_executable_data_pointer(status, sizeof(*status));
+    /* Write through the guest address; see elf_network_scan. */
+    tabos_elf_network_status_t* writable_status = status;
     network_status_t source;
     if (writable_status == NULL) {
         return -TABOS_EINVAL;
@@ -855,6 +855,7 @@ static int elf_network_status(tabos_elf_network_status_t* status)
     (void) snprintf(writable_status->ssid, sizeof(writable_status->ssid), "%s", source.ssid);
     (void) snprintf(writable_status->ipv4, sizeof(writable_status->ipv4), "%s", source.ipv4);
     (void) snprintf(writable_status->last_failure, sizeof(writable_status->last_failure), "%s", source.last_failure);
+    (void) snprintf(writable_status->saved_ssid, sizeof(writable_status->saved_ssid), "%s", source.saved_ssid);
     return 0;
 }
 
@@ -862,7 +863,7 @@ static int elf_network_connect_saved(void)
 {
     network_config_t config;
     const network_config_result_t result = network_config_load(&config);
-    if (result == NETWORK_CONFIG_NOT_FOUND) {
+    if (result == NETWORK_CONFIG_NOT_FOUND || result == NETWORK_CONFIG_NO_PROFILE) {
         return -TABOS_ENOENT;
     }
     if (result != NETWORK_CONFIG_OK) {
@@ -882,6 +883,63 @@ static int elf_network_disconnect(void)
     }
     hardware_devices_update();
     return 0;
+}
+
+static int elf_network_connect(const char* ssid, const char* password)
+{
+    char copied_ssid[NETWORK_CONFIG_SSID_MAX + 1U];
+    char copied_password[NETWORK_CONFIG_PASSWORD_MAX + 1U];
+    const char* readable_ssid     = platform_executable_data_pointer(ssid, sizeof(copied_ssid));
+    const char* readable_password = platform_executable_data_pointer(password, sizeof(copied_password));
+    if (readable_ssid == NULL || readable_password == NULL) {
+        return -TABOS_EINVAL;
+    }
+    const size_t ssid_length     = strnlen(readable_ssid, sizeof(copied_ssid));
+    const size_t password_length = strnlen(readable_password, sizeof(copied_password));
+    if (ssid_length == 0U || ssid_length == sizeof(copied_ssid) || password_length == sizeof(copied_password)) {
+        return -TABOS_EINVAL;
+    }
+    memcpy(copied_ssid, readable_ssid, ssid_length + 1U);
+    memcpy(copied_password, readable_password, password_length + 1U);
+    network_status_t status;
+    const bool auto_connect = network_service_status(&status) && status.auto_connect;
+    const bool started      = network_service_connect(copied_ssid, copied_password, auto_connect);
+    memset(copied_password, 0, sizeof(copied_password));
+    if (!started) {
+        return -TABOS_EIO;
+    }
+    hardware_devices_update();
+    return 0;
+}
+
+static int network_profile_error(network_profile_result_t result)
+{
+    switch (result) {
+        case NETWORK_PROFILE_OK: return 0;
+        case NETWORK_PROFILE_NOT_CONNECTED: return -TABOS_ENETDOWN;
+        case NETWORK_PROFILE_UNAVAILABLE: return -TABOS_ENODEV;
+        case NETWORK_PROFILE_INVALID: return -TABOS_EINVAL;
+        case NETWORK_PROFILE_IO: return -TABOS_EIO;
+    }
+    return -TABOS_EIO;
+}
+
+static int elf_network_save_profile(void)
+{
+    return network_profile_error(network_service_save_current());
+}
+
+static int elf_network_forget_profile(void)
+{
+    return network_profile_error(network_service_forget());
+}
+
+static int elf_network_set_auto_connect(uint32_t enabled)
+{
+    if (enabled > 1U) {
+        return -TABOS_EINVAL;
+    }
+    return network_profile_error(network_service_set_auto_connect(enabled != 0U));
 }
 
 static int network_operation_error(network_operation_result_t result)
@@ -2365,6 +2423,10 @@ static bool elf_entry(tabos_app_context_t* context)
         .compute_wait                    = elf_compute_wait,
         .compute_poll                    = elf_compute_poll,
         .network_scan                    = elf_network_scan,
+        .network_connect                 = elf_network_connect,
+        .network_save_profile            = elf_network_save_profile,
+        .network_forget_profile          = elf_network_forget_profile,
+        .network_set_auto_connect        = elf_network_set_auto_connect,
         .graphics_close                  = elf_graphics_close,
         .graphics_capabilities           = elf_graphics_capabilities,
         .graphics_blit_ex                = elf_graphics_blit_ex,

@@ -25,6 +25,9 @@ typedef struct {
         bool auto_connect;
         bool config_available;
         char last_failure[64];
+        /* SSID of the saved profile; empty when no network is saved. It differs
+         * from ssid after a volatile connection to another network. */
+        char saved_ssid[33];
 } network_status_t;
 
 typedef enum {
@@ -81,6 +84,21 @@ network_operation_result_t network_service_echo(const network_address_t* address
  * operation lock, so runtime updates continue while the radio scans. */
 network_operation_result_t network_service_scan(network_access_point_t* access_points, uint32_t capacity,
                                                 uint32_t* count);
+typedef enum {
+    NETWORK_PROFILE_OK = 0,
+    NETWORK_PROFILE_NOT_CONNECTED,
+    NETWORK_PROFILE_UNAVAILABLE,
+    NETWORK_PROFILE_INVALID,
+    NETWORK_PROFILE_IO,
+} network_profile_result_t;
+
+/* Profile operations serialize their read-modify-write of T:/etc/wifi.conf and
+ * run on the caller's task; none of them disconnects or starts a connection.
+ * save_current persists the in-memory credentials of the current connection and
+ * only succeeds while online, so a failed connection never replaces a saved one. */
+network_profile_result_t network_service_save_current(void);
+network_profile_result_t network_service_forget(void);
+network_profile_result_t network_service_set_auto_connect(bool enabled);
 const char* network_state_name(network_state_t state);
 
 #endif

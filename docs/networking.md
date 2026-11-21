@@ -24,7 +24,13 @@ auto_connect=true
 
 The `ssid` and `password` values must be quoted. An empty password selects an
 open network. With `auto_connect=true`, TabOS starts one asynchronous connection
-sequence during boot and makes at most three attempts.
+sequence during boot and makes at most three attempts. Each attempt is bounded to
+20 seconds, so a missing or rejecting network ends in a failure instead of a
+connection that never completes.
+
+A `[wifi]` section with neither `ssid` nor `password` is valid and means no saved
+network; `name` and `auto_connect` still apply. `netctl forget` writes this form.
+A `password` without an `ssid` is rejected as a damaged file.
 
 The optional quoted `name` is sent as the DHCP hostname. It supports one through
 32 ASCII letters, digits, or hyphens; a hyphen cannot be first or last. It
@@ -44,17 +50,39 @@ Supported commands are:
 netctl status
 netctl scan
 netctl connect
-netctl connect --prompt
+netctl connect --prompt [--save]
+netctl connect --ssid NAME [--save]
 netctl disconnect
+netctl save
+netctl forget
+netctl autoconnect on|off
 ```
 
-Bare `netctl connect` uses the saved profile. `--prompt` explicitly selects
-interactive credential entry; that path is reserved for the next networking
-slice and currently reports an unsupported operation.
+Bare `netctl connect` joins the saved network.
 
-`status` reports state, hostname, saved configuration availability, autoconnect
-policy, attempt count, SSID, IPv4 address, signal strength, and last failure
-when those fields are available. It never reports the password.
+`connect --prompt` scans, lists each named network once (strongest access point
+first), and asks for a number or, for a hidden network, its name. `--ssid NAME`
+skips the scan. The password is read without echo; each character shows as `*`.
+Press Enter at the network prompt to cancel, or at the password prompt for an open
+network. netctl waits for the connection, reporting a readable reason on failure
+such as `network not found` or `wrong password or security mismatch`. After a
+failure the saved network is unchanged and netctl rejoins it. After success it asks
+whether to save the network as the default; `--save` saves without asking.
+Credentials never appear in arguments, history, logs, or status.
+
+Saving happens only after the connection succeeds, and the kernel saves the
+credentials it is already using; no password is passed back from an application.
+`save` stores the current connection, for example after a connection you chose not
+to save. `forget` removes the saved network but keeps the hostname, autoconnect
+policy, comments, and unknown settings; the current connection stays up until
+disconnect or restart. `autoconnect on|off` sets whether the saved network is joined
+at boot. These commands report a missing `T:` card or a damaged `wifi.conf`, which
+they never overwrite, and serialize their changes to the file.
+
+`status` reports state, saved network, hostname, autoconnect policy, attempt count,
+current SSID, IPv4 address, signal strength, and last failure when those fields are
+available. The current SSID differs from the saved network while trying another
+network. It never reports the password.
 
 `scan` lists nearby access points, strongest first, with signal strength,
 channel, security, and SSID. Hidden networks appear as `<hidden>`. Scanning works
@@ -72,7 +100,7 @@ Status, connect, disconnect, and retry-deadline operations are safe when runtime
 native application tasks call them concurrently. Status always returns one complete
 snapshot; backend connection work does not hold the portable state lock.
 
-Interactive credential entry and forgetting credentials are not implemented yet.
+Only one network is saved at a time.
 
 ## Application API
 
@@ -86,6 +114,14 @@ operations for independently loaded applications:
 
 - `tabos_network_echo()` sends one bounded ICMP echo request to a resolved
   address.
+
+- `tabos_network_connect()` starts a connection to an SSID and password without
+  saving it; poll `tabos_network_get_status()` for `TABOS_NETWORK_ONLINE`, or
+  `TABOS_NETWORK_FAILED` with three attempts. `tabos_network_save_profile()`
+  saves the current connection while online (`ENETDOWN` otherwise).
+  `tabos_network_forget_profile()` and `tabos_network_set_auto_connect()` edit
+  the saved profile. Profile calls report `ENODEV` without `T:` and `EINVAL` for
+  a damaged `wifi.conf`. Status `saved_ssid` names the saved network.
 
 - `tabos_network_scan()` scans nearby 2.4 GHz access points and stores up to
   `TABOS_WIFI_SCAN_MAX` (32) `tabos_wifi_access_point_t` records, strongest

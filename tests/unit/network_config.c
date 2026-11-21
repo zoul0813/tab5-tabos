@@ -75,5 +75,39 @@ int main(void)
     expect(strcmp(reparsed.password, config.password) == 0, "updated password round trips");
     expect(strcmp(reparsed.name, config.name) == 0, "updated hostname round trips");
     expect(reparsed.auto_connect, "updated autoconnect round trips");
+
+    char resaved[NETWORK_CONFIG_FILE_MAX + 1U];
+    size_t resaved_length = 0U;
+    expect(network_config_format_update(updated, updated_length, &config, resaved, sizeof(resaved),
+                                        &resaved_length) == NETWORK_CONFIG_OK &&
+               resaved_length == updated_length && memcmp(resaved, updated, updated_length) == 0,
+           "repeated save is stable and adds no empty [wifi] header or blank line");
+
+    static const char no_profile[] = "version=1\n# kept\n[wifi]\nname=\"Den-TabOS\"\nauto_connect=false\n";
+    expect(network_config_parse(no_profile, sizeof(no_profile) - 1U, &config) == NETWORK_CONFIG_NO_PROFILE &&
+               config.ssid[0] == '\0' && config.password[0] == '\0' && strcmp(config.name, "Den-TabOS") == 0 &&
+               !config.auto_connect,
+           "file without a saved network parses as no profile and keeps settings");
+    static const char version_only[] = "version=1\n";
+    expect(network_config_parse(version_only, sizeof(version_only) - 1U, &config) == NETWORK_CONFIG_NO_PROFILE &&
+               config.auto_connect && strcmp(config.name, NETWORK_CONFIG_DEFAULT_NAME) == 0,
+           "version-only file is a valid empty profile with defaults");
+
+    network_config_t forgotten = {.name = "Kitchen-TabOS", .auto_connect = false};
+    char cleared[NETWORK_CONFIG_FILE_MAX + 1U];
+    size_t cleared_length = 0U;
+    expect(network_config_format_update(updated, updated_length, &forgotten, cleared, sizeof(cleared),
+                                        &cleared_length) == NETWORK_CONFIG_OK,
+           "forgetting formats");
+    expect(strstr(cleared, "ssid=") == NULL && strstr(cleared, "password=") == NULL &&
+               strstr(cleared, "# TabOS network") != NULL && strstr(cleared, "[dns]\nservers=\"future\"") != NULL,
+           "forgetting removes credentials and keeps comments and unknown sections");
+    expect(network_config_parse(cleared, cleared_length, &reparsed) == NETWORK_CONFIG_NO_PROFILE &&
+               strcmp(reparsed.name, "Kitchen-TabOS") == 0 && !reparsed.auto_connect,
+           "forgotten file keeps hostname and autoconnect policy");
+    network_config_t orphan_password = {.password = "secret", .name = "TabOS"};
+    expect(network_config_format_update(updated, updated_length, &orphan_password, cleared, sizeof(cleared),
+                                        &cleared_length) == NETWORK_CONFIG_INVALID,
+           "a password without a network is never written");
     return failures == 0 ? 0 : 1;
 }

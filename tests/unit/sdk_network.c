@@ -4,6 +4,7 @@
 #include <tabos/wait.h>
 
 #include <errno.h>
+#include <stdio.h>
 #include <string.h>
 
 const tabos_elf_api_t* tabos_runtime_api;
@@ -20,6 +21,34 @@ static int provide_status(tabos_elf_network_status_t* status)
     (void) strcpy(status->hostname, "Test-TabOS");
     (void) strcpy(status->ssid, "test-network");
     (void) strcpy(status->ipv4, "192.0.2.1");
+    memset(status->saved_ssid, 's', sizeof(status->saved_ssid));
+    return 0;
+}
+
+static char connected_ssid[40];
+static char connected_password[80];
+static uint32_t auto_connect_seen = 9U;
+
+static int connect_network(const char* ssid, const char* password)
+{
+    (void) snprintf(connected_ssid, sizeof(connected_ssid), "%s", ssid);
+    (void) snprintf(connected_password, sizeof(connected_password), "%s", password);
+    return strcmp(ssid, "busy") == 0 ? -TABOS_EBUSY : 0;
+}
+
+static int save_profile(void)
+{
+    return -TABOS_ENETDOWN;
+}
+
+static int forget_profile(void)
+{
+    return 0;
+}
+
+static int set_auto_connect(uint32_t enabled)
+{
+    auto_connect_seen = enabled;
     return 0;
 }
 
@@ -147,7 +176,10 @@ int main(void)
         return 1;
     }
     tabos_wifi_access_point_t unavailable[1];
-    if (tabos_network_scan(unavailable, 1U) == 0 || errno != ENOSYS) {
+    if (tabos_network_scan(unavailable, 1U) == 0 || errno != ENOSYS || tabos_network_connect("x", "") == 0 ||
+        errno != ENOSYS || tabos_network_save_profile() == 0 || errno != ENOSYS ||
+        tabos_network_forget_profile() == 0 || errno != ENOSYS || tabos_network_set_auto_connect(true) == 0 ||
+        errno != ENOSYS) {
         return 1;
     }
     const tabos_elf_api_t api = {
@@ -163,6 +195,10 @@ int main(void)
         .socket_wait_source    = socket_wait_source,
         .wait                  = wait_socket,
         .network_scan          = scan_networks,
+        .network_connect       = connect_network,
+        .network_save_profile  = save_profile,
+        .network_forget_profile = forget_profile,
+        .network_set_auto_connect = set_auto_connect,
     };
     tabos_runtime_api = &api;
     if (tabos_network_get_status(&status) != 0 || status.state != TABOS_NETWORK_ONLINE ||
@@ -195,5 +231,35 @@ int main(void)
         wait_item.returned_events != TABOS_WAIT_READABLE || tabos_socket_close(socket) != 0) {
         return 1;
     }
-    return scan_test();
+    if (scan_test() != 0) {
+        return 1;
+    }
+    if (status.saved_ssid[sizeof(status.saved_ssid) - 1U] != '\0' || strlen(status.saved_ssid) != 32U) {
+        return 1;
+    }
+    char long_ssid[34];
+    memset(long_ssid, 'a', sizeof(long_ssid) - 1U);
+    long_ssid[sizeof(long_ssid) - 1U] = '\0';
+    char long_password[66];
+    memset(long_password, 'p', sizeof(long_password) - 1U);
+    long_password[sizeof(long_password) - 1U] = '\0';
+    if (tabos_network_connect(NULL, "") == 0 || errno != EINVAL || tabos_network_connect("x", NULL) == 0 ||
+        errno != EINVAL || tabos_network_connect("", "") == 0 || errno != EINVAL ||
+        tabos_network_connect(long_ssid, "") == 0 || errno != EINVAL || tabos_network_connect("x", long_password) == 0 ||
+        errno != EINVAL || connected_ssid[0] != '\0') {
+        return 1;
+    }
+    long_ssid[32]     = '\0';
+    long_password[64] = '\0';
+    if (tabos_network_connect(long_ssid, long_password) != 0 || strcmp(connected_ssid, long_ssid) != 0 ||
+        strcmp(connected_password, long_password) != 0 || tabos_network_connect("busy", "pw") == 0 ||
+        errno != TABOS_EBUSY) {
+        return 1;
+    }
+    if (tabos_network_save_profile() == 0 || errno != TABOS_ENETDOWN || tabos_network_forget_profile() != 0 ||
+        tabos_network_set_auto_connect(false) != 0 || auto_connect_seen != 0U ||
+        tabos_network_set_auto_connect(true) != 0 || auto_connect_seen != 1U) {
+        return 1;
+    }
+    return 0;
 }

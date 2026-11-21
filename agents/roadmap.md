@@ -674,7 +674,8 @@ but is not a substitute for this execution path.
 - [x] Add deterministic portable tests plus physical Wi-Fi, DNS, ICMP, socket, NTP,
   and TLS validation.
 - [x] Add station-mode Wi-Fi scan (`tabos_network_scan`, `netctl scan`, `wifiscan`).
-- [ ] Add Wi-Fi forget and interactive configuration workflows.
+- [x] Add Wi-Fi forget and interactive configuration workflows (`netctl connect --prompt`,
+  `save`, `forget`, `autoconnect`).
 
 ### Audio
 

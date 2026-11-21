@@ -123,3 +123,7 @@ NATIVE_GATE(int, compute_poll, (void), ())
 
 NATIVE_GATE(int, network_scan, (tabos_elf_wifi_access_point_t * access_points, uint32_t capacity),
             (access_points, capacity))
+NATIVE_GATE(int, network_connect, (const char* ssid, const char* password), (ssid, password))
+NATIVE_GATE(int, network_save_profile, (void), ())
+NATIVE_GATE(int, network_forget_profile, (void), ())
+NATIVE_GATE(int, network_set_auto_connect, (uint32_t enabled), (enabled))

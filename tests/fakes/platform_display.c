@@ -637,6 +637,10 @@ bool platform_network_connect(const char* ssid, const char* password)
         return false;
     }
     ++network_connect_calls;
+    /* Models a radio that refuses to start while it is still busy. */
+    if (strcmp(ssid, "rejecting-network") == 0) {
+        return false;
+    }
     fake_network.state = PLATFORM_NETWORK_CONNECTING;
     (void) snprintf(fake_network.ssid, sizeof(fake_network.ssid), "%s", ssid);
     if (fake_network_event != NULL) {

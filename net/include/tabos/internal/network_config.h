@@ -27,15 +27,20 @@ typedef enum {
     NETWORK_CONFIG_INVALID,
     NETWORK_CONFIG_TOO_LARGE,
     NETWORK_CONFIG_IO_ERROR,
+    /* Valid file without a saved network. name and auto_connect are filled and
+     * ssid/password are empty; written by forgetting the saved profile. */
+    NETWORK_CONFIG_NO_PROFILE,
 } network_config_result_t;
 
 network_config_result_t network_config_parse(const char* text, size_t length, network_config_t* config);
 network_config_result_t network_config_load(network_config_t* config);
+/* An empty ssid with an empty password writes a [wifi] section without a saved
+ * network, preserving name, auto_connect, comments, and unknown content. */
 network_config_result_t network_config_format_update(const char* existing, size_t existing_length,
                                                      const network_config_t* config, char* output,
                                                      size_t output_capacity, size_t* output_length);
-/* Retained for the planned netctl credential-editing workflow. Its persistence
- * contract is exercised by component.network_config_file; no public write gate yet. */
+/* Atomically replaces T:/etc/wifi.conf. Callers that read, modify, and save must
+ * serialize that sequence themselves; the network service does so for profiles. */
 network_config_result_t network_config_save(const network_config_t* config);
 const char* network_config_result_name(network_config_result_t result);
 

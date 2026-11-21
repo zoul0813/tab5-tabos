@@ -53,8 +53,9 @@ Use official `esp_hosted` and `esp_wifi_remote` over 4-bit SDIO.
 - [x] Default `auto_connect` to `true` when key is omitted. `false` loads saved
   credentials but requires manual saved connection.
 - [x] Permit an empty password for open networks.
-- [ ] Serialize configuration mutations before adding `netctl` commands that
-  write `wifi.conf`; current saved-connect/status operations only read it.
+- [x] Serialize configuration mutations before adding `netctl` commands that
+  write `wifi.conf`: the network service holds one profile lock across each
+  load-modify-save, and `network_config_save` remains atomic.
 - [x] If `T:` is removed after configuration loads, retain credentials in memory
   for current session but report that persistent configuration is unavailable.
 - [x] Never place password in argv, shell history, boot report, serial logs, or
@@ -66,7 +67,8 @@ Use official `esp_hosted` and `esp_wifi_remote` over 4-bit SDIO.
 - [x] Extend public `<tabos/network.h>` with DNS, bounded ICMP echo, and bounded
   BSD-like socket operations.
 - [x] Add portable station-mode scan API (`tabos_network_scan`, private ELF API 27).
-- [ ] Add volatile interactive-connect API.
+- [x] Add volatile interactive-connect API (`tabos_network_connect`) and kernel-held
+  profile save/forget/autoconnect calls (private ELF API 28).
 - [x] Support IPv4 and IPv6, TCP and UDP, `socket`, `bind`, `listen`, `accept`,
   `connect`, `send`, `receive`, `shutdown`, nonblocking mode, and close.
 Additional socket options are deferred until a concrete portable option set is
@@ -129,10 +131,14 @@ deferred beyond this milestone.
   channel, and signal strength.
 - [x] Add `wifiscan` under `apps/netutils` with SSID/channel filters, bounded
   repeat, and channel-congestion survey.
-- [ ] Add `netctl connect --prompt` with hidden-password input, optional save only
-  after success, and terminal restoration on every exit path.
-- [ ] Add `netctl forget` and `netctl autoconnect on|off`; preserve unknown config
+- [x] Add `netctl connect --prompt` with hidden-password input and optional save only
+  after success. TabOS stdin never echoes, so no terminal mode changes and none needs
+  restoring. Add `--ssid NAME` for hidden networks and `netctl save`.
+- [x] Add `netctl forget` and `netctl autoconnect on|off`; preserve unknown config
   content and never replace working credentials after a failed connection.
+- [x] Bound each connection attempt to 20 seconds; retry rejected starts; stop the
+  radio after a final failure; ignore the late disconnect event of the previous AP;
+  report readable disconnect reasons.
 - [x] Make `netctl status` show connection state, SSID, signal strength, IPv4,
   hostname, attempt count, autoconnect state, saved-config availability, and
   last failure without exposing password content.
@@ -238,7 +244,12 @@ user-mode/PMP execution boundary; native application faults are currently device
 - [x] Validate physical station-mode scan: `netctl scan`, `wifiscan` list/filter/repeat/
   `--channels`, and RV32 tester scan coverage (218 assertions, 0 failures) on Tab5
   with ESP32-C6 hosted firmware 1.4.1, while online and during association (busy).
-- [ ] Validate physical interactive connection, IPv6, and `nettest` client mode.
+- [x] Validate physical interactive connection on Tab5: prompt cancel, missing network
+  (reason 201), wrong password on the saved network (reason 15), saved profile
+  unchanged and rejoined after both, autoconnect off/on, forget, save, and status.
+  A successful interactive `netctl connect --prompt` with a typed password was
+  confirmed manually on Tab5. Open and hidden networks remain unexercised.
+- [ ] Validate physical IPv6 and `nettest` client mode.
 
 ## Assumptions
 

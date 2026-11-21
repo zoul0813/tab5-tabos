@@ -24,7 +24,14 @@ typedef struct {
         bool auto_connect;
         bool saved_config;
         char last_failure[96];
+        /* SSID of the saved profile, or empty; ssid is the current target. */
+        char saved_ssid[33];
 } tabos_network_status_t;
+
+enum {
+    TABOS_NETWORK_SSID_MAX     = 32,
+    TABOS_NETWORK_PASSWORD_MAX = 64,
+};
 
 typedef enum {
     TABOS_NETWORK_FAMILY_ANY  = 0,
@@ -101,6 +108,21 @@ typedef struct {
 int tabos_network_get_status(tabos_network_status_t* status);
 int tabos_network_connect_saved(void);
 int tabos_network_disconnect(void);
+/* Starts connecting to ssid without saving it; an empty password selects an open
+ * network. Returns once the attempt starts: poll tabos_network_get_status() for
+ * TABOS_NETWORK_ONLINE, or FAILED after the third attempt. The saved profile is
+ * untouched. Callers should clear their password buffer afterwards. */
+int tabos_network_connect(const char* ssid, const char* password);
+/* Saves the current connection as the profile in T:/etc/wifi.conf. Only succeeds
+ * while online (ENETDOWN otherwise), so a failed connection never replaces the
+ * saved network. The kernel supplies the password; none is passed back in.
+ * ENODEV reports missing T: storage and EINVAL a damaged wifi.conf. */
+int tabos_network_save_profile(void);
+/* Removes the saved network, keeping hostname, autoconnect policy, comments, and
+ * unknown settings. Does not disconnect. */
+int tabos_network_forget_profile(void);
+/* Sets whether the saved network is joined at boot. */
+int tabos_network_set_auto_connect(bool enabled);
 int tabos_network_resolve(const char* hostname, tabos_network_family_t family, tabos_network_address_t* address);
 int tabos_network_echo(const tabos_network_address_t* address, uint16_t sequence, uint16_t payload_bytes,
                        uint32_t timeout_ms, tabos_network_echo_result_t* result);

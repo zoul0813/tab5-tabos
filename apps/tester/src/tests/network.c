@@ -370,6 +370,29 @@ static void test_scan(tester_context_t* context)
     tester_expect(context, ordered, "scan records are ordered strongest first");
 }
 
+/* Argument validation only: real connections, saves, and forgets would change the
+ * device's network and wifi.conf, so they are validated manually with netctl. */
+static void test_connect_arguments(tester_context_t* context)
+{
+    char long_ssid[TABOS_NETWORK_SSID_MAX + 2];
+    memset(long_ssid, 'a', sizeof(long_ssid) - 1U);
+    long_ssid[sizeof(long_ssid) - 1U] = '\0';
+    char long_password[TABOS_NETWORK_PASSWORD_MAX + 2];
+    memset(long_password, 'p', sizeof(long_password) - 1U);
+    long_password[sizeof(long_password) - 1U] = '\0';
+    tester_expect(context, tabos_network_connect(NULL, "") < 0 && errno == EINVAL, "connect rejects missing SSID");
+    tester_expect(context, tabos_network_connect("", "") < 0 && errno == EINVAL, "connect rejects empty SSID");
+    tester_expect(context, tabos_network_connect(long_ssid, "") < 0 && errno == EINVAL,
+                  "connect rejects a 33-byte SSID");
+    tester_expect(context, tabos_network_connect("tabos-test", long_password) < 0 && errno == EINVAL,
+                  "connect rejects a 65-byte password");
+    tabos_network_status_t status;
+    tester_expect(context,
+                  tabos_network_get_status(&status) == 0 &&
+                      memchr(status.saved_ssid, '\0', sizeof(status.saved_ssid)) != NULL,
+                  "status reports a terminated saved network name");
+}
+
 void tester_test_network(tester_context_t* context)
 {
     test_tcp(context);
@@ -379,4 +402,5 @@ void tester_test_network(tester_context_t* context)
     test_full_table_accept(context);
     test_wait_sources(context);
     test_scan(context);
+    test_connect_arguments(context);
 }

@@ -647,11 +647,17 @@ esp_wifi_scan_get_ap_num and drops zero-padding records. The scan gate writes
 results through the guest address: the executable-image data-pointer alias is for
 reading guest input, and stores through it are invisible to static image storage.
 No monitor mode or raw 802.11 access is exposed.
+Applications start volatile connections with an SSID and password. The kernel
+alone persists credentials: saving uses the in-memory credentials of the current
+connection and requires ONLINE, so a failed attempt never replaces wifi.conf.
+Profile edits serialize their read-modify-write under one service lock. Each
+attempt is bounded to 20 seconds because ESP-Hosted can retry a missing AP without
+reporting a final disconnect; a final failure disconnects to stop that retrying.
 Host supplies corresponding socket/TLS services and simulated Wi-Fi status and scans.
 
 ### Open
 
-- forgetting Wi-Fi profiles and interactive credential editing
+- multiple saved Wi-Fi profiles
 - physical coexistence, latency, and stop/cancellation measurements
 
 ## 12. Host Development and Emulation

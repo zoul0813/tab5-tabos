@@ -119,6 +119,21 @@ static int test_network_scan(tabos_elf_wifi_access_point_t* access_points, uint3
     return (int) capacity;
 }
 
+static int test_network_save_profile(void)
+{
+    return 5;
+}
+
+static int test_network_forget_profile(void)
+{
+    return 6;
+}
+
+static int test_network_set_auto_connect(uint32_t enabled)
+{
+    return (int) enabled + 10;
+}
+
 static platform_riscv32_result_t execute_raw_with_limits(const uint32_t* instructions, size_t size, unsigned int budget,
                                                          size_t heap_bytes, size_t stack_bytes)
 {
@@ -135,6 +150,9 @@ static platform_riscv32_result_t execute_raw_with_limits(const uint32_t* instruc
         .device_count      = test_device_count,
         .battery_status    = test_battery_status,
         .network_scan      = test_network_scan,
+        .network_save_profile     = test_network_save_profile,
+        .network_forget_profile   = test_network_forget_profile,
+        .network_set_auto_connect = test_network_set_auto_connect,
     };
     int returned_status = -1;
     platform_riscv32_context_t* context =
@@ -180,6 +198,19 @@ int main(void)
         raw_returned_status != 2 ||
         execute_raw(scan_oversized, sizeof(scan_oversized), 32U) != PLATFORM_RISCV32_RETURNED ||
         raw_returned_status != TABOS_ELF_WIFI_SCAN_MAX) {
+        return 1;
+    }
+
+    /* Profile gates sit at offsets 436, 440, and 444; set_auto_connect passes a0. */
+    const uint32_t save_profile[]   = {0x1b452283U, 0x00028067U};
+    const uint32_t forget_profile[] = {0x1b852283U, 0x00028067U};
+    const uint32_t auto_connect[]   = {0x1bc52283U, 0x00100513U, 0x00028067U};
+    if (execute_raw(save_profile, sizeof(save_profile), 32U) != PLATFORM_RISCV32_RETURNED ||
+        raw_returned_status != 5 ||
+        execute_raw(forget_profile, sizeof(forget_profile), 32U) != PLATFORM_RISCV32_RETURNED ||
+        raw_returned_status != 6 ||
+        execute_raw(auto_connect, sizeof(auto_connect), 32U) != PLATFORM_RISCV32_RETURNED ||
+        raw_returned_status != 11) {
         return 1;
     }
 

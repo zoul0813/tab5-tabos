@@ -1458,6 +1458,20 @@ tabos_enable_warnings(tabos_network_config_file)
 tabos_enable_sanitizers(tabos_network_config_file)
 add_test(NAME component.network_config_file COMMAND tabos_network_config_file)
 
+add_executable(tabos_network_profile
+    component/network_profile.c fakes/platform_display.c
+    "${TABOS_ROOT}/platform/posix/storage.c"
+)
+target_include_directories(tabos_network_profile PRIVATE
+    "${TABOS_ROOT}/fs/include" "${TABOS_ROOT}/net/include"
+    "${TABOS_ROOT}/platform/include" "${TABOS_ROOT}/sdk/include"
+    "${CMAKE_CURRENT_LIST_DIR}/fakes"
+)
+target_link_libraries(tabos_network_profile PRIVATE tabos_core)
+tabos_enable_warnings(tabos_network_profile)
+tabos_enable_sanitizers(tabos_network_profile)
+add_test(NAME component.network_profile COMMAND tabos_network_profile)
+
 add_executable(tabos_tab5_msc_control unit/tab5_msc_control.c)
 tabos_enable_warnings(tabos_tab5_msc_control)
 tabos_enable_sanitizers(tabos_tab5_msc_control)

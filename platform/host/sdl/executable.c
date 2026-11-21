@@ -128,7 +128,11 @@ static _Thread_local uint32_t host_rv32_active_ram_size;
     X(COMPUTE_SUBMIT, 416U)                  \
     X(COMPUTE_WAIT, 420U)                    \
     X(COMPUTE_POLL, 424U)                    \
-    X(NETWORK_SCAN, 428U)
+    X(NETWORK_SCAN, 428U)                    \
+    X(NETWORK_CONNECT, 432U)                 \
+    X(NETWORK_SAVE_PROFILE, 436U)            \
+    X(NETWORK_FORGET_PROFILE, 440U)          \
+    X(NETWORK_SET_AUTO_CONNECT, 444U)
 
 enum {
 #define HOST_RV32_GATE_INDEX(name, api_offset) HOST_RV32_GATE_INDEX_##name,
@@ -805,6 +809,43 @@ static platform_riscv32_result_t step_inner(platform_riscv32_context_t* context,
                 address, context->state.regs[11], context->state.regs[12], context->state.regs[13], echo_result);
             current_user_data = NULL;
             context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_NETWORK_CONNECT) {
+            const char* ssid     = guest_string(context->memory, context->state.regs[10]);
+            const char* password = guest_string(context->memory, context->state.regs[11]);
+            if (ssid == NULL || password == NULL || context->api.network_connect == NULL) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data       = context->user_data;
+            context->state.regs[10] = (uint32_t) context->api.network_connect(ssid, password);
+            current_user_data       = NULL;
+            context->state.pc       = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_NETWORK_SAVE_PROFILE ||
+            context->state.pc == HOST_RV32_NETWORK_FORGET_PROFILE) {
+            int (*call)(void) = context->api.network_forget_profile;
+            if (context->state.pc == HOST_RV32_NETWORK_SAVE_PROFILE) {
+                call = context->api.network_save_profile;
+            }
+            if (call == NULL) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data       = context->user_data;
+            context->state.regs[10] = (uint32_t) call();
+            current_user_data       = NULL;
+            context->state.pc       = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_NETWORK_SET_AUTO_CONNECT) {
+            if (context->api.network_set_auto_connect == NULL) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data       = context->user_data;
+            context->state.regs[10] = (uint32_t) context->api.network_set_auto_connect(context->state.regs[10]);
+            current_user_data       = NULL;
+            context->state.pc       = context->state.regs[1];
             continue;
         }
         if (context->state.pc == HOST_RV32_NETWORK_SCAN) {

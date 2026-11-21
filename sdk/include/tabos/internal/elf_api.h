@@ -11,7 +11,7 @@
 
 #include <stdint.h>
 
-#define TABOS_ELF_API_VERSION  27U
+#define TABOS_ELF_API_VERSION  28U
 #define TABOS_ELF_EXEC_PENDING (-2147483647 - 1)
 
 enum {
@@ -63,6 +63,7 @@ typedef struct {
         uint32_t auto_connect;
         uint32_t saved_config;
         char last_failure[96];
+        char saved_ssid[33];
 } tabos_elf_network_status_t;
 
 typedef struct {
@@ -229,6 +230,11 @@ typedef struct {
         int (*compute_poll)(void);
         /* Returns copied record count, strongest first, or negative errno. */
         int (*network_scan)(tabos_elf_wifi_access_point_t* access_points, uint32_t capacity);
+        /* Starts a connection without saving it. Never retains guest pointers. */
+        int (*network_connect)(const char* ssid, const char* password);
+        int (*network_save_profile)(void);
+        int (*network_forget_profile)(void);
+        int (*network_set_auto_connect)(uint32_t enabled);
 } tabos_elf_api_t;
 
 typedef int (*tabos_elf_entry_fn)(const tabos_elf_api_t* api, int argc, const char* const* argv);

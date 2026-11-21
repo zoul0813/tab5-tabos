@@ -74,6 +74,13 @@ static void* update_concurrently(void* argument)
     return NULL;
 }
 
+/* Fake time is frozen during the concurrency test, so the only valid deadlines are
+ * none or the timeout of an attempt started by a concurrent connect. */
+static bool deadline_is_idle_or_attempt(uint64_t deadline)
+{
+    return deadline == UINT64_MAX || deadline == test_platform_time_ms() + 20000U;
+}
+
 static void* observe_concurrently(void* argument)
 {
     concurrency_context_t* context = argument;
@@ -86,7 +93,7 @@ static void* observe_concurrently(void* argument)
             memchr(status.last_failure, '\0', sizeof(status.last_failure)) == NULL || status.attempts > 1U ||
             (status.ssid[0] != '\0' && strcmp(status.ssid, "test-network") != 0 &&
              strcmp(status.ssid, concurrent_ssid_a) != 0 && strcmp(status.ssid, concurrent_ssid_b) != 0) ||
-            network_service_next_deadline() != UINT64_MAX) {
+            !deadline_is_idle_or_attempt(network_service_next_deadline())) {
             atomic_store_explicit(&context->failed, true, memory_order_release);
         }
     }
@@ -225,7 +232,8 @@ int main(void)
     test_platform_advance_time_ms(1U);
     network_service_update();
     expect(test_platform_network_connect_calls() == 2U, "second attempt issued");
-    expect(network_service_next_deadline() == UINT64_MAX, "fired retry clears deadline");
+    expect(network_service_next_deadline() == test_platform_time_ms() + 20000U,
+           "fired retry replaces its deadline with the new attempt timeout");
     test_platform_network_set_state(PLATFORM_NETWORK_FAILED, "test failure");
     network_service_update();
     test_platform_advance_time_ms(1000U);
@@ -287,6 +295,40 @@ int main(void)
     test_platform_advance_time_ms(5000U);
     network_service_update();
     expect(test_platform_network_connect_calls() == 6U, "cancelled retry does not start later");
+
+    expect(network_service_connect("missing-network", "secret", false), "connect to silent network starts");
+    const unsigned int silent_start = test_platform_network_connect_calls();
+    expect(network_service_next_deadline() == test_platform_time_ms() + 20000U,
+           "attempt publishes its timeout deadline");
+    for (unsigned int attempt = 1U; attempt <= 3U; ++attempt) {
+        test_platform_advance_time_ms(19999U);
+        network_service_update();
+        expect(network_service_status(&status) && status.state == NETWORK_STATE_CONNECTING,
+               "attempt does not time out early");
+        test_platform_advance_time_ms(1U);
+        network_service_update();
+        network_service_update();
+        expect(network_service_status(&status) && status.state == NETWORK_STATE_FAILED &&
+                   strstr(status.last_failure, "timed out") != NULL,
+               "silent attempt times out and the stop-disconnect keeps the failure");
+        test_platform_advance_time_ms(1000U);
+        network_service_update();
+    }
+    expect(test_platform_network_connect_calls() == silent_start + 2U && network_service_status(&status) &&
+               status.state == NETWORK_STATE_FAILED && status.attempts == 3U &&
+               network_service_next_deadline() == UINT64_MAX,
+           "three timed-out attempts end in a final failure without further deadlines");
+
+    const unsigned int rejected_start = test_platform_network_connect_calls();
+    expect(!network_service_connect("rejecting-network", "secret", false), "rejected start reports failure");
+    for (unsigned int retry = 0U; retry < 3U; ++retry) {
+        test_platform_advance_time_ms(1000U);
+        network_service_update();
+    }
+    expect(test_platform_network_connect_calls() == rejected_start + 3U && network_service_status(&status) &&
+               status.state == NETWORK_STATE_FAILED && status.attempts == 3U &&
+               network_service_next_deadline() == UINT64_MAX,
+           "rejected starts are retried and end in a final failure");
 
     test_concurrent_access();
 

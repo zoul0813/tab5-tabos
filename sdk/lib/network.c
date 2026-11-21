@@ -40,6 +40,8 @@ int tabos_network_get_status(tabos_network_status_t* status)
     memcpy(status->ssid, source.ssid, sizeof(status->ssid));
     memcpy(status->ipv4, source.ipv4, sizeof(status->ipv4));
     memcpy(status->last_failure, source.last_failure, sizeof(status->last_failure));
+    memcpy(status->saved_ssid, source.saved_ssid, sizeof(status->saved_ssid));
+    status->saved_ssid[sizeof(status->saved_ssid) - 1U] = '\0';
     return 0;
 }
 
@@ -59,6 +61,49 @@ int tabos_network_disconnect(void)
         return -1;
     }
     return api_result(tabos_runtime_api->network_disconnect());
+}
+
+int tabos_network_connect(const char* ssid, const char* password)
+{
+    /* memchr bounds the scan to the limit plus terminator, like strnlen. */
+    if (ssid == NULL || password == NULL || ssid[0] == '\0' ||
+        memchr(ssid, '\0', TABOS_NETWORK_SSID_MAX + 1U) == NULL ||
+        memchr(password, '\0', TABOS_NETWORK_PASSWORD_MAX + 1U) == NULL) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (tabos_runtime_api == NULL || tabos_runtime_api->network_connect == NULL) {
+        errno = ENOSYS;
+        return -1;
+    }
+    return api_result(tabos_runtime_api->network_connect(ssid, password));
+}
+
+int tabos_network_save_profile(void)
+{
+    if (tabos_runtime_api == NULL || tabos_runtime_api->network_save_profile == NULL) {
+        errno = ENOSYS;
+        return -1;
+    }
+    return api_result(tabos_runtime_api->network_save_profile());
+}
+
+int tabos_network_forget_profile(void)
+{
+    if (tabos_runtime_api == NULL || tabos_runtime_api->network_forget_profile == NULL) {
+        errno = ENOSYS;
+        return -1;
+    }
+    return api_result(tabos_runtime_api->network_forget_profile());
+}
+
+int tabos_network_set_auto_connect(bool enabled)
+{
+    if (tabos_runtime_api == NULL || tabos_runtime_api->network_set_auto_connect == NULL) {
+        errno = ENOSYS;
+        return -1;
+    }
+    return api_result(tabos_runtime_api->network_set_auto_connect(enabled ? 1U : 0U));
 }
 
 int tabos_network_resolve(const char* hostname, tabos_network_family_t family, tabos_network_address_t* address)

@@ -68,6 +68,20 @@ static void set_wifi_state(platform_network_state_t state)
     }
 }
 
+static const char* disconnect_reason_text(unsigned int reason)
+{
+    switch (reason) {
+        case WIFI_REASON_NO_AP_FOUND: return "network not found";
+        case WIFI_REASON_AUTH_FAIL:
+        case WIFI_REASON_AUTH_EXPIRE: return "authentication failed";
+        case WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT:
+        case WIFI_REASON_HANDSHAKE_TIMEOUT: return "wrong password or security mismatch";
+        case WIFI_REASON_ASSOC_FAIL: return "association failed";
+        case WIFI_REASON_BEACON_TIMEOUT: return "access point lost";
+        default: return "Wi-Fi disconnected";
+    }
+}
+
 static void network_event(void* argument, esp_event_base_t base, int32_t id, void* data)
 {
     (void) argument;
@@ -82,11 +96,16 @@ static void network_event(void* argument, esp_event_base_t base, int32_t id, voi
     if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
         const wifi_event_sta_disconnected_t* event = data;
         if (atomic_exchange_explicit(&wifi_disconnect_requested, false, memory_order_acq_rel)) {
-            set_wifi_state(PLATFORM_NETWORK_OFFLINE);
+            /* The event of a requested disconnect can arrive after the next
+             * connection started; it must not knock that attempt offline. */
+            if (atomic_load_explicit(&wifi_state, memory_order_acquire) != PLATFORM_NETWORK_CONNECTING) {
+                set_wifi_state(PLATFORM_NETWORK_OFFLINE);
+            }
         } else {
             if (xSemaphoreTake(wifi_status_mutex, portMAX_DELAY) == pdTRUE) {
-                (void) snprintf(wifi_failure, sizeof(wifi_failure), "Wi-Fi disconnect reason %u",
-                                event != NULL ? event->reason : 0U);
+                const unsigned int reason = event != NULL ? event->reason : 0U;
+                (void) snprintf(wifi_failure, sizeof(wifi_failure), "%s (reason %u)",
+                                disconnect_reason_text(reason), reason);
                 xSemaphoreGive(wifi_status_mutex);
             }
             set_wifi_state(PLATFORM_NETWORK_FAILED);
@@ -303,7 +322,8 @@ bool platform_network_connect(const char* ssid, const char* password)
         wifi_failure[0] = '\0';
         xSemaphoreGive(wifi_status_mutex);
     }
-    atomic_store_explicit(&wifi_disconnect_requested, false, memory_order_release);
+    /* Keep a pending requested-disconnect flag: its event, e.g. reason 8 from
+     * leaving the previous AP, is still in flight and is not this attempt failing. */
     set_wifi_state(PLATFORM_NETWORK_CONNECTING);
     if (esp_wifi_set_config(WIFI_IF_STA, &config) != ESP_OK || esp_wifi_connect() != ESP_OK) {
         set_wifi_state(PLATFORM_NETWORK_FAILED);
