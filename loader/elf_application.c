@@ -894,6 +894,7 @@ static int network_operation_error(network_operation_result_t result)
         case NETWORK_OPERATION_TIMEOUT: return -TABOS_ETIMEDOUT;
         case NETWORK_OPERATION_UNSUPPORTED: return -TABOS_ENOTSUP;
         case NETWORK_OPERATION_IO: return -TABOS_EIO;
+        case NETWORK_OPERATION_BUSY: return -TABOS_EBUSY;
     }
     return -TABOS_EIO;
 }
@@ -943,6 +944,56 @@ static int elf_network_echo(const tabos_elf_network_address_t* address, uint32_t
     writable_result->bytes         = echoed.bytes;
     writable_result->round_trip_ms = echoed.round_trip_ms;
     return 0;
+}
+
+_Static_assert((int) TABOS_ELF_WIFI_SCAN_MAX == (int) NETWORK_SCAN_MAX &&
+                   (int) TABOS_WIFI_SCAN_MAX == (int) NETWORK_SCAN_MAX,
+               "Wi-Fi scan bounds must match across the private ABI");
+_Static_assert((int) TABOS_WIFI_SECURITY_OPEN == (int) PLATFORM_WIFI_SECURITY_OPEN &&
+                   (int) TABOS_WIFI_SECURITY_WPA2_WPA3 == (int) PLATFORM_WIFI_SECURITY_WPA2_WPA3 &&
+                   (int) TABOS_WIFI_SECURITY_UNKNOWN == (int) PLATFORM_WIFI_SECURITY_UNKNOWN,
+               "Wi-Fi security values pass through unchanged");
+_Static_assert((int) TABOS_WIFI_PHY_11B == (int) PLATFORM_WIFI_PHY_11B &&
+                   (int) TABOS_WIFI_PHY_11AX == (int) PLATFORM_WIFI_PHY_11AX,
+               "Wi-Fi PHY flags pass through unchanged");
+
+static int elf_network_scan(tabos_elf_wifi_access_point_t* access_points, uint32_t capacity)
+{
+    if (capacity == 0U) {
+        return -TABOS_EINVAL;
+    }
+    if (capacity > TABOS_ELF_WIFI_SCAN_MAX) {
+        capacity = TABOS_ELF_WIFI_SCAN_MAX;
+    }
+    /* Write through the guest's own address, as fd_read does. The data-pointer
+     * alias of an executable image is for reading guest input: stores through it
+     * are not visible to code reading static image storage such as SDK buffers. */
+    if (access_points == NULL) {
+        return -TABOS_EINVAL;
+    }
+    tabos_elf_wifi_access_point_t* writable = access_points;
+    network_access_point_t* found = calloc(capacity, sizeof(*found));
+    if (found == NULL) {
+        return -TABOS_ENOMEM;
+    }
+    uint32_t count                             = 0U;
+    const network_operation_result_t operation = network_service_scan(found, capacity, &count);
+    if (operation != NETWORK_OPERATION_OK) {
+        free(found);
+        return network_operation_error(operation);
+    }
+    for (uint32_t index = 0U; index < count; ++index) {
+        tabos_elf_wifi_access_point_t* target = &writable[index];
+        memset(target, 0, sizeof(*target));
+        memcpy(target->ssid, found[index].ssid, sizeof(target->ssid) - 1U);
+        memcpy(target->bssid, found[index].bssid, sizeof(target->bssid));
+        target->channel    = found[index].channel;
+        target->signal_dbm = found[index].signal_dbm;
+        target->security   = found[index].security;
+        target->phy        = found[index].phy;
+    }
+    free(found);
+    return (int) count;
 }
 
 static elf_socket_t* elf_socket(loader_elf_application_t* application, int socket)
@@ -2313,6 +2364,7 @@ static bool elf_entry(tabos_app_context_t* context)
         .compute_submit                  = elf_compute_submit,
         .compute_wait                    = elf_compute_wait,
         .compute_poll                    = elf_compute_poll,
+        .network_scan                    = elf_network_scan,
         .graphics_close                  = elf_graphics_close,
         .graphics_capabilities           = elf_graphics_capabilities,
         .graphics_blit_ex                = elf_graphics_blit_ex,

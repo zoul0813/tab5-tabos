@@ -19,13 +19,17 @@ make -C apps/netutils ntpdate
 make -C apps/netutils httpsget
 make -C apps/netutils fetch
 make -C apps/netutils irc
+make -C apps/netutils wifiscan
 ```
 
 Use `build-netctl`, `build-ping`, `build-nettest`, `build-ntpdate`,
-`build-httpsget`, `build-fetch`, or `build-irc` to compile without installing.
+`build-httpsget`, `build-fetch`, `build-irc`, or `build-wifiscan` to compile without
+installing.
 Runnable binaries install to `.local/rootfs/T/bin/` without filename extensions.
 
-`netctl` reports and controls the saved Wi-Fi connection. `ping` performs DNS and
+`netctl` reports and controls the saved Wi-Fi connection and lists nearby access
+points with `netctl scan`. `wifiscan` filters, repeats, and surveys channel
+congestion from the same scan API. `ping` performs DNS and
 bounded ICMP echo checks. `nettest` validates TCP and UDP interoperability with a
 LAN peer; see `docs/networking.md` for its client and listener workflows. `ntpdate`
 sets the UTC clock from an NTP server. `httpsget` retrieves a certificate-verified

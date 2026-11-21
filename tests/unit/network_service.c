@@ -122,10 +122,83 @@ static void test_concurrent_access(void)
            "concurrent status, connect, disconnect, update, and deadline access stays consistent");
 }
 
+static platform_wifi_access_point_t scan_record(const char* ssid, uint8_t last_octet, uint32_t channel,
+                                                int32_t signal_dbm, uint32_t security)
+{
+    platform_wifi_access_point_t record = {
+        .bssid      = {0x02U, 0x00U, 0x5eU, 0x00U, 0x00U, last_octet},
+        .channel    = channel,
+        .signal_dbm = signal_dbm,
+        .security   = security,
+        .phy        = PLATFORM_WIFI_PHY_11B | PLATFORM_WIFI_PHY_11N,
+    };
+    (void) snprintf(record.ssid, sizeof(record.ssid), "%s", ssid);
+    return record;
+}
+
+static void test_scan(void)
+{
+    network_access_point_t found[NETWORK_SCAN_MAX];
+    uint32_t count = 99U;
+    expect(network_service_scan(NULL, 4U, &count) == NETWORK_OPERATION_INVALID &&
+               network_service_scan(found, 4U, NULL) == NETWORK_OPERATION_INVALID &&
+               network_service_scan(found, 0U, &count) == NETWORK_OPERATION_INVALID,
+           "scan rejects missing buffers and zero capacity");
+
+    platform_wifi_access_point_t records[] = {
+        scan_record("weak", 1U, 6U, -70, PLATFORM_WIFI_SECURITY_WPA2),
+        scan_record("strong-high-channel", 2U, 11U, -40, PLATFORM_WIFI_SECURITY_WPA3),
+        scan_record("", 3U, 3U, -55, PLATFORM_WIFI_SECURITY_OPEN),
+        scan_record("strong-low-channel", 4U, 1U, -40, PLATFORM_WIFI_SECURITY_OWE),
+    };
+    /* A backend may fill every SSID byte; the portable copy must still terminate. */
+    memset(records[0].ssid, 'x', sizeof(records[0].ssid));
+    test_platform_network_set_scan(records, 4U, PLATFORM_NETWORK_OPERATION_OK);
+    const unsigned int connect_calls = test_platform_network_connect_calls();
+    network_status_t before;
+    network_status_t after;
+    expect(network_service_status(&before), "status before scan");
+    expect(network_service_scan(found, NETWORK_SCAN_MAX, &count) == NETWORK_OPERATION_OK && count == 4U,
+           "offline scan returns every backend record");
+    expect(strcmp(found[0].ssid, "strong-low-channel") == 0 && strcmp(found[1].ssid, "strong-high-channel") == 0 &&
+               found[2].ssid[0] == '\0' && found[3].ssid[sizeof(found[3].ssid) - 1U] == '\0' &&
+               strlen(found[3].ssid) == 32U,
+           "scan orders by signal, then channel, and terminates SSIDs");
+    expect(found[0].bssid[5] == 4U && found[0].channel == 1U && found[0].signal_dbm == -40 &&
+               found[0].security == PLATFORM_WIFI_SECURITY_OWE &&
+               found[0].phy == (PLATFORM_WIFI_PHY_11B | PLATFORM_WIFI_PHY_11N),
+           "scan preserves record fields");
+    expect(test_platform_network_scan_calls() == 1U && test_platform_network_scan_capacity() == PLATFORM_WIFI_SCAN_MAX,
+           "scan requests the full platform bound");
+    expect(network_service_status(&after) && after.state == before.state &&
+               test_platform_network_connect_calls() == connect_calls,
+           "scan does not change connection state");
+
+    expect(network_service_scan(found, 2U, &count) == NETWORK_OPERATION_OK && count == 2U &&
+               found[0].bssid[5] == 4U && found[1].bssid[5] == 2U &&
+               test_platform_network_scan_capacity() == PLATFORM_WIFI_SCAN_MAX,
+           "small capacity keeps the strongest records rather than backend order");
+    expect(network_service_scan(found, 1000U, &count) == NETWORK_OPERATION_OK && count == 4U,
+           "oversized capacity is clamped");
+
+    test_platform_network_set_scan(NULL, 0U, PLATFORM_NETWORK_OPERATION_BUSY);
+    count = 99U;
+    expect(network_service_scan(found, 4U, &count) == NETWORK_OPERATION_BUSY && count == 0U,
+           "busy radio result propagates with no records");
+    test_platform_network_set_scan(NULL, 0U, PLATFORM_NETWORK_OPERATION_OK);
+    expect(network_service_scan(found, 4U, &count) == NETWORK_OPERATION_OK && count == 0U,
+           "empty scan succeeds");
+}
+
 int main(void)
 {
+    network_access_point_t uninitialized_scan[1];
+    uint32_t uninitialized_count = 0U;
+    expect(network_service_scan(uninitialized_scan, 1U, &uninitialized_count) == NETWORK_OPERATION_OFFLINE,
+           "scan before initialization reports offline");
     expect(filesystem_init(), "filesystem initializes");
     expect(network_service_init(), "network service initializes");
+    test_scan();
     expect(strcmp(test_platform_network_hostname(), "TabOS") == 0, "hostname defaults to TabOS");
     network_status_t status;
     expect(network_service_status(&status) && status.state == NETWORK_STATE_OFFLINE &&
@@ -218,6 +291,8 @@ int main(void)
     test_concurrent_access();
 
     network_service_shutdown();
+    expect(network_service_scan(uninitialized_scan, 1U, &uninitialized_count) == NETWORK_OPERATION_OFFLINE,
+           "scan after shutdown reports offline");
     filesystem_shutdown();
     return failures == 0 ? 0 : 1;
 }

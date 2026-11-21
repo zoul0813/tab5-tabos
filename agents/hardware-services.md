@@ -377,7 +377,8 @@ sleep entry, time accounting, and measurement rather than repeating that convers
 ## Explicitly Deferred
 
 - [ ] USB host initialization, HID keyboard/mouse, and USB mass-storage mounting.
-- [ ] Wi-Fi scan, forget, prompted connection, and richer network status fields.
+- [ ] Wi-Fi forget, prompted connection, and richer network status fields. (Station-mode
+  scan landed with private ELF API 27; see `agents/milestone-networking.md`.)
 - [ ] Motion-triggered wake before Phase 8.
 - [ ] GUI toolkit, gestures, focus hierarchy, compositor, and window manager.
 - [ ] External-application raw GPIO, I2C, SPI, or UART access.

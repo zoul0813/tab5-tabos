@@ -638,11 +638,20 @@ The portable network service owns copied status, serialized connect/disconnect,
 autoconnect retries, and version-1 T:/etc/wifi.conf profiles. Applications use
 TabOS-owned BSD-like sockets, DNS, ICMP echo, bounded waits, and certificate-verified
 TLS through SDK services; native driver/socket objects remain below the boundary.
-Host supplies corresponding socket/TLS services and simulated Wi-Fi status.
+Station-mode scan returns copied, bounded, signal-ordered access-point records; it
+waits on WIFI_EVENT_SCAN_DONE with a bounded timeout and never holds the service
+operation lock. Scans during startup or association, or preempted by
+esp_wifi_connect, report EBUSY. ESP-Hosted 1.4 never writes the delivered count back
+from esp_wifi_scan_get_ap_records, so the backend bounds requests with
+esp_wifi_scan_get_ap_num and drops zero-padding records. The scan gate writes
+results through the guest address: the executable-image data-pointer alias is for
+reading guest input, and stores through it are invisible to static image storage.
+No monitor mode or raw 802.11 access is exposed.
+Host supplies corresponding socket/TLS services and simulated Wi-Fi status and scans.
 
 ### Open
 
-- Wi-Fi scanning, forgetting profiles, and interactive credential editing
+- forgetting Wi-Fi profiles and interactive credential editing
 - physical coexistence, latency, and stop/cancellation measurements
 
 ## 12. Host Development and Emulation

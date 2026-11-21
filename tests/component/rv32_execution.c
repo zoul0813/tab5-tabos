@@ -109,6 +109,16 @@ static int test_battery_status(tabos_elf_battery_status_t* status)
     return 0;
 }
 
+static int test_network_scan(tabos_elf_wifi_access_point_t* access_points, uint32_t capacity)
+{
+    if (access_points == NULL) {
+        return -1;
+    }
+    access_points[0]         = (tabos_elf_wifi_access_point_t) {0};
+    access_points[0].channel = 6U;
+    return (int) capacity;
+}
+
 static platform_riscv32_result_t execute_raw_with_limits(const uint32_t* instructions, size_t size, unsigned int budget,
                                                          size_t heap_bytes, size_t stack_bytes)
 {
@@ -124,6 +134,7 @@ static platform_riscv32_result_t execute_raw_with_limits(const uint32_t* instruc
         .wait              = test_wait,
         .device_count      = test_device_count,
         .battery_status    = test_battery_status,
+        .network_scan      = test_network_scan,
     };
     int returned_status = -1;
     platform_riscv32_context_t* context =
@@ -155,6 +166,20 @@ int main(void)
         raw_returned_status != -TABOS_ENOTSUP ||
         execute_raw(compute_poll, sizeof(compute_poll), 32U) != PLATFORM_RISCV32_RETURNED ||
         raw_returned_status != -TABOS_ENOTSUP) {
+        return 1;
+    }
+
+    /* network_scan sits at API offset 428 (0x1ac). a0 is the guest API table,
+     * reused as a writable record buffer; a1 carries the requested capacity. */
+    const uint32_t scan_without_capacity[] = {0x00000593U, 0x1ac52283U, 0x00028067U};
+    const uint32_t scan_two_records[]      = {0x00200593U, 0x1ac52283U, 0x00028067U};
+    const uint32_t scan_oversized[]        = {0x06400593U, 0x1ac52283U, 0x00028067U};
+    if (execute_raw(scan_without_capacity, sizeof(scan_without_capacity), 32U) != PLATFORM_RISCV32_RETURNED ||
+        raw_returned_status != -TABOS_EINVAL ||
+        execute_raw(scan_two_records, sizeof(scan_two_records), 32U) != PLATFORM_RISCV32_RETURNED ||
+        raw_returned_status != 2 ||
+        execute_raw(scan_oversized, sizeof(scan_oversized), 32U) != PLATFORM_RISCV32_RETURNED ||
+        raw_returned_status != TABOS_ELF_WIFI_SCAN_MAX) {
         return 1;
     }
 

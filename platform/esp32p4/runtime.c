@@ -24,7 +24,13 @@
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdatomic.h>
+#include <stdlib.h>
 #include <string.h>
+
+enum {
+    WIFI_SCAN_TIMEOUT_MS = 15000,
+    WIFI_SCAN_POLL_MS    = 100,
+};
 
 static const char* const TAG = TABOS_PLATFORM_LOG_TAG;
 static atomic_bool stop_requested;
@@ -44,6 +50,15 @@ static char wifi_hostname[33];
 static char wifi_ipv4[16];
 static char wifi_failure[64];
 static platform_network_event_fn wifi_event_callback;
+/* Scan primitives use static storage and are never deleted, so a scan running in
+ * an application task never races semaphore destruction during shutdown. */
+static StaticSemaphore_t wifi_scan_lock_storage;
+static StaticSemaphore_t wifi_scan_done_storage;
+static SemaphoreHandle_t wifi_scan_lock;
+static SemaphoreHandle_t wifi_scan_done;
+static atomic_bool wifi_scan_active;
+static atomic_bool wifi_scan_failed;
+static atomic_bool wifi_scan_cancel;
 
 static void set_wifi_state(platform_network_state_t state)
 {
@@ -56,6 +71,14 @@ static void set_wifi_state(platform_network_state_t state)
 static void network_event(void* argument, esp_event_base_t base, int32_t id, void* data)
 {
     (void) argument;
+    if (base == WIFI_EVENT && id == WIFI_EVENT_SCAN_DONE) {
+        const wifi_event_sta_scan_done_t* event = data;
+        if (atomic_load_explicit(&wifi_scan_active, memory_order_acquire)) {
+            atomic_store_explicit(&wifi_scan_failed, event != NULL && event->status != 0U, memory_order_release);
+            (void) xSemaphoreGive(wifi_scan_done);
+        }
+        return;
+    }
     if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
         const wifi_event_sta_disconnected_t* event = data;
         if (atomic_exchange_explicit(&wifi_disconnect_requested, false, memory_order_acq_rel)) {
@@ -199,6 +222,16 @@ bool platform_network_init(const char* hostname, platform_network_event_fn event
     if (!hosted_initialized || hostname == NULL || hostname[0] == '\0' || strlen(hostname) > 32U) {
         return false;
     }
+    if (wifi_scan_lock == NULL) {
+        wifi_scan_lock = xSemaphoreCreateMutexStatic(&wifi_scan_lock_storage);
+    }
+    if (wifi_scan_done == NULL) {
+        wifi_scan_done = xSemaphoreCreateBinaryStatic(&wifi_scan_done_storage);
+    }
+    if (wifi_scan_lock == NULL || wifi_scan_done == NULL) {
+        return false;
+    }
+    atomic_store_explicit(&wifi_scan_cancel, false, memory_order_release);
     wifi_status_mutex = xSemaphoreCreateMutex();
     if (wifi_status_mutex == NULL) {
         return false;
@@ -225,6 +258,9 @@ bool platform_network_init(const char* hostname, platform_network_event_fn event
 
 void platform_network_shutdown(void)
 {
+    /* Stop any application scan and wait for it to leave the driver. */
+    atomic_store_explicit(&wifi_scan_cancel, true, memory_order_release);
+    const bool scan_locked = wifi_scan_lock != NULL && xSemaphoreTake(wifi_scan_lock, portMAX_DELAY) == pdTRUE;
     tab5_wifi_startup_stop_and_join(&wifi_startup);
     tab5_wifi_driver_shutdown(&wifi_driver);
     atomic_store_explicit(&wifi_initialized, false, memory_order_release);
@@ -233,6 +269,9 @@ void platform_network_shutdown(void)
         wifi_status_mutex = NULL;
     }
     wifi_event_callback = NULL;
+    if (scan_locked) {
+        (void) xSemaphoreGive(wifi_scan_lock);
+    }
 }
 
 bool platform_network_connect(const char* ssid, const char* password)
@@ -316,6 +355,165 @@ bool platform_network_status(platform_network_status_t* status)
         status->signal_dbm = access_point.rssi;
     }
     return true;
+}
+
+static uint32_t wifi_security(wifi_auth_mode_t mode)
+{
+    switch (mode) {
+        case WIFI_AUTH_OPEN: return PLATFORM_WIFI_SECURITY_OPEN;
+        case WIFI_AUTH_WEP: return PLATFORM_WIFI_SECURITY_WEP;
+        case WIFI_AUTH_WPA_PSK: return PLATFORM_WIFI_SECURITY_WPA;
+        case WIFI_AUTH_WPA2_PSK: return PLATFORM_WIFI_SECURITY_WPA2;
+        case WIFI_AUTH_WPA_WPA2_PSK: return PLATFORM_WIFI_SECURITY_WPA_WPA2;
+        case WIFI_AUTH_WPA3_PSK: return PLATFORM_WIFI_SECURITY_WPA3;
+        case WIFI_AUTH_WPA2_WPA3_PSK: return PLATFORM_WIFI_SECURITY_WPA2_WPA3;
+        case WIFI_AUTH_WPA2_ENTERPRISE:
+        case WIFI_AUTH_WPA3_ENT_192: return PLATFORM_WIFI_SECURITY_ENTERPRISE;
+        case WIFI_AUTH_OWE: return PLATFORM_WIFI_SECURITY_OWE;
+        default: return PLATFORM_WIFI_SECURITY_UNKNOWN;
+    }
+}
+
+static uint32_t wifi_phy(const wifi_ap_record_t* record)
+{
+    uint32_t phy = 0U;
+    if (record->phy_11b != 0U) {
+        phy |= PLATFORM_WIFI_PHY_11B;
+    }
+    if (record->phy_11g != 0U) {
+        phy |= PLATFORM_WIFI_PHY_11G;
+    }
+    if (record->phy_11n != 0U) {
+        phy |= PLATFORM_WIFI_PHY_11N;
+    }
+    if (record->phy_11ax != 0U) {
+        phy |= PLATFORM_WIFI_PHY_11AX;
+    }
+    return phy;
+}
+
+static platform_network_operation_result_t wifi_scan_wait(void)
+{
+    uint32_t waited_ms = 0U;
+    while (xSemaphoreTake(wifi_scan_done, pdMS_TO_TICKS(WIFI_SCAN_POLL_MS)) != pdTRUE) {
+        if (platform_riscv32_current_cancelled() || atomic_load_explicit(&wifi_scan_cancel, memory_order_acquire)) {
+            return PLATFORM_NETWORK_OPERATION_IO;
+        }
+        waited_ms += WIFI_SCAN_POLL_MS;
+        if (waited_ms >= WIFI_SCAN_TIMEOUT_MS) {
+            return PLATFORM_NETWORK_OPERATION_TIMEOUT;
+        }
+    }
+    /* A failed SCAN_DONE is normally an association (esp_wifi_connect) preempting
+     * the scan. Report it as busy so callers retry instead of seeing an I/O error. */
+    if (atomic_load_explicit(&wifi_scan_failed, memory_order_acquire)) {
+        return PLATFORM_NETWORK_OPERATION_BUSY;
+    }
+    return PLATFORM_NETWORK_OPERATION_OK;
+}
+
+static platform_network_operation_result_t wifi_scan_collect(platform_wifi_access_point_t* access_points,
+                                                             uint32_t capacity, uint32_t* count)
+{
+    /* ESP-Hosted 1.4 zero-fills the whole request and never writes the delivered
+     * count back to number. Bound the request by the scanned AP count first and
+     * discard zero-padding records rather than trusting number afterwards. */
+    uint16_t available = 0U;
+    if (esp_wifi_scan_get_ap_num(&available) != ESP_OK) {
+        return PLATFORM_NETWORK_OPERATION_IO;
+    }
+    if (available == 0U) {
+        *count = 0U;
+        return PLATFORM_NETWORK_OPERATION_OK;
+    }
+    uint16_t number = (uint16_t) capacity;
+    if (available < number) {
+        number = available;
+    }
+    const uint32_t requested  = number;
+    wifi_ap_record_t* records = calloc(requested, sizeof(*records));
+    if (records == NULL) {
+        return PLATFORM_NETWORK_OPERATION_IO;
+    }
+    if (esp_wifi_scan_get_ap_records(&number, records) != ESP_OK) {
+        free(records);
+        return PLATFORM_NETWORK_OPERATION_IO;
+    }
+    static const uint8_t empty_bssid[6] = {0};
+    uint32_t copied                     = 0U;
+    for (uint32_t index = 0U; index < requested && index < number; ++index) {
+        if (records[index].primary == 0U && memcmp(records[index].bssid, empty_bssid, sizeof(empty_bssid)) == 0) {
+            continue;
+        }
+        platform_wifi_access_point_t* target = &access_points[copied];
+        memset(target, 0, sizeof(*target));
+        memcpy(target->ssid, records[index].ssid, sizeof(target->ssid) - 1U);
+        memcpy(target->bssid, records[index].bssid, sizeof(target->bssid));
+        target->channel    = records[index].primary;
+        target->signal_dbm = records[index].rssi;
+        target->security   = wifi_security(records[index].authmode);
+        target->phy        = wifi_phy(&records[index]);
+        ++copied;
+    }
+    free(records);
+    *count = copied;
+    return PLATFORM_NETWORK_OPERATION_OK;
+}
+
+platform_network_operation_result_t platform_network_scan(platform_wifi_access_point_t* access_points,
+                                                          uint32_t capacity, uint32_t* count)
+{
+    if (access_points == NULL || count == NULL || capacity == 0U) {
+        return PLATFORM_NETWORK_OPERATION_INVALID;
+    }
+    *count = 0U;
+    if (capacity > PLATFORM_WIFI_SCAN_MAX) {
+        capacity = PLATFORM_WIFI_SCAN_MAX;
+    }
+    if (wifi_scan_lock == NULL || wifi_scan_done == NULL) {
+        return PLATFORM_NETWORK_OPERATION_OFFLINE;
+    }
+    if (!atomic_load_explicit(&wifi_initialized, memory_order_acquire)) {
+        if (tab5_wifi_startup_running(&wifi_startup)) {
+            return PLATFORM_NETWORK_OPERATION_BUSY;
+        }
+        return PLATFORM_NETWORK_OPERATION_OFFLINE;
+    }
+    if (xSemaphoreTake(wifi_scan_lock, 0) != pdTRUE) {
+        return PLATFORM_NETWORK_OPERATION_BUSY;
+    }
+    if (atomic_load_explicit(&wifi_scan_cancel, memory_order_acquire)) {
+        (void) xSemaphoreGive(wifi_scan_lock);
+        return PLATFORM_NETWORK_OPERATION_OFFLINE;
+    }
+
+    /* Wait for WIFI_EVENT_SCAN_DONE instead of a blocking start so cancellation
+     * and the bounded timeout stay under TabOS control across ESP-Hosted. */
+    (void) xSemaphoreTake(wifi_scan_done, 0);
+    atomic_store_explicit(&wifi_scan_failed, false, memory_order_release);
+    atomic_store_explicit(&wifi_scan_active, true, memory_order_release);
+    const wifi_scan_config_t config = {
+        .show_hidden = true,
+        .scan_type   = WIFI_SCAN_TYPE_ACTIVE,
+    };
+    const esp_err_t started = esp_wifi_scan_start(&config, false);
+    platform_network_operation_result_t result = PLATFORM_NETWORK_OPERATION_OK;
+    if (started == ESP_ERR_WIFI_STATE) {
+        /* The station is associating; esp_wifi_connect owns the radio. */
+        result = PLATFORM_NETWORK_OPERATION_BUSY;
+    } else if (started != ESP_OK) {
+        result = PLATFORM_NETWORK_OPERATION_IO;
+    } else {
+        result = wifi_scan_wait();
+    }
+    atomic_store_explicit(&wifi_scan_active, false, memory_order_release);
+    if (result == PLATFORM_NETWORK_OPERATION_OK) {
+        result = wifi_scan_collect(access_points, capacity, count);
+    } else if (started == ESP_OK) {
+        (void) esp_wifi_scan_stop();
+    }
+    (void) xSemaphoreGive(wifi_scan_lock);
+    return result;
 }
 
 int platform_run(platform_update_fn update, platform_deadline_fn next_deadline)

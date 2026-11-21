@@ -164,6 +164,11 @@ static platform_network_event_fn fake_network_event;
 static unsigned int network_connect_calls;
 static unsigned int network_status_calls;
 static char network_hostname[33];
+static platform_wifi_access_point_t fake_scan_records[PLATFORM_WIFI_SCAN_MAX];
+static uint32_t fake_scan_count;
+static platform_network_operation_result_t fake_scan_result;
+static unsigned int network_scan_calls;
+static uint32_t network_scan_capacity;
 static bool fake_rtc_ready = true;
 static int fake_rtc_error;
 static bool fake_keyboard_ready = true;
@@ -893,6 +898,51 @@ unsigned int test_platform_network_connect_calls(void)
 unsigned int test_platform_network_status_calls(void)
 {
     return network_status_calls;
+}
+
+platform_network_operation_result_t platform_network_scan(platform_wifi_access_point_t* access_points,
+                                                          uint32_t capacity, uint32_t* count)
+{
+    ++network_scan_calls;
+    network_scan_capacity = capacity;
+    if (access_points == NULL || count == NULL || capacity == 0U) {
+        return PLATFORM_NETWORK_OPERATION_INVALID;
+    }
+    *count = 0U;
+    if (fake_scan_result != PLATFORM_NETWORK_OPERATION_OK) {
+        return fake_scan_result;
+    }
+    const uint32_t copied = fake_scan_count < capacity ? fake_scan_count : capacity;
+    for (uint32_t index = 0U; index < copied; ++index) {
+        access_points[index] = fake_scan_records[index];
+    }
+    *count = copied;
+    return PLATFORM_NETWORK_OPERATION_OK;
+}
+
+void test_platform_network_set_scan(const platform_wifi_access_point_t* access_points, uint32_t count,
+                                    platform_network_operation_result_t result)
+{
+    if (count > PLATFORM_WIFI_SCAN_MAX) {
+        count = PLATFORM_WIFI_SCAN_MAX;
+    }
+    memset(fake_scan_records, 0, sizeof(fake_scan_records));
+    for (uint32_t index = 0U; access_points != NULL && index < count; ++index) {
+        fake_scan_records[index] = access_points[index];
+    }
+    fake_scan_count    = access_points != NULL ? count : 0U;
+    fake_scan_result   = result;
+    network_scan_calls = 0U;
+}
+
+unsigned int test_platform_network_scan_calls(void)
+{
+    return network_scan_calls;
+}
+
+uint32_t test_platform_network_scan_capacity(void)
+{
+    return network_scan_capacity;
 }
 
 const char* test_platform_network_hostname(void)

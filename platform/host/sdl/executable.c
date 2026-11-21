@@ -127,7 +127,8 @@ static _Thread_local uint32_t host_rv32_active_ram_size;
     X(GRAPHICS_WAIT, 412U)                   \
     X(COMPUTE_SUBMIT, 416U)                  \
     X(COMPUTE_WAIT, 420U)                    \
-    X(COMPUTE_POLL, 424U)
+    X(COMPUTE_POLL, 424U)                    \
+    X(NETWORK_SCAN, 428U)
 
 enum {
 #define HOST_RV32_GATE_INDEX(name, api_offset) HOST_RV32_GATE_INDEX_##name,
@@ -804,6 +805,27 @@ static platform_riscv32_result_t step_inner(platform_riscv32_context_t* context,
                 address, context->state.regs[11], context->state.regs[12], context->state.regs[13], echo_result);
             current_user_data = NULL;
             context->state.pc = context->state.regs[1];
+            continue;
+        }
+        if (context->state.pc == HOST_RV32_NETWORK_SCAN) {
+            uint32_t capacity = context->state.regs[11];
+            if (capacity == 0U) {
+                context->state.regs[10] = (uint32_t) -TABOS_EINVAL;
+                context->state.pc       = context->state.regs[1];
+                continue;
+            }
+            if (capacity > TABOS_ELF_WIFI_SCAN_MAX) {
+                capacity = TABOS_ELF_WIFI_SCAN_MAX;
+            }
+            tabos_elf_wifi_access_point_t* access_points = guest_buffer(
+                context->memory, context->state.regs[10], capacity * (uint32_t) sizeof(tabos_elf_wifi_access_point_t));
+            if (access_points == NULL || context->api.network_scan == NULL) {
+                return PLATFORM_RISCV32_FAULT;
+            }
+            current_user_data       = context->user_data;
+            context->state.regs[10] = (uint32_t) context->api.network_scan(access_points, capacity);
+            current_user_data       = NULL;
+            context->state.pc       = context->state.regs[1];
             continue;
         }
         if (context->state.pc == HOST_RV32_SOCKET_OPEN || context->state.pc == HOST_RV32_SOCKET_CLOSE ||

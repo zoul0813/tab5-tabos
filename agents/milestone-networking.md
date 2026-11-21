@@ -65,7 +65,8 @@ Use official `esp_hosted` and `esp_wifi_remote` over 4-bit SDIO.
 - [x] Add public `<tabos/network.h>` exposing Wi-Fi status and saved connect/disconnect.
 - [x] Extend public `<tabos/network.h>` with DNS, bounded ICMP echo, and bounded
   BSD-like socket operations.
-- [ ] Add portable scan and volatile interactive-connect APIs.
+- [x] Add portable station-mode scan API (`tabos_network_scan`, private ELF API 27).
+- [ ] Add volatile interactive-connect API.
 - [x] Support IPv4 and IPv6, TCP and UDP, `socket`, `bind`, `listen`, `accept`,
   `connect`, `send`, `receive`, `shutdown`, nonblocking mode, and close.
 Additional socket options are deferred until a concrete portable option set is
@@ -124,8 +125,10 @@ deferred beyond this milestone.
 - [x] Add external `netctl` application.
 - [x] Add `netctl status`, saved-profile `netctl connect`, and
   `netctl disconnect`.
-- [ ] Add bounded, signal-ordered `netctl scan` output with SSID, security,
+- [x] Add bounded, signal-ordered `netctl scan` output with SSID, security,
   channel, and signal strength.
+- [x] Add `wifiscan` under `apps/netutils` with SSID/channel filters, bounded
+  repeat, and channel-congestion survey.
 - [ ] Add `netctl connect --prompt` with hidden-password input, optional save only
   after success, and terminal restoration on every exit path.
 - [ ] Add `netctl forget` and `netctl autoconnect on|off`; preserve unknown config
@@ -232,7 +235,10 @@ user-mode/PMP execution boundary; native application faults are currently device
   support for Tab5 Debug.
 - [x] Validate physical Tab5 HTTPS success, repeated TLS lifecycle, expired
   certificate rejection, and hostname-mismatch rejection without reset.
-- [ ] Validate physical scan, interactive connection, IPv6, and `nettest` client mode.
+- [x] Validate physical station-mode scan: `netctl scan`, `wifiscan` list/filter/repeat/
+  `--channels`, and RV32 tester scan coverage (218 assertions, 0 failures) on Tab5
+  with ESP32-C6 hosted firmware 1.4.1, while online and during association (busy).
+- [ ] Validate physical interactive connection, IPv6, and `nettest` client mode.
 
 ## Assumptions
 

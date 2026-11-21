@@ -6,6 +6,7 @@
 
 #include <stdio.h>
 #include <stdatomic.h>
+#include <stdlib.h>
 #include <string.h>
 
 enum {
@@ -13,9 +14,14 @@ enum {
     NETWORK_RETRY_DELAY_MS       = 1000,
 };
 
+_Static_assert((int) NETWORK_SCAN_MAX == (int) PLATFORM_WIFI_SCAN_MAX, "portable and platform scan bounds must match");
+_Static_assert((int) NETWORK_OPERATION_BUSY == (int) PLATFORM_NETWORK_OPERATION_BUSY,
+               "portable and platform operation results must match");
+
 static network_status_t current;
 static char password[NETWORK_CONFIG_PASSWORD_MAX + 1U];
 static bool initialized;
+static bool backend_ready;
 static bool retry_suppressed;
 static tabos_timer_t retry_timer;
 static atomic_bool status_pending;
@@ -111,6 +117,7 @@ bool network_service_init(void)
         return true;
     }
     current.state = NETWORK_STATE_OFFLINE;
+    backend_ready = true;
     if (result == NETWORK_CONFIG_OK) {
         current.config_available = true;
         current.auto_connect     = config.auto_connect;
@@ -208,7 +215,8 @@ void network_service_shutdown(void)
         platform_mutex_unlock(operation);
         return;
     }
-    initialized = false;
+    initialized   = false;
+    backend_ready = false;
     tabos_timer_cancel(&retry_timer);
     retry_suppressed = true;
     platform_mutex_unlock(state);
@@ -367,6 +375,80 @@ network_operation_result_t network_service_echo(const network_address_t* address
         result->bytes         = platform_result.bytes;
         result->round_trip_ms = platform_result.round_trip_ms;
     }
+    return (network_operation_result_t) operation;
+}
+
+static bool access_point_precedes(const platform_wifi_access_point_t* left, const platform_wifi_access_point_t* right)
+{
+    if (left->signal_dbm != right->signal_dbm) {
+        return left->signal_dbm > right->signal_dbm;
+    }
+    if (left->channel != right->channel) {
+        return left->channel < right->channel;
+    }
+    return memcmp(left->bssid, right->bssid, sizeof(left->bssid)) < 0;
+}
+
+static void sort_access_points(platform_wifi_access_point_t* access_points, uint32_t count)
+{
+    for (uint32_t index = 1U; index < count; ++index) {
+        const platform_wifi_access_point_t candidate = access_points[index];
+        uint32_t position                            = index;
+        while (position > 0U && access_point_precedes(&candidate, &access_points[position - 1U])) {
+            access_points[position] = access_points[position - 1U];
+            --position;
+        }
+        access_points[position] = candidate;
+    }
+}
+
+network_operation_result_t network_service_scan(network_access_point_t* access_points, uint32_t capacity,
+                                                uint32_t* count)
+{
+    if (access_points == NULL || count == NULL || capacity == 0U) {
+        return NETWORK_OPERATION_INVALID;
+    }
+    *count = 0U;
+    if (capacity > NETWORK_SCAN_MAX) {
+        capacity = NETWORK_SCAN_MAX;
+    }
+    if (state_mutex == NULL) {
+        return NETWORK_OPERATION_OFFLINE;
+    }
+    platform_mutex_lock(state_mutex);
+    const bool ready = initialized && backend_ready;
+    platform_mutex_unlock(state_mutex);
+    if (!ready) {
+        return NETWORK_OPERATION_OFFLINE;
+    }
+
+    /* Request the full bound so ordering never depends on backend truncation. */
+    platform_wifi_access_point_t* found = calloc(PLATFORM_WIFI_SCAN_MAX, sizeof(*found));
+    if (found == NULL) {
+        return NETWORK_OPERATION_IO;
+    }
+    uint32_t found_count = 0U;
+    const platform_network_operation_result_t operation =
+        platform_network_scan(found, PLATFORM_WIFI_SCAN_MAX, &found_count);
+    if (operation == PLATFORM_NETWORK_OPERATION_OK) {
+        if (found_count > PLATFORM_WIFI_SCAN_MAX) {
+            found_count = PLATFORM_WIFI_SCAN_MAX;
+        }
+        sort_access_points(found, found_count);
+        const uint32_t copied = found_count < capacity ? found_count : capacity;
+        for (uint32_t index = 0U; index < copied; ++index) {
+            network_access_point_t* target = &access_points[index];
+            memset(target, 0, sizeof(*target));
+            memcpy(target->ssid, found[index].ssid, sizeof(target->ssid) - 1U);
+            memcpy(target->bssid, found[index].bssid, sizeof(target->bssid));
+            target->channel    = found[index].channel;
+            target->signal_dbm = found[index].signal_dbm;
+            target->security   = found[index].security;
+            target->phy        = found[index].phy;
+        }
+        *count = copied;
+    }
+    free(found);
     return (network_operation_result_t) operation;
 }
 

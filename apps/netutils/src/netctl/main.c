@@ -7,7 +7,8 @@
 static void usage(FILE* stream)
 {
     fprintf(stream,
-            "Usage: netctl status\n       netctl connect\n       netctl connect --prompt\n       netctl disconnect\n");
+            "Usage: netctl status\n       netctl scan\n       netctl connect\n       netctl connect --prompt\n"
+            "       netctl disconnect\n");
 }
 
 static int show_status(void)
@@ -37,10 +38,40 @@ static int show_status(void)
     return 0;
 }
 
+static int show_scan(void)
+{
+    static tabos_wifi_access_point_t access_points[TABOS_WIFI_SCAN_MAX];
+    const int count = tabos_network_scan(access_points, TABOS_WIFI_SCAN_MAX);
+    if (count < 0) {
+        const int error = errno;
+        if (error == EBUSY) {
+            fprintf(stderr, "netctl: cannot scan: radio busy (starting, connecting, or another scan); try again\n");
+        } else {
+            fprintf(stderr, "netctl: cannot scan: %s\n", strerror(error));
+        }
+        return 1;
+    }
+    printf("%-8s %-3s %-10s %s\n", "SIGNAL", "CH", "SECURITY", "SSID");
+    for (int index = 0; index < count; ++index) {
+        const tabos_wifi_access_point_t* access_point = &access_points[index];
+        const char* ssid                              = access_point->ssid;
+        if (ssid[0] == '\0') {
+            ssid = "<hidden>";
+        }
+        printf("%4ld dBm %3lu %-10s %s\n", (long) access_point->signal_dbm, (unsigned long) access_point->channel,
+               tabos_wifi_security_name(access_point->security), ssid);
+    }
+    printf("%d access point%s\n", count, count == 1 ? "" : "s");
+    return 0;
+}
+
 int main(int argc, char** argv)
 {
     if (argc == 2 && strcmp(argv[1], "status") == 0) {
         return show_status();
+    }
+    if (argc == 2 && strcmp(argv[1], "scan") == 0) {
+        return show_scan();
     }
     if (argc == 2 && strcmp(argv[1], "connect") == 0) {
         if (tabos_network_connect_saved() != 0) {

@@ -85,6 +85,55 @@ static int wait_socket(tabos_elf_wait_item_t* items, uint32_t count, uint32_t ti
     return 1;
 }
 
+static uint32_t scan_capacity_seen;
+
+static int scan_networks(tabos_elf_wifi_access_point_t* access_points, uint32_t capacity)
+{
+    scan_capacity_seen = capacity;
+    if (capacity == 7U) {
+        return -TABOS_EBUSY;
+    }
+    access_points[0] = (tabos_elf_wifi_access_point_t) {
+        .bssid      = {0x02U, 0x00U, 0x5eU, 0x00U, 0x00U, 0x01U},
+        .channel    = 6U,
+        .signal_dbm = -38,
+        .security   = TABOS_WIFI_SECURITY_WPA2,
+        .phy        = TABOS_WIFI_PHY_11B | TABOS_WIFI_PHY_11AX,
+    };
+    memset(access_points[0].ssid, 'n', sizeof(access_points[0].ssid));
+    access_points[1]          = (tabos_elf_wifi_access_point_t) {.channel = 11U, .signal_dbm = -80};
+    access_points[1].security = 200U;
+    return 2;
+}
+
+static int scan_test(void)
+{
+    tabos_wifi_access_point_t found[TABOS_WIFI_SCAN_MAX];
+    if (tabos_network_scan(NULL, 4U) == 0 || errno != EINVAL || tabos_network_scan(found, 0U) == 0 ||
+        errno != EINVAL) {
+        return 1;
+    }
+    if (tabos_network_scan(found, 4U) != 2 || scan_capacity_seen != 4U || found[0].ssid[32] != '\0' ||
+        strlen(found[0].ssid) != 32U || found[0].bssid[5] != 1U || found[0].channel != 6U ||
+        found[0].signal_dbm != -38 || found[0].security != TABOS_WIFI_SECURITY_WPA2 ||
+        found[0].phy != (TABOS_WIFI_PHY_11B | TABOS_WIFI_PHY_11AX) || found[1].ssid[0] != '\0' ||
+        found[1].security != TABOS_WIFI_SECURITY_UNKNOWN) {
+        return 1;
+    }
+    if (tabos_network_scan(found, 500U) != 2 || scan_capacity_seen != TABOS_WIFI_SCAN_MAX) {
+        return 1;
+    }
+    if (tabos_network_scan(found, 7U) != -1 || errno != TABOS_EBUSY) {
+        return 1;
+    }
+    if (strcmp(tabos_wifi_security_name(TABOS_WIFI_SECURITY_OPEN), "open") != 0 ||
+        strcmp(tabos_wifi_security_name(TABOS_WIFI_SECURITY_WPA2_WPA3), "WPA2/WPA3") != 0 ||
+        strcmp(tabos_wifi_security_name((tabos_wifi_security_t) 99), "unknown") != 0) {
+        return 1;
+    }
+    return 0;
+}
+
 static int socket_wait_source(int socket)
 {
     return socket == 3 ? 19 : -TABOS_EBADF;
@@ -95,6 +144,10 @@ int main(void)
     tabos_network_status_t status;
     if (tabos_network_get_status(NULL) == 0 || errno != EINVAL || tabos_network_get_status(&status) == 0 ||
         errno != ENOSYS) {
+        return 1;
+    }
+    tabos_wifi_access_point_t unavailable[1];
+    if (tabos_network_scan(unavailable, 1U) == 0 || errno != ENOSYS) {
         return 1;
     }
     const tabos_elf_api_t api = {
@@ -109,6 +162,7 @@ int main(void)
         .socket_receive        = receive_socket,
         .socket_wait_source    = socket_wait_source,
         .wait                  = wait_socket,
+        .network_scan          = scan_networks,
     };
     tabos_runtime_api = &api;
     if (tabos_network_get_status(&status) != 0 || status.state != TABOS_NETWORK_ONLINE ||
@@ -141,5 +195,5 @@ int main(void)
         wait_item.returned_events != TABOS_WAIT_READABLE || tabos_socket_close(socket) != 0) {
         return 1;
     }
-    return 0;
+    return scan_test();
 }

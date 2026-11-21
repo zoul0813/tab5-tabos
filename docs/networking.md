@@ -42,6 +42,7 @@ Supported commands are:
 
 ```sh
 netctl status
+netctl scan
 netctl connect
 netctl connect --prompt
 netctl disconnect
@@ -55,6 +56,14 @@ slice and currently reports an unsupported operation.
 policy, attempt count, SSID, IPv4 address, signal strength, and last failure
 when those fields are available. It never reports the password.
 
+`scan` lists nearby access points, strongest first, with signal strength,
+channel, security, and SSID. Hidden networks appear as `<hidden>`. Scanning works
+whether or not TabOS is connected and does not change the current connection. It
+reports a busy radio while the ESP32-C6 is starting or associating, including a scan
+interrupted by autoconnect; retry after the connection settles (shortly after boot,
+`netctl status` shows `connecting`). Use `wifiscan` for filtering, repeated scans, and a channel
+survey.
+
 Failed autoconnect attempts use an exact monotonic retry deadline. Disconnecting or
 starting an explicit connection cancels pending retry immediately; retry never fires
 before its configured delay.
@@ -63,8 +72,7 @@ Status, connect, disconnect, and retry-deadline operations are safe when runtime
 native application tasks call them concurrently. Status always returns one complete
 snapshot; backend connection work does not hold the portable state lock.
 
-Interactive credential entry, scanning, and forgetting credentials are not
-implemented yet.
+Interactive credential entry and forgetting credentials are not implemented yet.
 
 ## Application API
 
@@ -78,6 +86,18 @@ operations for independently loaded applications:
 
 - `tabos_network_echo()` sends one bounded ICMP echo request to a resolved
   address.
+
+- `tabos_network_scan()` scans nearby 2.4 GHz access points and stores up to
+  `TABOS_WIFI_SCAN_MAX` (32) `tabos_wifi_access_point_t` records, strongest
+  signal first. Each record carries SSID (empty for hidden networks), BSSID,
+  primary channel, signal in dBm, a `tabos_wifi_security_t` value, and
+  `TABOS_WIFI_PHY_11B`/`11G`/`11N`/`11AX` flags. It blocks for the scan, usually a
+  few seconds, returns the stored count, and fails with `ENETDOWN` when the radio is
+  unavailable, `EBUSY` while it is starting, associating, or already scanning,
+  `ETIMEDOUT`, or `EIO`. `tabos_wifi_security_name()` returns a short display name.
+  Scanning is station-mode only: TabOS does not expose monitor mode or raw
+  802.11 frames. The host build returns a fixed simulated set and never touches
+  workstation Wi-Fi.
 
 ### TCP and UDP sockets
 
@@ -205,6 +225,25 @@ it rejects transfer codings, malformed or oversized headers, HTTP errors, and
 truncated length-delimited bodies. The destination is replaced only after the
 complete response has been written and closed successfully. Failed downloads
 remove the `.part` file and preserve an existing destination.
+
+## Wi-Fi Scanner
+
+`wifiscan` is a site-survey tool built on `tabos_network_scan()`:
+
+```sh
+make -C apps/netutils wifiscan
+wifiscan
+wifiscan -s lab -c 6
+wifiscan -r 10 -i 3
+wifiscan --channels
+```
+
+The default view lists signal (dBm and a four-step bar), channel, security, PHY
+modes, BSSID, and SSID. `-s` keeps SSIDs containing text, ignoring case; `-c` keeps
+one channel. `-r` repeats the scan up to 1000 times with an `-i` second delay
+(default 5) for walking a site. `--channels` replaces the list with per-channel
+access-point counts, the strongest signal, and an overlap count of access points
+within four channels, then names the least congested of channels 1, 6, and 11.
 
 ## Ping
 

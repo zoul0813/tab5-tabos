@@ -673,7 +673,8 @@ but is not a substitute for this execution path.
 - [x] Add certificate-verified TLS client connections and HTTPS utilities.
 - [x] Add deterministic portable tests plus physical Wi-Fi, DNS, ICMP, socket, NTP,
   and TLS validation.
-- [ ] Add Wi-Fi scan, forget, and interactive configuration workflows.
+- [x] Add station-mode Wi-Fi scan (`tabos_network_scan`, `netctl scan`, `wifiscan`).
+- [ ] Add Wi-Fi forget and interactive configuration workflows.
 
 ### Audio
 

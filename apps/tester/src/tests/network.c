@@ -344,6 +344,32 @@ static void test_wait_sources(tester_context_t* context)
     }
 }
 
+static void test_scan(tester_context_t* context)
+{
+    static tabos_wifi_access_point_t found[TABOS_WIFI_SCAN_MAX];
+    tester_expect(context, tabos_network_scan(NULL, 1U) < 0 && errno == EINVAL, "scan rejects missing buffer");
+    tester_expect(context, tabos_network_scan(found, 0U) < 0 && errno == EINVAL, "scan rejects zero capacity");
+    const int count = tabos_network_scan(found, TABOS_WIFI_SCAN_MAX);
+    const int error = errno;
+    /* Tab5 may still be starting or associating; that is a valid, bounded answer. */
+    tester_expect(context, count >= 0 || error == EBUSY, "scan completes or reports a busy radio");
+    bool bounded = count <= TABOS_WIFI_SCAN_MAX;
+    bool ordered = true;
+    for (int index = 0; index < count && bounded; ++index) {
+        const tabos_wifi_access_point_t* access_point = &found[index];
+        if (memchr(access_point->ssid, '\0', sizeof(access_point->ssid)) == NULL ||
+            access_point->security > TABOS_WIFI_SECURITY_UNKNOWN || access_point->channel == 0U ||
+            access_point->channel > 14U) {
+            bounded = false;
+        }
+        if (index > 0 && access_point->signal_dbm > found[index - 1].signal_dbm) {
+            ordered = false;
+        }
+    }
+    tester_expect(context, bounded, "scan records are terminated and within 2.4 GHz bounds");
+    tester_expect(context, ordered, "scan records are ordered strongest first");
+}
+
 void tester_test_network(tester_context_t* context)
 {
     test_tcp(context);
@@ -352,4 +378,5 @@ void tester_test_network(tester_context_t* context)
     test_socket_capacity(context);
     test_full_table_accept(context);
     test_wait_sources(context);
+    test_scan(context);
 }

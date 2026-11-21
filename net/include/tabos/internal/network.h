@@ -35,7 +35,23 @@ typedef enum {
     NETWORK_OPERATION_TIMEOUT,
     NETWORK_OPERATION_IO,
     NETWORK_OPERATION_UNSUPPORTED,
+    NETWORK_OPERATION_BUSY,
 } network_operation_result_t;
+
+enum {
+    NETWORK_SCAN_MAX = 32,
+};
+
+/* Security and PHY values match the public tabos_wifi_security_t and
+ * TABOS_WIFI_PHY_* values. */
+typedef struct {
+        char ssid[33];
+        uint8_t bssid[6];
+        uint32_t channel;
+        int32_t signal_dbm;
+        uint32_t security;
+        uint32_t phy;
+} network_access_point_t;
 
 typedef struct {
         uint32_t family;
@@ -59,6 +75,12 @@ network_operation_result_t network_service_resolve(const char* hostname, uint32_
 network_operation_result_t network_service_echo(const network_address_t* address, uint16_t sequence,
                                                 uint16_t payload_bytes, uint32_t timeout_ms,
                                                 network_echo_result_t* result);
+/* Scans nearby access points without changing connection state. Returns up to
+ * capacity records, strongest signal first; capacity above NETWORK_SCAN_MAX is
+ * clamped. The call blocks for the scan duration and never holds the service
+ * operation lock, so runtime updates continue while the radio scans. */
+network_operation_result_t network_service_scan(network_access_point_t* access_points, uint32_t capacity,
+                                                uint32_t* count);
 const char* network_state_name(network_state_t state);
 
 #endif

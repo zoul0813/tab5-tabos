@@ -120,7 +120,42 @@ typedef enum {
     PLATFORM_NETWORK_OPERATION_TIMEOUT,
     PLATFORM_NETWORK_OPERATION_IO,
     PLATFORM_NETWORK_OPERATION_UNSUPPORTED,
+    PLATFORM_NETWORK_OPERATION_BUSY,
 } platform_network_operation_result_t;
+
+enum {
+    PLATFORM_WIFI_SCAN_MAX = 32,
+};
+
+/* Values match the public tabos_wifi_security_t and TABOS_WIFI_PHY_* values. */
+typedef enum {
+    PLATFORM_WIFI_SECURITY_OPEN = 0,
+    PLATFORM_WIFI_SECURITY_WEP,
+    PLATFORM_WIFI_SECURITY_WPA,
+    PLATFORM_WIFI_SECURITY_WPA2,
+    PLATFORM_WIFI_SECURITY_WPA_WPA2,
+    PLATFORM_WIFI_SECURITY_WPA3,
+    PLATFORM_WIFI_SECURITY_WPA2_WPA3,
+    PLATFORM_WIFI_SECURITY_ENTERPRISE,
+    PLATFORM_WIFI_SECURITY_OWE,
+    PLATFORM_WIFI_SECURITY_UNKNOWN,
+} platform_wifi_security_t;
+
+enum {
+    PLATFORM_WIFI_PHY_11B  = 1U << 0U,
+    PLATFORM_WIFI_PHY_11G  = 1U << 1U,
+    PLATFORM_WIFI_PHY_11N  = 1U << 2U,
+    PLATFORM_WIFI_PHY_11AX = 1U << 3U,
+};
+
+typedef struct {
+        char ssid[33];
+        uint8_t bssid[6];
+        uint32_t channel;
+        int32_t signal_dbm;
+        uint32_t security;
+        uint32_t phy;
+} platform_wifi_access_point_t;
 
 typedef struct {
         uint32_t family;
@@ -235,6 +270,11 @@ void platform_network_shutdown(void);
 bool platform_network_connect(const char* ssid, const char* password);
 bool platform_network_disconnect(void);
 bool platform_network_status(platform_network_status_t* status);
+/* Blocking station-mode scan of nearby access points. Stores at most capacity
+ * records in backend order and their number in count. BUSY reports a scan or
+ * connection already in progress; OFFLINE reports an unavailable radio. */
+platform_network_operation_result_t platform_network_scan(platform_wifi_access_point_t* access_points,
+                                                          uint32_t capacity, uint32_t* count);
 bool platform_battery_status(platform_battery_status_t* status);
 bool platform_battery_set_charging(bool enabled);
 bool platform_battery_set_fast_charging(bool enabled);

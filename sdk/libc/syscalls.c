@@ -37,6 +37,8 @@ __attribute__((weak)) const char* strerror(int error)
         case ENAMETOOLONG: return "File name too long";
         case TABOS_ENOTEMPTY: return "Directory not empty";
         case ENOTSUP: return "Operation not supported";
+        case EBUSY: return "Device or resource busy";
+        case ENETDOWN: return "Network is down";
         default: return "Unknown error";
     }
 }

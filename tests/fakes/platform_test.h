@@ -20,6 +20,11 @@ void test_platform_network_set_state(platform_network_state_t state, const char*
 unsigned int test_platform_network_connect_calls(void);
 unsigned int test_platform_network_status_calls(void);
 const char* test_platform_network_hostname(void);
+/* Copies up to PLATFORM_WIFI_SCAN_MAX records returned by later scans. */
+void test_platform_network_set_scan(const platform_wifi_access_point_t* access_points, uint32_t count,
+                                    platform_network_operation_result_t result);
+unsigned int test_platform_network_scan_calls(void);
+uint32_t test_platform_network_scan_capacity(void);
 void test_platform_keyboard_set_status(bool ready, int error);
 unsigned int test_platform_keyboard_update_calls(void);
 unsigned int test_platform_pointer_update_calls(void);

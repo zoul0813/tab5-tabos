@@ -120,3 +120,6 @@ NATIVE_GATE(int, graphics_wait, (void), ())
 NATIVE_GATE(int, compute_submit, (uintptr_t callback, void* data, uint32_t bytes), (callback, data, bytes))
 NATIVE_GATE(int, compute_wait, (void), ())
 NATIVE_GATE(int, compute_poll, (void), ())
+
+NATIVE_GATE(int, network_scan, (tabos_elf_wifi_access_point_t * access_points, uint32_t capacity),
+            (access_points, capacity))

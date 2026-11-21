@@ -11,7 +11,7 @@
 
 #include <stdint.h>
 
-#define TABOS_ELF_API_VERSION  26U
+#define TABOS_ELF_API_VERSION  27U
 #define TABOS_ELF_EXEC_PENDING (-2147483647 - 1)
 
 enum {
@@ -19,6 +19,7 @@ enum {
     TABOS_ELF_ARG_BYTES_MAX    = 512,
     TABOS_ELF_SYSTEM_REBOOT    = 1,
     TABOS_ELF_SYSTEM_POWER_OFF = 2,
+    TABOS_ELF_WIFI_SCAN_MAX    = 32,
 };
 
 typedef struct {
@@ -92,6 +93,19 @@ typedef struct {
         tabos_elf_network_address_t address;
         uint32_t port;
 } tabos_elf_socket_endpoint_t;
+
+/* Fixed 56-byte layout shared by RV32 guests and 64-bit host emulation. */
+typedef struct {
+        char ssid[33];
+        uint8_t bssid[6];
+        uint8_t reserved;
+        uint32_t channel;
+        int32_t signal_dbm;
+        uint32_t security;
+        uint32_t phy;
+} tabos_elf_wifi_access_point_t;
+
+_Static_assert(sizeof(tabos_elf_wifi_access_point_t) == 56U, "Wi-Fi scan record layout is private ABI");
 
 typedef struct {
         union {
@@ -213,6 +227,8 @@ typedef struct {
         int (*compute_submit)(uintptr_t callback, void* data, uint32_t bytes);
         int (*compute_wait)(void);
         int (*compute_poll)(void);
+        /* Returns copied record count, strongest first, or negative errno. */
+        int (*network_scan)(tabos_elf_wifi_access_point_t* access_points, uint32_t capacity);
 } tabos_elf_api_t;
 
 typedef int (*tabos_elf_entry_fn)(const tabos_elf_api_t* api, int argc, const char* const* argv);

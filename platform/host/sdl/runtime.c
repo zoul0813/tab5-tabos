@@ -263,6 +263,51 @@ bool platform_network_status(platform_network_status_t* status)
     return true;
 }
 
+/* Host scans never touch workstation Wi-Fi. They report a fixed, deliberately
+ * unordered set of locally administered BSSIDs so portable ordering, hidden
+ * networks, security names, and PHY flags remain deterministic in tests. */
+static const platform_wifi_access_point_t host_access_points[] = {
+    {.ssid       = "TabOS-Guest",
+     .bssid      = {0x02U, 0x00U, 0x5eU, 0x10U, 0x00U, 0x02U},
+     .channel    = 1U,
+     .signal_dbm = -61,
+     .security   = PLATFORM_WIFI_SECURITY_OPEN,
+     .phy        = PLATFORM_WIFI_PHY_11B | PLATFORM_WIFI_PHY_11G | PLATFORM_WIFI_PHY_11N},
+    {.ssid       = "TabOS-Lab",
+     .bssid      = {0x02U, 0x00U, 0x5eU, 0x10U, 0x00U, 0x01U},
+     .channel    = 6U,
+     .signal_dbm = -38,
+     .security   = PLATFORM_WIFI_SECURITY_WPA2,
+     .phy        = PLATFORM_WIFI_PHY_11B | PLATFORM_WIFI_PHY_11G | PLATFORM_WIFI_PHY_11N},
+    {.ssid       = "TabOS-IoT",
+     .bssid      = {0x02U, 0x00U, 0x5eU, 0x10U, 0x00U, 0x04U},
+     .channel    = 11U,
+     .signal_dbm = -80,
+     .security   = PLATFORM_WIFI_SECURITY_WPA_WPA2,
+     .phy        = PLATFORM_WIFI_PHY_11B | PLATFORM_WIFI_PHY_11G},
+    {.ssid       = "",
+     .bssid      = {0x02U, 0x00U, 0x5eU, 0x10U, 0x00U, 0x03U},
+     .channel    = 11U,
+     .signal_dbm = -74,
+     .security   = PLATFORM_WIFI_SECURITY_WPA2_WPA3,
+     .phy        = PLATFORM_WIFI_PHY_11B | PLATFORM_WIFI_PHY_11G | PLATFORM_WIFI_PHY_11N | PLATFORM_WIFI_PHY_11AX},
+};
+
+platform_network_operation_result_t platform_network_scan(platform_wifi_access_point_t* access_points,
+                                                          uint32_t capacity, uint32_t* count)
+{
+    if (access_points == NULL || count == NULL || capacity == 0U) {
+        return PLATFORM_NETWORK_OPERATION_INVALID;
+    }
+    const uint32_t available = (uint32_t) (sizeof(host_access_points) / sizeof(host_access_points[0]));
+    const uint32_t copied    = available < capacity ? available : capacity;
+    for (uint32_t index = 0U; index < copied; ++index) {
+        access_points[index] = host_access_points[index];
+    }
+    *count = copied;
+    return PLATFORM_NETWORK_OPERATION_OK;
+}
+
 bool platform_battery_status(platform_battery_status_t* status)
 {
     if (status == NULL) {

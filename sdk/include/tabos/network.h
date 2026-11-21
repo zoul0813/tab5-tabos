@@ -46,7 +46,39 @@ typedef struct {
 enum {
     TABOS_NETWORK_IO_MAX = 1024,
     TABOS_SOCKET_MAX     = 8,
+    TABOS_WIFI_SCAN_MAX  = 32,
 };
+
+typedef enum {
+    TABOS_WIFI_SECURITY_OPEN = 0,
+    TABOS_WIFI_SECURITY_WEP,
+    TABOS_WIFI_SECURITY_WPA,
+    TABOS_WIFI_SECURITY_WPA2,
+    TABOS_WIFI_SECURITY_WPA_WPA2,
+    TABOS_WIFI_SECURITY_WPA3,
+    TABOS_WIFI_SECURITY_WPA2_WPA3,
+    TABOS_WIFI_SECURITY_ENTERPRISE,
+    TABOS_WIFI_SECURITY_OWE,
+    TABOS_WIFI_SECURITY_UNKNOWN,
+} tabos_wifi_security_t;
+
+/* Bits in tabos_wifi_access_point_t.phy. */
+enum {
+    TABOS_WIFI_PHY_11B  = 1U << 0U,
+    TABOS_WIFI_PHY_11G  = 1U << 1U,
+    TABOS_WIFI_PHY_11N  = 1U << 2U,
+    TABOS_WIFI_PHY_11AX = 1U << 3U,
+};
+
+/* One nearby access point. An empty ssid is a hidden network. */
+typedef struct {
+        char ssid[33];
+        uint8_t bssid[6];
+        uint32_t channel;
+        int32_t signal_dbm;
+        tabos_wifi_security_t security;
+        uint32_t phy;
+} tabos_wifi_access_point_t;
 
 typedef int32_t tabos_socket_t;
 
@@ -86,6 +118,13 @@ int tabos_socket_receive(tabos_socket_t socket, void* data, uint32_t capacity);
 int tabos_socket_send_to(tabos_socket_t socket, const void* data, uint32_t size,
                          const tabos_socket_endpoint_t* endpoint);
 int tabos_socket_receive_from(tabos_socket_t socket, void* data, uint32_t capacity, tabos_socket_endpoint_t* peer);
+/* Scans nearby 2.4 GHz access points without changing the current connection.
+ * Blocks for the scan, usually a few seconds. Stores up to capacity records,
+ * strongest signal first; capacity above TABOS_WIFI_SCAN_MAX is clamped.
+ * Returns the stored count, or -1 with errno EINVAL, ENETDOWN (radio
+ * unavailable), EBUSY (connecting, starting, or another scan), ETIMEDOUT, or EIO. */
+int tabos_network_scan(tabos_wifi_access_point_t* access_points, uint32_t capacity);
 const char* tabos_network_state_name(tabos_network_state_t state);
+const char* tabos_wifi_security_name(tabos_wifi_security_t security);
 
 #endif

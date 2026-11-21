@@ -299,3 +299,49 @@ const char* tabos_network_state_name(tabos_network_state_t state)
     };
     return (unsigned int) state < sizeof(names) / sizeof(names[0]) ? names[state] : "unknown";
 }
+
+int tabos_network_scan(tabos_wifi_access_point_t* access_points, uint32_t capacity)
+{
+    if (access_points == NULL || capacity == 0U) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (tabos_runtime_api == NULL || tabos_runtime_api->network_scan == NULL) {
+        errno = ENOSYS;
+        return -1;
+    }
+    if (capacity > TABOS_WIFI_SCAN_MAX) {
+        capacity = TABOS_WIFI_SCAN_MAX;
+    }
+    /* Static storage keeps the 1.8 KiB transfer off small application stacks;
+     * section garbage collection drops it from applications that never scan. */
+    static tabos_elf_wifi_access_point_t records[TABOS_ELF_WIFI_SCAN_MAX];
+    const int count = tabos_runtime_api->network_scan(records, capacity);
+    if (count < 0) {
+        return api_result(count);
+    }
+    const uint32_t copied = (uint32_t) count < capacity ? (uint32_t) count : capacity;
+    for (uint32_t index = 0U; index < copied; ++index) {
+        tabos_wifi_access_point_t* target = &access_points[index];
+        memset(target, 0, sizeof(*target));
+        memcpy(target->ssid, records[index].ssid, sizeof(target->ssid) - 1U);
+        memcpy(target->bssid, records[index].bssid, sizeof(target->bssid));
+        target->channel    = records[index].channel;
+        target->signal_dbm = records[index].signal_dbm;
+        target->phy        = records[index].phy;
+        if (records[index].security <= (uint32_t) TABOS_WIFI_SECURITY_UNKNOWN) {
+            target->security = (tabos_wifi_security_t) records[index].security;
+        } else {
+            target->security = TABOS_WIFI_SECURITY_UNKNOWN;
+        }
+    }
+    return (int) copied;
+}
+
+const char* tabos_wifi_security_name(tabos_wifi_security_t security)
+{
+    static const char* const names[] = {
+        "open", "WEP", "WPA", "WPA2", "WPA/WPA2", "WPA3", "WPA2/WPA3", "enterprise", "OWE", "unknown",
+    };
+    return (unsigned int) security < sizeof(names) / sizeof(names[0]) ? names[security] : "unknown";
+}
