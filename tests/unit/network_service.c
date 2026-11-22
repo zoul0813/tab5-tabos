@@ -91,8 +91,8 @@ static void* observe_concurrently(void* argument)
             memchr(status.ssid, '\0', sizeof(status.ssid)) == NULL ||
             memchr(status.ipv4, '\0', sizeof(status.ipv4)) == NULL ||
             memchr(status.last_failure, '\0', sizeof(status.last_failure)) == NULL || status.attempts > 1U ||
-            (status.ssid[0] != '\0' && strcmp(status.ssid, "test-network") != 0 &&
-             strcmp(status.ssid, concurrent_ssid_a) != 0 && strcmp(status.ssid, concurrent_ssid_b) != 0) ||
+            (status.ssid[0] != '\0' && strcmp(status.ssid, concurrent_ssid_a) != 0 &&
+             strcmp(status.ssid, concurrent_ssid_b) != 0) ||
             !deadline_is_idle_or_attempt(network_service_next_deadline())) {
             atomic_store_explicit(&context->failed, true, memory_order_release);
         }
@@ -330,11 +330,13 @@ int main(void)
                network_service_next_deadline() == UINT64_MAX,
            "rejected starts are retried and end in a final failure");
 
-    test_concurrent_access();
-
     network_service_shutdown();
     expect(network_service_scan(uninitialized_scan, 1U, &uninitialized_count) == NETWORK_OPERATION_OFFLINE,
            "scan after shutdown reports offline");
+
+    expect(network_service_init(), "fresh network service initializes for concurrency test");
+    test_concurrent_access();
+    network_service_shutdown();
     filesystem_shutdown();
     return failures == 0 ? 0 : 1;
 }
