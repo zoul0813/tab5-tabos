@@ -49,6 +49,12 @@ Run `./tools/tabos setup` to install pinned ESP-IDF v5.4.4 locally. Application
 builds use Bash explicitly, including when launched from a fresh dash shell. Manual
 `eval "$(./tools/tabos activate-idf)"` activation also requires Bash.
 
+Tab5 firmware CI pins `idf-component-manager==2.5.2` inside the ESP-IDF v5.4.4
+container. To reproduce CI locally, activate ESP-IDF and run
+`python -m pip install 'idf-component-manager==2.5.2'` before building Tab5.
+This version fixes a resolver bug that can require USB Kconfig options from
+ESP-Hosted versions outside the project lock.
+
 ```sh
 ./apps/build.sh
 ./tools/tabos linux debug test

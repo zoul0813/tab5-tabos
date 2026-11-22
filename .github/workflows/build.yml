@@ -141,6 +141,7 @@ jobs:
         shell: bash
         run: |
           . /opt/esp/idf/export.sh
+          python -m pip install 'idf-component-manager==2.5.2'
           ./tools/tabos tab5 ${{ matrix.configuration }} build
       - name: Download application rootfs
         if: matrix.configuration == 'release'
